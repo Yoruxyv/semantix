@@ -51,7 +51,7 @@ Kode Etik ini berlaku untuk:
 
 Untuk penyalahgunaan platform yang memerlukan tindakan segera, gunakan fitur block dan report milik GitHub.
 
-Untuk masalah yang berkaitan dengan project, hubungi maintainer secara private melalui metode kontak yang tercantum pada [@Dendroculus GitHub profile](https://github.com/Dendroculus). Jangan membuka public issue yang berisi informasi pribadi yang sensitif.
+Untuk masalah yang berkaitan dengan project, hubungi maintainer secara private melalui metode kontak yang tercantum pada [@Yoruxyv GitHub profile](https://github.com/Yoruxyv). Jangan membuka public issue yang berisi informasi pribadi yang sensitif.
 
 Security vulnerability harus dilaporkan melalui [SECURITY.md](SECURITY.md).
 

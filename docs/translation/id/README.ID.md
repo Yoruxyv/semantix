@@ -81,7 +81,7 @@ Instal Git dan Docker Desktop, atau Docker Engine beserta Compose.
 Linux atau macOS:
 
 ```bash
-git clone https://github.com/Dendroculus/semantix.git
+git clone https://github.com/Yoruxyv/semantix.git
 cd semantix
 cp backend/.env.example backend/.env
 ```
@@ -89,7 +89,7 @@ cp backend/.env.example backend/.env
 Windows PowerShell:
 
 ```powershell
-git clone https://github.com/Dendroculus/semantix.git
+git clone https://github.com/Yoruxyv/semantix.git
 Set-Location semantix
 Copy-Item backend\.env.example backend\.env
 ```
@@ -342,8 +342,8 @@ Dibuat dengan ❤️ oleh:
 <table>
   <tr>
     <td align="center" width="180">
-      <a href="https://github.com/Dendroculus">
-        <img src="https://github.com/Dendroculus.png?size=96" width="96" alt="Avatar Hans"><br>
+      <a href="https://github.com/Yoruxyv">
+        <img src="https://github.com/Yoruxyv.png?size=96" width="96" alt="Avatar Hans"><br>
         <b>Hans</b>
       </a><br>
     </td>

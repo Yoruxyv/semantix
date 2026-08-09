@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/Dendroculus/semantix/security/advisories/new
+    url: https://github.com/Yoruxyv/semantix/security/advisories/new
     about: Report suspected vulnerabilities privately. Do not open a public issue.
   - name: Project documentation
-    url: https://github.com/Dendroculus/semantix/tree/main/docs
+    url: https://github.com/Yoruxyv/semantix/tree/main/docs
     about: Review setup, architecture, providers, caching, benchmarking, and load-testing guides.

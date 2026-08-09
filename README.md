@@ -91,7 +91,7 @@ Install Git and Docker Desktop, or Docker Engine with Compose.
 Linux or macOS:
 
 ```bash
-git clone https://github.com/Dendroculus/semantix.git
+git clone https://github.com/Yoruxyv/semantix.git
 cd semantix
 cp backend/.env.example backend/.env
 ```
@@ -99,7 +99,7 @@ cp backend/.env.example backend/.env
 Windows PowerShell:
 
 ```powershell
-git clone https://github.com/Dendroculus/semantix.git
+git clone https://github.com/Yoruxyv/semantix.git
 Set-Location semantix
 Copy-Item backend\.env.example backend\.env
 ```
@@ -385,8 +385,8 @@ Made with ❤️ by:
 <table>
   <tr>
     <td align="center" width="180">
-      <a href="https://github.com/Dendroculus">
-        <img src="https://github.com/Dendroculus.png?size=96" width="96" alt="Hans avatar"><br>
+      <a href="https://github.com/Yoruxyv">
+        <img src="https://github.com/Yoruxyv.png?size=96" width="96" alt="Hans avatar"><br>
         <b>Hans</b>
       </a><br>
     </td>

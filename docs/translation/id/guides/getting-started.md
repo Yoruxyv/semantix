@@ -11,7 +11,7 @@ Instal Git dan Docker Desktop atau Docker Engine dengan Compose. Hosted provider
 Clone repository dan buat file environment backend:
 
 ```bash
-git clone https://github.com/Dendroculus/semantix.git
+git clone https://github.com/Yoruxyv/semantix.git
 cd semantix
 cp backend/.env.example backend/.env
 ```
@@ -19,7 +19,7 @@ cp backend/.env.example backend/.env
 Windows PowerShell:
 
 ```powershell
-git clone https://github.com/Dendroculus/semantix.git
+git clone https://github.com/Yoruxyv/semantix.git
 Set-Location semantix
 Copy-Item backend\.env.example backend\.env
 ```

@@ -60,7 +60,7 @@ For immediate platform abuse, use GitHub's block and report tools.
 
 For project-specific concerns, contact the maintainers privately through a
 contact method listed on the
-[@Dendroculus GitHub profile](https://github.com/Dendroculus). Do not open a
+[@Yoruxyv GitHub profile](https://github.com/Yoruxyv). Do not open a
 public issue containing sensitive personal information.
 
 Security vulnerabilities must be reported through
