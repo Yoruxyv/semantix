@@ -954,7 +954,7 @@ requires-dist = [
     { name = "slowapi", specifier = ">=0.1.10,<1" },
     { name = "symspellpy", specifier = ">=6.10.0,<7" },
     { name = "tenacity", specifier = ">=9.1.4,<10" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.0,<1" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.1,<1" },
 ]
 provides-extras = ["dev"]
 
