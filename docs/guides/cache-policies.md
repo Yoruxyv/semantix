@@ -131,4 +131,13 @@ The Cache workspace exposes safe metadata:
 
 Deleting one entry does not rewrite historical aggregate hit/miss counters.
 Clearing the cache removes entries and resets those counters. Embeddings and
-full responses are not returned by inspector endpoints.
+full responses are never rendered by the deep-linkable entry-detail page.
+The existing single-entry endpoint can return the complete response only after
+an explicit user request from the Cache Inspector; its safe Markdown renderer
+does not execute raw HTML.
+
+`/cache/entries/{cache_key}` is a best-effort operational link, not a durable
+record. It can stop resolving after expiry, LRU eviction, deletion, restart, or
+an embedding-space change. Missing and unauthorized entries intentionally use
+the same message. Evaluation cache keys remain isolated evidence and are not
+linked to this live-cache route.

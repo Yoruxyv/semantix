@@ -96,6 +96,7 @@ fallback:
 |---|---|
 | `/` | Query monitor, decision evidence, similarity trace, and session log |
 | `/cache` | Cache inspection, search, sorting, deletion, and clearing |
+| `/cache/entries/:cacheKey` | Authorized, best-effort live-cache entry evidence |
 | `/evaluations` | Isolated controlled evaluation |
 | `/observability` | Process-local runtime metrics |
 | `*` | Not-found page |
@@ -109,6 +110,11 @@ Each feature owns its pages, components, hooks, API adapter, types, and route
 registry. `src/app/router` composes those registries and provides the shared
 lazy loader. Shared providers keep cache statistics, threshold state, and the
 monitor trace session alive across client-side navigation.
+
+The Cache detail route reuses the existing Viewer-authorized single-entry API
+and protected React Query key. It renders metadata and the bounded preview,
+keeps delete server-authorized for Admin principals, and preserves Cache list
+filters in the return URL. Evaluation cache keys never enter this route.
 
 Monitor traces intentionally live in browser memory. Reloading starts a new
 trace session; backend cache entries follow the configured cache lifecycle.

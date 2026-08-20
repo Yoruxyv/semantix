@@ -347,6 +347,8 @@ def test_auth_session_returns_only_principal_metadata() -> None:
 
 
 def test_entry_operations_do_not_reveal_foreign_namespace_existence() -> None:
+    authorized_prompt = "authorized namespace entry"
+    authorized_key = prompt_cache_key(authorized_prompt)
     foreign_prompt = "foreign namespace secret"
     foreign_key = prompt_cache_key(
         foreign_prompt,
@@ -355,6 +357,11 @@ def test_entry_operations_do_not_reveal_foreign_namespace_existence() -> None:
     missing_key = "0" * 64
 
     with TestClient(create_app(settings())) as client:
+        authorized_created = client.post(
+            "/api/v1/query",
+            headers=authorization(ADMIN_TOKEN),
+            json={"prompt": authorized_prompt},
+        )
         created = client.post(
             "/api/v1/query",
             headers=authorization(ADMIN_TOKEN),
@@ -369,6 +376,14 @@ def test_entry_operations_do_not_reveal_foreign_namespace_existence() -> None:
         )
         missing_detail = client.get(
             f"/api/v1/cache/entries/{missing_key}",
+            headers=authorization(VIEWER_TOKEN),
+        )
+        authorized_detail = client.get(
+            f"/api/v1/cache/entries/{authorized_key}",
+            headers=authorization(VIEWER_TOKEN),
+        )
+        viewer_delete = client.delete(
+            f"/api/v1/cache/entries/{authorized_key}",
             headers=authorization(VIEWER_TOKEN),
         )
         foreign_delete = client.delete(
@@ -388,7 +403,11 @@ def test_entry_operations_do_not_reveal_foreign_namespace_existence() -> None:
             headers=authorization(ADMIN_TOKEN),
         )
 
-    assert created.status_code == 200
+    assert authorized_created.status_code == created.status_code == 200
+    assert authorized_detail.status_code == 200
+    assert authorized_detail.json()["cache_key"] == authorized_key
+    assert "embedding" not in authorized_detail.json()
+    assert viewer_delete.status_code == 403
     assert foreign_detail.status_code == missing_detail.status_code == 404
     assert foreign_detail.json() == missing_detail.json()
     assert foreign_delete.status_code == missing_delete.status_code == 404

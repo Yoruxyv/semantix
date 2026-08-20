@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import type { ReactNode, JSX } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link, useLocation } from 'react-router';
 
+import { APP_PATHS } from '@/app/navigation/navigationConfig';
 import { getCacheEntry } from '../api/cacheApi';
 import { MarkdownContent } from '@/shared/components/markdown/MarkdownContent';
 import { Alert, InlineConfirmation } from '@/shared/components/ui';
@@ -57,6 +59,7 @@ export function CacheEntryCard({
   onConfirmDelete,
   onRequestDelete,
 }: Readonly<CacheEntryCardProps>): JSX.Element {
+  const location = useLocation();
   const [isResponseExpanded, setIsResponseExpanded] = useState(false);
   const responseRegionId = `cache-response-${entry.cache_key}`;
   const detailQuery = useQuery({
@@ -139,17 +142,27 @@ export function CacheEntryCard({
             </h3>
           </div>
 
-          {!isPendingDelete && (
-            <button
-              aria-label={`Delete ${entry.prompt}`}
-              className="ui-label min-h-9 border-b border-(--coral) px-1 py-2 text-(--coral-text) transition-colors hover:text-(--text) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--coral) active:translate-y-px disabled:opacity-50"
-              disabled={isDeleting}
-              type="button"
-              onClick={onRequestDelete}
+          <div className="flex flex-wrap items-center gap-4">
+            <Link
+              className="ui-label min-h-9 border-b border-(--teal) px-1 py-2 text-(--teal) transition-colors hover:text-(--text) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--teal)"
+              state={{ cacheReturnSearch: location.search }}
+              to={`${APP_PATHS.cache}/entries/${entry.cache_key}`}
             >
-              Delete
-            </button>
-          )}
+              View entry details
+            </Link>
+
+            {!isPendingDelete && (
+              <button
+                aria-label={`Delete ${entry.prompt}`}
+                className="ui-label min-h-9 border-b border-(--coral) px-1 py-2 text-(--coral-text) transition-colors hover:text-(--text) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--coral) active:translate-y-px disabled:opacity-50"
+                disabled={isDeleting}
+                type="button"
+                onClick={onRequestDelete}
+              >
+                Delete
+              </button>
+            )}
+          </div>
         </header>
 
         {entry.response_preview_truncated ? (

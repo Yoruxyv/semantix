@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 
 import {
   apiErrorFromUnknown,
@@ -66,11 +67,21 @@ export function useCacheInspector({
   onMutation,
 }: Readonly<UseCacheInspectorOptions>): CacheInspectorController {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
-  const [namespace, setNamespace] = useState("");
-  const [sort, setSort] =
-    useState<CacheEntrySort>("newest");
-  const [offset, setOffset] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const search = searchParams.get("search") ?? "";
+  const namespace = searchParams.get("namespace") ?? "";
+  const requestedSort = searchParams.get("sort");
+  const sort: CacheEntrySort =
+    requestedSort === "oldest" ||
+    requestedSort === "most_hit" ||
+    requestedSort === "nearest_expiry"
+      ? requestedSort
+      : "newest";
+  const requestedOffset = Number(searchParams.get("offset") ?? 0);
+  const offset =
+    Number.isSafeInteger(requestedOffset) && requestedOffset >= 0
+      ? requestedOffset
+      : 0;
   const [actionError, setActionError] =
     useState<string | null>(null);
   const [pendingDelete, setPendingDelete] =
@@ -146,22 +157,58 @@ export function useCacheInspector({
   }
 
   function updateSearch(nextSearch: string): void {
-    setSearch(nextSearch);
-    setOffset(0);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (nextSearch === "") {
+        next.delete("search");
+      } else {
+        next.set("search", nextSearch);
+      }
+      next.delete("offset");
+      return next;
+    }, { replace: true });
     setPendingDelete(null);
   }
 
   function updateNamespace(nextNamespace: string): void {
-    setNamespace(nextNamespace);
-    setOffset(0);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (nextNamespace === "") {
+        next.delete("namespace");
+      } else {
+        next.set("namespace", nextNamespace);
+      }
+      next.delete("offset");
+      return next;
+    }, { replace: true });
     setConfirmClear(false);
     setPendingDelete(null);
   }
 
   function updateSort(nextSort: CacheEntrySort): void {
-    setSort(nextSort);
-    setOffset(0);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (nextSort === "newest") {
+        next.delete("sort");
+      } else {
+        next.set("sort", nextSort);
+      }
+      next.delete("offset");
+      return next;
+    }, { replace: true });
     setPendingDelete(null);
+  }
+
+  function updateOffset(nextOffset: number): void {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (nextOffset === 0) {
+        next.delete("offset");
+      } else {
+        next.set("offset", String(nextOffset));
+      }
+      return next;
+    }, { replace: true });
   }
 
   function requestClear(): void {
@@ -190,7 +237,7 @@ export function useCacheInspector({
     try {
       await deleteMutation.mutateAsync(cacheKey);
       setPendingDelete(null);
-      setOffset(0);
+      updateOffset(0);
       await onMutation("delete");
     } catch (error: unknown) {
       setActionError(
@@ -209,7 +256,7 @@ export function useCacheInspector({
       );
       setConfirmClear(false);
       setPendingDelete(null);
-      setOffset(0);
+      updateOffset(0);
       await onMutation("clear");
     } catch (error: unknown) {
       setActionError(
@@ -243,10 +290,9 @@ export function useCacheInspector({
     refreshError,
     mutation,
     namespace,
-    nextPage: () => setOffset((current) => current + PAGE_SIZE),
+    nextPage: () => updateOffset(offset + PAGE_SIZE),
     pendingDelete,
-    previousPage: () =>
-      setOffset((current) => Math.max(0, current - PAGE_SIZE)),
+    previousPage: () => updateOffset(Math.max(0, offset - PAGE_SIZE)),
     refresh,
     requestClear,
     requestDelete,
