@@ -66,6 +66,15 @@ Check the following at desktop and mobile widths:
 - malformed, missing, expired, deleted, and unauthorized live-entry links use
   a neutral announced state without disclosing foreign-key existence;
 - empty histogram bins have no visible bar.
+- Monitor Advanced cache policy uses a native disclosure and radio group with
+  textual mode explanations; its namespace, policy, summary, and Submit flow
+  remains one column at 744, 768, 820, and 834 px portrait widths;
+- private-mode trace behavior is described by its radio control, effective
+  namespace and policy are announced with results, and the live-hit link has
+  the descriptive name “Open matched live cache entry”;
+- Viewer query denial and scoped-admin threshold preview state are explained in
+  text, while eligible Operator and wildcard-Admin actions remain keyboard
+  operable with visible focus;
 
 Navigation verification also covers:
 

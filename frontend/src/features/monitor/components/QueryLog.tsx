@@ -8,7 +8,7 @@ import {
   meetsSimilarityThreshold,
 } from '@/shared/domain/similarity';
 import { EmptyState } from '@/shared/components/ui';
-import type { QueryTrace } from '../types';
+import { QUERY_POLICY_LABELS, type QueryTrace } from '../types';
 
 import type { JSX } from "react";
 
@@ -99,8 +99,13 @@ export function QueryLog({
                   </span>
                 </div>
 
-                <span className="wrap-break-word text-(--text-soft) min-[760px]:truncate">
-                  {trace.prompt}
+                <span className="min-w-0 wrap-break-word text-(--text-soft)">
+                  <span className="block min-[760px]:truncate">
+                    {trace.prompt}
+                  </span>
+                  <span className="ui-label mt-1 block wrap-break-word text-(--text-faint)">
+                    {trace.namespace} · {QUERY_POLICY_LABELS[trace.policyMode]}
+                  </span>
                 </span>
 
                 <div className="flex justify-between gap-4 min-[760px]:contents">

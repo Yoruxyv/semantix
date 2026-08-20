@@ -94,7 +94,7 @@ fallback:
 
 | Route | Feature |
 |---|---|
-| `/` | Query monitor, decision evidence, similarity trace, and session log |
+| `/` | Namespace/policy query monitor, decision evidence, similarity trace, and session log |
 | `/cache` | Cache inspection, search, sorting, deletion, and clearing |
 | `/cache/entries/:cacheKey` | Authorized, best-effort live-cache entry evidence |
 | `/evaluations` | Isolated controlled evaluation |
@@ -117,7 +117,12 @@ keeps delete server-authorized for Admin principals, and preserves Cache list
 filters in the return URL. Evaluation cache keys never enter this route.
 
 Monitor traces intentionally live in browser memory. Reloading starts a new
-trace session; backend cache entries follow the configured cache lifecycle.
+trace session; principal changes clear the local feature state. Non-private
+traces retain only the prompt plus safe namespace, policy, score, latency, and
+decision context. Private requests are omitted from trace collection. A live
+hit can link its server-returned cache key to the authorized Cache detail route;
+misses and evaluation keys cannot. Backend cache entries follow the configured
+cache lifecycle.
 Evaluation result state is route-local. Backend evaluation execution is
 serialized and creates a fresh in-memory semantic cache per run, so completion,
 failure, timeout, or cancellation cannot seed a later run or modify the

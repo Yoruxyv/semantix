@@ -120,6 +120,18 @@ test.beforeEach(async ({ page }) => {
       json: { authentication_required: false },
     });
   });
+  await page.route('**/api/v1/cache/stats**', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      json: { size: 1, hits: 1, misses: 0, hit_rate: 1 },
+    });
+  });
+  await page.route('**/api/v1/cache/threshold', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      json: { threshold: 0.92 },
+    });
+  });
   await page.route('**/api/v1/evaluations/datasets', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -244,6 +256,127 @@ test.beforeEach(async ({ page }) => {
       });
     },
   );
+});
+
+test('Monitor policy evidence remains accessible and bounded at required widths', async ({
+  page,
+}) => {
+  const cacheKey = 'c'.repeat(64);
+  const namespace = 'tenant-responsive-with-a-long-but-valid-namespace';
+  let submittedRequest: unknown;
+  await page.route('**/api/v1/query', async (route) => {
+    submittedRequest = route.request().postDataJSON();
+    await route.fulfill({
+      contentType: 'application/json',
+      json: {
+        response: '**Cached policy response**',
+        cache_hit: true,
+        similarity_score: 0.98,
+        similarity_threshold: 0.92,
+        matched_prompt: 'Long responsive policy prompt',
+        matched_cache_key: cacheKey,
+        cache_entry_created_at: '2026-07-17T10:00:00Z',
+        cache_entry_age_seconds: 5,
+        generation_skipped: true,
+        provider_called: false,
+        latency_ms: 8,
+      },
+    });
+  });
+  await page.route(`**/api/v1/cache/entries/${cacheKey}`, async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      json: {
+        cache_key: cacheKey,
+        namespace,
+        prompt: 'Long responsive policy prompt',
+        response_preview: 'Cached policy response',
+        response_preview_truncated: false,
+        response: null,
+        created_at: '2026-07-17T10:00:00Z',
+        expires_at: '2026-07-17T11:00:00Z',
+        remaining_ttl_seconds: 3_595,
+        hit_count: 1,
+        last_accessed_at: '2026-07-17T10:00:05Z',
+        recency_rank: 1,
+        is_expired: false,
+      },
+    });
+  });
+
+  await page.setViewportSize({ width: 820, height: 1_180 });
+  await page.goto('/');
+  const disclosure = page.getByText('Advanced cache policy', {
+    exact: true,
+  });
+  await disclosure.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('details')).toHaveAttribute('open', '');
+  await page.getByLabel('Explicit namespace').fill(namespace);
+  const refreshMode = page.getByRole('radio', {
+    name: /^Refresh and write/,
+  });
+  await refreshMode.focus();
+  await page.keyboard.press('Space');
+  await expect(refreshMode).toBeChecked();
+
+  for (const viewport of VIEWPORTS) {
+    await test.step(`monitor-${viewport.name}`, async () => {
+      await page.setViewportSize(viewport);
+      await expect(page.getByLabel('Query text')).toBeVisible();
+      await expect(page.getByText(`namespace ${namespace}`, {
+        exact: false,
+      })).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Run query' }),
+      ).toBeVisible();
+      const overflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(1);
+
+      if ([744, 768, 820, 834].includes(viewport.width)) {
+        const advancedColumns = await page
+          .locator('details > div')
+          .evaluate((element) => getComputedStyle(element).gridTemplateColumns);
+        expect(advancedColumns.trim().split(/\s+/)).toHaveLength(1);
+      }
+    });
+  }
+
+  await page.setViewportSize({ width: 820, height: 1_180 });
+  const normalMode = page.getByRole('radio', {
+    name: /^Normal read and write/,
+  });
+  await normalMode.focus();
+  await page.keyboard.press('Space');
+  await page.getByLabel('Query text').fill('Long responsive policy prompt');
+  await page.getByRole('button', { name: 'Run query' }).click();
+  await expect(
+    page.getByText(
+      `Effective namespace: ${namespace} · Policy: Normal read and write.`,
+    ),
+  ).toBeVisible();
+  expect(submittedRequest).toEqual({
+    prompt: 'Long responsive policy prompt',
+    namespace,
+    cache_enabled: true,
+    cache_read_enabled: true,
+    cache_write_enabled: true,
+    private: false,
+  });
+
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations).toEqual([]);
+
+  await page
+    .getByRole('link', { name: 'Open matched live cache entry' })
+    .click();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Cache entry detail' }),
+  ).toBeVisible();
 });
 
 test('persistent catalog remains readable and bounded at required widths', async ({

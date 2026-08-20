@@ -54,6 +54,12 @@ Only `prompt` is required. `cache_enabled=false` overrides both granular flags.
 writes enabled refreshes the entry from the provider; disabling writes still
 permits an eligible cached response.
 
+The endpoint requires Operator capability. Namespace authorization remains
+server-side: a sole concrete namespace can be inferred for older clients, but
+the Monitor UI always sends its selected concrete namespace. Multiple-scope
+and wildcard principals must select or enter one authorized concrete value;
+`*` is never a query namespace.
+
 See [Cache policies](../guides/cache-policies.md) for precedence and namespace
 rules.
 
@@ -80,6 +86,11 @@ be present when an entry existed but did not meet the threshold. The leader of
 a generated miss reports `provider_called=true`; a coalesced follower remains
 a miss but reports `generation_skipped=true` and `provider_called=false`
 because it awaited the leader.
+
+Monitor links `matched_cache_key` to `/cache/entries/{cache_key}` only when
+`cache_hit=true`. This is live-cache evidence subject to the detail endpoint's
+existing Viewer authorization and non-disclosing not-found behavior. Misses
+and isolated evaluation keys are never linked.
 
 Embeddings and full inspector responses are never exposed through the query or
 cache-management contracts.

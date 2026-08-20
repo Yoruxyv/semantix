@@ -39,10 +39,30 @@ describe("useQuery", () => {
     const { result } = renderHook(() => useQuery());
 
     await act(async () => {
-      const response = await result.current.submit("Hello");
+      const response = await result.current.submit({
+        prompt: "Hello",
+        namespace: "tenant-a",
+        cache_enabled: true,
+        cache_read_enabled: false,
+        cache_write_enabled: true,
+        private: false,
+      });
       expect(response?.response).toBe("Cached");
     });
 
     expect(result.current.state.status).toBe("success");
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/query"),
+      expect.objectContaining({
+        body: JSON.stringify({
+          prompt: "Hello",
+          namespace: "tenant-a",
+          cache_enabled: true,
+          cache_read_enabled: false,
+          cache_write_enabled: true,
+          private: false,
+        }),
+      }),
+    );
   });
 });

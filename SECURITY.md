@@ -64,6 +64,9 @@ The supplied hardened stack is not a complete multi-tenant service. It does not 
   metrics are a global operational surface restricted to global
   administrators; namespace users have scoped cache statistics instead.
 - Hosted providers receive prompts selected by authorized operators.
+- Private Monitor requests bypass cache reads and writes and are omitted from
+  the browser-memory query trace. Their prompt, response, matched content, and
+  cache key are not retained as trace evidence.
 - When explicitly enabled, the PostgreSQL evaluation catalog stores
   namespace-authorized prompts and notes until expiry or deletion. Database
   backups may outlive application retention and require a separate secure

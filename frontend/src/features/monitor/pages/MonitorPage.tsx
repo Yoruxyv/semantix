@@ -5,6 +5,8 @@ import { QueryLog } from "../components/QueryLog";
 import { ResponseCard } from "../components/ResponseCard";
 import { ResponseSkeleton } from "../components/ResponseSkeleton";
 import { SimilarityRadar } from "../components/similarity-radar/SimilarityRadar";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { canApplyGlobalThreshold } from "@/features/auth/permissions";
 import { useCacheControl } from "@/features/cache/hooks/useCacheControl";
 import { useMonitor } from "../hooks/useMonitor";
 import { Alert } from "@/shared/components/ui";
@@ -12,6 +14,7 @@ import { Alert } from "@/shared/components/ui";
 import type { JSX } from "react";
 
 export function MonitorPage(): JSX.Element {
+  const { session, status } = useAuth();
   const {
     cacheState,
     commitThreshold,
@@ -20,7 +23,8 @@ export function MonitorPage(): JSX.Element {
     previewThreshold,
     setPreviewThreshold,
   } = useCacheControl();
-  const { queryState, submitPrompt, traces } = useMonitor();
+  const { latestEvidence, queryState, submitPrompt, traces } = useMonitor();
+  const canApplyThreshold = canApplyGlobalThreshold(status, session);
 
   return (
     <>
@@ -64,7 +68,7 @@ export function MonitorPage(): JSX.Element {
 
         {queryState.status === "success" && (
           <div className="mt-8">
-            <ResponseCard result={queryState.data} />
+            <ResponseCard evidence={latestEvidence} result={queryState.data} />
           </div>
         )}
       </section>
@@ -91,6 +95,7 @@ export function MonitorPage(): JSX.Element {
 
             <SimilarityRadar
               appliedThreshold={cacheState.data.appliedThreshold}
+              canApplyThreshold={canApplyThreshold}
               isApplyingThreshold={isApplyingThreshold}
               traces={traces}
               threshold={previewThreshold}

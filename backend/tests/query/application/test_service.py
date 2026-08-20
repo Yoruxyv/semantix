@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections.abc import Sequence
 
 import pytest
@@ -343,7 +344,10 @@ async def test_failed_query_records_request_error_and_provider_attempt() -> None
 
 
 @pytest.mark.asyncio
-async def test_private_prompt_bypasses_cache_reads_and_writes() -> None:
+async def test_private_prompt_bypasses_cache_reads_writes_and_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger="app.query.application.service")
     provider = SequenceProvider(["cached response", "private response"])
     service = query_service(provider)
     await service.execute("sensitive prompt")
@@ -362,6 +366,8 @@ async def test_private_prompt_bypasses_cache_reads_and_writes() -> None:
     assert cached.response == "cached response"
     assert cached.cache_hit is True
     assert provider.call_count == 2
+    assert "sensitive prompt" not in caplog.text
+    assert "private response" not in caplog.text
 
 
 @pytest.mark.asyncio

@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ResponseCard } from "@/features/monitor/components/ResponseCard";
@@ -90,21 +91,24 @@ describe("ResponseCard math rendering", () => {
 
   it("renders every explainability field for a cache hit", () => {
     render(
-      <ResponseCard
-        result={{
-          response: "Cached response",
-          cache_hit: true,
-          similarity_score: 0.97,
-          similarity_threshold: 0.92,
-          matched_prompt: "Explain semantic caching",
-          matched_cache_key: "a".repeat(64),
-          cache_entry_created_at: "2026-07-17T10:00:00Z",
-          cache_entry_age_seconds: 125,
-          generation_skipped: true,
-          provider_called: false,
-          latency_ms: 8.25,
-        }}
-      />,
+      <MemoryRouter>
+        <ResponseCard
+          evidence={{ namespace: "tenant-a", policyMode: "normal" }}
+          result={{
+            response: "Cached response",
+            cache_hit: true,
+            similarity_score: 0.97,
+            similarity_threshold: 0.92,
+            matched_prompt: "Explain semantic caching",
+            matched_cache_key: "a".repeat(64),
+            cache_entry_created_at: "2026-07-17T10:00:00Z",
+            cache_entry_age_seconds: 125,
+            generation_skipped: true,
+            provider_called: false,
+            latency_ms: 8.25,
+          }}
+        />
+      </MemoryRouter>,
     );
 
     expect(screen.getByText("CACHE HIT")).toBeTruthy();
@@ -117,6 +121,16 @@ describe("ResponseCard math rendering", () => {
     expect(detailValue("Generation")).toBe("Skipped");
     expect(detailValue("Provider")).toBe("Not called");
     expect(detailValue("Request latency")).toBe("8.3 ms");
+    expect(
+      screen.getByText(
+        "Effective namespace: tenant-a · Policy: Normal read and write.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("link", { name: "Open matched live cache entry" })
+        .getAttribute("href"),
+    ).toBe(`/cache/entries/${"a".repeat(64)}`);
   });
 
   it("renders explicit miss explainability without matched-entry values", () => {
@@ -139,6 +153,9 @@ describe("ResponseCard math rendering", () => {
     expect(detailValue("Generation")).toBe("Ran");
     expect(detailValue("Provider")).toBe("Called");
     expect(detailValue("Request latency")).toBe("12.0 ms");
+    expect(
+      screen.queryByRole("link", { name: "Open matched live cache entry" }),
+    ).toBeNull();
   });
 
   it("explains a coalesced miss without claiming a provider call", () => {

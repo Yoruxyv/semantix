@@ -5,6 +5,7 @@ import type { JSX } from "react";
 
 interface ThresholdControlsProps {
   appliedThreshold: number;
+  canApplyThreshold: boolean;
   isApplyingThreshold: boolean;
   onThresholdApply: (threshold: number) => void;
   onThresholdChange: (threshold: number) => void;
@@ -13,6 +14,7 @@ interface ThresholdControlsProps {
 
 export function ThresholdControls({
   appliedThreshold,
+  canApplyThreshold,
   isApplyingThreshold,
   onThresholdApply,
   onThresholdChange,
@@ -59,15 +61,22 @@ export function ThresholdControls({
       </div>
 
       <div className="mt-5 flex flex-wrap gap-3">
-        <Button
-          className="border-(--gold) text-(--gold) hover:bg-(--gold) hover:text-(--ink) focus-visible:outline-(--gold) disabled:opacity-40"
-          disabled={!hasPendingThreshold || isApplyingThreshold}
-          size="compact"
-          variant="secondary"
-          onClick={() => onThresholdApply(threshold)}
-        >
-          {isApplyingThreshold ? 'Applying' : 'Apply to cache'}
-        </Button>
+        {canApplyThreshold ? (
+          <Button
+            className="border-(--gold) text-(--gold) hover:bg-(--gold) hover:text-(--ink) focus-visible:outline-(--gold) disabled:opacity-40"
+            disabled={!hasPendingThreshold || isApplyingThreshold}
+            size="compact"
+            variant="secondary"
+            onClick={() => onThresholdApply(threshold)}
+          >
+            {isApplyingThreshold ? 'Applying' : 'Apply to cache'}
+          </Button>
+        ) : (
+          <p className="font-data max-w-sm text-[10px]/5 text-(--text-faint)">
+            Preview only. Applying the global threshold requires an
+            administrator with wildcard namespace access.
+          </p>
+        )}
 
         <button
           className="ui-label min-h-10 border-b border-(--teal) px-1 py-2 text-(--teal) transition-colors hover:text-(--text) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--teal) active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40"

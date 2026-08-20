@@ -99,6 +99,7 @@ function renderLegacyRouteWithHistory() {
 function useAuthenticatedPrincipal(
   role: AuthRole,
   namespaces: string[],
+  name = `${role}-principal`,
 ): void {
   vi.mocked(useAuth).mockReturnValue({
     authenticate: vi.fn(async () => true),
@@ -107,7 +108,7 @@ function useAuthenticatedPrincipal(
     logout: vi.fn(),
     retryAccessPolicy: vi.fn(),
     session: {
-      name: `${role}-principal`,
+      name,
       role,
       namespaces,
     },
@@ -539,6 +540,60 @@ describe('application routing', () => {
     ).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Observability' })).toBeTruthy();
     await waitFor(() => expect(getRuntimeMetrics).toHaveBeenCalledOnce());
+  });
+
+  it.each([
+    ['viewer', ['default'], false, false],
+    ['operator', ['default'], true, false],
+    ['admin', ['default'], true, false],
+    ['admin', ['*'], true, true],
+  ] as const)(
+    'applies Monitor capabilities for %s with namespaces %s',
+    async (role, namespaces, canQuery, canApplyThreshold) => {
+      useAuthenticatedPrincipal(role, [...namespaces]);
+      renderAt('/');
+
+      const queryButton = screen.getByRole('button', {
+        name: canQuery ? 'Run query' : 'Operator access required',
+      });
+      expect((queryButton as HTMLButtonElement).disabled).toBe(!canQuery);
+      await screen.findByText('Backend applied 0.90');
+
+      if (canApplyThreshold) {
+        expect(
+          screen.getByRole('button', { name: 'Apply to cache' }),
+        ).toBeTruthy();
+      } else {
+        expect(
+          screen.queryByRole('button', { name: 'Apply to cache' }),
+        ).toBeNull();
+        expect(screen.getByText(/Preview only/)).toBeTruthy();
+      }
+    },
+  );
+
+  it('clears Monitor-local evidence when the principal changes', async () => {
+    useAuthenticatedPrincipal('operator', ['tenant-one'], 'first');
+    const view = renderAt('/');
+
+    fireEvent.change(await screen.findByLabelText('Query text'), {
+      target: { value: 'First principal content' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Run query' }));
+    expect(await screen.findByText('First principal content')).toBeTruthy();
+
+    useAuthenticatedPrincipal('operator', ['tenant-two'], 'second');
+    view.rerender(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(
+      (screen.getByLabelText('Query text') as HTMLTextAreaElement).value,
+    ).toBe('');
+    expect(screen.queryByText('First principal content')).toBeNull();
+    expect(screen.getByText(/namespace tenant-two/i)).toBeTruthy();
   });
 
   it('does not move focus on initial route rendering', async () => {

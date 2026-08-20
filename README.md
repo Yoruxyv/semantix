@@ -36,7 +36,7 @@ comparing replaceable AI and storage providers.
 
 | Workspace | Purpose |
 |---|---|
-| **Monitor** | Submit prompts and inspect cache hits, misses, latency, matched prompts, and similarity evidence |
+| **Monitor** | Submit namespace-scoped policy probes and inspect cache hits, misses, latency, matched prompts, and similarity evidence |
 | **Cache Inspector** | Search entries, inspect metadata, delete records, clear namespaces, and manage the threshold |
 | **Evaluations** | Measure precision, recall, false hits, false misses, inspect filtered case evidence, and export reproducible runs |
 | **Observability** | Track request volume, provider calls, cache activity, coalescing, expirations, and evictions |
@@ -46,6 +46,8 @@ Core capabilities:
 - independent embedding and generation providers;
 - memory or persistent PostgreSQL + pgvector storage;
 - TTL, LRU eviction, namespaces, private requests, and read/write policies;
+- role-aware Monitor controls, private trace minimization, and live-hit links to
+  authorized Cache detail;
 - request coalescing for identical concurrent misses;
 - optional typo-aware prompt normalization;
 - token roles and namespace authorization for hardened deployments;

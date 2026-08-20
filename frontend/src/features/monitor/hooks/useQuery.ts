@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { submitQuery } from '../api/queryApi';
-import type { QueryResponse, QueryState } from '../types';
+import type { QueryRequest, QueryResponse, QueryState } from '../types';
 
 export interface UseQueryResult {
   state: QueryState;
-  submit: (prompt: string) => Promise<QueryResponse | null>;
+  submit: (request: QueryRequest) => Promise<QueryResponse | null>;
 }
 
 export function useQuery(): UseQueryResult {
@@ -22,7 +22,7 @@ export function useQuery(): UseQueryResult {
   );
 
   const submit = useCallback(
-    async (prompt: string): Promise<QueryResponse | null> => {
+    async (request: QueryRequest): Promise<QueryResponse | null> => {
       controller.current?.abort();
       controller.current = new AbortController();
 
@@ -31,7 +31,7 @@ export function useQuery(): UseQueryResult {
 
       setState({ status: 'loading' });
 
-      const result = await submitQuery({ prompt }, controller.current.signal);
+      const result = await submitQuery(request, controller.current.signal);
 
       if (currentRequestId !== requestId.current) {
         return null;

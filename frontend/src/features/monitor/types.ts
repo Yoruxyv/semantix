@@ -9,6 +9,31 @@ export interface QueryRequest {
   private?: boolean;
 }
 
+export type QueryPolicyMode =
+  | "normal"
+  | "read-only"
+  | "refresh"
+  | "bypass"
+  | "private";
+
+export const QUERY_POLICY_LABELS: Record<QueryPolicyMode, string> = {
+  normal: "Normal read and write",
+  "read-only": "Read only",
+  refresh: "Refresh and write",
+  bypass: "Bypass cache",
+  private: "Private request",
+};
+
+export interface QuerySubmission {
+  policyMode: QueryPolicyMode;
+  request: QueryRequest;
+}
+
+export interface QueryEvidence {
+  namespace: string;
+  policyMode: QueryPolicyMode;
+}
+
 export interface QueryResponse {
   response: string;
   cache_hit: boolean;
@@ -36,5 +61,7 @@ export interface QueryTrace {
   latencyMs: number;
   recordedAt: Date;
   actualCacheHit: boolean;
+  namespace: string;
+  policyMode: QueryPolicyMode;
   providerCalled: boolean;
 }
