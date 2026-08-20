@@ -12,6 +12,7 @@ VIEWER_TOKEN = "viewer-secret"
 OPERATOR_TOKEN = "operator-secret"
 ADMIN_TOKEN = "admin-secret"
 NAMESPACE_ADMIN_TOKEN = "namespace-admin-secret"
+MULTI_OPERATOR_TOKEN = "multi-operator-secret"
 
 
 def token_hash(token: str) -> str:
@@ -51,6 +52,12 @@ def settings(*, rate_limit: str = "20/minute") -> Settings:
                 "token_sha256": token_hash(NAMESPACE_ADMIN_TOKEN),
                 "role": "admin",
                 "namespaces": ["default"],
+            },
+            {
+                "name": "multi-operator",
+                "token_sha256": token_hash(MULTI_OPERATOR_TOKEN),
+                "role": "operator",
+                "namespaces": ["tenant-a", "tenant-b"],
             },
         ],
     )
@@ -103,6 +110,17 @@ def test_viewer_can_read_its_namespace_but_cannot_clear_cache() -> None:
     assert clear_response.status_code == 403
 
 
+def test_viewer_cannot_submit_live_queries() -> None:
+    with TestClient(create_app(settings())) as client:
+        response = client.post(
+            "/api/v1/query",
+            headers=authorization(VIEWER_TOKEN),
+            json={"prompt": "Explain semantic caching"},
+        )
+
+    assert response.status_code == 403
+
+
 def test_operator_can_submit_queries_for_an_authorized_namespace() -> None:
     with TestClient(create_app(settings())) as client:
         response = client.post(
@@ -123,6 +141,35 @@ def test_operator_cannot_escape_its_namespace_scope() -> None:
         )
 
     assert response.status_code == 403
+
+
+def test_query_namespace_selection_covers_multiple_and_wildcard_scopes() -> None:
+    with TestClient(create_app(settings())) as client:
+        missing_selection = client.post(
+            "/api/v1/query",
+            headers=authorization(MULTI_OPERATOR_TOKEN),
+            json={"prompt": "Explain semantic caching"},
+        )
+        selected = client.post(
+            "/api/v1/query",
+            headers=authorization(MULTI_OPERATOR_TOKEN),
+            json={
+                "prompt": "Explain semantic caching",
+                "namespace": "tenant-b",
+            },
+        )
+        wildcard_explicit = client.post(
+            "/api/v1/query",
+            headers=authorization(ADMIN_TOKEN),
+            json={
+                "prompt": "Explain semantic caching",
+                "namespace": "tenant-c",
+            },
+        )
+
+    assert missing_selection.status_code == 403
+    assert selected.status_code == 200
+    assert wildcard_explicit.status_code == 200
 
 
 def test_benchmark_dataset_and_run_roles_match_viewer_operator_capabilities() -> None:

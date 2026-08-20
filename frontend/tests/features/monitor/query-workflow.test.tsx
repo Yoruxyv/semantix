@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -28,6 +35,8 @@ const traces: QueryTrace[] = [
     latencyMs: 10,
     recordedAt: new Date("2026-07-17T10:00:00Z"),
     actualCacheHit: true,
+    namespace: "tenant-a",
+    policyMode: "normal",
     providerCalled: false,
   },
   {
@@ -37,6 +46,8 @@ const traces: QueryTrace[] = [
     latencyMs: 20,
     recordedAt: new Date("2026-07-17T10:01:00Z"),
     actualCacheHit: false,
+    namespace: "tenant-a",
+    policyMode: "read-only",
     providerCalled: true,
   },
   {
@@ -46,6 +57,8 @@ const traces: QueryTrace[] = [
     latencyMs: 30,
     recordedAt: new Date("2026-07-17T10:02:00Z"),
     actualCacheHit: false,
+    namespace: "tenant-b",
+    policyMode: "bypass",
     providerCalled: false,
   },
 ];
@@ -207,7 +220,53 @@ describe("dashboard correctness", () => {
     expect(await screen.findByText("First cache query")).toBeTruthy();
     expect(screen.getByText("0 of 1 traces plotted")).toBeTruthy();
     expect(screen.getByText("MISS")).toBeTruthy();
+    expect(screen.getByText("default · Normal read and write")).toBeTruthy();
     expect(container.querySelectorAll('[data-testid="similarity-point"]')).toHaveLength(0);
+  });
+
+  it("omits private prompt and response content from recent query traces", async () => {
+    const privatePrompt = "Private customer incident";
+    const privateResponse = "Private provider response";
+    const submit = vi.fn().mockResolvedValue({
+      response: privateResponse,
+      cache_hit: false,
+      similarity_score: null,
+      similarity_threshold: 0.9,
+      matched_prompt: null,
+      matched_cache_key: null,
+      cache_entry_created_at: null,
+      cache_entry_age_seconds: null,
+      generation_skipped: false,
+      provider_called: true,
+      latency_ms: 12,
+    });
+    vi.mocked(useQuery).mockReturnValue({
+      state: { status: "idle" },
+      submit,
+    });
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByText("Advanced cache policy"));
+    fireEvent.click(
+      screen.getByRole("radio", { name: /^Private request/ }),
+    );
+    fireEvent.change(screen.getByLabelText("Query text"), {
+      target: { value: privatePrompt },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+    await waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    const trace = screen
+      .getByRole("heading", { name: "Recent query trace" })
+      .closest("section");
+    expect(trace).not.toBeNull();
+    expect(within(trace!).getByText("00 records")).toBeTruthy();
+    expect(within(trace!).queryByText(privatePrompt)).toBeNull();
+    expect(within(trace!).queryByText(privateResponse)).toBeNull();
   });
 
   it("plots only scored traces and keeps their positions stable across thresholds", () => {
@@ -216,6 +275,7 @@ describe("dashboard correctness", () => {
     const { container, rerender } = render(
       <SimilarityRadar
         appliedThreshold={0.9}
+        canApplyThreshold
         isApplyingThreshold={false}
         traces={traces}
         threshold={0.9}
@@ -234,6 +294,7 @@ describe("dashboard correctness", () => {
     rerender(
       <SimilarityRadar
         appliedThreshold={0.9}
+        canApplyThreshold
         isApplyingThreshold={false}
         traces={traces}
         threshold={0.99}
@@ -253,6 +314,7 @@ describe("dashboard correctness", () => {
     render(
       <SimilarityRadar
         appliedThreshold={0.9}
+        canApplyThreshold
         isApplyingThreshold={false}
         traces={traces}
         threshold={0.9}
