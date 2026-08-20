@@ -240,6 +240,9 @@ test("compact menu closes on routing and expanded resize cleanup", async ({
     page.getByRole("navigation", { name: "Primary navigation" }),
   ).toBeVisible();
   await page.setViewportSize({ width: 820, height: 1180 });
+  await expect
+    .poll(() => page.evaluate(() => window.innerWidth))
+    .toBe(820);
   const compactMenuButton = page.getByRole("button", {
     name: "Open primary menu",
   });
