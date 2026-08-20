@@ -8,8 +8,11 @@ const VIEWPORTS = [
   { name: "tablet-768", width: 768, height: 1_024 },
   { name: "tablet-820", width: 820, height: 1_180 },
   { name: "tablet-834", width: 834, height: 1_194 },
+  { name: "landscape-1133", width: 1_133, height: 744 },
+  { name: "landscape-1366", width: 1_366, height: 768 },
   { name: "desktop-1024", width: 1_024, height: 900 },
   { name: "desktop-1280", width: 1_280, height: 900 },
+  { name: "zoom-200-equivalent-at-1280", width: 640, height: 900 },
 ] as const;
 const RESPONSE_PREVIEW =
   "Response exceeds the preview limit. Inspect the complete response.";
@@ -127,6 +130,43 @@ for (const viewport of VIEWPORTS) {
     ).toHaveAttribute("href", "https://example.com/cache");
     await expect(page.locator("main script")).toHaveCount(0);
     await expect(page.getByText('<script>alert("unsafe")</script>')).toBeVisible();
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa"])
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
+
+  test(`cache entry detail is accessible without overflow at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.goto(`/cache/entries/${CACHE_KEY}`);
+
+    await expect(
+      page.getByRole("heading", { name: "Cache entry detail" }),
+    ).toBeVisible();
+    if (viewport.width < 1_024) {
+      await page.getByRole("button", { name: "Open primary menu" }).click();
+    }
+    await expect(
+      page.getByRole("link", { name: "Cache", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(page.getByText(RESPONSE_PREVIEW)).toBeVisible();
+    await expect(page.getByText("Complete bold response")).toHaveCount(0);
+    await expect(page.getByText(CACHE_KEY)).toBeVisible();
+
+    const columns = await page
+      .locator("[data-cache-entry-detail-grid]")
+      .evaluate((element) => getComputedStyle(element).gridTemplateColumns);
+    if (viewport.width < 1_024) {
+      expect(columns.split(" ")).toHaveLength(1);
+    }
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,

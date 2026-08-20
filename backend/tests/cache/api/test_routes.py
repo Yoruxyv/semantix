@@ -87,6 +87,7 @@ def test_cache_inspector_routes(settings: Settings) -> None:
         missing_response = client.get(f"/api/v1/cache/entries/{cache_key}")
         assert missing_response.status_code == 404
         assert missing_response.json()["error"] == "cache_entry_not_found"
+        assert client.get("/api/v1/cache/entries/not-a-cache-key").status_code == 422
 
         client.post(
             "/api/v1/query",

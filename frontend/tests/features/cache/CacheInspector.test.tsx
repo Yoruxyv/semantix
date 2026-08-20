@@ -7,6 +7,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { QueryTestProvider } from "../QueryTestProvider";
@@ -78,11 +79,16 @@ function successfulPage(
 
 let queryClient: QueryClient;
 
-function renderInspector(onMutation = vi.fn()) {
+function renderInspector(
+  onMutation = vi.fn(),
+  initialEntry = "/cache",
+) {
   return render(<CacheInspector onMutation={onMutation} />, {
     wrapper: ({ children }: Readonly<{ children: ReactNode }>) => (
       <QueryTestProvider client={queryClient}>
-        {children}
+        <MemoryRouter initialEntries={[initialEntry]}>
+          {children}
+        </MemoryRouter>
       </QueryTestProvider>
     ),
   });
@@ -262,6 +268,38 @@ describe("CacheInspector", () => {
     });
     expect(await screen.findByText(alphaEntry.prompt)).toBeTruthy();
     expect(screen.queryByText(betaEntry.prompt)).toBeNull();
+  });
+
+  it("restores filters and page state from the Cache URL", async () => {
+    vi.mocked(listCacheEntries).mockImplementation(async (params) =>
+      successfulPage([alphaEntry], params),
+    );
+
+    renderInspector(
+      vi.fn(),
+      "/cache?namespace=tenant-alpha&search=semantic&sort=oldest&offset=10",
+    );
+
+    await waitFor(() => {
+      expect(listCacheEntries).toHaveBeenCalledWith(
+        {
+          offset: 10,
+          limit: 10,
+          namespace: "tenant-alpha",
+          search: "semantic",
+          sort: "oldest",
+        },
+        expect.any(AbortSignal),
+      );
+    });
+    expect(
+      (screen.getByLabelText("Search cached prompts") as HTMLInputElement)
+        .value,
+    ).toBe("semantic");
+    expect(
+      (await screen.findByRole("link", { name: "View entry details" }))
+        .getAttribute("href"),
+    ).toBe(`/cache/entries/${alphaEntry.cache_key}`);
   });
 
   it("filters and clears one namespace", async () => {

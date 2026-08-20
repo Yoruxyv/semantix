@@ -72,6 +72,7 @@ describe("cache inspector API client", () => {
 
   it("requests and strictly decodes one complete cache entry", async () => {
     const cacheKey = "c".repeat(64);
+    const controller = new AbortController();
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -94,7 +95,7 @@ describe("cache inspector API client", () => {
       ),
     );
 
-    const result = await getCacheEntry(cacheKey);
+    const result = await getCacheEntry(cacheKey, controller.signal);
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -103,7 +104,7 @@ describe("cache inspector API client", () => {
     }
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(`/api/v1/cache/entries/${cacheKey}`),
-      expect.objectContaining({ method: "GET" }),
+      expect.objectContaining({ method: "GET", signal: controller.signal }),
     );
   });
 

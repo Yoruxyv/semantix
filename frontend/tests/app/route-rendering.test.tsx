@@ -18,6 +18,7 @@ import { useQuery } from '@/features/monitor/hooks/useQuery';
 import {
   clearCache,
   deleteCacheEntry,
+  getCacheEntry,
   getCacheStats,
   getCacheThreshold,
   listCacheEntries,
@@ -116,12 +117,17 @@ function useAuthenticatedPrincipal(
 
 describe('application routing', () => {
   const submit = vi.fn();
+  const writeClipboardText = vi.fn(async () => undefined);
 
   beforeEach(() => {
     vi.stubGlobal('crypto', {
       randomUUID: vi.fn(() => 'trace-id'),
     });
     vi.stubGlobal('scrollTo', vi.fn());
+    Object.defineProperty(window.navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: writeClipboardText },
+    });
     vi.mocked(useQuery).mockReturnValue({
       state: { status: 'idle' },
       submit,
@@ -149,6 +155,10 @@ describe('application routing', () => {
         limit: 10,
         has_more: false,
       },
+    });
+    vi.mocked(getCacheEntry).mockResolvedValue({
+      ok: true,
+      data: cacheEntry,
     });
     vi.mocked(deleteCacheEntry).mockResolvedValue({
       ok: true,
@@ -254,6 +264,140 @@ describe('application routing', () => {
     },
     10_000,
   );
+
+  it('loads a live cache entry directly with Cache active', async () => {
+    renderAt(`/cache/entries/${cacheEntry.cache_key}`);
+
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Cache entry detail',
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: 'Cache' }).getAttribute('aria-current'),
+    ).toBe('page');
+    expect(document.title).toBe('Cache | Semantix');
+    expect(
+      await screen.findByText(
+        cacheEntry.response_preview,
+        {},
+        { timeout: 10_000 },
+      ),
+    ).toBeTruthy();
+    expect(getCacheEntry).toHaveBeenCalledWith(
+      cacheEntry.cache_key,
+      expect.any(AbortSignal),
+    );
+  });
+
+  it('rejects a malformed cache key without an API request', async () => {
+    renderAt('/cache/entries/not-a-cache-key');
+
+    expect(
+      await screen.findByText(
+        'This cache entry could not be found or is no longer available.',
+        {},
+        { timeout: 10_000 },
+      ),
+    ).toBeTruthy();
+    expect(getCacheEntry).not.toHaveBeenCalled();
+  });
+
+  it(
+    'uses the same neutral detail state for a missing entry',
+    async () => {
+      vi.mocked(getCacheEntry).mockResolvedValue({
+        ok: false,
+        error: {
+          code: 'cache_entry_not_found',
+          detail: 'Cache entry not found.',
+          status: 404,
+        },
+      });
+
+      renderAt(`/cache/entries/${cacheEntry.cache_key}`);
+
+      expect(
+        await screen.findByText(
+          'This cache entry could not be found or is no longer available.',
+          {},
+          { timeout: 10_000 },
+        ),
+      ).toBeTruthy();
+      expect(screen.queryByText('Cache entry not found.')).toBeNull();
+    },
+    10_000,
+  );
+
+  it('copies the cache key with accessible feedback', async () => {
+    renderAt(`/cache/entries/${cacheEntry.cache_key}`);
+    await screen.findByRole('heading', { name: cacheEntry.prompt });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy cache key' }));
+
+    await waitFor(() =>
+      expect(writeClipboardText).toHaveBeenCalledWith(cacheEntry.cache_key),
+    );
+    expect(await screen.findByText('Cache key copied.')).toBeTruthy();
+  });
+
+  it('hides detail deletion from a Viewer', async () => {
+    useAuthenticatedPrincipal('viewer', ['default']);
+    renderAt(`/cache/entries/${cacheEntry.cache_key}`);
+
+    await screen.findByRole('heading', { name: cacheEntry.prompt });
+    expect(
+      screen.queryByRole('button', { name: 'Delete cache entry' }),
+    ).toBeNull();
+  });
+
+  it('deletes as an Admin-capable principal and returns to Cache', async () => {
+    renderAt(`/cache/entries/${cacheEntry.cache_key}`);
+    await screen.findByRole('heading', { name: cacheEntry.prompt });
+    const statsCallsBeforeDelete = vi.mocked(getCacheStats).mock.calls.length;
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete cache entry' }),
+    );
+    expect(
+      screen.getByRole('group', {
+        name: /Confirm deletion of cache entry/,
+      }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm delete' }));
+
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Cache inspector',
+      }),
+    ).toBeTruthy();
+    expect(await screen.findByText('Cache entry deleted.')).toBeTruthy();
+    expect(deleteCacheEntry).toHaveBeenCalledWith(cacheEntry.cache_key);
+    expect(vi.mocked(getCacheStats).mock.calls.length).toBeGreaterThan(
+      statsCallsBeforeDelete,
+    );
+  });
+
+  it('restores Cache filters after opening and closing entry detail', async () => {
+    renderAt('/cache?namespace=default&search=semantic&sort=oldest&offset=10');
+    await screen.findByText(cacheEntry.prompt);
+
+    fireEvent.click(screen.getByRole('link', { name: 'View entry details' }));
+    await screen.findByRole('heading', { name: 'Cache entry detail' });
+    fireEvent.click(screen.getByRole('link', { name: 'Back to Cache' }));
+
+    expect(
+      await screen.findByDisplayValue('semantic'),
+    ).toBeTruthy();
+    expect(
+      (screen.getByLabelText('Namespace') as HTMLInputElement).value,
+    ).toBe('default');
+    expect(
+      (screen.getByLabelText('Sort cache entries') as HTMLSelectElement).value,
+    ).toBe('oldest');
+  });
 
   it('renders a useful not-found route', async () => {
     renderAt('/missing');
