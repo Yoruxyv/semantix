@@ -52,7 +52,7 @@ jobs:
         uses: trufflesecurity/trufflehog@bcfcf73aaf4759d4dadc2783177c245a02792318 # v3.97.0
         with:
           extra_args: --results=verified
-          version: "3.96.0"
+          version: "3.97.0"
 
   image-scan:
     name: Image scan (${{ matrix.name }})
