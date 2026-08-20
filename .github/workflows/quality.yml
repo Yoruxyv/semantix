@@ -158,12 +158,6 @@ jobs:
       - name: Validate hardened Compose file
         run: docker compose --env-file .env.production -f docker-compose.prod.yml config --quiet
 
-      - name: Build development images
-        run: docker compose -f docker-compose.dev.yml build
-
-      - name: Build hardened images
-        run: docker compose --env-file .env.production -f docker-compose.prod.yml build
-
       - name: Verify development health gates
         shell: bash
         run: bash ops/ci/linux/dev-healthcheck-smoke.sh
@@ -210,7 +204,18 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/semantix-autocrlf/frontend"
           npm ci
-          npx playwright install --with-deps chromium
+          for attempt in 1 2; do
+            if timeout --kill-after=30s 5m \
+              npx playwright install --with-deps chromium; then
+              exit 0
+            fi
+            if [[ "$attempt" == "2" ]]; then
+              echo "::error::Playwright browser installation failed twice"
+              exit 1
+            fi
+            echo "::warning::Playwright browser installation stalled or failed; retrying once"
+            sleep 5
+          done
 
       - name: Run hardened-stack API, browser, and axe smoke
         shell: bash
@@ -338,9 +343,6 @@ jobs:
 
   security:
     name: Security checks
-    needs:
-      - containers
-      - container-platforms
     permissions:
       contents: read
       security-events: write

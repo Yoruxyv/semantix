@@ -32,7 +32,7 @@ export POSTGRES_DB="${POSTGRES_DB:-semantix}"
 export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(generate_secret)}"
 export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
 
-"${compose[@]}" --profile pgvector up --build --detach --wait --wait-timeout 180
+"${compose[@]}" --profile pgvector up --no-build --detach --wait --wait-timeout 180
 curl --fail --silent --show-error "http://127.0.0.1:${backend_port}/ready"
 "${compose[@]}" --profile pgvector down --volumes --remove-orphans
 
@@ -40,7 +40,7 @@ export CACHE_BACKEND=memory
 export MOCK_EMBEDDING_DIMENSIONS=0
 unset DATABASE_URL
 
-if "${compose[@]}" up --build --detach --wait --wait-timeout 45; then
+if "${compose[@]}" up --no-build --detach --wait --wait-timeout 45; then
   echo "Invalid backend configuration unexpectedly became healthy" >&2
   exit 1
 fi
