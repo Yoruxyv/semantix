@@ -1,4 +1,6 @@
 import type { ReactNode, JSX } from 'react';
+import { Link } from 'react-router';
+import { APP_PATHS } from '@/app/navigation/navigationConfig';
 import { MarkdownContent } from '@/shared/components/markdown/MarkdownContent';
 import {
   formatCompactDuration,
@@ -6,9 +8,14 @@ import {
   formatSimilarity,
 } from '@/shared/lib/formatters';
 import { hasSimilarityScore } from '@/shared/domain/similarity';
-import type { QueryResponse } from '../types';
+import {
+  QUERY_POLICY_LABELS,
+  type QueryEvidence,
+  type QueryResponse,
+} from '../types';
 
 interface ResponseCardProps {
+  evidence?: QueryEvidence | null;
   result: QueryResponse;
 }
 
@@ -57,6 +64,7 @@ function EvidenceMetric({
 }
 
 export function ResponseCard({
+  evidence = null,
   result,
 }: Readonly<ResponseCardProps>): JSX.Element {
   const similarity = formatSimilarity(result.similarity_score);
@@ -190,11 +198,27 @@ export function ResponseCard({
         <p className="ui-label text-(--text-faint)">Decision evidence</p>
         <p className="mt-2 text-sm/6 text-(--text-soft)">{explanation}</p>
 
+        {evidence !== null && (
+          <p className="font-data mt-3 wrap-break-word text-[11px]/5 text-(--text-muted)">
+            Effective namespace: {evidence.namespace} · Policy:{' '}
+            {QUERY_POLICY_LABELS[evidence.policyMode]}.
+          </p>
+        )}
+
         <dl className="mt-4 grid grid-cols-1 border-t border-(--hairline) min-[520px]:grid-cols-2 min-[860px]:grid-cols-4">
           {evidenceItems.map((item) => (
             <EvidenceMetric key={item.label} {...item} />
           ))}
         </dl>
+
+        {result.cache_hit && result.matched_cache_key !== null && (
+          <Link
+            className="ui-label mt-5 inline-flex min-h-11 items-center border-b border-(--teal) text-(--teal) focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-(--teal)"
+            to={`${APP_PATHS.cache}/entries/${encodeURIComponent(result.matched_cache_key)}`}
+          >
+            Open matched live cache entry
+          </Link>
+        )}
       </section>
     </article>
   );

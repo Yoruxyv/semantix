@@ -51,10 +51,16 @@ function Workspace({ mainRef }: WorkspaceProps): JSX.Element {
 }
 
 function AppShell(): JSX.Element {
-  const { status } = useAuth();
+  const { session, status } = useAuth();
   const mainRef = useRef<HTMLElement>(null);
   const canAccessWorkspace =
     status === 'disabled' || status === 'authenticated';
+  const workspaceKey = JSON.stringify([
+    status,
+    session?.name ?? null,
+    session?.role ?? null,
+    session?.namespaces ?? [],
+  ]);
 
   useRouteAccessibility(mainRef);
 
@@ -74,7 +80,7 @@ function AppShell(): JSX.Element {
     content = (
       <>
         <AuthPanel />
-        <WorkspaceProviders>
+        <WorkspaceProviders key={workspaceKey}>
           <Workspace mainRef={mainRef} />
         </WorkspaceProviders>
       </>

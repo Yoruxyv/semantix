@@ -20,6 +20,13 @@ export function canRunBenchmarks(
   status: AuthContextValue["status"],
   session: AuthSession | null,
 ): boolean {
+  return canSubmitQueries(status, session);
+}
+
+export function canSubmitQueries(
+  status: AuthContextValue["status"],
+  session: AuthSession | null,
+): boolean {
   if (status === "disabled") {
     return true;
   }
@@ -28,6 +35,13 @@ export function canRunBenchmarks(
     status === "authenticated" &&
     (session?.role === "operator" || session?.role === "admin")
   );
+}
+
+export function canApplyGlobalThreshold(
+  status: AuthContextValue["status"],
+  session: AuthSession | null,
+): boolean {
+  return canAccessGlobalMetrics(status, session);
 }
 
 export function canPersistEvaluationDatasets(

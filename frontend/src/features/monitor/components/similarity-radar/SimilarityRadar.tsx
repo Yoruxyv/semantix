@@ -9,6 +9,7 @@ import { ThresholdControls } from "./ThresholdControls";
 
 interface SimilarityRadarProps {
   appliedThreshold: number;
+  canApplyThreshold: boolean;
   isApplyingThreshold: boolean;
   traces: QueryTrace[];
   threshold: number;
@@ -18,6 +19,7 @@ interface SimilarityRadarProps {
 
 export function SimilarityRadar({
   appliedThreshold,
+  canApplyThreshold,
   isApplyingThreshold,
   traces,
   threshold,
@@ -94,6 +96,7 @@ export function SimilarityRadar({
 
       <ThresholdControls
         appliedThreshold={appliedThreshold}
+        canApplyThreshold={canApplyThreshold}
         isApplyingThreshold={isApplyingThreshold}
         threshold={threshold}
         onThresholdApply={onThresholdApply}

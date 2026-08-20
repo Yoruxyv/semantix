@@ -1,11 +1,17 @@
 import { createContext } from "react";
 
-import type { QueryState, QueryTrace } from "../types";
+import type {
+  QueryEvidence,
+  QueryState,
+  QuerySubmission,
+  QueryTrace,
+} from "../types";
 
 export interface MonitorContextValue {
   clearTraces: () => void;
+  latestEvidence: QueryEvidence | null;
   queryState: QueryState;
-  submitPrompt: (prompt: string) => Promise<void>;
+  submitPrompt: (submission: QuerySubmission) => Promise<void>;
   traces: QueryTrace[];
 }
 
