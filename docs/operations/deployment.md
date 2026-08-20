@@ -204,6 +204,11 @@ metrics require an `admin` principal with `namespaces:["*"]`. A namespace
 administrator remains limited to its authorized cache operations and receives
 `403 Forbidden` from `/api/v1/metrics`.
 
+Monitor mirrors these capabilities for clarity: Viewers cannot submit live
+queries, Operators and Admins can, and only wildcard Admins see the global
+threshold Apply action. These controls are usability boundaries; the API role
+dependencies remain authoritative.
+
 ## Namespace authorization
 
 Every principal receives one or more namespaces. A non-global principal cannot query, inspect, delete, or clear another namespace.
@@ -213,8 +218,10 @@ namespace are automatically limited to it. Principals with multiple namespaces
 must select one for creation. Only `namespaces:["*"]` can list globally. The
 `*` marker is authorization scope, never persisted ownership: wildcard
 administrators must provide a concrete namespace for persisted dataset create,
-delete, built-in history retention, and retained-history deletion. Persisted
-runs inherit their source dataset namespace.
+delete, built-in history retention, retained-history deletion, and Monitor
+queries. Monitor preselects a sole namespace, requires a choice when several
+are authorized, and validates wildcard users' explicit concrete namespace.
+Persisted runs inherit their source dataset namespace.
 
 Scoped history access preserves non-disclosure: foreign and missing retained
 run IDs use the same not-found behavior.

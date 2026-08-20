@@ -24,7 +24,8 @@ changes the matching text.
 
 `SIMILARITY_THRESHOLD` sets the startup value between `0` and `1`. The active
 threshold can be previewed in the Monitor workspace and applied through the
-cache threshold API.
+cache threshold API. Applying it from Monitor requires an administrator with
+wildcard namespace access; other authorized users retain the local preview.
 
 - Higher thresholds reduce reuse and generally lower false-positive risk.
 - Lower thresholds increase reuse and generally raise false-positive risk.
@@ -67,6 +68,11 @@ Statistics and clearing can target one namespace. Capacity remains global to
 the active embedding space, so heavy writes in one namespace can evict an LRU
 entry from another namespace.
 
+Monitor preselects a sole authorized namespace. Principals with multiple
+concrete namespaces must choose one, while wildcard principals enter one valid
+concrete namespace explicitly. The `*` authorization marker is never sent as a
+query namespace.
+
 ## Read, write, and private policies
 
 Query requests support:
@@ -88,6 +94,13 @@ Useful combinations:
 - read enabled, write disabled: reuse an existing answer without storing a new
   one;
 - both disabled: bypass the semantic cache entirely.
+
+Monitor exposes these combinations as mutually exclusive Normal, Read only,
+Refresh and write, Bypass cache, and Private request modes. The effective
+namespace and mode are shown before submission and with the result. Successful
+non-private queries add that safe context to the bounded in-memory trace.
+Private queries are omitted from the trace entirely, so their prompt, response,
+matched content, and cache key do not enter trace state.
 
 Provider failures and empty provider responses are never cached.
 
@@ -141,3 +154,5 @@ record. It can stop resolving after expiry, LRU eviction, deletion, restart, or
 an embedding-space change. Missing and unauthorized entries intentionally use
 the same message. Evaluation cache keys remain isolated evidence and are not
 linked to this live-cache route.
+Monitor renders “Open matched live cache entry” only for a true live hit with a
+server-returned `matched_cache_key`; misses never receive the link.
