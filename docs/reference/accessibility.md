@@ -58,6 +58,13 @@ Check the following at desktop and mobile widths:
   focus to the invoking case control when closed;
 - isolated evaluation keys are text evidence only and are not exposed as live
   Cache links;
+- live Cache entry details use one readable column below 1024 px, wrap keys,
+  namespaces, prompts, and previews without page-level overflow, expose copy
+  feedback through a polite status, and keep Back to Cache as a real link;
+- cache-entry deletion is shown only to Admin-capable users, and its exact-scope
+  confirmation names an abbreviated key and namespace before activation;
+- malformed, missing, expired, deleted, and unauthorized live-entry links use
+  a neutral announced state without disclosing foreign-key existence;
 - empty histogram bins have no visible bar.
 
 Navigation verification also covers:

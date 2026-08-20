@@ -322,6 +322,13 @@ this detail only when a user explicitly opens the complete response. Provider
 output remains untrusted text: the frontend Markdown renderer does not execute
 raw HTML and continues to reject unsafe link and image URLs.
 
+The frontend route `/cache/entries/{cache_key}` provides a deep-linkable view
+of the authorized metadata and bounded response preview. It never renders the
+complete response or embedding. The identifier is live operational evidence,
+not a permanent record: TTL expiry, LRU eviction, deletion, restart, or an
+embedding-space change can make a saved URL stop resolving. Missing and
+unauthorized keys use the same neutral browser state.
+
 `GET /api/v1/cache/stats?namespace=...` and
 `DELETE /api/v1/cache?namespace=...` target one namespace. Omitting the
 parameter returns global statistics or clears the active embedding space.
