@@ -278,6 +278,14 @@ persistent evaluation dataset repository and durable run-history repository. It
 reports configured storage modes and does not call hosted embedding or
 generation providers. A later PostgreSQL outage produces HTTP `503`.
 
+`GET /api/v1/diagnostics` is separate from those public probes. It requires a
+wildcard global Admin and returns only reviewed provider categories, safe
+evaluation fingerprints, cache readiness, normalization status, bounded
+evaluation limits, persistence booleans, and the application version for one
+backend process. It never returns credentials, URLs, model names, namespace or
+dataset identities, prompts, responses, run IDs, or raw settings. Keep this
+route behind the same authenticated proxy boundary as the other `/api` routes.
+
 ## Database roles and migrations
 
 The production database has two roles. Use URL-safe random passwords for the Compose example, or percent-encode credentials before placing them in a PostgreSQL URL.

@@ -88,6 +88,21 @@ display names and descriptions do not affect it.
 Benchmark requests may call the selected generation provider. Review provider
 cost, rate limits, and data handling before confirming.
 
+### Compare a run with current runtime diagnostics
+
+Global administrators can open **Observability → Runtime diagnostics** to
+compare an evaluation export's embedding-space, generation-configuration, and
+normalization fingerprints with the current backend process. Matching values
+support environment review but do not replace dataset digest, measured
+threshold, repetitions, reset policy, or the run's overall configuration
+fingerprint. Diagnostics are current process state only and are not retained as
+evaluation history.
+
+The section also shows provider categories, embedding dimensions, normalization
+status, cache readiness, evaluation limits, and whether dataset or run-history
+persistence is enabled. It intentionally omits model names, provider/database
+URLs, credentials, prompts, responses, namespaces, dataset names, and run IDs.
+
 Leaving the Evaluations workspace aborts the browser request and prevents a late
 response from updating the unmounted page. It does not guarantee that provider
 work already accepted by the backend has stopped.

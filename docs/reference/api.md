@@ -29,6 +29,7 @@ Application errors use a stable object containing `error` and `detail`.
 | `DELETE` | `/api/v1/evaluations/runs/{run_id}` | Delete one retained run from a concrete namespace |
 | `POST` | `/api/v1/evaluations/runs/compare` | Compare exactly two retained runs with server-backed compatibility checks |
 | `GET` | `/api/v1/metrics` | Read process-local aggregate metrics (global admin only) |
+| `GET` | `/api/v1/diagnostics` | Read allowlisted process diagnostics (global admin only) |
 | `GET` | `/health` | Read application and provider-type health |
 
 The frontend exposes the evaluation laboratory at canonical route
@@ -381,3 +382,48 @@ query application service and are not included in its request/error counters.
 
 For load-testing semantics and the distinction between caller decisions and
 actual cache lookups, see [Load testing](../operations/load-testing.md).
+
+## Runtime diagnostics
+
+`GET /api/v1/diagnostics` returns one backend process's current, read-only
+runtime evidence. It uses the same global-administrator authorization and rate
+limit as runtime metrics. Scoped Admin, Operator, Viewer, and unauthenticated
+token-mode requests are denied. Public `/health`, `/ready`, and the existing
+metrics contract are unchanged.
+
+```json
+{
+  "observed_at": "2026-08-21T08:00:00Z",
+  "process_scope": "single_backend_process",
+  "application_version": "1.0.0",
+  "embedding_provider_category": "mock",
+  "generation_provider_category": "mock",
+  "embedding_dimensions": 384,
+  "embedding_space_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "generation_configuration_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "cache_backend": "pgvector",
+  "cache_readiness": "ready",
+  "normalization_mode": "typo_correction",
+  "normalization_algorithm_version": "symspell-compound-v1",
+  "normalization_fingerprint": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "evaluation_timeout_seconds": 300.0,
+  "evaluation_max_cases": 50,
+  "evaluation_max_repetitions": 5,
+  "evaluation_max_thresholds": 15,
+  "evaluation_max_request_bytes": 65536,
+  "evaluation_dataset_persistence_enabled": true,
+  "evaluation_history_persistence_enabled": true
+}
+```
+
+The three fingerprints match the corresponding safe fields in evaluation
+reproducibility metadata. The normalization algorithm version is a readable
+diagnostic label; existing fingerprint construction and evaluation behavior are
+unchanged. `cache_readiness` is `ready` after a successful cache statistics
+check and `unavailable` after a recognized cache-storage failure.
+
+The response is built from a positive allowlist. It never includes credentials,
+credential hashes, authorization headers, database or provider URLs, model
+names, prompts, responses, namespaces, dataset names, run identifiers, or raw
+environment/settings serialization. It is a current process snapshot, not
+fleet state or retained history.
