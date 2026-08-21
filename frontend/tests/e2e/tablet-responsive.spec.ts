@@ -132,6 +132,54 @@ test.beforeEach(async ({ page }) => {
       json: { threshold: 0.92 },
     });
   });
+  await page.route('**/api/v1/metrics', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      json: {
+        observed_at: '2026-08-21T08:00:00Z',
+        uptime_seconds: 3_600,
+        request_count: 12,
+        error_count: 1,
+        cache_hits: 7,
+        cache_misses: 4,
+        provider_calls: 4,
+        in_flight_coalesced_requests: 0,
+        average_latency_ms: 25.5,
+        p95_latency_ms: 80.25,
+        latency_sample_size: 12,
+        cache_size: 5,
+        evictions: 3,
+        expirations: 2,
+      },
+    });
+  });
+  await page.route('**/api/v1/diagnostics', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      json: {
+        observed_at: '2026-08-21T08:00:00Z',
+        process_scope: 'single_backend_process',
+        application_version: '1.0.0',
+        embedding_provider_category: 'mock',
+        generation_provider_category: 'mock',
+        embedding_dimensions: 384,
+        embedding_space_fingerprint: 'a'.repeat(64),
+        generation_configuration_fingerprint: 'b'.repeat(64),
+        cache_backend: 'pgvector',
+        cache_readiness: 'ready',
+        normalization_mode: 'typo_correction',
+        normalization_algorithm_version: 'symspell-compound-v1',
+        normalization_fingerprint: 'c'.repeat(64),
+        evaluation_timeout_seconds: 300,
+        evaluation_max_cases: 50,
+        evaluation_max_repetitions: 5,
+        evaluation_max_thresholds: 15,
+        evaluation_max_request_bytes: 65_536,
+        evaluation_dataset_persistence_enabled: true,
+        evaluation_history_persistence_enabled: true,
+      },
+    });
+  });
   await page.route('**/api/v1/evaluations/datasets', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -256,6 +304,59 @@ test.beforeEach(async ({ page }) => {
       });
     },
   );
+});
+
+test('runtime diagnostics remain readable, bounded, and accessible', async ({
+  page,
+}) => {
+  for (const viewport of VIEWPORTS) {
+    await test.step(`diagnostics-${viewport.name}`, async () => {
+      await page.setViewportSize(viewport);
+      await page.goto('/observability');
+      await expect(
+        page.getByRole('heading', { name: 'Runtime diagnostics' }),
+      ).toBeVisible();
+      await expect(page.getByText('One backend process')).toBeVisible();
+      await expect(page.getByText('Ready', { exact: true })).toBeVisible();
+
+      const columns = await page
+        .locator('[data-runtime-diagnostics-grid]')
+        .evaluate((element) =>
+          getComputedStyle(element).gridTemplateColumns.split(' ').length,
+        );
+      expect(columns).toBe(viewport.width >= 1_024 ? 2 : 1);
+
+      const overflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(1);
+    });
+  }
+
+  await test.step('diagnostics-increased-text-and-keyboard-refresh', async () => {
+    await page.setViewportSize({ width: 1_280, height: 900 });
+    await page.goto('/observability');
+    await page.locator('html').evaluate((element) => {
+      element.style.fontSize = '200%';
+    });
+
+    const refresh = page.getByRole('button', { name: 'Refresh diagnostics' });
+    await refresh.focus();
+    await page.keyboard.press('Enter');
+    await expect(refresh).toBeEnabled();
+
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations).toEqual([]);
 });
 
 test('Monitor policy evidence remains accessible and bounded at required widths', async ({

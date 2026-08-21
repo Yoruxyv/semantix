@@ -25,7 +25,10 @@ import {
   updateCacheThreshold,
 } from '@/features/cache/api/cacheApi';
 import { getBenchmarkDatasets } from '@/features/benchmark/api/benchmarkApi';
-import { getRuntimeMetrics } from '@/features/observability/api/metricsApi';
+import {
+  getRuntimeDiagnostics,
+  getRuntimeMetrics,
+} from '@/features/observability/api/metricsApi';
 import type { CacheEntryMetadata } from '@/features/cache/types';
 import type { QueryResponse } from '@/features/monitor/types';
 
@@ -215,6 +218,31 @@ describe('application routing', () => {
         cache_size: 0,
         evictions: 0,
         expirations: 0,
+      },
+    });
+    vi.mocked(getRuntimeDiagnostics).mockResolvedValue({
+      ok: true,
+      data: {
+        observed_at: '2026-08-21T08:00:00Z',
+        process_scope: 'single_backend_process',
+        application_version: '1.0.0',
+        embedding_provider_category: 'mock',
+        generation_provider_category: 'mock',
+        embedding_dimensions: 32,
+        embedding_space_fingerprint: 'a'.repeat(64),
+        generation_configuration_fingerprint: 'b'.repeat(64),
+        cache_backend: 'memory',
+        cache_readiness: 'ready',
+        normalization_mode: 'identity',
+        normalization_algorithm_version: 'identity-v1',
+        normalization_fingerprint: 'c'.repeat(64),
+        evaluation_timeout_seconds: 300,
+        evaluation_max_cases: 50,
+        evaluation_max_repetitions: 5,
+        evaluation_max_thresholds: 15,
+        evaluation_max_request_bytes: 65_536,
+        evaluation_dataset_persistence_enabled: false,
+        evaluation_history_persistence_enabled: false,
       },
     });
   });
@@ -524,6 +552,7 @@ describe('application routing', () => {
         }),
       ).toBeTruthy();
       expect(getRuntimeMetrics).not.toHaveBeenCalled();
+      expect(getRuntimeDiagnostics).not.toHaveBeenCalled();
     },
   );
 
@@ -540,6 +569,7 @@ describe('application routing', () => {
     ).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Observability' })).toBeTruthy();
     await waitFor(() => expect(getRuntimeMetrics).toHaveBeenCalledOnce());
+    await waitFor(() => expect(getRuntimeDiagnostics).toHaveBeenCalledOnce());
   });
 
   it.each([

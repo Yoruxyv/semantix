@@ -27,6 +27,7 @@ import {
 import {
   benchmarkDatasetKeys,
   cacheEntryKeys,
+  runtimeDiagnosticsKeys,
   runtimeMetricsKeys,
 } from "@/shared/query/queryKeys";
 
@@ -95,6 +96,7 @@ describe("authentication query isolation", () => {
       sort: "newest",
     });
     queryClient.setQueryData(runtimeMetricsKeys.live(), "old metrics");
+    queryClient.setQueryData(runtimeDiagnosticsKeys.live(), "old diagnostics");
     queryClient.setQueryData(cacheKey, "old cache entries");
     queryClient.setQueryData(
       benchmarkDatasetKeys.catalog(),
@@ -129,6 +131,9 @@ describe("authentication query isolation", () => {
       queryClient.getQueryData(benchmarkDatasetKeys.catalog()),
     ).toBeUndefined();
     expect(queryClient.getQueryData(persistedKey)).toBeUndefined();
+    expect(
+      queryClient.getQueryData(runtimeDiagnosticsKeys.live()),
+    ).toBeUndefined();
     expect(queryClient.getQueryData(["public-preference"])).toBe(
       "preserve me",
     );

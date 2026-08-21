@@ -1,15 +1,26 @@
 from hashlib import sha256
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
+from app.core.exceptions import CacheStorageError
 from app.factory import create_app
 
 VIEWER_TOKEN = "metrics-viewer-secret"
 OPERATOR_TOKEN = "metrics-operator-secret"
 NAMESPACE_ADMIN_TOKEN = "metrics-namespace-admin-secret"
 GLOBAL_ADMIN_TOKEN = "metrics-global-admin-secret"
+FAKE_API_KEY = "recognizable-diagnostics-api-key"
+FAKE_DATABASE_URL = (
+    "postgresql://diagnostic-user:diagnostic-password@private-db.internal:5432/semantix"
+)
+FAKE_PROVIDER_URL = "https://private-provider.internal/v1"
+FAKE_MODEL = "private-model/diagnostics-must-not-leak"
+FAKE_PROMPT = "recognizable private diagnostics prompt"
+FAKE_NAMESPACE = "recognizable-private-namespace"
+FAKE_DATASET_NAME = "Recognizable private diagnostics dataset"
 
 
 def _token_hash(token: str) -> str:
@@ -25,10 +36,18 @@ def _secured_settings() -> Settings:
         embedding_provider="mock",
         generation_provider="mock",
         mock_embedding_dimensions=32,
+        hf_api_key=FAKE_API_KEY,
+        hf_inference_base_url=FAKE_PROVIDER_URL,
+        hf_chat_base_url=FAKE_PROVIDER_URL,
+        hf_embedding_model=FAKE_MODEL,
+        hf_generation_model=FAKE_MODEL,
+        openai_base_url=FAKE_PROVIDER_URL,
+        openai_embedding_model=FAKE_MODEL,
+        openai_generation_model=FAKE_MODEL,
         cache_backend="memory",
         cache_ttl_seconds=None,
-        hf_api_key=None,
-        allowed_origins=["http://localhost:5173"],
+        database_url=FAKE_DATABASE_URL,
+        allowed_origins=["https://private-ui.internal"],
         rate_limit="1000/minute",
         auth_mode="token",
         auth_principals=[
@@ -201,3 +220,164 @@ def test_global_admin_receives_unchanged_global_metrics_snapshot() -> None:
     assert payload["cache_misses"] == 1
     assert payload["provider_calls"] == 1
     assert payload["cache_size"] == 1
+
+
+def test_global_admin_receives_only_allowlisted_runtime_diagnostics() -> None:
+    app = create_app(_secured_settings())
+
+    with TestClient(app) as client:
+        live_query = client.post(
+            "/api/v1/query",
+            headers=_authorization(GLOBAL_ADMIN_TOKEN),
+            json={"prompt": FAKE_PROMPT, "namespace": FAKE_NAMESPACE},
+        )
+        evaluation = client.post(
+            "/api/v1/evaluations/runs",
+            headers=_authorization(GLOBAL_ADMIN_TOKEN),
+            json={
+                "dataset_source": {
+                    "kind": "inline",
+                    "definition": {
+                        "schema_version": 1,
+                        "name": FAKE_DATASET_NAME,
+                        "cases": [
+                            {
+                                "case_id": "private-seed",
+                                "prompt": FAKE_PROMPT,
+                                "expected_cache_hit": False,
+                            },
+                            {
+                                "case_id": "private-repeat",
+                                "prompt": FAKE_PROMPT,
+                                "expected_cache_hit": True,
+                                "expected_match_case_id": "private-seed",
+                            },
+                        ],
+                    },
+                },
+                "evaluation_thresholds": [0.8, 0.92],
+                "allow_external_provider_calls": True,
+            },
+        )
+        response = client.get(
+            "/api/v1/diagnostics",
+            headers=_authorization(GLOBAL_ADMIN_TOKEN),
+        )
+
+    assert live_query.status_code == 200
+    assert evaluation.status_code == 200
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload == {
+        "observed_at": payload["observed_at"],
+        "process_scope": "single_backend_process",
+        "application_version": "1.0.0",
+        "embedding_provider_category": "mock",
+        "generation_provider_category": "mock",
+        "embedding_dimensions": 32,
+        "embedding_space_fingerprint": payload["embedding_space_fingerprint"],
+        "generation_configuration_fingerprint": (
+            payload["generation_configuration_fingerprint"]
+        ),
+        "cache_backend": "memory",
+        "cache_readiness": "ready",
+        "normalization_mode": "identity",
+        "normalization_algorithm_version": "identity-v1",
+        "normalization_fingerprint": payload["normalization_fingerprint"],
+        "evaluation_timeout_seconds": 300.0,
+        "evaluation_max_cases": 50,
+        "evaluation_max_repetitions": 5,
+        "evaluation_max_thresholds": 15,
+        "evaluation_max_request_bytes": 65_536,
+        "evaluation_dataset_persistence_enabled": False,
+        "evaluation_history_persistence_enabled": False,
+    }
+    reproducibility = evaluation.json()["reproducibility"]
+    assert (
+        payload["embedding_space_fingerprint"]
+        == (reproducibility["embedding_space_fingerprint"])
+    )
+    assert (
+        payload["generation_configuration_fingerprint"]
+        == (reproducibility["generation_configuration_fingerprint"])
+    )
+    assert (
+        payload["normalization_fingerprint"]
+        == (reproducibility["normalization_fingerprint"])
+    )
+
+    forbidden_values = (
+        FAKE_API_KEY,
+        _token_hash(GLOBAL_ADMIN_TOKEN),
+        FAKE_DATABASE_URL,
+        "diagnostic-password",
+        FAKE_PROVIDER_URL,
+        FAKE_MODEL,
+        FAKE_PROMPT,
+        f"[mock provider] {FAKE_PROMPT}",
+        FAKE_NAMESPACE,
+        FAKE_DATASET_NAME,
+        evaluation.json()["run_id"],
+    )
+    assert all(value not in response.text for value in forbidden_values)
+
+
+@pytest.mark.parametrize(
+    "token",
+    [VIEWER_TOKEN, OPERATOR_TOKEN, NAMESPACE_ADMIN_TOKEN],
+    ids=["scoped-viewer", "scoped-operator", "namespace-admin"],
+)
+def test_diagnostics_rejects_non_global_principals(token: str) -> None:
+    with TestClient(create_app(_secured_settings())) as client:
+        response = client.get(
+            "/api/v1/diagnostics",
+            headers=_authorization(token),
+        )
+
+    assert response.status_code == 403
+    assert response.json()["error"] == "forbidden"
+    assert "embedding_space_fingerprint" not in response.text
+
+
+def test_diagnostics_requires_authentication_when_token_auth_is_enabled() -> None:
+    with TestClient(create_app(_secured_settings())) as client:
+        response = client.get("/api/v1/diagnostics")
+
+    assert response.status_code == 401
+    assert response.json()["error"] == "authentication_required"
+
+
+def test_diagnostics_retains_auth_disabled_local_access() -> None:
+    settings = Settings(
+        embedding_provider="mock",
+        generation_provider="mock",
+        mock_embedding_dimensions=32,
+        cache_backend="memory",
+        cache_ttl_seconds=None,
+        hf_api_key=None,
+        allowed_origins=["http://localhost:5173"],
+        rate_limit="1000/minute",
+    )
+
+    with TestClient(create_app(settings)) as client:
+        response = client.get("/api/v1/diagnostics")
+
+    assert response.status_code == 200
+    assert response.json()["process_scope"] == "single_backend_process"
+
+
+def test_diagnostics_reports_cache_unavailability_without_leaking_details() -> None:
+    app = create_app(_secured_settings())
+
+    with TestClient(app) as client:
+        app.state.semantic_cache.stats = AsyncMock(
+            side_effect=CacheStorageError("private storage failure")
+        )
+        response = client.get(
+            "/api/v1/diagnostics",
+            headers=_authorization(GLOBAL_ADMIN_TOKEN),
+        )
+
+    assert response.status_code == 200
+    assert response.json()["cache_readiness"] == "unavailable"
+    assert "private storage failure" not in response.text
