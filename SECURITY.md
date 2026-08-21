@@ -63,6 +63,11 @@ The supplied hardened stack is not a complete multi-tenant service. It does not 
 - Rate limiting, metrics, and request coalescing remain process-local. Runtime
   metrics are a global operational surface restricted to global
   administrators; namespace users have scoped cache statistics instead.
+- Runtime diagnostics are also global-admin-only and describe one backend
+  process. Their positive allowlist contains safe categories, fingerprints,
+  limits, readiness, and persistence booleans only; credentials and hashes,
+  URLs and hosts, model names, prompts, responses, namespaces, datasets, run
+  IDs, and raw settings are excluded.
 - Hosted providers receive prompts selected by authorized operators.
 - Private Monitor requests bypass cache reads and writes and are omitted from
   the browser-memory query trace. Their prompt, response, matched content, and

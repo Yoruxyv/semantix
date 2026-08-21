@@ -12,7 +12,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { QueryTestProvider } from "../QueryTestProvider";
 import { createTestQueryClient } from "../queryClient";
-import { getRuntimeMetrics } from "@/features/observability/api/metricsApi";
+import {
+  getRuntimeDiagnostics,
+  getRuntimeMetrics,
+} from "@/features/observability/api/metricsApi";
 import { ObservabilityDashboard } from "@/features/observability/components/ObservabilityDashboard";
 import { deferred } from "../support";
 
@@ -35,6 +38,29 @@ const metrics = {
   expirations: 2,
 };
 
+const diagnostics = {
+  observed_at: "2026-08-21T08:00:00Z",
+  process_scope: "single_backend_process" as const,
+  application_version: "1.0.0",
+  embedding_provider_category: "mock" as const,
+  generation_provider_category: "mock" as const,
+  embedding_dimensions: 32,
+  embedding_space_fingerprint: "a".repeat(64),
+  generation_configuration_fingerprint: "b".repeat(64),
+  cache_backend: "memory" as const,
+  cache_readiness: "ready" as const,
+  normalization_mode: "identity" as const,
+  normalization_algorithm_version: "identity-v1" as const,
+  normalization_fingerprint: "c".repeat(64),
+  evaluation_timeout_seconds: 300,
+  evaluation_max_cases: 50,
+  evaluation_max_repetitions: 5,
+  evaluation_max_thresholds: 15,
+  evaluation_max_request_bytes: 65_536,
+  evaluation_dataset_persistence_enabled: false,
+  evaluation_history_persistence_enabled: false,
+};
+
 let queryClient: QueryClient;
 
 function renderDashboard(ui = <ObservabilityDashboard />) {
@@ -50,6 +76,11 @@ function renderDashboard(ui = <ObservabilityDashboard />) {
 beforeEach(() => {
   queryClient = createTestQueryClient();
   vi.mocked(getRuntimeMetrics).mockReset();
+  vi.mocked(getRuntimeDiagnostics).mockReset();
+  vi.mocked(getRuntimeDiagnostics).mockResolvedValue({
+    ok: true,
+    data: diagnostics,
+  });
 });
 
 afterEach(() => {
@@ -112,6 +143,94 @@ describe("ObservabilityDashboard", () => {
 
     expect(await screen.findByText("Backend unavailable")).toBeTruthy();
     expect(screen.queryByText("25.5 ms")).toBeNull();
+  });
+
+  it("renders safe read-only diagnostics with full wrapping fingerprints", async () => {
+    vi.mocked(getRuntimeMetrics).mockResolvedValue({ ok: true, data: metrics });
+
+    renderDashboard();
+
+    const heading = await screen.findByRole("heading", {
+      name: "Runtime diagnostics",
+    });
+    const panel = heading.closest("section");
+    expect(panel).not.toBeNull();
+    expect(await screen.findByText("One backend process")).toBeTruthy();
+    expect(screen.getByText("Ready")).toBeTruthy();
+    expect(screen.getByText(/Runtime diagnostics observed/)).toBeTruthy();
+    expect(screen.getByText(diagnostics.embedding_space_fingerprint)).toBeTruthy();
+    expect(
+      screen.getByText(diagnostics.embedding_space_fingerprint).className,
+    ).toContain("break-all");
+    expect(panel?.querySelectorAll("input, select, textarea")).toHaveLength(0);
+    expect(
+      panel?.querySelector("[data-runtime-diagnostics-grid]")?.className,
+    ).toContain("lg:grid-cols-2");
+  });
+
+  it("distinguishes diagnostics loading and initial failure", async () => {
+    vi.mocked(getRuntimeMetrics).mockResolvedValue({ ok: true, data: metrics });
+    const request = deferred<Awaited<ReturnType<typeof getRuntimeDiagnostics>>>();
+    vi.mocked(getRuntimeDiagnostics).mockReturnValue(request.promise);
+
+    renderDashboard();
+
+    expect(
+      screen.getByLabelText("Loading runtime diagnostics"),
+    ).toBeTruthy();
+
+    await act(async () => {
+      request.resolve({
+        ok: false,
+        error: {
+          code: "network_error",
+          detail: "Diagnostics backend unavailable",
+          status: null,
+        },
+      });
+    });
+
+    expect(
+      await screen.findByText("Diagnostics backend unavailable"),
+    ).toBeTruthy();
+    expect(screen.queryByText("One backend process")).toBeNull();
+  });
+
+  it("keeps stale diagnostics visible after a refresh failure", async () => {
+    vi.mocked(getRuntimeMetrics).mockResolvedValue({ ok: true, data: metrics });
+    vi.mocked(getRuntimeDiagnostics)
+      .mockResolvedValueOnce({ ok: true, data: diagnostics })
+      .mockResolvedValueOnce({
+        ok: false,
+        error: {
+          code: "network_error",
+          detail: "Refresh failed safely",
+          status: null,
+        },
+      });
+
+    renderDashboard();
+    await screen.findByText("One backend process");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Refresh diagnostics" }),
+    );
+
+    expect(await screen.findByText("Refresh failed safely")).toBeTruthy();
+    expect(screen.getByText("Diagnostics may be stale")).toBeTruthy();
+    expect(screen.getByText("One backend process")).toBeTruthy();
+  });
+
+  it("reports cache readiness without relying on color", async () => {
+    vi.mocked(getRuntimeMetrics).mockResolvedValue({ ok: true, data: metrics });
+    vi.mocked(getRuntimeDiagnostics).mockResolvedValue({
+      ok: true,
+      data: { ...diagnostics, cache_readiness: "unavailable" },
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByText("Unavailable")).toBeTruthy();
   });
 
   it("deduplicates simultaneous consumers of runtime metrics", async () => {

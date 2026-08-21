@@ -39,7 +39,7 @@ comparing replaceable AI and storage providers.
 | **Monitor** | Submit namespace-scoped policy probes and inspect cache hits, misses, latency, matched prompts, and similarity evidence |
 | **Cache Inspector** | Search entries, inspect metadata, delete records, clear namespaces, and manage the threshold |
 | **Evaluations** | Measure precision, recall, false hits, false misses, inspect filtered case evidence, and export reproducible runs |
-| **Observability** | Track request volume, provider calls, cache activity, coalescing, expirations, and evictions |
+| **Observability** | Track process metrics and inspect safe, read-only runtime diagnostics for evaluation reproducibility |
 
 Core capabilities:
 
@@ -50,6 +50,8 @@ Core capabilities:
   authorized Cache detail;
 - request coalescing for identical concurrent misses;
 - optional typo-aware prompt normalization;
+- global-admin-only runtime diagnostics with safe provider categories,
+  fingerprints, readiness, and evaluation limits;
 - token roles and namespace authorization for hardened deployments;
 - deterministic mock providers for safe local testing.
 - run-local evaluation caches, complete confusion-matrix accounting, and
@@ -158,6 +160,7 @@ This single command starts:
 | Liveness | <http://localhost:8000/health> |
 | Readiness | <http://localhost:8000/ready> |
 | Runtime metrics | <http://localhost:8000/api/v1/metrics> |
+| Runtime diagnostics | <http://localhost:8000/api/v1/diagnostics> |
 | PostgreSQL from the host | `127.0.0.1:5433` |
 
 Useful commands:
@@ -362,7 +365,8 @@ boundaries.
   workload.
 - Hosted providers may receive prompts and can introduce cost, latency, and
   external data-handling requirements.
-- Runtime metrics, rate limiting, and request coalescing are process-local.
+- Runtime metrics, diagnostics, rate limiting, and request coalescing are
+  process-local.
 - The hardened stack is a single-instance baseline, not a complete multi-tenant
   or multi-replica platform.
 - Mock providers are for tests, demonstrations, and UI development.

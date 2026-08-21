@@ -58,8 +58,9 @@ content.
   composition used by cache and evaluation storage.
 - `app/providers` owns application-facing protocols, startup composition, and
   concrete external adapters.
-- `app/observability` stays flat because it is a small cohesive feature with one
-  endpoint and one process-local collector.
+- `app/observability` stays flat because it is a small cohesive feature with
+  process metrics, an allowlisted diagnostics endpoint, and one process-local
+  collector.
 - `app/core` owns configuration, errors, logging, and shared limits.
 
 Routes and application services depend on protocols rather than concrete
@@ -98,7 +99,7 @@ fallback:
 | `/cache` | Cache inspection, search, sorting, deletion, and clearing |
 | `/cache/entries/:cacheKey` | Authorized, best-effort live-cache entry evidence |
 | `/evaluations` | Isolated controlled evaluation |
-| `/observability` | Process-local runtime metrics |
+| `/observability` | Process-local runtime metrics and read-only diagnostics |
 | `*` | Not-found page |
 
 `/benchmarks` remains a compatibility URL. It replace-redirects to
@@ -195,7 +196,8 @@ semantix/
 
 The supplied deployment is intentionally single-instance and local-first:
 
-- rate limiting, coalescing, and runtime metrics are process-local;
+- rate limiting, coalescing, runtime metrics, and runtime diagnostics are
+  process-local;
 - authentication can be disabled for trusted local development or configured
   with namespace-scoped token principals;
 - CORS is configured for known local frontend origins;
