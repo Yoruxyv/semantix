@@ -8,6 +8,7 @@ import {
   RUNTIME_METRICS_REFRESH_INTERVAL_MS,
   useRuntimeMetrics,
 } from '../hooks/useRuntimeMetrics';
+import { RuntimeDiagnosticsPanel } from './RuntimeDiagnosticsPanel';
 import { MetricsSkeleton } from './MetricsSkeleton';
 import { MetricTile } from './MetricTile';
 
@@ -132,7 +133,7 @@ export function ObservabilityDashboard(): JSX.Element {
       : [];
 
   return (
-    <main>
+    <div>
       <PageHeader
         actions={
           <Button
@@ -221,6 +222,8 @@ export function ObservabilityDashboard(): JSX.Element {
           </div>
         )}
       </div>
-    </main>
+
+      <RuntimeDiagnosticsPanel />
+    </div>
   );
 }

@@ -6,8 +6,14 @@ const PROTECTED_QUERY_ROOTS = new Set([
   "benchmark-datasets",
   "benchmark-history",
   "cache-entries",
+  "runtime-diagnostics",
   "runtime-metrics",
 ]);
+
+export const runtimeDiagnosticsKeys = {
+  all: ["runtime-diagnostics"] as const,
+  live: () => [...runtimeDiagnosticsKeys.all, "live"] as const,
+};
 
 export const runtimeMetricsKeys = {
   all: ["runtime-metrics"] as const,
