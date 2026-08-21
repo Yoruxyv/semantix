@@ -106,6 +106,10 @@ class BenchmarkService:
     def run_history_enabled(self) -> bool:
         return self._runtime_configuration.evaluation_run_history_storage == "postgres"
 
+    @property
+    def runtime_configuration(self) -> BenchmarkRuntimeConfiguration:
+        return self._runtime_configuration
+
     def datasets(self) -> BenchmarkDatasetListResponse:
         return BenchmarkDatasetListResponse(
             datasets=list_datasets(),
