@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from typing import get_args, get_type_hints
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.cache.application.service import SemanticCache
@@ -73,6 +74,29 @@ def test_empty_prompt(settings: Settings) -> None:
         response = client.post(
             "/api/v1/query",
             json={"prompt": "   "},
+        )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("response", "client-controlled response"),
+        ("embedding", [1.0, 0.0]),
+        ("cache_key", "0" * 64),
+        ("created_at", "2026-01-01T00:00:00Z"),
+    ],
+)
+def test_query_route_rejects_client_supplied_cache_fields(
+    settings: Settings,
+    field: str,
+    value: object,
+) -> None:
+    with TestClient(create_app(settings)) as client:
+        response = client.post(
+            "/api/v1/query",
+            json={"prompt": "one", field: value},
         )
 
     assert response.status_code == 422

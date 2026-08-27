@@ -228,6 +228,31 @@ run IDs use the same not-found behavior.
 
 This is server-side authorization. Frontend controls are not treated as a security boundary.
 
+## Semantic-cache integrity before exposure
+
+Namespace authorization prevents cross-namespace cache poisoning, but it does
+not create trust tiers inside one namespace. Any Operator allowed to seed a
+namespace can influence later semantic reuse there through the generated
+response.
+
+Before exposing Semantix to untrusted clients:
+
+1. Give Operator tokens only the namespaces they require; use separate
+   namespaces for workloads with different trust boundaries.
+2. Measure entity changes, numeric drift, negation, and benign paraphrases with
+   the deployed embedding model and proposed threshold.
+3. Keep threshold changes under wildcard-Admin review; do not treat a clean
+   finite run as universal poisoning immunity.
+4. Use Private or Bypass cache for requests that must not read or seed shared
+   semantic state, and use Refresh and write only when forced provider
+   generation and a cache write are intentional.
+5. Clear the affected cache after changing embedding space or prompt
+   normalization, and delete suspect entries through the authorized Cache
+   Inspector workflow.
+
+See [Cache policies](../guides/cache-policies.md#cache-poisoning-and-integrity)
+and the repository [threat model](../../SECURITY.md#semantic-cache-poisoning-threat-model).
+
 ## Proxy-aware client addresses
 
 The limiter trusts forwarded addresses only when the direct peer belongs to `TRUSTED_PROXY_CIDRS`. Spoofed `X-Forwarded-For` from any other peer is ignored.

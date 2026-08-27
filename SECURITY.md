@@ -58,6 +58,57 @@ The hardened stack requires:
 
 The supplied hardened stack is not a complete multi-tenant service. It does not add distributed coordination, deployment-wide metrics, tenant billing, or a general identity provider.
 
+## Semantic-cache poisoning threat model
+
+An authenticated Operator can submit arbitrary bounded prompts to an authorized
+namespace. The generation provider, not the client, supplies the response that
+may be cached after a miss. Semantix validates the response shape and size, but
+that structural validation does not establish factual accuracy or trust.
+
+The enforced integrity boundaries are:
+
+- the backend resolves every query to one authorized concrete namespace;
+- memory and pgvector nearest-neighbor searches filter that namespace before
+  selecting a candidate, including when embeddings are equal;
+- exact cache keys hash the namespace, a NUL separator, and the exact prompt;
+- Read only cannot write, Refresh and write cannot read, and Bypass cache and
+  Private request cannot read or write;
+- provider failures and empty or oversized responses are rejected before a
+  cache write;
+- query requests cannot supply a response, embedding, cache key, or creation
+  timestamp;
+- evaluation caches remain isolated from the live cache.
+
+These boundaries prevent one namespace from poisoning another. They do not
+make similarity-only reuse safe inside a namespace: two materially different
+prompts whose compatible embeddings meet the active threshold can reuse the
+same response. Deterministic probes cover entity substitution, numeric drift,
+negation, injection-shaped synthetic seeds, threshold boundaries, and benign
+paraphrase controls. Equal embeddings intentionally demonstrate this residual
+risk; no keyword filter or exact-string fallback is presented as a universal
+fix.
+
+| Scenario | Enforced or measured behavior |
+|---|---|
+| Same exact prompt, same namespace | Reuse remains valid |
+| Benign paraphrase, same namespace | Reused when similarity meets the threshold |
+| Same prompt or equal embedding, foreign namespace | Foreign entry is excluded before selection |
+| Normal | May read and seed its authorized namespace |
+| Read only | May read but cannot seed |
+| Refresh and write | Cannot read; may seed its authorized namespace |
+| Bypass cache or Private request | Cannot read or seed |
+| Entity, numeric, negation, or injection-shaped collision | Measured same-namespace residual risk |
+| Candidate below / at / above threshold | Miss / hit / hit according to the inclusive threshold rule |
+| Identity or typo normalization | Tested distinctions remain separate; changing normalization still requires cache clearing |
+| Invalid provider response | Rejected before storage |
+| Foreign cache-entry detail | Indistinguishable from a missing entry |
+
+Operators must evaluate the configured embedding model, normalizer, workload,
+and threshold together. A clean finite evaluation is provider- and
+threshold-specific evidence, not proof of universal poisoning immunity. See
+[Cache policies](docs/guides/cache-policies.md) and
+[Hardened deployment](docs/operations/deployment.md).
+
 ## Known design limitations
 
 - Rate limiting, metrics, and request coalescing remain process-local. Runtime
@@ -76,7 +127,8 @@ The supplied hardened stack is not a complete multi-tenant service. It does not 
   namespace-authorized prompts and notes until expiry or deletion. Database
   backups may outlive application retention and require a separate secure
   erasure policy.
-- Semantic similarity remains probabilistic and needs threshold evaluation.
+- Semantic similarity remains probabilistic, permits same-namespace false hits,
+  and needs workload-specific adversarial and benign threshold evaluation.
 - Access tokens configured through `AUTH_PRINCIPALS` are operator-managed credentials rather than federated identity.
 - The default production frontend binds to loopback and depends on an external TLS reverse proxy.
 

@@ -104,6 +104,26 @@ matched content, and cache key do not enter trace state.
 
 Provider failures and empty provider responses are never cached.
 
+## Cache poisoning and integrity
+
+Namespace filtering is an integrity boundary; similarity is not. Memory and
+pgvector lookup select candidates only from the authorized request namespace,
+so an equal embedding in another namespace cannot win. Exact cache keys are
+also namespace-scoped, but exact-key hashing does not govern semantic lookup.
+
+Inside one namespace, a materially different prompt can reuse an incorrect
+response whenever its embedding meets the active threshold. This is an
+inherent risk of similarity-only reuse, including entity substitutions,
+numeric changes, negation, and prompts that influence a generated response
+before it is cached. Structural provider-response validation does not make the
+response semantically trusted.
+
+Evaluate adversarial miss cases and benign paraphrase hit controls for the
+configured embedding model and threshold. Restrict Operator tokens to the
+namespaces they need, use Private or Bypass cache for content that must not be
+reused, and inspect or clear suspect entries explicitly. See the complete
+[poisoning threat model](../../SECURITY.md#semantic-cache-poisoning-threat-model).
+
 ## Request coalescing
 
 Concurrent requests with the same namespace, prompt, and effective cache
