@@ -23,7 +23,13 @@ ENV PATH="/app/.venv/bin:$PATH" \
 
 WORKDIR /app
 
-RUN addgroup --system app \
+RUN apt-get update \
+    && apt-get install --only-upgrade --yes --no-install-recommends \
+        libssl3t64 \
+        openssl \
+        openssl-provider-legacy \
+    && rm -rf /var/lib/apt/lists/* \
+    && addgroup --system app \
     && adduser --system --ingroup app app \
     && SYSTEM_SITE_PACKAGES="$(python -c 'import site; print(site.getsitepackages()[0])')" \
     && rm -rf "$SYSTEM_SITE_PACKAGES"/pip* \
