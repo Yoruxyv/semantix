@@ -320,6 +320,13 @@ async def test_namespace_filtering_stats_and_clear(
             vector_index=0,
         )
         await backend.put(alpha)
+        assert (
+            await backend.find_nearest(
+                unit_vector(),
+                namespace="tenant-beta",
+            )
+            is None
+        )
         await backend.put(beta)
 
         nearest = await backend.find_nearest(
