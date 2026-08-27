@@ -2,7 +2,6 @@ import { CacheReadingsSkeleton } from "../components/CacheReadingsSkeleton";
 import { FieldMetrics } from "../components/FieldMetrics";
 import { QueryForm } from "../components/QueryForm";
 import { QueryLog } from "../components/QueryLog";
-import { ResponseCard } from "../components/ResponseCard";
 import { ResponseSkeleton } from "../components/ResponseSkeleton";
 import { SimilarityRadar } from "../components/similarity-radar/SimilarityRadar";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -11,7 +10,13 @@ import { useCacheControl } from "@/features/cache/hooks/useCacheControl";
 import { useMonitor } from "../hooks/useMonitor";
 import { Alert } from "@/shared/components/ui";
 
-import type { JSX } from "react";
+import { lazy, Suspense, type JSX } from "react";
+
+const ResponseCard = lazy(() =>
+  import("../components/ResponseCard").then((module) => ({
+    default: module.ResponseCard,
+  })),
+);
 
 export function MonitorPage(): JSX.Element {
   const { session, status } = useAuth();
@@ -68,7 +73,9 @@ export function MonitorPage(): JSX.Element {
 
         {queryState.status === "success" && (
           <div className="mt-8">
-            <ResponseCard evidence={latestEvidence} result={queryState.data} />
+            <Suspense fallback={<ResponseSkeleton />}>
+              <ResponseCard evidence={latestEvidence} result={queryState.data} />
+            </Suspense>
           </div>
         )}
       </section>

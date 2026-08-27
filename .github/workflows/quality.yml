@@ -133,6 +133,73 @@ jobs:
       - name: Report frontend bundle budget
         run: npm run bundle:check
 
+  frontend-lighthouse:
+    name: Frontend Lighthouse budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ALLOWED_ORIGINS: '["http://127.0.0.1:4173"]'
+      AUTH_MODE: disabled
+      CACHE_BACKEND: memory
+      EVALUATION_DATASET_STORAGE: session
+      EVALUATION_RUN_HISTORY_STORAGE: disabled
+      PYTHONPYCACHEPREFIX: /tmp/semantix-cache/python
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          version: "0.11.32"
+
+      - name: Install locked dependencies
+        run: |
+          npm --prefix frontend ci
+          uv --directory backend sync --locked --extra dev
+
+      - name: Run production Lighthouse budget
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd backend
+          uv run --no-sync uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/semantix-lighthouse-backend.log 2>&1 &
+          backend_pid=$!
+          trap 'kill "$backend_pid" 2>/dev/null || true; wait "$backend_pid" 2>/dev/null || true' EXIT
+
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8000/health > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8000/health > /dev/null
+
+          cd ../frontend
+          npm run lighthouse
+
+      - name: Upload Lighthouse diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
+          path: frontend/lighthouse-reports/
+          if-no-files-found: ignore
+          retention-days: 7
+
   containers:
     name: Container validation
     runs-on: ubuntu-latest
@@ -355,6 +422,7 @@ jobs:
       - backend
       - backend-compatibility
       - frontend
+      - frontend-lighthouse
       - containers
       - container-platforms
       - security
@@ -372,6 +440,7 @@ jobs:
           CONTAINER_PLATFORMS_RESULT: ${{ needs.container-platforms.result }}
           DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
+          FRONTEND_LIGHTHOUSE_RESULT: ${{ needs.frontend-lighthouse.result }}
           HARDENED_WINDOWS_CHECKOUT_RESULT: ${{ needs.hardened-windows-checkout.result }}
           PGVECTOR_RESULT: ${{ needs.pgvector.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
@@ -379,6 +448,7 @@ jobs:
           test "$BACKEND_RESULT" = "success"
           test "$BACKEND_COMPATIBILITY_RESULT" = "success"
           test "$FRONTEND_RESULT" = "success"
+          test "$FRONTEND_LIGHTHOUSE_RESULT" = "success"
           test "$CONTAINERS_RESULT" = "success"
           test "$CONTAINER_PLATFORMS_RESULT" = "success"
           test "$SECURITY_RESULT" = "success"

@@ -224,6 +224,38 @@ describe("dashboard correctness", () => {
     expect(container.querySelectorAll('[data-testid="similarity-point"]')).toHaveLength(0);
   });
 
+  it("renders the deferred response card after a successful query", async () => {
+    vi.mocked(useQuery).mockReturnValue({
+      state: {
+        status: "success",
+        data: {
+          response: "Generated response",
+          cache_hit: false,
+          similarity_score: null,
+          similarity_threshold: 0.9,
+          matched_prompt: null,
+          matched_cache_key: null,
+          cache_entry_created_at: null,
+          cache_entry_age_seconds: null,
+          generation_skipped: false,
+          provider_called: true,
+          latency_ms: 12,
+        },
+      },
+      submit: vi.fn().mockResolvedValue(null),
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Latest response" }),
+    ).toBeTruthy();
+  });
+
   it("omits private prompt and response content from recent query traces", async () => {
     const privatePrompt = "Private customer incident";
     const privateResponse = "Private provider response";
