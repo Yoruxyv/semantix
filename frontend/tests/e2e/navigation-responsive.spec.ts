@@ -237,12 +237,15 @@ test("compact menu closes on routing and expanded resize cleanup", async ({
   await page.getByRole("button", { name: "Open primary menu" }).click();
   await page.setViewportSize({ width: 1024, height: 900 });
   await expect(
+    page.getByRole("button", {
+      includeHidden: true,
+      name: "Open primary menu",
+    }),
+  ).toHaveAttribute("aria-expanded", "false");
+  await expect(
     page.getByRole("navigation", { name: "Primary navigation" }),
   ).toBeVisible();
   await page.setViewportSize({ width: 820, height: 1180 });
-  await expect
-    .poll(() => page.evaluate(() => window.innerWidth))
-    .toBe(820);
   const compactMenuButton = page.getByRole("button", {
     name: "Open primary menu",
   });
