@@ -1,11 +1,11 @@
-import { useRef, type ChangeEvent, type JSX } from "react";
+import { useRef, type ChangeEvent, type JSX } from 'react';
 
-import { Button } from "@/shared/components/ui";
-import { formatCount } from "@/shared/lib/formatters";
+import { Button } from '@/shared/components/ui';
+import { formatCount } from '@/shared/lib/formatters';
 import {
   EVALUATION_IMPORT_FILE_MAX_BYTES,
   type BenchmarkController,
-} from "@/features/benchmark/hooks/useBenchmark";
+} from '@/features/benchmark/hooks/useBenchmark';
 
 interface BenchmarkDatasetImportProps {
   controller: BenchmarkController;
@@ -26,7 +26,7 @@ export function BenchmarkDatasetImport({
 
   function selectFile(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0];
-    event.target.value = "";
+    event.target.value = '';
     if (file !== undefined) {
       void controller.selectImportFile(file);
     }
@@ -44,21 +44,18 @@ export function BenchmarkDatasetImport({
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2
-            className="ui-label text-(--text-muted)"
-            id="evaluation-import-heading"
-          >
+          <h2 className="ui-label text-(--text-muted)" id="evaluation-import-heading">
             Session-local JSON dataset
           </h2>
           <p
             className="font-data mt-2 max-w-3xl text-[10px]/5 text-(--text-faint)"
             id="evaluation-import-guidance"
           >
-            Choose one schema version 1 JSON file. The browser limit is{" "}
-            {formatCount(EVALUATION_IMPORT_FILE_MAX_BYTES)} bytes; the server
-            also enforces decoded-content, case-count, and workload limits. The
-            file stays in this page&apos;s memory and is cleared on removal,
-            reload, sign-out, or principal change.
+            Choose one schema version 1 JSON file. The browser limit is{' '}
+            {formatCount(EVALUATION_IMPORT_FILE_MAX_BYTES)} bytes; the server also
+            enforces decoded-content, case-count, and workload limits. The file stays in
+            this page&apos;s memory and is cleared on removal, reload, sign-out, or
+            principal change.
           </p>
         </div>
 
@@ -103,13 +100,8 @@ export function BenchmarkDatasetImport({
       )}
 
       {importError !== null && (
-        <div
-          className="mt-4 border-l-2 border-(--coral) pl-4"
-          role="alert"
-        >
-          <p className="ui-label text-(--coral-text)">
-            Dataset validation failed
-          </p>
+        <div className="mt-4 border-l-2 border-(--coral) pl-4" role="alert">
+          <p className="ui-label text-(--coral-text)">Dataset validation failed</p>
           <p className="font-data mt-2 text-[10px]/5 text-(--text-soft)">
             {importError}
           </p>
@@ -118,14 +110,10 @@ export function BenchmarkDatasetImport({
               {importIssues.map((issue, index) => (
                 <li key={`${issue.pointer}-${issue.code}-${index}`}>
                   <span className="text-(--coral-text)">{issue.code}</span>
-                  {" — "}
+                  {' — '}
                   {issue.detail} Reference: {issue.pointer}
-                  {issue.case_id === undefined
-                    ? ""
-                    : `; case ${issue.case_id}`}
-                  {issue.case_index === undefined
-                    ? ""
-                    : `; index ${issue.case_index}`}
+                  {issue.case_id === undefined ? '' : `; case ${issue.case_id}`}
+                  {issue.case_index === undefined ? '' : `; index ${issue.case_index}`}
                 </li>
               ))}
             </ul>
@@ -159,31 +147,30 @@ export function BenchmarkDatasetImport({
             <div>
               <dt className="text-(--text-faint)">Cases</dt>
               <dd className="mt-1 text-(--text-soft)">
-                {formatCount(preview.case_count)} ·{" "}
-                {formatCount(preview.expected_hits)} expected hits ·{" "}
-                {formatCount(preview.expected_misses)} expected misses
+                {formatCount(preview.case_count)} · {formatCount(preview.expected_hits)}{' '}
+                expected hits · {formatCount(preview.expected_misses)} expected misses
               </dd>
             </div>
             <div>
               <dt className="text-(--text-faint)">Decoded content</dt>
               <dd className="mt-1 text-(--text-soft)">
-                {formatCount(preview.decoded_bytes)} /{" "}
+                {formatCount(preview.decoded_bytes)} /{' '}
                 {formatCount(preview.limits.max_decoded_bytes)} bytes
               </dd>
             </div>
             <div>
               <dt className="text-(--text-faint)">Bounded review workload</dt>
               <dd className="mt-1 text-(--text-soft)">
-                {formatCount(preview.query_executions)} queries ·{" "}
-                {formatCount(preview.threshold_projection_evaluations)}{" "}
-                threshold projections
+                {formatCount(preview.query_executions)} queries ·{' '}
+                {formatCount(preview.threshold_projection_evaluations)} threshold
+                projections
               </dd>
             </div>
           </dl>
           <p className="font-data mt-4 text-[10px]/5 text-(--text-muted)">
-            Validation made {preview.provider_calls_made} provider calls.
-            Execution may send imported prompts outside this system and make at
-            most {formatCount(preview.maximum_provider_calls)} generation calls.
+            Validation made {preview.provider_calls_made} provider calls. Execution may
+            send imported prompts outside this system and make at most{' '}
+            {formatCount(preview.maximum_provider_calls)} generation calls.
           </p>
           {preview.warnings.length > 0 && (
             <ul className="font-data mt-3 grid gap-2 text-[10px]/5 text-(--gold)">

@@ -1,4 +1,4 @@
-export type AuthRole = "viewer" | "operator" | "admin";
+export type AuthRole = 'viewer' | 'operator' | 'admin';
 
 export interface AuthConfig {
   authentication_required: boolean;

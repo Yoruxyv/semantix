@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+.vite-cache
+lighthouse-reports
+playwright-report
+test-results
+package-lock.json

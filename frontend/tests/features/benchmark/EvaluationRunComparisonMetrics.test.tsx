@@ -67,9 +67,7 @@ describe('EvaluationRunComparisonMetrics', () => {
     };
 
     expect(cardText('F1 score')).toContain('Improved · higher is better');
-    expect(cardText('Hit rate')).toContain(
-      'Changed · no quality direction implied',
-    );
+    expect(cardText('Hit rate')).toContain('Changed · no quality direction implied');
     expect(cardText('Hit rate')).not.toContain('Improved');
     expect(cardText('Provider calls')).toContain(
       'Changed · efficiency signal; assess with correctness metrics',

@@ -2,11 +2,7 @@ import type { JSX } from 'react';
 
 import type { EvaluationThresholdComparisonDelta } from '@/features/benchmark/comparisonTypes';
 import type { ThresholdEvaluation } from '@/features/benchmark/types';
-import {
-  formatCount,
-  formatLatency,
-  formatPercent,
-} from '@/shared/lib/formatters';
+import { formatCount, formatLatency, formatPercent } from '@/shared/lib/formatters';
 
 function signed(value: number, suffix = ''): string {
   const prefix = value > 0 ? '+' : '';
@@ -122,8 +118,8 @@ export function EvaluationRunComparisonThresholds({
         Shared threshold projections
       </h4>
       <p className="font-data mt-2 text-[10px]/5 text-(--text-muted)">
-        Only thresholds retained by both runs are shown. Projection-list
-        differences remain an explicit comparison warning.
+        Only thresholds retained by both runs are shown. Projection-list differences
+        remain an explicit comparison warning.
       </p>
       <div className="mt-4 grid gap-4">
         {deltas.map((delta) => {
@@ -134,10 +130,7 @@ export function EvaluationRunComparisonThresholds({
           }
 
           return (
-            <article
-              className="border border-(--hairline) p-4"
-              key={delta.threshold}
-            >
+            <article className="border border-(--hairline) p-4" key={delta.threshold}>
               <header className="flex flex-wrap items-baseline justify-between gap-3">
                 <h5 className="text-sm text-(--text)">
                   Threshold {delta.threshold.toFixed(2)}
@@ -148,30 +141,28 @@ export function EvaluationRunComparisonThresholds({
                 </p>
               </header>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
-                {values(baselineEvaluation, candidateEvaluation, delta).map(
-                  (item) => (
-                    <dl
-                      className="font-data border-t border-(--hairline) pt-3 text-[10px]/5"
-                      key={item.label}
-                    >
-                      <dt className="text-(--text-faint)">{item.label}</dt>
-                      <dd className="mt-2 grid gap-2 lg:grid-cols-3">
-                        <span>
-                          <span className="block text-(--text-faint)">Baseline</span>
-                          <span className="text-(--text-soft)">{item.baseline}</span>
-                        </span>
-                        <span>
-                          <span className="block text-(--text-faint)">Candidate</span>
-                          <span className="text-(--text-soft)">{item.candidate}</span>
-                        </span>
-                        <span>
-                          <span className="block text-(--text-faint)">Delta</span>
-                          <span className="text-(--text)">{item.delta}</span>
-                        </span>
-                      </dd>
-                    </dl>
-                  ),
-                )}
+                {values(baselineEvaluation, candidateEvaluation, delta).map((item) => (
+                  <dl
+                    className="font-data border-t border-(--hairline) pt-3 text-[10px]/5"
+                    key={item.label}
+                  >
+                    <dt className="text-(--text-faint)">{item.label}</dt>
+                    <dd className="mt-2 grid gap-2 lg:grid-cols-3">
+                      <span>
+                        <span className="block text-(--text-faint)">Baseline</span>
+                        <span className="text-(--text-soft)">{item.baseline}</span>
+                      </span>
+                      <span>
+                        <span className="block text-(--text-faint)">Candidate</span>
+                        <span className="text-(--text-soft)">{item.candidate}</span>
+                      </span>
+                      <span>
+                        <span className="block text-(--text-faint)">Delta</span>
+                        <span className="text-(--text)">{item.delta}</span>
+                      </span>
+                    </dd>
+                  </dl>
+                ))}
               </div>
             </article>
           );

@@ -1,11 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -179,18 +173,12 @@ describe('evaluation run comparison UI', () => {
     expect(selectButtons).toHaveLength(2);
 
     fireEvent.click(selectButtons[0]!);
-    expect(
-      screen.getByRole('button', { name: 'Baseline selected' }),
-    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Baseline selected' })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Select to compare' }));
-    expect(
-      screen.getByRole('button', { name: 'Candidate selected' }),
-    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Candidate selected' })).toBeTruthy();
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Compare selected runs' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Compare selected runs' }));
 
     await waitFor(() =>
       expect(compareEvaluationRuns).toHaveBeenCalledWith({
@@ -232,9 +220,7 @@ describe('evaluation run comparison UI', () => {
     });
     fireEvent.click(selectButtons[0]!);
     fireEvent.click(screen.getByRole('button', { name: 'Select to compare' }));
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Compare selected runs' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Compare selected runs' }));
 
     expect(await screen.findByText('Comparison caveats')).toBeTruthy();
     expect(screen.getByText(/generation_configuration_changed/)).toBeTruthy();
@@ -289,9 +275,7 @@ describe('evaluation run comparison UI', () => {
     });
     fireEvent.click(selectButtons[0]!);
     fireEvent.click(screen.getByRole('button', { name: 'Select to compare' }));
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Compare selected runs' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Compare selected runs' }));
 
     expect(await screen.findByText('Comparison blocked')).toBeTruthy();
     expect(screen.getByText(/namespace_mismatch/)).toBeTruthy();

@@ -1,26 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { useSearchParams } from "react-router";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 
-import {
-  apiErrorFromUnknown,
-  dataFromApiResult,
-} from "@/shared/query/apiResult";
-import { cacheEntryKeys } from "@/shared/query/queryKeys";
+import { apiErrorFromUnknown, dataFromApiResult } from '@/shared/query/apiResult';
+import { cacheEntryKeys } from '@/shared/query/queryKeys';
 
-import {
-  clearCache,
-  deleteCacheEntry,
-  listCacheEntries,
-} from "../api/cacheApi";
-import type {
-  CacheEntryListResponse,
-  CacheEntrySort,
-} from "../types";
+import { clearCache, deleteCacheEntry, listCacheEntries } from '../api/cacheApi';
+import type { CacheEntryListResponse, CacheEntrySort } from '../types';
 
 const PAGE_SIZE = 10;
 
-export type CacheMutation = "delete" | "clear";
+export type CacheMutation = 'delete' | 'clear';
 
 interface UseCacheInspectorOptions {
   onMutation: (mutation: CacheMutation) => void | Promise<void>;
@@ -68,24 +58,20 @@ export function useCacheInspector({
 }: Readonly<UseCacheInspectorOptions>): CacheInspectorController {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const search = searchParams.get("search") ?? "";
-  const namespace = searchParams.get("namespace") ?? "";
-  const requestedSort = searchParams.get("sort");
+  const search = searchParams.get('search') ?? '';
+  const namespace = searchParams.get('namespace') ?? '';
+  const requestedSort = searchParams.get('sort');
   const sort: CacheEntrySort =
-    requestedSort === "oldest" ||
-    requestedSort === "most_hit" ||
-    requestedSort === "nearest_expiry"
+    requestedSort === 'oldest' ||
+    requestedSort === 'most_hit' ||
+    requestedSort === 'nearest_expiry'
       ? requestedSort
-      : "newest";
-  const requestedOffset = Number(searchParams.get("offset") ?? 0);
+      : 'newest';
+  const requestedOffset = Number(searchParams.get('offset') ?? 0);
   const offset =
-    Number.isSafeInteger(requestedOffset) && requestedOffset >= 0
-      ? requestedOffset
-      : 0;
-  const [actionError, setActionError] =
-    useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] =
-    useState<string | null>(null);
+    Number.isSafeInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0;
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
 
   const params = {
@@ -131,21 +117,15 @@ export function useCacheInspector({
   const data = entriesQuery.data ?? null;
   const loadError =
     data === null && entriesQuery.isError
-      ? errorDetail(
-          entriesQuery.error,
-          "Cache inspector data could not be loaded.",
-        )
+      ? errorDetail(entriesQuery.error, 'Cache inspector data could not be loaded.')
       : null;
   const refreshError =
     data !== null && entriesQuery.isError
-      ? errorDetail(
-          entriesQuery.error,
-          "Cache inspector data could not be refreshed.",
-        )
+      ? errorDetail(entriesQuery.error, 'Cache inspector data could not be refreshed.')
       : null;
   let mutation: string | null = null;
   if (clearMutation.isPending) {
-    mutation = "clear";
+    mutation = 'clear';
   } else if (deleteMutation.isPending) {
     mutation = deleteMutation.variables ?? null;
   }
@@ -157,58 +137,70 @@ export function useCacheInspector({
   }
 
   function updateSearch(nextSearch: string): void {
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      if (nextSearch === "") {
-        next.delete("search");
-      } else {
-        next.set("search", nextSearch);
-      }
-      next.delete("offset");
-      return next;
-    }, { replace: true });
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (nextSearch === '') {
+          next.delete('search');
+        } else {
+          next.set('search', nextSearch);
+        }
+        next.delete('offset');
+        return next;
+      },
+      { replace: true },
+    );
     setPendingDelete(null);
   }
 
   function updateNamespace(nextNamespace: string): void {
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      if (nextNamespace === "") {
-        next.delete("namespace");
-      } else {
-        next.set("namespace", nextNamespace);
-      }
-      next.delete("offset");
-      return next;
-    }, { replace: true });
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (nextNamespace === '') {
+          next.delete('namespace');
+        } else {
+          next.set('namespace', nextNamespace);
+        }
+        next.delete('offset');
+        return next;
+      },
+      { replace: true },
+    );
     setConfirmClear(false);
     setPendingDelete(null);
   }
 
   function updateSort(nextSort: CacheEntrySort): void {
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      if (nextSort === "newest") {
-        next.delete("sort");
-      } else {
-        next.set("sort", nextSort);
-      }
-      next.delete("offset");
-      return next;
-    }, { replace: true });
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (nextSort === 'newest') {
+          next.delete('sort');
+        } else {
+          next.set('sort', nextSort);
+        }
+        next.delete('offset');
+        return next;
+      },
+      { replace: true },
+    );
     setPendingDelete(null);
   }
 
   function updateOffset(nextOffset: number): void {
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      if (nextOffset === 0) {
-        next.delete("offset");
-      } else {
-        next.set("offset", String(nextOffset));
-      }
-      return next;
-    }, { replace: true });
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (nextOffset === 0) {
+          next.delete('offset');
+        } else {
+          next.set('offset', String(nextOffset));
+        }
+        return next;
+      },
+      { replace: true },
+    );
   }
 
   function requestClear(): void {
@@ -229,20 +221,16 @@ export function useCacheInspector({
     setPendingDelete(null);
   }
 
-  async function confirmDeleteEntry(
-    cacheKey: string,
-  ): Promise<void> {
+  async function confirmDeleteEntry(cacheKey: string): Promise<void> {
     setActionError(null);
 
     try {
       await deleteMutation.mutateAsync(cacheKey);
       setPendingDelete(null);
       updateOffset(0);
-      await onMutation("delete");
+      await onMutation('delete');
     } catch (error: unknown) {
-      setActionError(
-        errorDetail(error, "The cache entry was not deleted."),
-      );
+      setActionError(errorDetail(error, 'The cache entry was not deleted.'));
     }
   }
 
@@ -252,25 +240,20 @@ export function useCacheInspector({
     const selectedNamespace = namespace.trim();
     try {
       await clearMutation.mutateAsync(
-        selectedNamespace === "" ? undefined : selectedNamespace,
+        selectedNamespace === '' ? undefined : selectedNamespace,
       );
       setConfirmClear(false);
       setPendingDelete(null);
       updateOffset(0);
-      await onMutation("clear");
+      await onMutation('clear');
     } catch (error: unknown) {
-      setActionError(
-        errorDetail(error, "The cache was not cleared."),
-      );
+      setActionError(errorDetail(error, 'The cache was not cleared.'));
     }
   }
 
-  const visibleStart =
-    data === null || data.total === 0 ? 0 : data.offset + 1;
+  const visibleStart = data === null || data.total === 0 ? 0 : data.offset + 1;
   const visibleEnd =
-    data === null
-      ? 0
-      : Math.min(data.offset + data.items.length, data.total);
+    data === null ? 0 : Math.min(data.offset + data.items.length, data.total);
 
   return {
     actionError,
@@ -282,7 +265,7 @@ export function useCacheInspector({
     data,
     hasNext: data?.has_more ?? false,
     hasPrevious: data !== null && data.offset > 0,
-    isClearing: mutation === "clear",
+    isClearing: mutation === 'clear',
     isLoading: data === null && entriesQuery.isPending,
     isMutating: mutation !== null,
     isRefreshing: data !== null && entriesQuery.isFetching,

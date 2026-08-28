@@ -172,8 +172,7 @@ export function main(args = process.argv.slice(2)) {
 }
 
 const isMain =
-  process.argv[1] &&
-  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isMain) {
   process.exitCode = main();

@@ -5,9 +5,7 @@ export const THRESHOLD_MAX = 1;
 
 export type CacheDecisionLabel = 'HIT' | 'MISS';
 
-export function hasSimilarityScore(
-  score: number | null,
-): score is number {
+export function hasSimilarityScore(score: number | null): score is number {
   return score !== null;
 }
 
@@ -18,8 +16,6 @@ export function meetsSimilarityThreshold(
   return hasSimilarityScore(score) && score >= threshold;
 }
 
-export function cacheDecisionLabel(
-  isHit: boolean,
-): CacheDecisionLabel {
+export function cacheDecisionLabel(isHit: boolean): CacheDecisionLabel {
   return isHit ? 'HIT' : 'MISS';
 }

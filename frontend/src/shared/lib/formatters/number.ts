@@ -40,9 +40,7 @@ export function formatPercent(
   fractionDigits = 1,
   fallback = 'n/a',
 ): string {
-  return isFiniteNumber(value)
-    ? `${(value * 100).toFixed(fractionDigits)}%`
-    : fallback;
+  return isFiniteNumber(value) ? `${(value * 100).toFixed(fractionDigits)}%` : fallback;
 }
 
 export function formatLatency(
@@ -50,9 +48,7 @@ export function formatLatency(
   fractionDigits = 1,
   fallback = 'n/a',
 ): string {
-  return isFiniteNumber(value)
-    ? `${value.toFixed(fractionDigits)} ms`
-    : fallback;
+  return isFiniteNumber(value) ? `${value.toFixed(fractionDigits)} ms` : fallback;
 }
 
 export function formatSimilarity(

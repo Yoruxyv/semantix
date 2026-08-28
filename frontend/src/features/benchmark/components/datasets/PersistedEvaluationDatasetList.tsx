@@ -1,10 +1,6 @@
 import type { JSX } from 'react';
 
-import {
-  Button,
-  EmptyState,
-  InlineConfirmation,
-} from '@/shared/components/ui';
+import { Button, EmptyState, InlineConfirmation } from '@/shared/components/ui';
 import { formatCount } from '@/shared/lib/formatters';
 
 import type {
@@ -54,24 +50,18 @@ export function PersistedEvaluationDatasetList({
     <section aria-labelledby="persisted-datasets-heading" className="mt-7">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h3
-            className="ui-label text-(--text-muted)"
-            id="persisted-datasets-heading"
-          >
+          <h3 className="ui-label text-(--text-muted)" id="persisted-datasets-heading">
             Persisted catalog
           </h3>
           <p className="font-data mt-2 text-[10px]/5 text-(--text-faint)">
             {formatCount(catalog.total)} active dataset
             {catalog.total === 1 ? '' : 's'} · maximum{' '}
-            {formatCount(catalog.limits.max_persisted_per_namespace)} per
-            namespace
+            {formatCount(catalog.limits.max_persisted_per_namespace)} per namespace
           </p>
         </div>
         {namespaces.length > 1 && !hasGlobalNamespace && (
           <label className="w-full sm:w-64">
-            <span className="ui-label text-(--text-muted)">
-              Catalog namespace
-            </span>
+            <span className="ui-label text-(--text-muted)">Catalog namespace</span>
             <select
               className={EVALUATION_DATASET_CONTROL_CLASS}
               value={listNamespace}
@@ -143,8 +133,8 @@ export function PersistedEvaluationDatasetList({
                       <>
                         Delete <strong>{dataset.name}</strong> from namespace{' '}
                         <strong>{dataset.namespace}</strong>? Its{' '}
-                        {formatCount(dataset.case_count)} cases will no
-                        longer be available for evaluation runs.
+                        {formatCount(dataset.case_count)} cases will no longer be
+                        available for evaluation runs.
                       </>
                     }
                     pendingLabel="Deleting dataset"
@@ -168,25 +158,20 @@ export function PersistedEvaluationDatasetList({
             size="compact"
             variant="secondary"
             onClick={() =>
-              onOffsetChange(
-                Math.max(0, offset - EVALUATION_DATASET_PAGE_SIZE),
-              )
+              onOffsetChange(Math.max(0, offset - EVALUATION_DATASET_PAGE_SIZE))
             }
           >
             Previous
           </Button>
           <span className="font-data text-[10px] text-(--text-muted)">
             Showing {formatCount(offset + 1)}–
-            {formatCount(offset + catalog.items.length)} of{' '}
-            {formatCount(catalog.total)}
+            {formatCount(offset + catalog.items.length)} of {formatCount(catalog.total)}
           </span>
           <Button
             disabled={!catalog.has_more}
             size="compact"
             variant="secondary"
-            onClick={() =>
-              onOffsetChange(offset + EVALUATION_DATASET_PAGE_SIZE)
-            }
+            onClick={() => onOffsetChange(offset + EVALUATION_DATASET_PAGE_SIZE)}
           >
             Next
           </Button>

@@ -5,7 +5,7 @@ import {
 } from '../namespace';
 import type { CacheEntrySort } from '../types';
 
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 interface CacheInspectorControlsProps {
   canClear: boolean;
@@ -54,10 +54,7 @@ export function CacheInspectorControls({
     <>
       <header className="flex flex-wrap items-end justify-between gap-5">
         <div>
-          <h2
-            className="font-display text-2xl italic"
-            id="cache-inspector-heading"
-          >
+          <h2 className="font-display text-2xl italic" id="cache-inspector-heading">
             Cache entries
           </h2>
 
@@ -110,10 +107,7 @@ export function CacheInspectorControls({
 
       <div className="mt-7 grid gap-5 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(180px,0.6fr)_220px]">
         <div>
-          <label
-            className="ui-label text-(--text-muted)"
-            htmlFor="cache-search"
-          >
+          <label className="ui-label text-(--text-muted)" htmlFor="cache-search">
             Search cached prompts
           </label>
 
@@ -128,10 +122,7 @@ export function CacheInspectorControls({
         </div>
 
         <div>
-          <label
-            className="ui-label text-(--text-muted)"
-            htmlFor="cache-namespace"
-          >
+          <label className="ui-label text-(--text-muted)" htmlFor="cache-namespace">
             Namespace
           </label>
 
@@ -156,9 +147,7 @@ export function CacheInspectorControls({
             className={controlClass}
             id="cache-sort"
             value={sort}
-            onChange={(event) =>
-              onSortChange(event.target.value as CacheEntrySort)
-            }
+            onChange={(event) => onSortChange(event.target.value as CacheEntrySort)}
           >
             <option value="newest">Newest</option>
             <option value="oldest">Oldest</option>

@@ -6,10 +6,10 @@ import type {
   CacheThresholdResponse,
   ClearCacheResponse,
   DeleteCacheEntryResponse,
-} from "../types";
-import type { ApiResult } from "@/shared/api/types";
-import { request, withSignal } from "@/shared/api/httpClient";
-import { isCacheNamespace } from "../namespace";
+} from '../types';
+import type { ApiResult } from '@/shared/api/types';
+import { request, withSignal } from '@/shared/api/httpClient';
+import { isCacheNamespace } from '../namespace';
 import {
   isIsoDate,
   isNonEmptyString,
@@ -20,7 +20,7 @@ import {
   isNumberInRange,
   isRecord,
   isSha256Hex,
-} from "@/shared/api/validators";
+} from '@/shared/api/validators';
 
 const LEGACY_RESPONSE_PREVIEW_LENGTH = 240;
 
@@ -32,7 +32,7 @@ function decodeCacheStats(value: unknown): CacheStatsResponse {
     !isNonNegativeNumber(value.misses) ||
     !isNumberInRange(value.hit_rate, 0, 1)
   ) {
-    throw new Error("Invalid cache stats response");
+    throw new Error('Invalid cache stats response');
   }
 
   return {
@@ -47,12 +47,12 @@ function decodeCacheEntry(value: unknown): CacheEntryMetadata {
   if (
     !isRecord(value) ||
     !isSha256Hex(value.cache_key) ||
-    typeof value.namespace !== "string" ||
+    typeof value.namespace !== 'string' ||
     !isCacheNamespace(value.namespace) ||
     !isNonEmptyString(value.prompt) ||
     !isNonEmptyString(value.response_preview) ||
     (value.response_preview_truncated !== undefined &&
-      typeof value.response_preview_truncated !== "boolean") ||
+      typeof value.response_preview_truncated !== 'boolean') ||
     (value.response !== undefined &&
       value.response !== null &&
       !isNonEmptyString(value.response)) ||
@@ -63,9 +63,9 @@ function decodeCacheEntry(value: unknown): CacheEntryMetadata {
     !isNullableIsoDate(value.last_accessed_at) ||
     !isNonNegativeInteger(value.recency_rank) ||
     value.recency_rank < 1 ||
-    typeof value.is_expired !== "boolean"
+    typeof value.is_expired !== 'boolean'
   ) {
-    throw new Error("Invalid cache-entry metadata");
+    throw new Error('Invalid cache-entry metadata');
   }
 
   const hasValidExpiry =
@@ -74,7 +74,7 @@ function decodeCacheEntry(value: unknown): CacheEntryMetadata {
       : value.remaining_ttl_seconds !== null;
 
   if (!hasValidExpiry) {
-    throw new Error("Invalid cache-entry timestamps");
+    throw new Error('Invalid cache-entry timestamps');
   }
 
   return {
@@ -85,7 +85,7 @@ function decodeCacheEntry(value: unknown): CacheEntryMetadata {
     response_preview_truncated:
       value.response_preview_truncated ??
       (value.response_preview.length === LEGACY_RESPONSE_PREVIEW_LENGTH &&
-        value.response_preview.endsWith("...")),
+        value.response_preview.endsWith('...')),
     response: value.response ?? null,
     created_at: value.created_at,
     expires_at: value.expires_at,
@@ -97,9 +97,7 @@ function decodeCacheEntry(value: unknown): CacheEntryMetadata {
   };
 }
 
-function decodeCacheEntryList(
-  value: unknown,
-): CacheEntryListResponse {
+function decodeCacheEntryList(value: unknown): CacheEntryListResponse {
   if (
     !isRecord(value) ||
     !Array.isArray(value.items) ||
@@ -107,20 +105,16 @@ function decodeCacheEntryList(
     !isNonNegativeInteger(value.offset) ||
     !isNonNegativeInteger(value.limit) ||
     !isNumberInRange(value.limit, 1, 100) ||
-    typeof value.has_more !== "boolean"
+    typeof value.has_more !== 'boolean'
   ) {
-    throw new Error("Invalid cache-entry list");
+    throw new Error('Invalid cache-entry list');
   }
 
   const items = value.items.map(decodeCacheEntry);
-  const expectedHasMore =
-    value.offset + items.length < value.total;
+  const expectedHasMore = value.offset + items.length < value.total;
 
-  if (
-    items.length > value.limit ||
-    value.has_more !== expectedHasMore
-  ) {
-    throw new Error("Invalid cache-entry page");
+  if (items.length > value.limit || value.has_more !== expectedHasMore) {
+    throw new Error('Invalid cache-entry page');
   }
 
   return {
@@ -134,21 +128,15 @@ function decodeCacheEntryList(
 
 function decodeClearCache(value: unknown): ClearCacheResponse {
   if (!isRecord(value) || value.cleared !== true) {
-    throw new Error("Invalid clear-cache response");
+    throw new Error('Invalid clear-cache response');
   }
 
   return { cleared: true };
 }
 
-function decodeDeleteCacheEntry(
-  value: unknown,
-): DeleteCacheEntryResponse {
-  if (
-    !isRecord(value) ||
-    value.deleted !== true ||
-    !isSha256Hex(value.cache_key)
-  ) {
-    throw new Error("Invalid delete-cache-entry response");
+function decodeDeleteCacheEntry(value: unknown): DeleteCacheEntryResponse {
+  if (!isRecord(value) || value.deleted !== true || !isSha256Hex(value.cache_key)) {
+    throw new Error('Invalid delete-cache-entry response');
   }
 
   return {
@@ -157,14 +145,9 @@ function decodeDeleteCacheEntry(
   };
 }
 
-function decodeCacheThreshold(
-  value: unknown,
-): CacheThresholdResponse {
-  if (
-    !isRecord(value) ||
-    !isNumberInRange(value.threshold, 0, 1)
-  ) {
-    throw new Error("Invalid cache-threshold response");
+function decodeCacheThreshold(value: unknown): CacheThresholdResponse {
+  if (!isRecord(value) || !isNumberInRange(value.threshold, 0, 1)) {
+    throw new Error('Invalid cache-threshold response');
   }
 
   return { threshold: value.threshold };
@@ -174,9 +157,9 @@ export function getCacheStats(
   signal?: AbortSignal,
 ): Promise<ApiResult<CacheStatsResponse>> {
   return request(
-    "/api/v1/cache/stats",
+    '/api/v1/cache/stats',
     decodeCacheStats,
-    withSignal({ method: "GET" }, signal),
+    withSignal({ method: 'GET' }, signal),
   );
 }
 
@@ -191,17 +174,17 @@ export function listCacheEntries(
   });
   const namespace = params.namespace.trim();
   const search = params.search.trim();
-  if (namespace !== "") {
-    query.set("namespace", namespace);
+  if (namespace !== '') {
+    query.set('namespace', namespace);
   }
-  if (search !== "") {
-    query.set("search", search);
+  if (search !== '') {
+    query.set('search', search);
   }
 
   return request(
     `/api/v1/cache/entries?${query.toString()}`,
     decodeCacheEntryList,
-    withSignal({ method: "GET" }, signal),
+    withSignal({ method: 'GET' }, signal),
   );
 }
 
@@ -212,7 +195,7 @@ export function getCacheEntry(
   return request(
     `/api/v1/cache/entries/${encodeURIComponent(cacheKey)}`,
     decodeCacheEntry,
-    withSignal({ method: "GET" }, signal),
+    withSignal({ method: 'GET' }, signal),
   );
 }
 
@@ -222,45 +205,35 @@ export function deleteCacheEntry(
   return request(
     `/api/v1/cache/entries/${encodeURIComponent(cacheKey)}`,
     decodeDeleteCacheEntry,
-    { method: "DELETE" },
+    { method: 'DELETE' },
   );
 }
 
-export function clearCache(namespace?: string): Promise<
-  ApiResult<ClearCacheResponse>
-> {
+export function clearCache(namespace?: string): Promise<ApiResult<ClearCacheResponse>> {
   const query = new URLSearchParams();
   if (namespace !== undefined) {
-    query.set("namespace", namespace);
+    query.set('namespace', namespace);
   }
-  const suffix = query.size === 0 ? "" : `?${query.toString()}`;
+  const suffix = query.size === 0 ? '' : `?${query.toString()}`;
 
-  return request(
-    `/api/v1/cache${suffix}`,
-    decodeClearCache,
-    { method: "DELETE" },
-  );
+  return request(`/api/v1/cache${suffix}`, decodeClearCache, { method: 'DELETE' });
 }
 
 export function getCacheThreshold(
   signal?: AbortSignal,
 ): Promise<ApiResult<CacheThresholdResponse>> {
   return request(
-    "/api/v1/cache/threshold",
+    '/api/v1/cache/threshold',
     decodeCacheThreshold,
-    withSignal({ method: "GET" }, signal),
+    withSignal({ method: 'GET' }, signal),
   );
 }
 
 export function updateCacheThreshold(
   threshold: number,
 ): Promise<ApiResult<CacheThresholdResponse>> {
-  return request(
-    "/api/v1/cache/threshold",
-    decodeCacheThreshold,
-    {
-      method: "PUT",
-      body: JSON.stringify({ threshold }),
-    },
-  );
+  return request('/api/v1/cache/threshold', decodeCacheThreshold, {
+    method: 'PUT',
+    body: JSON.stringify({ threshold }),
+  });
 }

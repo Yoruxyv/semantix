@@ -7,10 +7,7 @@ import type {
   BenchmarkForm,
 } from '@/features/benchmark/hooks/useBenchmark';
 import { BenchmarkDatasetImport } from '../datasets/BenchmarkDatasetImport';
-import {
-  BENCHMARK_CONTROL_CLASS,
-  updateBenchmarkForm,
-} from './benchmarkControlShared';
+import { BENCHMARK_CONTROL_CLASS, updateBenchmarkForm } from './benchmarkControlShared';
 
 interface BenchmarkDatasetControlsProps {
   controller: BenchmarkController;
@@ -157,9 +154,7 @@ export function BenchmarkDatasetControls({
                   })
                 }
               />
-              <span>
-                Persisted dataset: {controller.persistedDataset.name}
-              </span>
+              <span>Persisted dataset: {controller.persistedDataset.name}</span>
             </label>
           )}
         </div>
@@ -171,11 +166,7 @@ export function BenchmarkDatasetControls({
         <select
           aria-label="Benchmark dataset"
           className={BENCHMARK_CONTROL_CLASS}
-          disabled={
-            datasetsLoading ||
-            isRunning ||
-            form.datasetSource !== 'builtin'
-          }
+          disabled={datasetsLoading || isRunning || form.datasetSource !== 'builtin'}
           value={form.datasetId}
           onChange={(event) =>
             updateBenchmarkForm(controller, {
@@ -193,9 +184,7 @@ export function BenchmarkDatasetControls({
 
       {form.datasetSource === 'builtin' && (
         <label className="block">
-          <span className="ui-label text-(--text-muted)">
-            History namespace
-          </span>
+          <span className="ui-label text-(--text-muted)">History namespace</span>
           {historyNamespaceControl}
           <span
             className={`font-data mt-2 block text-[10px]/5 ${

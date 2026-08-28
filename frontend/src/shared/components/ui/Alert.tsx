@@ -23,16 +23,17 @@ export function Alert({
   tone = 'info',
   ...props
 }: Readonly<AlertProps>): JSX.Element {
-  const classes = [
-    ALERT_TONE_CLASSES[tone],
-    className,
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const classes = [ALERT_TONE_CLASSES[tone], className].filter(Boolean).join(' ');
 
   return (
     <div className={classes} {...props}>
-      <div className={action === undefined ? undefined : 'flex flex-wrap items-center justify-between gap-4'}>
+      <div
+        className={
+          action === undefined
+            ? undefined
+            : 'flex flex-wrap items-center justify-between gap-4'
+        }
+      >
         <div>
           {title !== undefined && <p className="ui-label">{title}</p>}
           <div>{children}</div>

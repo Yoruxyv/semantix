@@ -1,4 +1,4 @@
-import type { ApiResult } from "@/shared/api/types";
+import type { ApiResult } from '@/shared/api/types';
 import type {
   BenchmarkDatasetListResponse,
   BenchmarkRunResponse,
@@ -12,7 +12,7 @@ import type {
   PersistedEvaluationDatasetDetail,
   PersistedEvaluationDatasetListResponse,
   PersistEvaluationDatasetRequest,
-} from "../types";
+} from '../types';
 import {
   decodeBenchmarkDatasets,
   decodeBenchmarkRun,
@@ -20,21 +20,21 @@ import {
   decodeEvaluationDatasetPreview,
   decodePersistedEvaluationDatasetDetail,
   decodePersistedEvaluationDatasets,
-} from "./benchmarkDecoders";
+} from './benchmarkDecoders';
 import {
   decodeDeleteEvaluationRunHistory,
   decodeEvaluationRunHistoryDetail,
   decodeEvaluationRunHistoryList,
-} from "./historyDecoders";
-import { request, withSignal } from "@/shared/api/httpClient";
+} from './historyDecoders';
+import { request, withSignal } from '@/shared/api/httpClient';
 
 export async function getBenchmarkDatasets(
   signal?: AbortSignal,
 ): Promise<ApiResult<BenchmarkDatasetListResponse>> {
   return request(
-    "/api/v1/evaluations/datasets",
+    '/api/v1/evaluations/datasets',
     decodeBenchmarkDatasets,
-    withSignal({ method: "GET" }, signal),
+    withSignal({ method: 'GET' }, signal),
   );
 }
 
@@ -43,11 +43,11 @@ export async function runBenchmark(
   signal?: AbortSignal,
 ): Promise<ApiResult<BenchmarkRunResponse>> {
   return request(
-    "/api/v1/evaluations/runs",
+    '/api/v1/evaluations/runs',
     decodeBenchmarkRun,
     withSignal(
       {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify(payload),
       },
       signal,
@@ -60,11 +60,11 @@ export async function validateEvaluationDataset(
   signal?: AbortSignal,
 ): Promise<ApiResult<EvaluationDatasetPreview>> {
   return request(
-    "/api/v1/evaluations/datasets/validate",
+    '/api/v1/evaluations/datasets/validate',
     decodeEvaluationDatasetPreview,
     withSignal(
       {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify(payload),
       },
       signal,
@@ -152,15 +152,15 @@ export async function getEvaluationRunHistory(
 ): Promise<ApiResult<EvaluationRunHistoryListResponse>> {
   const parameters = new URLSearchParams();
   if (options.namespace?.trim()) {
-    parameters.set("namespace", options.namespace.trim());
+    parameters.set('namespace', options.namespace.trim());
   }
-  parameters.set("offset", String(options.offset ?? 0));
-  parameters.set("limit", String(options.limit ?? 20));
+  parameters.set('offset', String(options.offset ?? 0));
+  parameters.set('limit', String(options.limit ?? 20));
 
   return request(
     `/api/v1/evaluations/runs?${parameters.toString()}`,
     decodeEvaluationRunHistoryList,
-    withSignal({ method: "GET" }, signal),
+    withSignal({ method: 'GET' }, signal),
   );
 }
 
@@ -171,7 +171,7 @@ export async function getEvaluationRunHistoryDetail(
   return request(
     `/api/v1/evaluations/runs/${encodeURIComponent(runId)}`,
     decodeEvaluationRunHistoryDetail,
-    withSignal({ method: "GET" }, signal),
+    withSignal({ method: 'GET' }, signal),
   );
 }
 
@@ -181,10 +181,8 @@ export async function deleteEvaluationRunHistory(
   signal?: AbortSignal,
 ): Promise<ApiResult<DeleteEvaluationRunHistoryResponse>> {
   return request(
-    `/api/v1/evaluations/runs/${encodeURIComponent(runId)}${namespaceQuery(
-      namespace,
-    )}`,
+    `/api/v1/evaluations/runs/${encodeURIComponent(runId)}${namespaceQuery(namespace)}`,
     decodeDeleteEvaluationRunHistory,
-    withSignal({ method: "DELETE" }, signal),
+    withSignal({ method: 'DELETE' }, signal),
   );
 }

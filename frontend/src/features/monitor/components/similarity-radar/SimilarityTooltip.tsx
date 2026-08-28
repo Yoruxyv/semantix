@@ -1,13 +1,8 @@
 import { formatSimilarity } from '@/shared/lib/formatters';
 import { cacheDecisionLabel } from '@/shared/domain/similarity';
-import {
-  PLOT_TOP,
-  VIEW_HEIGHT,
-  VIEW_WIDTH,
-  type PlotPoint,
-} from './model';
+import { PLOT_TOP, VIEW_HEIGHT, VIEW_WIDTH, type PlotPoint } from './model';
 
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 const TOOLTIP_WIDTH = 270;
 const TOOLTIP_HEIGHT = 104;
@@ -28,18 +23,12 @@ function tooltipPosition(point: PlotPoint): {
   y: number;
 } {
   const desiredX = point.x - TOOLTIP_WIDTH / 2;
-  const x = Math.max(
-    4,
-    Math.min(VIEW_WIDTH - TOOLTIP_WIDTH - 4, desiredX),
-  );
+  const x = Math.max(4, Math.min(VIEW_WIDTH - TOOLTIP_WIDTH - 4, desiredX));
   const desiredY =
     point.y > PLOT_TOP + TOOLTIP_HEIGHT
       ? point.y - TOOLTIP_HEIGHT - TOOLTIP_GAP
       : point.y + TOOLTIP_GAP;
-  const y = Math.max(
-    4,
-    Math.min(VIEW_HEIGHT - TOOLTIP_HEIGHT - 4, desiredY),
-  );
+  const y = Math.max(4, Math.min(VIEW_HEIGHT - TOOLTIP_HEIGHT - 4, desiredY));
 
   return { x, y };
 }

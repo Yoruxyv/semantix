@@ -111,9 +111,7 @@ describe('EvaluationRunHistory', () => {
   it('lists retained aggregate runs and loads detail on demand', async () => {
     renderHistory();
 
-    expect(
-      await screen.findByText(benchmarkResult.dataset.name),
-    ).toBeTruthy();
+    expect(await screen.findByText(benchmarkResult.dataset.name)).toBeTruthy();
     expect(screen.getByText('50.0%')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'View details' }));
@@ -123,9 +121,7 @@ describe('EvaluationRunHistory', () => {
         name: 'Retained threshold evaluations',
       }),
     ).toBeTruthy();
-    expect(
-      screen.getByText(/Per-query prompts, generated responses/),
-    ).toBeTruthy();
+    expect(screen.getByText(/Per-query prompts, generated responses/)).toBeTruthy();
     expect(getEvaluationRunHistoryDetail).toHaveBeenCalledWith(
       retainedItem.run_id,
       expect.any(AbortSignal),
@@ -148,9 +144,7 @@ describe('EvaluationRunHistory', () => {
 
     renderHistory();
 
-    expect(
-      await screen.findByText('Durable history is disabled'),
-    ).toBeTruthy();
+    expect(await screen.findByText('Durable history is disabled')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'View details' })).toBeNull();
   });
 
@@ -161,9 +155,7 @@ describe('EvaluationRunHistory', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await act(async () => {
-      fireEvent.click(
-        screen.getByRole('button', { name: 'Delete retained run' }),
-      );
+      fireEvent.click(screen.getByRole('button', { name: 'Delete retained run' }));
       await Promise.resolve();
     });
 

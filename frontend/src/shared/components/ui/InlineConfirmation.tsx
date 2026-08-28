@@ -29,23 +29,16 @@ export function InlineConfirmation({
   onConfirm,
   pendingLabel,
 }: Readonly<InlineConfirmationProps>): JSX.Element {
-  const classes = [
-    'min-w-0 border-0 border-l border-(--coral) p-0 pl-4',
-    className,
-  ]
+  const classes = ['min-w-0 border-0 border-l border-(--coral) p-0 pl-4', className]
     .filter(Boolean)
     .join(' ');
 
   return (
     <fieldset aria-label={ariaLabel} className={classes}>
-      <div
-        className={`text-(--text-soft) ${messageClassName ?? 'text-sm'}`}
-      >
+      <div className={`text-(--text-soft) ${messageClassName ?? 'text-sm'}`}>
         {message}
       </div>
-      <div
-        className={`mt-3 flex flex-wrap ${actionsClassName ?? 'gap-4'}`}
-      >
+      <div className={`mt-3 flex flex-wrap ${actionsClassName ?? 'gap-4'}`}>
         <Button
           aria-label={confirmAriaLabel}
           className="ui-label min-h-9 text-(--coral-text) focus-visible:outline-(--coral) disabled:opacity-50"

@@ -12,7 +12,7 @@ import { RuntimeDiagnosticsPanel } from './RuntimeDiagnosticsPanel';
 import { MetricsSkeleton } from './MetricsSkeleton';
 import { MetricTile } from './MetricTile';
 
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 interface MetricItem {
   description: string;
@@ -25,10 +25,7 @@ interface MetricGroupProps {
   title: string;
 }
 
-function MetricGroup({
-  items,
-  title,
-}: Readonly<MetricGroupProps>): JSX.Element {
+function MetricGroup({ items, title }: Readonly<MetricGroupProps>): JSX.Element {
   return (
     <section>
       <h2 className="ui-label text-(--gold)">{title}</h2>
@@ -72,8 +69,7 @@ export function ObservabilityDashboard(): JSX.Element {
                 value: formatCount(state.data.provider_calls),
               },
               {
-                description:
-                  'Followers currently sharing an in-flight request.',
+                description: 'Followers currently sharing an in-flight request.',
                 label: 'Coalesced now',
                 value: formatCount(state.data.in_flight_coalesced_requests),
               },
@@ -188,36 +184,25 @@ export function ObservabilityDashboard(): JSX.Element {
           <div className="space-y-8">
             <div className="flex flex-wrap gap-x-6 gap-y-2 border-b border-(--hairline) pb-4 text-xs text-(--text-faint)">
               <span>
-                Auto-refresh:{' '}
-                {formatCount(RUNTIME_METRICS_REFRESH_INTERVAL_MS / 1_000)}{' '}
+                Auto-refresh: {formatCount(RUNTIME_METRICS_REFRESH_INTERVAL_MS / 1_000)}{' '}
                 seconds
               </span>
 
               <span>
-                Process uptime:{' '}
-                {formatHoursMinutesDuration(state.data.uptime_seconds)}
+                Process uptime: {formatHoursMinutesDuration(state.data.uptime_seconds)}
               </span>
 
-              <span>
-                Samples: {formatCount(state.data.latency_sample_size)}
-              </span>
+              <span>Samples: {formatCount(state.data.latency_sample_size)}</span>
 
               {isRefreshing && (
-                <output
-                  aria-live="polite"
-                  className="ui-label text-(--gold)"
-                >
+                <output aria-live="polite" className="ui-label text-(--gold)">
                   Refreshing runtime metrics
                 </output>
               )}
             </div>
 
             {metricGroups.map((group) => (
-              <MetricGroup
-                key={group.title}
-                items={group.items}
-                title={group.title}
-              />
+              <MetricGroup key={group.title} items={group.items} title={group.title} />
             ))}
           </div>
         )}

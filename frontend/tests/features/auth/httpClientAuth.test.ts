@@ -1,10 +1,7 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  clearAuthToken,
-  setAuthToken,
-} from "@/shared/api/authToken";
-import { request } from "@/shared/api/httpClient";
+import { clearAuthToken, setAuthToken } from '@/shared/api/authToken';
+import { request } from '@/shared/api/httpClient';
 
 interface Payload {
   ok: boolean;
@@ -12,32 +9,29 @@ interface Payload {
 
 function createFetchMock() {
   return vi.fn(
-    async (
-      _input: RequestInfo | URL,
-      _init?: RequestInit,
-    ): Promise<Response> =>
+    async (_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> =>
       new Response(JSON.stringify({ ok: true }), {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
       }),
   );
 }
 
-describe("authenticated HTTP requests", () => {
+describe('authenticated HTTP requests', () => {
   afterEach(() => {
     clearAuthToken();
     vi.unstubAllGlobals();
   });
 
-  it("adds the runtime bearer token without bundling it into configuration", async () => {
+  it('adds the runtime bearer token without bundling it into configuration', async () => {
     const fetchMock = createFetchMock();
-    vi.stubGlobal("fetch", fetchMock);
-    setAuthToken("runtime-secret");
+    vi.stubGlobal('fetch', fetchMock);
+    setAuthToken('runtime-secret');
 
     const result = await request<Payload>(
-      "/api/v1/auth/session",
+      '/api/v1/auth/session',
       (value) => value as Payload,
-      { method: "GET" },
+      { method: 'GET' },
     );
 
     expect(result.ok).toBe(true);
@@ -46,43 +40,41 @@ describe("authenticated HTTP requests", () => {
     const firstCall = fetchMock.mock.calls.at(0);
     const headers = new Headers(firstCall?.[1]?.headers);
 
-    expect(headers.get("Authorization")).toBe("Bearer runtime-secret");
+    expect(headers.get('Authorization')).toBe('Bearer runtime-secret');
   });
 
-  it("does not add Authorization when no session token exists", async () => {
+  it('does not add Authorization when no session token exists', async () => {
     const fetchMock = createFetchMock();
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal('fetch', fetchMock);
 
-    await request<Payload>(
-      "/api/v1/auth/config",
-      (value) => value as Payload,
-      { method: "GET" },
-    );
+    await request<Payload>('/api/v1/auth/config', (value) => value as Payload, {
+      method: 'GET',
+    });
 
     expect(fetchMock).toHaveBeenCalledOnce();
 
     const firstCall = fetchMock.mock.calls.at(0);
     const headers = new Headers(firstCall?.[1]?.headers);
 
-    expect(headers.has("Authorization")).toBe(false);
+    expect(headers.has('Authorization')).toBe(false);
   });
 
-  it("exposes a valid Retry-After response header on API errors", async () => {
+  it('exposes a valid Retry-After response header on API errors', async () => {
     vi.stubGlobal(
-      "fetch",
+      'fetch',
       vi.fn(
         async () =>
           new Response(
             JSON.stringify({
-              error: "authentication_temporarily_locked",
+              error: 'authentication_temporarily_locked',
               detail:
-                "Too many failed authentication attempts. Please try again later.",
+                'Too many failed authentication attempts. Please try again later.',
             }),
             {
               status: 429,
               headers: {
-                "Content-Type": "application/json",
-                "Retry-After": "30",
+                'Content-Type': 'application/json',
+                'Retry-After': '30',
               },
             },
           ),
@@ -90,46 +82,45 @@ describe("authenticated HTTP requests", () => {
     );
 
     const result = await request<Payload>(
-      "/api/v1/auth/session",
+      '/api/v1/auth/session',
       (value) => value as Payload,
-      { method: "GET" },
+      { method: 'GET' },
     );
 
     expect(result).toEqual({
       ok: false,
       error: {
-        code: "authentication_temporarily_locked",
-        detail:
-          "Too many failed authentication attempts. Please try again later.",
+        code: 'authentication_temporarily_locked',
+        detail: 'Too many failed authentication attempts. Please try again later.',
         retryAfterSeconds: 30,
         status: 429,
       },
     });
   });
 
-  it("ignores a malformed Retry-After response header", async () => {
+  it('ignores a malformed Retry-After response header', async () => {
     vi.stubGlobal(
-      "fetch",
+      'fetch',
       vi.fn(
         async () =>
           new Response(
             JSON.stringify({
-              error: "authentication_temporarily_locked",
+              error: 'authentication_temporarily_locked',
               detail:
-                "Too many failed authentication attempts. Please try again later.",
+                'Too many failed authentication attempts. Please try again later.',
             }),
             {
               status: 429,
-              headers: { "Retry-After": "later" },
+              headers: { 'Retry-After': 'later' },
             },
           ),
       ),
     );
 
     const result = await request<Payload>(
-      "/api/v1/auth/session",
+      '/api/v1/auth/session',
       (value) => value as Payload,
-      { method: "GET" },
+      { method: 'GET' },
     );
 
     expect(result.ok).toBe(false);

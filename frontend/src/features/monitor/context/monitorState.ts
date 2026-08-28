@@ -1,11 +1,6 @@
-import { createContext } from "react";
+import { createContext } from 'react';
 
-import type {
-  QueryEvidence,
-  QueryState,
-  QuerySubmission,
-  QueryTrace,
-} from "../types";
+import type { QueryEvidence, QueryState, QuerySubmission, QueryTrace } from '../types';
 
 export interface MonitorContextValue {
   clearTraces: () => void;
@@ -15,6 +10,4 @@ export interface MonitorContextValue {
   traces: QueryTrace[];
 }
 
-export const MonitorContext = createContext<MonitorContextValue | null>(
-  null,
-);
+export const MonitorContext = createContext<MonitorContextValue | null>(null);

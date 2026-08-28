@@ -1,11 +1,11 @@
-import { useMemo, useState, type JSX } from "react";
+import { useMemo, useState, type JSX } from 'react';
 
-import type { QueryTrace } from "@/features/monitor/types";
-import { buildPlotPoints } from "./model";
-import { SimilarityPlot } from "./SimilarityPlot";
-import { SimilarityStats } from "./SimilarityStats";
-import { SimilarityTraceList } from "./SimilarityTraceList";
-import { ThresholdControls } from "./ThresholdControls";
+import type { QueryTrace } from '@/features/monitor/types';
+import { buildPlotPoints } from './model';
+import { SimilarityPlot } from './SimilarityPlot';
+import { SimilarityStats } from './SimilarityStats';
+import { SimilarityTraceList } from './SimilarityTraceList';
+import { ThresholdControls } from './ThresholdControls';
 
 interface SimilarityRadarProps {
   appliedThreshold: number;
@@ -26,31 +26,19 @@ export function SimilarityRadar({
   onThresholdChange,
   onThresholdApply,
 }: Readonly<SimilarityRadarProps>): JSX.Element {
-  const [selectedPointId, setSelectedPointId] =
-    useState<string | null>(null);
-  const points = useMemo(
-    () => buildPlotPoints(traces, threshold),
-    [threshold, traces],
-  );
-  const activePointId = points.some(
-    (point) => point.id === selectedPointId,
-  )
+  const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
+  const points = useMemo(() => buildPlotPoints(traces, threshold), [threshold, traces]);
+  const activePointId = points.some((point) => point.id === selectedPointId)
     ? selectedPointId
     : null;
-  const projectedHits = points.filter(
-    (point) => point.isProjectedHit,
-  ).length;
-  const projectedMisses =
-    points.length - projectedHits;
+  const projectedHits = points.filter((point) => point.isProjectedHit).length;
+  const projectedMisses = points.length - projectedHits;
   const recentPoints = points.slice(0, 5);
 
   return (
     <section aria-labelledby="radar-heading">
       <header className="mb-5">
-        <h2
-          className="font-display text-2xl italic"
-          id="radar-heading"
-        >
+        <h2 className="font-display text-2xl italic" id="radar-heading">
           Similarity threshold plot
         </h2>
         <p className="ui-label mt-1 text-(--text-faint)">
@@ -70,9 +58,8 @@ export function SimilarityRadar({
 
       {points.length === 0 && (
         <p className="mt-3 border-l border-(--gold) pl-3 text-xs/5  text-(--text-muted)">
-          No scored comparison yet. The first query seeds the cache; the
-          next query is the first one that can produce a similarity
-          score.
+          No scored comparison yet. The first query seeds the cache; the next query is
+          the first one that can produce a similarity score.
         </p>
       )}
 

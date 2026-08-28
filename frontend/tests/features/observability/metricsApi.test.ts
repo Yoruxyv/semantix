@@ -1,13 +1,13 @@
-import type { MockedFunction } from "vitest";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { MockedFunction } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   getRuntimeDiagnostics,
   getRuntimeMetrics,
-} from "@/features/observability/api/metricsApi";
+} from '@/features/observability/api/metricsApi';
 
 const metricsPayload = {
-  observed_at: "2026-07-19T08:00:00Z",
+  observed_at: '2026-07-19T08:00:00Z',
   uptime_seconds: 120,
   request_count: 10,
   error_count: 1,
@@ -24,19 +24,19 @@ const metricsPayload = {
 };
 
 const diagnosticsPayload = {
-  observed_at: "2026-08-21T08:00:00Z",
-  process_scope: "single_backend_process",
-  application_version: "1.0.0",
-  embedding_provider_category: "mock",
-  generation_provider_category: "mock",
+  observed_at: '2026-08-21T08:00:00Z',
+  process_scope: 'single_backend_process',
+  application_version: '1.0.0',
+  embedding_provider_category: 'mock',
+  generation_provider_category: 'mock',
   embedding_dimensions: 32,
-  embedding_space_fingerprint: "a".repeat(64),
-  generation_configuration_fingerprint: "b".repeat(64),
-  cache_backend: "memory",
-  cache_readiness: "ready",
-  normalization_mode: "identity",
-  normalization_algorithm_version: "identity-v1",
-  normalization_fingerprint: "c".repeat(64),
+  embedding_space_fingerprint: 'a'.repeat(64),
+  generation_configuration_fingerprint: 'b'.repeat(64),
+  cache_backend: 'memory',
+  cache_readiness: 'ready',
+  normalization_mode: 'identity',
+  normalization_algorithm_version: 'identity-v1',
+  normalization_fingerprint: 'c'.repeat(64),
   evaluation_timeout_seconds: 300,
   evaluation_max_cases: 50,
   evaluation_max_repetitions: 5,
@@ -46,19 +46,19 @@ const diagnosticsPayload = {
   evaluation_history_persistence_enabled: false,
 };
 
-describe("runtime metrics API", () => {
+describe('runtime metrics API', () => {
   let fetchMock: MockedFunction<typeof fetch>;
 
   beforeEach(() => {
     fetchMock = vi.fn<typeof fetch>();
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal('fetch', fetchMock);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("requests and decodes runtime metrics", async () => {
+  it('requests and decodes runtime metrics', async () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify(metricsPayload), { status: 200 }),
     );
@@ -67,41 +67,40 @@ describe("runtime metrics API", () => {
 
     expect(result).toEqual({ ok: true, data: metricsPayload });
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/api/v1/metrics"),
-      expect.objectContaining({ method: "GET" }),
+      expect.stringContaining('/api/v1/metrics'),
+      expect.objectContaining({ method: 'GET' }),
     );
   });
 
-  it("rejects negative or malformed counters", async () => {
+  it('rejects negative or malformed counters', async () => {
     fetchMock.mockResolvedValue(
-      new Response(
-        JSON.stringify({ ...metricsPayload, provider_calls: -1 }),
-        { status: 200 },
-      ),
+      new Response(JSON.stringify({ ...metricsPayload, provider_calls: -1 }), {
+        status: 200,
+      }),
     );
 
     const result = await getRuntimeMetrics();
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.error.code).toBe("invalid_response");
+      expect(result.error.code).toBe('invalid_response');
     }
   });
 });
 
-describe("runtime diagnostics API", () => {
+describe('runtime diagnostics API', () => {
   let fetchMock: MockedFunction<typeof fetch>;
 
   beforeEach(() => {
     fetchMock = vi.fn<typeof fetch>();
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal('fetch', fetchMock);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("requests and strictly decodes runtime diagnostics", async () => {
+  it('requests and strictly decodes runtime diagnostics', async () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify(diagnosticsPayload), { status: 200 }),
     );
@@ -110,34 +109,32 @@ describe("runtime diagnostics API", () => {
 
     expect(result).toEqual({ ok: true, data: diagnosticsPayload });
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/api/v1/diagnostics"),
-      expect.objectContaining({ method: "GET" }),
+      expect.stringContaining('/api/v1/diagnostics'),
+      expect.objectContaining({ method: 'GET' }),
     );
   });
 
   it.each([
     {
-      name: "malformed fingerprint",
-      payload: { ...diagnosticsPayload, embedding_space_fingerprint: "unsafe" },
+      name: 'malformed fingerprint',
+      payload: { ...diagnosticsPayload, embedding_space_fingerprint: 'unsafe' },
     },
     {
-      name: "unsupported readiness state",
-      payload: { ...diagnosticsPayload, cache_readiness: "unknown" },
+      name: 'unsupported readiness state',
+      payload: { ...diagnosticsPayload, cache_readiness: 'unknown' },
     },
     {
-      name: "unexpected field",
-      payload: { ...diagnosticsPayload, database_url: "private" },
+      name: 'unexpected field',
+      payload: { ...diagnosticsPayload, database_url: 'private' },
     },
-  ])("rejects $name", async ({ payload }) => {
-    fetchMock.mockResolvedValue(
-      new Response(JSON.stringify(payload), { status: 200 }),
-    );
+  ])('rejects $name', async ({ payload }) => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }));
 
     const result = await getRuntimeDiagnostics();
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.error.code).toBe("invalid_response");
+      expect(result.error.code).toBe('invalid_response');
     }
   });
 });

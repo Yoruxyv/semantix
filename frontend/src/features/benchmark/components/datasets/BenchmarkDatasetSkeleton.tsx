@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 const CONTROL_SKELETONS = [0, 1, 2, 3, 4, 5] as const;
 
@@ -10,10 +10,7 @@ export function BenchmarkDatasetSkeleton(): JSX.Element {
       className="block animate-pulse border-y border-(--hairline) py-6"
     >
       <span className="sr-only">Loading the benchmark dataset catalog.</span>
-      <span
-        aria-hidden="true"
-        className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
-      >
+      <span aria-hidden="true" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {CONTROL_SKELETONS.map((control) => {
           if (control === 5) {
             return (

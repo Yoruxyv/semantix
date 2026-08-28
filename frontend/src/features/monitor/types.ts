@@ -1,4 +1,4 @@
-import type { ApiError } from "@/shared/api/types";
+import type { ApiError } from '@/shared/api/types';
 
 export interface QueryRequest {
   prompt: string;
@@ -9,19 +9,14 @@ export interface QueryRequest {
   private?: boolean;
 }
 
-export type QueryPolicyMode =
-  | "normal"
-  | "read-only"
-  | "refresh"
-  | "bypass"
-  | "private";
+export type QueryPolicyMode = 'normal' | 'read-only' | 'refresh' | 'bypass' | 'private';
 
 export const QUERY_POLICY_LABELS: Record<QueryPolicyMode, string> = {
-  normal: "Normal read and write",
-  "read-only": "Read only",
-  refresh: "Refresh and write",
-  bypass: "Bypass cache",
-  private: "Private request",
+  normal: 'Normal read and write',
+  'read-only': 'Read only',
+  refresh: 'Refresh and write',
+  bypass: 'Bypass cache',
+  private: 'Private request',
 };
 
 export interface QuerySubmission {
@@ -49,10 +44,10 @@ export interface QueryResponse {
 }
 
 export type QueryState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "success"; data: QueryResponse }
-  | { status: "error"; error: ApiError };
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; data: QueryResponse }
+  | { status: 'error'; error: ApiError };
 
 export interface QueryTrace {
   id: string;

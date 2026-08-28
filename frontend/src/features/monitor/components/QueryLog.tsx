@@ -10,7 +10,7 @@ import {
 import { EmptyState } from '@/shared/components/ui';
 import { QUERY_POLICY_LABELS, type QueryTrace } from '../types';
 
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 interface QueryLogProps {
   traces: QueryTrace[];
@@ -23,9 +23,7 @@ interface MobileLabelProps {
 
 const TRACE_HEADERS = ['Time', 'Score', 'Query', 'Projection', 'Latency'] as const;
 
-function MobileLabel({
-  children,
-}: Readonly<MobileLabelProps>): JSX.Element {
+function MobileLabel({ children }: Readonly<MobileLabelProps>): JSX.Element {
   return (
     <span className="ui-label mr-2 text-(--text-faint) min-[760px]:hidden">
       {children}
@@ -33,10 +31,7 @@ function MobileLabel({
   );
 }
 
-export function QueryLog({
-  traces,
-  threshold,
-}: Readonly<QueryLogProps>): JSX.Element {
+export function QueryLog({ traces, threshold }: Readonly<QueryLogProps>): JSX.Element {
   const recordCount = traces.length.toString().padStart(2, '0');
 
   return (
@@ -53,8 +48,8 @@ export function QueryLog({
           className="py-6"
           description={
             <p className="font-data text-[10px]/5">
-            The first probe seeds the visible history. Later prompts show their
-            nearest-cache score and projected decision here.
+              The first probe seeds the visible history. Later prompts show their
+              nearest-cache score and projected decision here.
             </p>
           }
           title="No query traces yet"
@@ -73,8 +68,10 @@ export function QueryLog({
           </div>
 
           {traces.map((trace) => {
-            const isProjectedHit =
-              meetsSimilarityThreshold(trace.similarity, threshold);
+            const isProjectedHit = meetsSimilarityThreshold(
+              trace.similarity,
+              threshold,
+            );
             const projectionAccentColor = isProjectedHit
               ? 'var(--gold)'
               : 'var(--coral)';
@@ -100,9 +97,7 @@ export function QueryLog({
                 </div>
 
                 <span className="min-w-0 wrap-break-word text-(--text-soft)">
-                  <span className="block min-[760px]:truncate">
-                    {trace.prompt}
-                  </span>
+                  <span className="block min-[760px]:truncate">{trace.prompt}</span>
                   <span className="ui-label mt-1 block wrap-break-word text-(--text-faint)">
                     {trace.namespace} · {QUERY_POLICY_LABELS[trace.policyMode]}
                   </span>

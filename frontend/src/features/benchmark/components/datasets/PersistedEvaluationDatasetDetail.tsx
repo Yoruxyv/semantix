@@ -23,10 +23,7 @@ export function PersistedEvaluationDatasetDetail({
       aria-labelledby="persisted-dataset-detail-heading"
       className="mt-7 border-y border-(--hairline) py-6"
     >
-      <h3
-        className="ui-label text-(--gold)"
-        id="persisted-dataset-detail-heading"
-      >
+      <h3 className="ui-label text-(--gold)" id="persisted-dataset-detail-heading">
         Persisted dataset detail
       </h3>
       {isPending && (
@@ -41,9 +38,7 @@ export function PersistedEvaluationDatasetDetail({
         <>
           <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <h4 className="wrap-break-word text-xl text-(--text)">
-                {detail.name}
-              </h4>
+              <h4 className="wrap-break-word text-xl text-(--text)">{detail.name}</h4>
               <EvaluationDatasetMetadata dataset={detail} />
             </div>
             {canRun && (

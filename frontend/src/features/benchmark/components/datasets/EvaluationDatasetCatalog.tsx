@@ -8,10 +8,7 @@ import {
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { isCacheNamespace } from '@/features/cache/namespace';
 import { Alert } from '@/shared/components/ui';
-import {
-  apiErrorFromUnknown,
-  dataFromApiResult,
-} from '@/shared/query/apiResult';
+import { apiErrorFromUnknown, dataFromApiResult } from '@/shared/query/apiResult';
 import { benchmarkDatasetKeys } from '@/shared/query/queryKeys';
 import {
   deletePersistedEvaluationDataset,
@@ -63,18 +60,11 @@ export function EvaluationDatasetCatalog({
 
   useEffect(() => {
     setSaveNamespace(defaultSaveNamespace(auth.status, namespaces));
-    setListNamespace(
-      defaultListNamespace(auth.status, namespaces, hasGlobalNamespace),
-    );
+    setListNamespace(defaultListNamespace(auth.status, namespaces, hasGlobalNamespace));
     setOffset(0);
     setSelectedId(null);
     setPendingDelete(null);
-  }, [
-    auth.status,
-    auth.session?.name,
-    hasGlobalNamespace,
-    namespaces,
-  ]);
+  }, [auth.status, auth.session?.name, hasGlobalNamespace, namespaces]);
 
   const catalogQuery = useQuery({
     queryKey: benchmarkDatasetKeys.persistedList(
@@ -109,9 +99,7 @@ export function EvaluationDatasetCatalog({
       if (selectedId === null) {
         throw new Error('No persisted dataset is selected.');
       }
-      return dataFromApiResult(
-        await getPersistedEvaluationDataset(selectedId, signal),
-      );
+      return dataFromApiResult(await getPersistedEvaluationDataset(selectedId, signal));
     },
     enabled: selectedId !== null && catalog?.persistence_enabled === true,
   });
@@ -120,24 +108,17 @@ export function EvaluationDatasetCatalog({
   const canRun = canRunBenchmarks(auth.status, auth.session);
   const requiresSaveNamespace =
     auth.status === 'disabled' ||
-    (auth.status === 'authenticated' &&
-      (hasGlobalNamespace || namespaces.length > 1));
-  const saveNamespaceValid =
-    !requiresSaveNamespace || isCacheNamespace(saveNamespace);
+    (auth.status === 'authenticated' && (hasGlobalNamespace || namespaces.length > 1));
+  const saveNamespaceValid = !requiresSaveNamespace || isCacheNamespace(saveNamespace);
 
   async function saveSessionDataset(): Promise<void> {
     if (!saveNamespaceValid) {
       return;
     }
     setActionError(null);
-    const saved = await controller.saveImport(
-      saveNamespace,
-      retentionDays,
-    );
+    const saved = await controller.saveImport(saveNamespace, retentionDays);
     if (saved !== null) {
-      setCatalogStatus(
-        `Saved ${saved.name} in namespace ${saved.namespace}.`,
-      );
+      setCatalogStatus(`Saved ${saved.name} in namespace ${saved.namespace}.`);
       setSelectedId(saved.dataset_id);
     }
   }
@@ -166,9 +147,7 @@ export function EvaluationDatasetCatalog({
       await queryClient.invalidateQueries({
         queryKey: benchmarkDatasetKeys.persisted(),
       });
-      setCatalogStatus(
-        `Deleted ${dataset.name} from namespace ${dataset.namespace}.`,
-      );
+      setCatalogStatus(`Deleted ${dataset.name} from namespace ${dataset.namespace}.`);
     } finally {
       setDeletingId(null);
     }
@@ -183,12 +162,12 @@ export function EvaluationDatasetCatalog({
   }
 
   const catalogError = catalogQuery.isError
-    ? apiErrorFromUnknown(catalogQuery.error).detail ??
-      'The persisted dataset catalog could not be loaded.'
+    ? (apiErrorFromUnknown(catalogQuery.error).detail ??
+      'The persisted dataset catalog could not be loaded.')
     : null;
   const detailError = detailQuery.isError
-    ? apiErrorFromUnknown(detailQuery.error).detail ??
-      'The persisted dataset details could not be loaded.'
+    ? (apiErrorFromUnknown(detailQuery.error).detail ??
+      'The persisted dataset details could not be loaded.')
     : null;
 
   return (
@@ -202,9 +181,9 @@ export function EvaluationDatasetCatalog({
           Evaluation datasets
         </h2>
         <p className="mt-2 max-w-3xl text-sm/6 text-(--text-muted)">
-          Built-in definitions stay code-owned. Session imports remain only in
-          this page until an Operator explicitly saves a validated dataset to an
-          authorized namespace.
+          Built-in definitions stay code-owned. Session imports remain only in this page
+          until an Operator explicitly saves a validated dataset to an authorized
+          namespace.
         </p>
       </header>
 
@@ -217,9 +196,8 @@ export function EvaluationDatasetCatalog({
           tone="warning"
         >
           <p className="font-data mt-1 text-[10px]/5 text-(--text-soft)">
-            This deployment uses session-only evaluation datasets. Built-in and
-            imported runs still work, but validated imports cannot be saved
-            across reloads.
+            This deployment uses session-only evaluation datasets. Built-in and imported
+            runs still work, but validated imports cannot be saved across reloads.
           </p>
         </Alert>
       )}
@@ -276,9 +254,7 @@ export function EvaluationDatasetCatalog({
         />
       )}
 
-      {(catalogError !== null ||
-        detailError !== null ||
-        actionError !== null) && (
+      {(catalogError !== null || detailError !== null || actionError !== null) && (
         <Alert
           className="mt-6 border-l-2 border-(--coral) px-4 py-3"
           role="alert"

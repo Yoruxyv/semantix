@@ -6,10 +6,10 @@ import {
   PLOT_RIGHT,
   PLOT_TOP,
   scoreToX,
-} from "./model";
-import { formatDecimal } from "@/shared/lib/formatters";
+} from './model';
+import { formatDecimal } from '@/shared/lib/formatters';
 
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 interface PlotBackdropProps {
   appliedThreshold: number;
@@ -22,8 +22,7 @@ export function PlotBackdrop({
 }: Readonly<PlotBackdropProps>): JSX.Element {
   const appliedThresholdX = scoreToX(appliedThreshold);
   const previewThresholdX = scoreToX(previewThreshold);
-  const hasPendingThreshold =
-    Math.abs(previewThreshold - appliedThreshold) >= 0.001;
+  const hasPendingThreshold = Math.abs(previewThreshold - appliedThreshold) >= 0.001;
 
   return (
     <>
@@ -82,13 +81,7 @@ export function PlotBackdrop({
 
         return (
           <g key={tick}>
-            <line
-              stroke="var(--hairline)"
-              x1={x}
-              x2={x}
-              y1={PLOT_TOP}
-              y2={AXIS_Y}
-            />
+            <line stroke="var(--hairline)" x1={x} x2={x} y1={PLOT_TOP} y2={AXIS_Y} />
             <text
               fill="var(--text-faint)"
               fontFamily="IBM Plex Mono"

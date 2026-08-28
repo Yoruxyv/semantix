@@ -53,8 +53,8 @@ export function EvaluationRunComparisonWorkspace({
   const error =
     controller.error === null
       ? null
-      : apiErrorFromUnknown(controller.error).detail ??
-        'The selected retained runs could not be compared.';
+      : (apiErrorFromUnknown(controller.error).detail ??
+        'The selected retained runs could not be compared.');
 
   return (
     <section
@@ -109,10 +109,7 @@ export function EvaluationRunComparisonWorkspace({
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <Button
-          disabled={!controller.canCompare}
-          onClick={controller.compare}
-        >
+        <Button disabled={!controller.canCompare} onClick={controller.compare}>
           {controller.isPending ? 'Comparing...' : 'Compare selected runs'}
         </Button>
         <p className="font-data text-[10px]/5 text-(--text-faint)">
@@ -136,9 +133,7 @@ export function EvaluationRunComparisonWorkspace({
           title="Comparison unavailable"
           tone="error"
         >
-          <p className="font-data mt-1 text-[10px]/5 text-(--text-soft)">
-            {error}
-          </p>
+          <p className="font-data mt-1 text-[10px]/5 text-(--text-soft)">{error}</p>
         </Alert>
       )}
 

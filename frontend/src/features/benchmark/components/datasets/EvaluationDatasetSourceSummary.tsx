@@ -1,9 +1,6 @@
 import type { JSX } from 'react';
 
-import {
-  formatBytes,
-  formatCount,
-} from '@/shared/lib/formatters';
+import { formatBytes, formatCount } from '@/shared/lib/formatters';
 
 import type { BenchmarkController } from '@/features/benchmark/hooks/useBenchmark';
 import { EvaluationDatasetDigest } from './EvaluationDatasetMetadata';
@@ -34,8 +31,8 @@ export function EvaluationDatasetSourceSummary({
           <p className="ui-label text-(--gold)">Session</p>
           {controller.preview === null ? (
             <p className="font-data mt-2 text-[10px]/5 text-(--text-faint)">
-              No validated session import. Return to Runs to choose and
-              validate a schema version 1 JSON file.
+              No validated session import. Return to Runs to choose and validate a
+              schema version 1 JSON file.
             </p>
           ) : (
             <>

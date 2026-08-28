@@ -112,10 +112,7 @@ const INVALID_RUN_CASES: InvalidRunCase[] = [
   {
     name: 'a missing reproducibility measured threshold',
     mutate: (value) => {
-      Reflect.deleteProperty(
-        value.reproducibility,
-        'measured_threshold',
-      );
+      Reflect.deleteProperty(value.reproducibility, 'measured_threshold');
     },
   },
   {
@@ -173,9 +170,9 @@ describe('benchmark decoders', () => {
   });
 
   it('accepts reconciled evidence covering all four confusion outcomes', () => {
-    expect(
-      decodeBenchmarkRun(structuredClone(benchmarkAnalysisResult)),
-    ).toEqual(benchmarkAnalysisResult);
+    expect(decodeBenchmarkRun(structuredClone(benchmarkAnalysisResult))).toEqual(
+      benchmarkAnalysisResult,
+    );
   });
 
   it.each(INVALID_RUN_CASES)('rejects $name', ({ mutate }) => {
@@ -253,9 +250,7 @@ describe('benchmark decoders', () => {
       dataset_schema_version: 1,
     };
 
-    expect(decodeBenchmarkRun(custom).dataset.categories).toEqual([
-      'domain-specific',
-    ]);
+    expect(decodeBenchmarkRun(custom).dataset.categories).toEqual(['domain-specific']);
     expect(
       decodeEvaluationDatasetPreview({
         schema_version: 1,
@@ -339,9 +334,7 @@ describe('benchmark decoders', () => {
 
     const reordered = structuredClone(persistedDataset);
     reordered.cases.reverse();
-    expect(() =>
-      decodePersistedEvaluationDatasetDetail(reordered),
-    ).toThrow();
+    expect(() => decodePersistedEvaluationDatasetDetail(reordered)).toThrow();
   });
 
   it('rejects inconsistent preview limits and provider-call accounting', () => {

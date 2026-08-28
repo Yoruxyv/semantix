@@ -31,11 +31,7 @@ export function EvaluationRunHistoryFilter({
 }: Readonly<EvaluationRunHistoryFilterProps>): JSX.Element {
   let namespaceControl: JSX.Element;
 
-  if (
-    authStatus === 'authenticated' &&
-    !hasGlobalNamespace &&
-    namespaces.length > 1
-  ) {
+  if (authStatus === 'authenticated' && !hasGlobalNamespace && namespaces.length > 1) {
     namespaceControl = (
       <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
         <label className="min-w-0 flex-1">
@@ -75,11 +71,7 @@ export function EvaluationRunHistoryFilter({
             onChange={(event) => onNamespaceInputChange(event.target.value)}
           />
         </label>
-        <Button
-          size="compact"
-          variant="secondary"
-          onClick={onApplyNamespace}
-        >
+        <Button size="compact" variant="secondary" onClick={onApplyNamespace}>
           Apply namespace
         </Button>
       </div>
@@ -91,10 +83,7 @@ export function EvaluationRunHistoryFilter({
       aria-labelledby="run-history-filter-heading"
       className="mt-5 border border-(--hairline) p-4"
     >
-      <h3
-        className="ui-label text-(--text-muted)"
-        id="run-history-filter-heading"
-      >
+      <h3 className="ui-label text-(--text-muted)" id="run-history-filter-heading">
         Namespace scope
       </h3>
 
@@ -104,14 +93,11 @@ export function EvaluationRunHistoryFilter({
         className="font-data mt-2 text-[10px]/5 text-(--text-faint)"
         id="history-namespace-guidance"
       >
-        Wildcard access may leave this blank to list all authorized history.
-        Deletion always remains scoped to the run&apos;s retained namespace.
+        Wildcard access may leave this blank to list all authorized history. Deletion
+        always remains scoped to the run&apos;s retained namespace.
       </p>
       {namespaceError !== null && (
-        <p
-          className="font-data mt-2 text-[10px]/5 text-(--coral)"
-          role="alert"
-        >
+        <p className="font-data mt-2 text-[10px]/5 text-(--coral)" role="alert">
           {namespaceError}
         </p>
       )}

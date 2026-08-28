@@ -1,30 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   canPersistEvaluationDatasets,
   canRunBenchmarks,
-} from "@/features/auth/permissions";
-import { useAuth } from "@/features/auth/hooks/useAuth";
-import {
-  apiErrorFromUnknown,
-  dataFromApiResult,
-} from "@/shared/query/apiResult";
-import { benchmarkDatasetKeys } from "@/shared/query/queryKeys";
+} from '@/features/auth/permissions';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { apiErrorFromUnknown, dataFromApiResult } from '@/shared/query/apiResult';
+import { benchmarkDatasetKeys } from '@/shared/query/queryKeys';
 
-import { getBenchmarkDatasets } from "../api/benchmarkApi";
-import {
-  compileThresholdSweep,
-} from "../lib/thresholdSweep";
-import type {
-  BenchmarkDatasetSummary,
-  BenchmarkRunResponse,
-} from "../types";
+import { getBenchmarkDatasets } from '../api/benchmarkApi';
+import { compileThresholdSweep } from '../lib/thresholdSweep';
+import type { BenchmarkDatasetSummary, BenchmarkRunResponse } from '../types';
 import {
   BENCHMARK_DATASET_GC_TIME_MS,
   BENCHMARK_DATASET_STALE_TIME_MS,
@@ -34,19 +21,16 @@ import {
   persistedSummary,
   type BenchmarkController,
   type BenchmarkForm,
-} from "./benchmarkController";
-import { useEvaluationDatasetWorkflow } from "./useEvaluationDatasetWorkflow";
-import { useEvaluationRunWorkflow } from "./useEvaluationRunWorkflow";
+} from './benchmarkController';
+import { useEvaluationDatasetWorkflow } from './useEvaluationDatasetWorkflow';
+import { useEvaluationRunWorkflow } from './useEvaluationRunWorkflow';
 
 export {
   BENCHMARK_DATASET_GC_TIME_MS,
   BENCHMARK_DATASET_STALE_TIME_MS,
   EVALUATION_IMPORT_FILE_MAX_BYTES,
-} from "./benchmarkController";
-export type {
-  BenchmarkController,
-  BenchmarkForm,
-} from "./benchmarkController";
+} from './benchmarkController';
+export type { BenchmarkController, BenchmarkForm } from './benchmarkController';
 
 export function useBenchmark(): BenchmarkController {
   const auth = useAuth();
@@ -54,7 +38,7 @@ export function useBenchmark(): BenchmarkController {
   const [result, setResult] = useState<BenchmarkRunResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showWarning, setShowWarning] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("");
+  const [statusMessage, setStatusMessage] = useState('');
   const hasAppliedDefaultDataset = useRef(false);
   const previousPrincipal = useRef<string | null>(null);
 
@@ -67,10 +51,7 @@ export function useBenchmark(): BenchmarkController {
   });
 
   useEffect(() => {
-    if (
-      datasetQuery.data === undefined ||
-      hasAppliedDefaultDataset.current
-    ) {
+    if (datasetQuery.data === undefined || hasAppliedDefaultDataset.current) {
       return;
     }
 
@@ -83,9 +64,9 @@ export function useBenchmark(): BenchmarkController {
 
   const authIdentity = useMemo(
     () =>
-      `${auth.status}:${auth.session?.name ?? ""}:${
-        auth.session?.role ?? ""
-      }:${auth.session?.namespaces.join(",") ?? ""}`,
+      `${auth.status}:${auth.session?.name ?? ''}:${
+        auth.session?.role ?? ''
+      }:${auth.session?.namespaces.join(',') ?? ''}`,
     [auth.session, auth.status],
   );
 
@@ -98,36 +79,30 @@ export function useBenchmark(): BenchmarkController {
       previousPrincipal.current = authIdentity;
       setForm((current) => ({
         ...current,
-        datasetSource: "builtin",
-        persistedDatasetId: "",
-        persistedNamespace: "",
-        historyNamespace: "",
+        datasetSource: 'builtin',
+        persistedDatasetId: '',
+        persistedNamespace: '',
+        historyNamespace: '',
       }));
     }
   }, [authIdentity]);
 
   const datasets = datasetQuery.data?.datasets ?? [];
-  const datasetsLoading =
-    datasetQuery.data === undefined && datasetQuery.isPending;
+  const datasetsLoading = datasetQuery.data === undefined && datasetQuery.isPending;
   const datasetError = datasetQuery.isError
-    ? apiErrorFromUnknown(datasetQuery.error).detail ??
-      "Evaluation datasets could not be loaded."
+    ? (apiErrorFromUnknown(datasetQuery.error).detail ??
+      'Evaluation datasets could not be loaded.')
     : null;
   const canRun = canRunBenchmarks(auth.status, auth.session);
-  const canSaveImport = canPersistEvaluationDatasets(
-    auth.status,
-    auth.session,
-  );
+  const canSaveImport = canPersistEvaluationDatasets(auth.status, auth.session);
 
-  const {
-    required: historyNamespaceRequired,
-    valid: historyNamespaceValid,
-  } = historyNamespacePolicy(
-    auth.status,
-    auth.session?.namespaces ?? [],
-    form.datasetSource,
-    form.historyNamespace,
-  );
+  const { required: historyNamespaceRequired, valid: historyNamespaceValid } =
+    historyNamespacePolicy(
+      auth.status,
+      auth.session?.namespaces ?? [],
+      form.datasetSource,
+      form.historyNamespace,
+    );
 
   const sweep = compileThresholdSweep(
     form.sweepStart,
@@ -151,12 +126,10 @@ export function useBenchmark(): BenchmarkController {
   const builtinDataset =
     datasets.find((dataset) => dataset.dataset_id === form.datasetId) ?? null;
   let selectedDataset: BenchmarkDatasetSummary | null = builtinDataset;
-  if (form.datasetSource === "custom") {
+  if (form.datasetSource === 'custom') {
     selectedDataset =
-      datasetWorkflow.preview === null
-        ? null
-        : customSummary(datasetWorkflow.preview);
-  } else if (form.datasetSource === "persisted") {
+      datasetWorkflow.preview === null ? null : customSummary(datasetWorkflow.preview);
+  } else if (form.datasetSource === 'persisted') {
     selectedDataset =
       datasetWorkflow.persistedDataset === null
         ? null
@@ -164,15 +137,13 @@ export function useBenchmark(): BenchmarkController {
   }
 
   let hasRunnableDataset = builtinDataset !== null;
-  if (form.datasetSource === "custom") {
+  if (form.datasetSource === 'custom') {
     hasRunnableDataset =
-      datasetWorkflow.importedDefinition !== null &&
-      datasetWorkflow.preview !== null;
-  } else if (form.datasetSource === "persisted") {
+      datasetWorkflow.importedDefinition !== null && datasetWorkflow.preview !== null;
+  } else if (form.datasetSource === 'persisted') {
     hasRunnableDataset =
       datasetWorkflow.persistedDataset !== null &&
-      datasetWorkflow.persistedDataset.dataset_id ===
-        form.persistedDatasetId &&
+      datasetWorkflow.persistedDataset.dataset_id === form.persistedDatasetId &&
       datasetWorkflow.persistedDataset.namespace === form.persistedNamespace;
   }
 
@@ -194,8 +165,7 @@ export function useBenchmark(): BenchmarkController {
   return {
     datasets,
     datasetsLoading,
-    datasetsRefreshing:
-      datasetQuery.data !== undefined && datasetQuery.isFetching,
+    datasetsRefreshing: datasetQuery.data !== undefined && datasetQuery.isFetching,
     canRun,
     canSaveImport,
     error: error ?? datasetError,

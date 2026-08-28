@@ -1,14 +1,10 @@
-import { PlotBackdrop } from "./PlotBackdrop";
-import { SimilarityTooltip } from "./SimilarityTooltip";
-import {
-  VIEW_HEIGHT,
-  VIEW_WIDTH,
-  type PlotPoint,
-} from "./model";
-import { formatSimilarity } from "@/shared/lib/formatters";
-import { cacheDecisionLabel } from "@/shared/domain/similarity";
+import { PlotBackdrop } from './PlotBackdrop';
+import { SimilarityTooltip } from './SimilarityTooltip';
+import { VIEW_HEIGHT, VIEW_WIDTH, type PlotPoint } from './model';
+import { formatSimilarity } from '@/shared/lib/formatters';
+import { cacheDecisionLabel } from '@/shared/domain/similarity';
 
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 interface SimilarityPlotProps {
   activePointId: string | null;
@@ -25,7 +21,7 @@ function pointLabel(point: PlotPoint): string {
     `Similarity ${formatSimilarity(point.similarity)}.`,
     `Projected ${cacheDecisionLabel(point.isProjectedHit).toLowerCase()}.`,
     `Actual ${cacheDecisionLabel(point.actualCacheHit).toLowerCase()}.`,
-  ].join(" ");
+  ].join(' ');
 }
 
 export function SimilarityPlot({
@@ -36,8 +32,7 @@ export function SimilarityPlot({
   previewThreshold,
   totalTraces,
 }: Readonly<SimilarityPlotProps>): JSX.Element {
-  const activePoint =
-    points.find((point) => point.id === activePointId) ?? null;
+  const activePoint = points.find((point) => point.id === activePointId) ?? null;
 
   return (
     <section
@@ -56,17 +51,12 @@ export function SimilarityPlot({
 
         {points.map((point, index) => {
           const isActive = point.id === activePointId;
-          const color = point.isProjectedHit
-            ? "var(--gold)"
-            : "var(--coral)";
-          const baseRadius = index === 0 ? "7" : "5";
-          const radius = isActive ? "8" : baseRadius;
+          const color = point.isProjectedHit ? 'var(--gold)' : 'var(--coral)';
+          const baseRadius = index === 0 ? '7' : '5';
+          const radius = isActive ? '8' : baseRadius;
 
           return (
-            <g
-              key={point.id}
-              data-active={isActive ? "true" : "false"}
-            >
+            <g key={point.id} data-active={isActive ? 'true' : 'false'}>
               {isActive && (
                 <circle
                   aria-hidden="true"
@@ -87,15 +77,10 @@ export function SimilarityPlot({
                 data-trace-id={point.id}
                 fill={color}
                 r={radius}
-                stroke={isActive ? "var(--text)" : "var(--ink)"}
-                strokeWidth={isActive ? "3" : "2"}
+                stroke={isActive ? 'var(--text)' : 'var(--ink)'}
+                strokeWidth={isActive ? '3' : '2'}
               />
-              <foreignObject
-                height="24"
-                width="24"
-                x={point.x - 12}
-                y={point.y - 12}
-              >
+              <foreignObject height="24" width="24" x={point.x - 12} y={point.y - 12}>
                 <button
                   aria-label={pointLabel(point)}
                   className="size-6 cursor-pointer bg-transparent p-0"
@@ -111,9 +96,7 @@ export function SimilarityPlot({
           );
         })}
 
-        {activePoint !== null && (
-          <SimilarityTooltip point={activePoint} />
-        )}
+        {activePoint !== null && <SimilarityTooltip point={activePoint} />}
       </svg>
     </section>
   );

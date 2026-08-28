@@ -7,10 +7,7 @@ import { BENCHMARK_RESULT_COLUMNS } from '@/features/benchmark/lib/resultColumns
 import type { JSX } from 'react';
 
 interface BenchmarkResultsTableProps {
-  onSelectCase: (
-    result: BenchmarkQueryResult,
-    trigger: HTMLButtonElement,
-  ) => void;
+  onSelectCase: (result: BenchmarkQueryResult, trigger: HTMLButtonElement) => void;
   results: BenchmarkQueryResult[];
   selectedCase: BenchmarkQueryResult | null;
 }
@@ -22,10 +19,7 @@ export function BenchmarkResultsTable({
 }: Readonly<BenchmarkResultsTableProps>): JSX.Element {
   return (
     <section aria-labelledby="benchmark-results-heading" className="mt-6">
-      <h3
-        className="ui-label text-(--text-muted)"
-        id="benchmark-results-heading"
-      >
+      <h3 className="ui-label text-(--text-muted)" id="benchmark-results-heading">
         Filtered measured cases
       </h3>
       <ul
@@ -52,9 +46,7 @@ export function BenchmarkResultsTable({
               </div>
               <span
                 className={`ui-label ${
-                  result.correct
-                    ? 'text-(--teal)'
-                    : 'text-(--coral-text)'
+                  result.correct ? 'text-(--teal)' : 'text-(--coral-text)'
                 }`}
               >
                 {result.outcome.replaceAll('_', ' ')}
@@ -82,27 +74,22 @@ export function BenchmarkResultsTable({
             </dl>
             <Button
               aria-controls={
-                selectedCase === result
-                  ? 'benchmark-case-detail'
-                  : undefined
+                selectedCase === result ? 'benchmark-case-detail' : undefined
               }
               aria-expanded={selectedCase === result}
               className="mt-4 border-(--hairline) text-(--text-soft) hover:border-(--teal) hover:text-(--teal)"
-              onClick={(event) =>
-                onSelectCase(result, event.currentTarget)
-              }
+              onClick={(event) => onSelectCase(result, event.currentTarget)}
               size="compact"
               variant="secondary"
             >
-              View details for case {result.case_id}, repetition{' '}
-              {result.repetition}
+              View details for case {result.case_id}, repetition {result.repetition}
             </Button>
           </li>
         ))}
       </ul>
       <p className="font-data mt-3 hidden text-[10px] text-(--text-faint) min-[960px]:block">
-        The table remains horizontally scrollable for dense comparison. Every
-        row has the same detail alternative as the compact list.
+        The table remains horizontally scrollable for dense comparison. Every row has
+        the same detail alternative as the compact list.
       </p>
       <section
         aria-label="Scrollable per-query benchmark evidence"
@@ -150,15 +137,11 @@ export function BenchmarkResultsTable({
                 <td className="px-3 py-4">
                   <Button
                     aria-controls={
-                      selectedCase === result
-                        ? 'benchmark-case-detail'
-                        : undefined
+                      selectedCase === result ? 'benchmark-case-detail' : undefined
                     }
                     aria-expanded={selectedCase === result}
                     className="whitespace-nowrap border-(--hairline) text-(--text-soft) hover:border-(--teal) hover:text-(--teal)"
-                    onClick={(event) =>
-                      onSelectCase(result, event.currentTarget)
-                    }
+                    onClick={(event) => onSelectCase(result, event.currentTarget)}
                     size="compact"
                     variant="secondary"
                   >

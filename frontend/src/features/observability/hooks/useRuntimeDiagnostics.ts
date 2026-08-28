@@ -1,22 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useQuery } from '@tanstack/react-query';
+import { useCallback } from 'react';
 
-import type { ApiError } from "@/shared/api/types";
-import {
-  apiErrorFromUnknown,
-  dataFromApiResult,
-} from "@/shared/query/apiResult";
-import { runtimeDiagnosticsKeys } from "@/shared/query/queryKeys";
+import type { ApiError } from '@/shared/api/types';
+import { apiErrorFromUnknown, dataFromApiResult } from '@/shared/query/apiResult';
+import { runtimeDiagnosticsKeys } from '@/shared/query/queryKeys';
 
-import { getRuntimeDiagnostics } from "../api/metricsApi";
-import type { RuntimeDiagnostics } from "../types";
+import { getRuntimeDiagnostics } from '../api/metricsApi';
+import type { RuntimeDiagnostics } from '../types';
 
 export const RUNTIME_DIAGNOSTICS_STALE_TIME_MS = 30_000;
 
 type DiagnosticsState =
-  | { status: "loading" }
-  | { status: "ready"; data: RuntimeDiagnostics }
-  | { status: "error"; error: ApiError };
+  | { status: 'loading' }
+  | { status: 'ready'; data: RuntimeDiagnostics }
+  | { status: 'error'; error: ApiError };
 
 interface RuntimeDiagnosticsController {
   isRefreshing: boolean;
@@ -37,14 +34,14 @@ export function useRuntimeDiagnostics(): RuntimeDiagnosticsController {
 
   let state: DiagnosticsState;
   if (query.data !== undefined) {
-    state = { status: "ready", data: query.data };
+    state = { status: 'ready', data: query.data };
   } else if (query.isError) {
     state = {
-      status: "error",
+      status: 'error',
       error: apiErrorFromUnknown(query.error),
     };
   } else {
-    state = { status: "loading" };
+    state = { status: 'loading' };
   }
 
   const refresh = useCallback((): void => {

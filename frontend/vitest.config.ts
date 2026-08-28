@@ -1,22 +1,22 @@
-import { fileURLToPath, URL } from "node:url";
-import { defineConfig } from "vitest/config";
+import { fileURLToPath, URL } from 'node:url';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  cacheDir: ".vite-cache",
+  cacheDir: '.vite-cache',
 
   define: {
-    "import.meta.env.VITE_API_BASE_URL": JSON.stringify("http://localhost:8000"),
+    'import.meta.env.VITE_API_BASE_URL': JSON.stringify('http://localhost:8000'),
   },
 
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
 
   test: {
     coverage: {
-      provider: "v8",
+      provider: 'v8',
       thresholds: {
         branches: 75,
         functions: 82,
@@ -24,13 +24,9 @@ export default defineConfig({
         statements: 82,
       },
     },
-    environment: "jsdom",
-    exclude: [
-      "tests/e2e/**",
-      "**/node_modules/**",
-      "**/dist/**",
-    ],
+    environment: 'jsdom',
+    exclude: ['tests/e2e/**', '**/node_modules/**', '**/dist/**'],
     globals: true,
-    setupFiles: ["./tests/setup.ts"],
+    setupFiles: ['./tests/setup.ts'],
   },
 });

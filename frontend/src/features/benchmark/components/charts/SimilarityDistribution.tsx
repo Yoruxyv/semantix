@@ -1,10 +1,7 @@
-import {
-  formatCount,
-  formatDecimal,
-} from '@/shared/lib/formatters';
+import { formatCount, formatDecimal } from '@/shared/lib/formatters';
 import type { BenchmarkQueryResult } from '@/features/benchmark/types';
 
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 interface SimilarityDistributionProps {
   results: BenchmarkQueryResult[];
@@ -53,9 +50,7 @@ export function SimilarityDistribution({
 }: Readonly<SimilarityDistributionProps>): JSX.Element {
   const bins = buildBins(results);
   const maxCount = Math.max(1, ...bins.map((bin) => bin.count));
-  const unscored = results.filter(
-    (result) => result.similarity_score === null,
-  ).length;
+  const unscored = results.filter((result) => result.similarity_score === null).length;
   const unscoredCount = formatCount(unscored);
 
   return (
@@ -66,9 +61,7 @@ export function SimilarityDistribution({
       <div className="mt-5 flex h-32 items-end gap-1">
         {bins.map((bin) => {
           const height =
-            bin.count === 0
-              ? '0%'
-              : `${Math.max(2, (bin.count / maxCount) * 100)}%`;
+            bin.count === 0 ? '0%' : `${Math.max(2, (bin.count / maxCount) * 100)}%`;
 
           return (
             <div
@@ -76,10 +69,7 @@ export function SimilarityDistribution({
               key={bin.label}
               title={`${bin.label}: ${formatCount(bin.count)}`}
             >
-              <div
-                className="w-full bg-(--teal) opacity-75"
-                style={{ height }}
-              />
+              <div className="w-full bg-(--teal) opacity-75" style={{ height }} />
             </div>
           );
         })}
@@ -90,8 +80,8 @@ export function SimilarityDistribution({
         ))}
       </div>
       <p className="font-data mt-3 text-[9px] text-(--text-faint)">
-        {unscoredCount} unscored seed quer{unscored === 1 ? 'y' : 'ies'}{' '}
-        excluded from the histogram.
+        {unscoredCount} unscored seed quer{unscored === 1 ? 'y' : 'ies'} excluded from
+        the histogram.
       </p>
       <div className="sr-only">
         <table>

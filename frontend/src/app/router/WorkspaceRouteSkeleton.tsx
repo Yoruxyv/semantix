@@ -1,12 +1,8 @@
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
-import { APP_PATHS } from "../navigation/navigationConfig";
+import { APP_PATHS } from '../navigation/navigationConfig';
 
-type WorkspaceKind =
-  | "benchmark"
-  | "cache"
-  | "monitor"
-  | "observability";
+type WorkspaceKind = 'benchmark' | 'cache' | 'monitor' | 'observability';
 
 interface HeaderSkeletonProps {
   action?: boolean;
@@ -28,15 +24,15 @@ function kindForPath(pathname: string): WorkspaceKind {
     pathname.startsWith(APP_PATHS.evaluations) ||
     pathname.startsWith(APP_PATHS.benchmarks)
   ) {
-    return "benchmark";
+    return 'benchmark';
   }
   if (pathname.startsWith(APP_PATHS.cache)) {
-    return "cache";
+    return 'cache';
   }
   if (pathname.startsWith(APP_PATHS.observability)) {
-    return "observability";
+    return 'observability';
   }
-  return "monitor";
+  return 'monitor';
 }
 
 function HeaderSkeleton({
@@ -48,7 +44,7 @@ function HeaderSkeleton({
       <span className="block min-w-0 flex-1">
         <span className="block h-2.5 w-28 bg-[rgba(212,161,90,0.16)]" />
         <span
-          className={`${large ? "h-12 w-64" : "h-9 w-56"} mt-3 block max-w-4/5 bg-[rgba(234,230,221,0.09)]`}
+          className={`${large ? 'h-12 w-64' : 'h-9 w-56'} mt-3 block max-w-4/5 bg-[rgba(234,230,221,0.09)]`}
         />
         <span className="mt-4 block h-3 w-full max-w-2xl bg-[rgba(234,230,221,0.05)]" />
         <span className="mt-2 block h-3 w-4/5 max-w-xl bg-[rgba(234,230,221,0.05)]" />
@@ -92,10 +88,7 @@ function MonitorSkeleton(): JSX.Element {
 
 function CacheEntrySkeleton(): JSX.Element {
   return (
-    <span
-      className="block border-t border-(--hairline) py-5"
-      data-skeleton-route-entry
-    >
+    <span className="block border-t border-(--hairline) py-5" data-skeleton-route-entry>
       <span className="flex items-start justify-between gap-4">
         <span className="block min-w-0 flex-1">
           <span className="block h-2.5 w-56 max-w-3/5 bg-[rgba(91,156,148,0.1)]" />
@@ -134,11 +127,7 @@ function CacheSkeleton(): JSX.Element {
         </span>
         <span className="mt-7 grid gap-5 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(180px,0.6fr)_220px]">
           {CACHE_CONTROLS.map((control) => (
-            <span
-              className="block"
-              data-skeleton-route-control
-              key={control}
-            >
+            <span className="block" data-skeleton-route-control key={control}>
               <span className="block h-2.5 w-28 bg-[rgba(234,230,221,0.06)]" />
               <span className="mt-3 block h-10 border border-(--hairline) bg-(--surface)" />
             </span>
@@ -159,10 +148,7 @@ function BenchmarkControlSkeleton({
 }: Readonly<{ control: number }>): JSX.Element {
   if (control === 5) {
     return (
-      <span
-        className="flex flex-col justify-between gap-4"
-        data-skeleton-route-control
-      >
+      <span className="flex flex-col justify-between gap-4" data-skeleton-route-control>
         <span className="flex items-center gap-2">
           <span className="block size-4 bg-[rgba(234,230,221,0.08)]" />
           <span className="block h-2.5 w-48 bg-[rgba(234,230,221,0.06)]" />
@@ -236,10 +222,10 @@ export function WorkspaceRouteSkeleton({
 
   return (
     <span aria-hidden="true" className="block">
-      {kind === "benchmark" && <BenchmarkSkeleton />}
-      {kind === "cache" && <CacheSkeleton />}
-      {kind === "monitor" && <MonitorSkeleton />}
-      {kind === "observability" && <ObservabilitySkeleton />}
+      {kind === 'benchmark' && <BenchmarkSkeleton />}
+      {kind === 'cache' && <CacheSkeleton />}
+      {kind === 'monitor' && <MonitorSkeleton />}
+      {kind === 'observability' && <ObservabilitySkeleton />}
     </span>
   );
 }

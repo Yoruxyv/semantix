@@ -12,10 +12,7 @@ import {
   formatCount,
   formatTimestamp,
 } from '@/shared/lib/formatters';
-import {
-  apiErrorFromUnknown,
-  dataFromApiResult,
-} from '@/shared/query/apiResult';
+import { apiErrorFromUnknown, dataFromApiResult } from '@/shared/query/apiResult';
 import { cacheEntryKeys } from '@/shared/query/queryKeys';
 import type { CacheEntryMetadata } from '../types';
 
@@ -215,8 +212,7 @@ export function CacheEntryCard({
                       role="alert"
                       tone="error"
                     >
-                      The complete response is unavailable from this backend
-                      version.
+                      The complete response is unavailable from this backend version.
                     </Alert>
                   )}
 

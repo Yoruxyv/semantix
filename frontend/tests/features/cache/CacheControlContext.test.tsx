@@ -44,22 +44,14 @@ function CacheControlProbe(): JSX.Element {
 
   return (
     <div>
-      <output data-testid="cache-state">
-        {stateLabel}
-      </output>
+      <output data-testid="cache-state">{stateLabel}</output>
       <output data-testid="cache-refresh-state">
         {isRefreshingCacheState ? 'refreshing' : 'idle'}
       </output>
-      <button
-        type="button"
-        onClick={() => void refreshCacheState(false)}
-      >
+      <button type="button" onClick={() => void refreshCacheState(false)}>
         Refresh cache state
       </button>
-      <button
-        type="button"
-        onClick={() => void commitThreshold(0.97)}
-      >
+      <button type="button" onClick={() => void commitThreshold(0.97)}>
         Apply threshold
       </button>
     </div>
@@ -98,14 +90,10 @@ describe('CacheControlProvider', () => {
   });
 
   it('ignores an older initial read that resolves last', async () => {
-    const olderStats =
-      deferred<Awaited<ReturnType<typeof getCacheStats>>>();
-    const newerStats =
-      deferred<Awaited<ReturnType<typeof getCacheStats>>>();
-    const olderThreshold =
-      deferred<Awaited<ReturnType<typeof getCacheThreshold>>>();
-    const newerThreshold =
-      deferred<Awaited<ReturnType<typeof getCacheThreshold>>>();
+    const olderStats = deferred<Awaited<ReturnType<typeof getCacheStats>>>();
+    const newerStats = deferred<Awaited<ReturnType<typeof getCacheStats>>>();
+    const olderThreshold = deferred<Awaited<ReturnType<typeof getCacheThreshold>>>();
+    const newerThreshold = deferred<Awaited<ReturnType<typeof getCacheThreshold>>>();
     vi.mocked(getCacheStats)
       .mockReturnValueOnce(olderStats.promise)
       .mockReturnValueOnce(newerStats.promise);
@@ -131,9 +119,7 @@ describe('CacheControlProvider', () => {
       });
     });
 
-    expect(
-      (await screen.findByTestId('cache-state')).textContent,
-    ).toBe('0.96:9:0.96');
+    expect((await screen.findByTestId('cache-state')).textContent).toBe('0.96:9:0.96');
 
     await act(async () => {
       olderStats.resolve({ ok: true, data: initialStats });
@@ -143,16 +129,12 @@ describe('CacheControlProvider', () => {
       });
     });
 
-    expect(screen.getByTestId('cache-state').textContent).toBe(
-      '0.96:9:0.96',
-    );
+    expect(screen.getByTestId('cache-state').textContent).toBe('0.96:9:0.96');
   });
 
   it('keeps a threshold write authoritative over an older refresh', async () => {
-    const staleStats =
-      deferred<Awaited<ReturnType<typeof getCacheStats>>>();
-    const staleThreshold =
-      deferred<Awaited<ReturnType<typeof getCacheThreshold>>>();
+    const staleStats = deferred<Awaited<ReturnType<typeof getCacheStats>>>();
+    const staleThreshold = deferred<Awaited<ReturnType<typeof getCacheThreshold>>>();
     vi.mocked(getCacheStats)
       .mockResolvedValueOnce({ ok: true, data: initialStats })
       .mockReturnValueOnce(staleStats.promise);
@@ -165,23 +147,15 @@ describe('CacheControlProvider', () => {
 
     renderProbe();
     await waitFor(() => {
-      expect(screen.getByTestId('cache-state').textContent).toBe(
-        '0.92:1:0.92',
-      );
+      expect(screen.getByTestId('cache-state').textContent).toBe('0.92:1:0.92');
     });
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Refresh cache state' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh cache state' }));
     await waitFor(() => expect(getCacheThreshold).toHaveBeenCalledTimes(2));
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Apply threshold' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Apply threshold' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('cache-state').textContent).toBe(
-        '0.97:1:0.97',
-      );
+      expect(screen.getByTestId('cache-state').textContent).toBe('0.97:1:0.97');
     });
 
     await act(async () => {
@@ -195,9 +169,7 @@ describe('CacheControlProvider', () => {
       });
     });
 
-    expect(screen.getByTestId('cache-state').textContent).toBe(
-      '0.97:1:0.97',
-    );
+    expect(screen.getByTestId('cache-state').textContent).toBe('0.97:1:0.97');
   });
 
   it('surfaces an initial read failure without a default threshold', async () => {
@@ -223,32 +195,21 @@ describe('CacheControlProvider', () => {
   it('keeps confirmed cache readings visible during a background refresh', async () => {
     renderProbe();
     await waitFor(() => {
-      expect(screen.getByTestId('cache-state').textContent).toBe(
-        '0.92:1:0.92',
-      );
+      expect(screen.getByTestId('cache-state').textContent).toBe('0.92:1:0.92');
     });
 
-    const refreshedStats =
-      deferred<Awaited<ReturnType<typeof getCacheStats>>>();
+    const refreshedStats = deferred<Awaited<ReturnType<typeof getCacheStats>>>();
     const refreshedThreshold =
       deferred<Awaited<ReturnType<typeof getCacheThreshold>>>();
     vi.mocked(getCacheStats).mockReturnValueOnce(refreshedStats.promise);
-    vi.mocked(getCacheThreshold).mockReturnValueOnce(
-      refreshedThreshold.promise,
-    );
+    vi.mocked(getCacheThreshold).mockReturnValueOnce(refreshedThreshold.promise);
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Refresh cache state' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh cache state' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId('cache-refresh-state').textContent,
-      ).toBe('refreshing');
+      expect(screen.getByTestId('cache-refresh-state').textContent).toBe('refreshing');
     });
-    expect(screen.getByTestId('cache-state').textContent).toBe(
-      '0.92:1:0.92',
-    );
+    expect(screen.getByTestId('cache-state').textContent).toBe('0.92:1:0.92');
 
     await act(async () => {
       refreshedStats.resolve({
@@ -261,11 +222,7 @@ describe('CacheControlProvider', () => {
       });
     });
 
-    expect(screen.getByTestId('cache-state').textContent).toBe(
-      '0.94:4:0.92',
-    );
-    expect(
-      screen.getByTestId('cache-refresh-state').textContent,
-    ).toBe('idle');
+    expect(screen.getByTestId('cache-state').textContent).toBe('0.94:4:0.92');
+    expect(screen.getByTestId('cache-refresh-state').textContent).toBe('idle');
   });
 });

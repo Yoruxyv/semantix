@@ -24,8 +24,7 @@ const VIEWPORTS = [
   },
 ] as const;
 
-const HISTORY_NAMESPACE =
-  'tenant-responsive-history-with-a-long-name-for-layout';
+const HISTORY_NAMESPACE = 'tenant-responsive-history-with-a-long-name-for-layout';
 
 function retainedHistoryRun(runId: string) {
   return {
@@ -45,8 +44,7 @@ function retainedHistoryRun(runId: string) {
     metrics: benchmarkAnalysisResult.metrics,
     failure_code: null,
     safe_failure_detail: null,
-    threshold_evaluation_mode:
-      benchmarkAnalysisResult.threshold_evaluation_mode,
+    threshold_evaluation_mode: benchmarkAnalysisResult.threshold_evaluation_mode,
     threshold_evaluations: benchmarkAnalysisResult.threshold_evaluations,
   };
 }
@@ -79,8 +77,8 @@ const comparisonMetricDeltas = {
   f1_score: 0,
 };
 
-const comparisonThresholdDeltas =
-  benchmarkAnalysisResult.threshold_evaluations.map((evaluation) => ({
+const comparisonThresholdDeltas = benchmarkAnalysisResult.threshold_evaluations.map(
+  (evaluation) => ({
     threshold: evaluation.threshold,
     baseline_result_kind: evaluation.result_kind,
     candidate_result_kind: evaluation.result_kind,
@@ -94,7 +92,8 @@ const comparisonThresholdDeltas =
     true_negative_misses: 0,
     false_positive_hits: 0,
     false_negative_misses: 0,
-  }));
+  }),
+);
 
 function compatibleComparison() {
   return {
@@ -214,15 +213,12 @@ test.beforeEach(async ({ page }) => {
       },
     });
   });
-  await page.route(
-    '**/api/v1/evaluations/runs/compare',
-    async (route) => {
-      await route.fulfill({
-        contentType: 'application/json',
-        json: compatibleComparison(),
-      });
-    },
-  );
+  await page.route('**/api/v1/evaluations/runs/compare', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      json: compatibleComparison(),
+    });
+  });
   await page.route(
     `**/api/v1/evaluations/datasets/persisted/${persistedDataset.dataset_id}`,
     async (route) => {
@@ -231,79 +227,71 @@ test.beforeEach(async ({ page }) => {
         json: {
           ...persistedDataset,
           name: `${persistedDataset.name} with an intentionally long responsive label`,
-          description:
-            '<script>alert("catalog")</script> remains inert dataset text.',
+          description: '<script>alert("catalog")</script> remains inert dataset text.',
         },
       });
     },
   );
-  await page.route(
-    '**/api/v1/evaluations/datasets/persisted?*',
-    async (route) => {
-      await route.fulfill({
-        contentType: 'application/json',
-        json: {
-          storage_mode: 'postgres',
-          persistence_enabled: true,
-          items: [
-            {
-              ...persistedDataset,
-              name: `${persistedDataset.name} with an intentionally long responsive label`,
-              description:
-                '<script>alert("catalog")</script> remains inert dataset text.',
-              cases: undefined,
-            },
-          ],
-          total: 1,
-          offset: 0,
-          limit: 12,
-          has_more: false,
-          limits: {
-            default_retention_days: 30,
-            max_retention_days: 365,
-            max_persisted_per_namespace: 100,
+  await page.route('**/api/v1/evaluations/datasets/persisted?*', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      json: {
+        storage_mode: 'postgres',
+        persistence_enabled: true,
+        items: [
+          {
+            ...persistedDataset,
+            name: `${persistedDataset.name} with an intentionally long responsive label`,
+            description:
+              '<script>alert("catalog")</script> remains inert dataset text.',
+            cases: undefined,
           },
+        ],
+        total: 1,
+        offset: 0,
+        limit: 12,
+        has_more: false,
+        limits: {
+          default_retention_days: 30,
+          max_retention_days: 365,
+          max_persisted_per_namespace: 100,
         },
-      });
-    },
-  );
-  await page.route(
-    '**/api/v1/evaluations/datasets/validate',
-    async (route) => {
-      await route.fulfill({
-        contentType: 'application/json',
-        json: {
-          schema_version: 1,
-          dataset_id: 'custom:1234567890abcdef',
-          digest: '9'.repeat(64),
-          name: 'Imported responsive dataset with a long readable name',
-          description: 'Synthetic session-local dataset.',
-          case_count: 1,
-          expected_hits: 0,
-          expected_misses: 1,
-          categories: ['uncategorized'],
-          decoded_bytes: 180,
-          warnings: [
-            {
-              code: 'uncategorized_cases',
-              detail:
-                'Cases without a category are grouped as uncategorized.',
-              count: 1,
-            },
-          ],
-          query_executions: 1,
-          threshold_projection_evaluations: 7,
-          maximum_provider_calls: 1,
-          provider_calls_made: 0,
-          limits: {
-            max_cases: 50,
-            max_decoded_bytes: 49_152,
-            max_workload_queries: 250,
+      },
+    });
+  });
+  await page.route('**/api/v1/evaluations/datasets/validate', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      json: {
+        schema_version: 1,
+        dataset_id: 'custom:1234567890abcdef',
+        digest: '9'.repeat(64),
+        name: 'Imported responsive dataset with a long readable name',
+        description: 'Synthetic session-local dataset.',
+        case_count: 1,
+        expected_hits: 0,
+        expected_misses: 1,
+        categories: ['uncategorized'],
+        decoded_bytes: 180,
+        warnings: [
+          {
+            code: 'uncategorized_cases',
+            detail: 'Cases without a category are grouped as uncategorized.',
+            count: 1,
           },
+        ],
+        query_executions: 1,
+        threshold_projection_evaluations: 7,
+        maximum_provider_calls: 1,
+        provider_calls_made: 0,
+        limits: {
+          max_cases: 50,
+          max_decoded_bytes: 49_152,
+          max_workload_queries: 250,
         },
-      });
-    },
-  );
+      },
+    });
+  });
 });
 
 test('runtime diagnostics remain readable, bounded, and accessible', async ({
@@ -321,15 +309,14 @@ test('runtime diagnostics remain readable, bounded, and accessible', async ({
 
       const columns = await page
         .locator('[data-runtime-diagnostics-grid]')
-        .evaluate((element) =>
-          getComputedStyle(element).gridTemplateColumns.split(' ').length,
+        .evaluate(
+          (element) => getComputedStyle(element).gridTemplateColumns.split(' ').length,
         );
       expect(columns).toBe(viewport.width >= 1_024 ? 2 : 1);
 
       const overflow = await page.evaluate(
         () =>
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth,
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       expect(overflow).toBeLessThanOrEqual(1);
     });
@@ -348,9 +335,7 @@ test('runtime diagnostics remain readable, bounded, and accessible', async ({
     await expect(refresh).toBeEnabled();
 
     const overflow = await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth -
-        document.documentElement.clientWidth,
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(1);
   });
@@ -425,16 +410,15 @@ test('Monitor policy evidence remains accessible and bounded at required widths'
     await test.step(`monitor-${viewport.name}`, async () => {
       await page.setViewportSize(viewport);
       await expect(page.getByLabel('Query text')).toBeVisible();
-      await expect(page.getByText(`namespace ${namespace}`, {
-        exact: false,
-      })).toBeVisible();
       await expect(
-        page.getByRole('button', { name: 'Run query' }),
+        page.getByText(`namespace ${namespace}`, {
+          exact: false,
+        }),
       ).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Run query' })).toBeVisible();
       const overflow = await page.evaluate(
         () =>
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth,
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       expect(overflow).toBeLessThanOrEqual(1);
 
@@ -472,9 +456,7 @@ test('Monitor policy evidence remains accessible and bounded at required widths'
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations).toEqual([]);
 
-  await page
-    .getByRole('link', { name: 'Open matched live cache entry' })
-    .click();
+  await page.getByRole('link', { name: 'Open matched live cache entry' }).click();
   await expect(
     page.getByRole('heading', { level: 1, name: 'Cache entry detail' }),
   ).toBeVisible();
@@ -493,9 +475,11 @@ test('persistent catalog remains readable and bounded at required widths', async
   await expect(
     page.getByRole('heading', { name: 'Evaluation datasets' }),
   ).toBeVisible();
-  await expect(page.getByText('<script>alert("catalog")</script>', {
-    exact: false,
-  })).toBeVisible();
+  await expect(
+    page.getByText('<script>alert("catalog")</script>', {
+      exact: false,
+    }),
+  ).toBeVisible();
   await expect(
     page.locator('script').filter({ hasText: 'alert("catalog")' }),
   ).toHaveCount(0);
@@ -508,8 +492,7 @@ test('persistent catalog remains readable and bounded at required widths', async
       ).toBeVisible();
       const overflow = await page.evaluate(
         () =>
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth,
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       expect(overflow).toBeLessThanOrEqual(1);
     });
@@ -518,12 +501,8 @@ test('persistent catalog remains readable and bounded at required widths', async
   const detailTrigger = page.getByRole('button', { name: 'View details' });
   await detailTrigger.focus();
   await page.keyboard.press('Enter');
-  await expect(
-    page.getByRole('heading', { name: 'Dataset detail' }),
-  ).toBeVisible();
-  await expect(
-    page.getByText('Expected repeat.', { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Dataset detail' })).toBeVisible();
+  await expect(page.getByText('Expected repeat.', { exact: true })).toBeVisible();
 
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations).toEqual([]);
@@ -564,8 +543,7 @@ test('session-local import remains readable and bounded at required widths', asy
       await expect(page.getByText('Validated preview')).toBeVisible();
       const overflow = await page.evaluate(
         () =>
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth,
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       expect(overflow).toBeLessThanOrEqual(1);
     });
@@ -596,18 +574,17 @@ test('retained history comparison remains usable and accessible at required widt
   await historyView.focus();
   await page.keyboard.press('Enter');
   await expect(historyView).toHaveAttribute('aria-pressed', 'true');
-  await expect(
-    page.getByRole('heading', { name: 'Run history' }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Run history' })).toBeVisible();
 
   const firstSelection = page
     .getByRole('button', { name: 'Select to compare' })
     .first();
   await firstSelection.focus();
   await page.keyboard.press('Enter');
-  await expect(
-    page.getByRole('button', { name: 'Baseline selected' }),
-  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Baseline selected' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 
   const secondSelection = page.getByRole('button', {
     name: 'Select to compare',
@@ -624,9 +601,7 @@ test('retained history comparison remains usable and accessible at required widt
   await compare.focus();
   await page.keyboard.press('Enter');
 
-  await expect(
-    page.getByRole('heading', { name: 'Comparison result' }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Comparison result' })).toBeVisible();
   await expect(page.getByText('Compatible comparison')).toBeVisible();
   await expect(page.getByText('Aggregate metric deltas')).toBeVisible();
   await expect(page.getByText('Shared threshold projections')).toBeVisible();
@@ -645,8 +620,7 @@ test('retained history comparison remains usable and accessible at required widt
 
       const overflow = await page.evaluate(
         () =>
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth,
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       expect(overflow).toBeLessThanOrEqual(1);
     });
@@ -660,9 +634,7 @@ test('retained history comparison remains usable and accessible at required widt
     await expect(page.getByText('Aggregate metric deltas')).toBeVisible();
 
     const overflow = await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth -
-        document.documentElement.clientWidth,
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(1);
   });
@@ -676,37 +648,33 @@ test('retained history comparison remains usable and accessible at required widt
   await page.setViewportSize({ width: 820, height: 1_180 });
 
   await page.unroute('**/api/v1/evaluations/runs/compare');
-  await page.route(
-    '**/api/v1/evaluations/runs/compare',
-    async (route) => {
-      await route.fulfill({
-        contentType: 'application/json',
-        json: {
-          baseline: retainedBaseline,
-          candidate: {
-            ...retainedCandidate,
-            namespace: 'tenant-responsive-history-other',
-          },
-          compatibility: {
-            status: 'incompatible',
-            can_compare: false,
-            incompatibilities: [
-              {
-                code: 'namespace_mismatch',
-                detail:
-                  'Run namespaces differ; cross-namespace comparison is blocked.',
-              },
-            ],
-            warnings: [],
-            case_evidence: 'not_retained',
-            opaque_configuration_fingerprint_matches: true,
-          },
-          metric_deltas: null,
-          threshold_deltas: [],
+  await page.route('**/api/v1/evaluations/runs/compare', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      json: {
+        baseline: retainedBaseline,
+        candidate: {
+          ...retainedCandidate,
+          namespace: 'tenant-responsive-history-other',
         },
-      });
-    },
-  );
+        compatibility: {
+          status: 'incompatible',
+          can_compare: false,
+          incompatibilities: [
+            {
+              code: 'namespace_mismatch',
+              detail: 'Run namespaces differ; cross-namespace comparison is blocked.',
+            },
+          ],
+          warnings: [],
+          case_evidence: 'not_retained',
+          opaque_configuration_fingerprint_matches: true,
+        },
+        metric_deltas: null,
+        threshold_deltas: [],
+      },
+    });
+  });
 
   await page.getByRole('button', { name: 'Clear selection' }).click();
 
@@ -715,9 +683,11 @@ test('retained history comparison remains usable and accessible at required widt
     .first();
   await incompatibleBaseline.click();
   await page.getByRole('button', { name: 'Select to compare' }).click();
-  await page.getByRole('button', {
-    name: 'Compare selected runs',
-  }).click();
+  await page
+    .getByRole('button', {
+      name: 'Compare selected runs',
+    })
+    .click();
 
   await expect(page.getByText('Comparison blocked')).toBeVisible();
   await expect(page.getByText(/namespace_mismatch/)).toBeVisible();
@@ -744,14 +714,11 @@ test('evaluation controls and projections remain usable at required viewports', 
 
       const overflow = await page.evaluate(
         () =>
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth,
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       expect(overflow).toBeLessThanOrEqual(1);
 
-      if (
-        [744, 768, 820, 834].includes(viewport.width)
-      ) {
+      if ([744, 768, 820, 834].includes(viewport.width)) {
         const columns = await page
           .locator('[data-benchmark-controls] > label')
           .evaluateAll((labels) => {
@@ -784,9 +751,7 @@ test('evaluation controls and projections remain usable at required viewports', 
       page.getByRole('button', { name: 'Review benchmark run' }),
     ).toBeVisible();
     const overflow = await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth -
-        document.documentElement.clientWidth,
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(1);
   });
@@ -794,28 +759,21 @@ test('evaluation controls and projections remain usable at required viewports', 
   await page.setViewportSize({ width: 820, height: 1_180 });
   await page.goto('/evaluations');
 
-  await page
-    .getByLabel('Benchmark history namespace')
-    .fill('responsive-e2e');
+  await page.getByLabel('Benchmark history namespace').fill('responsive-e2e');
   await expect(
     page.getByRole('button', { name: 'Review benchmark run' }),
   ).toBeEnabled();
   await page.getByRole('button', { name: 'Review benchmark run' }).click();
-  await expect(page.getByRole('alertdialog')).toContainText(
-    'may make at most',
-  );
+  await expect(page.getByRole('alertdialog')).toContainText('may make at most');
   await page.getByRole('button', { name: 'Run benchmark now' }).click();
-  await expect(
-    page.getByText('Measured run', { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText('Measured run', { exact: true })).toBeVisible();
   await expect(
     page.getByText('Run identity and safe reproducibility metadata'),
   ).toBeVisible();
   await expect(
-    page.getByText(
-      'Hit rate vs. threshold (frozen-candidate projection)',
-      { exact: true },
-    ),
+    page.getByText('Hit rate vs. threshold (frozen-candidate projection)', {
+      exact: true,
+    }),
   ).toBeVisible();
 
   const chartTables = page.getByRole('table', {
@@ -836,15 +794,9 @@ test('evaluation controls and projections remain usable at required viewports', 
   });
   await detailTrigger.focus();
   await page.keyboard.press('Enter');
-  await expect(
-    page.getByRole('heading', { name: 'Case shared-miss' }),
-  ).toBeVisible();
-  await expect(
-    page.getByText(/run-local evaluation cache/),
-  ).toBeVisible();
-  await expect(
-    page.locator('#benchmark-case-detail a'),
-  ).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Case shared-miss' })).toBeVisible();
+  await expect(page.getByText(/run-local evaluation cache/)).toBeVisible();
+  await expect(page.locator('#benchmark-case-detail a')).toHaveCount(0);
 
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations).toEqual([]);
@@ -862,8 +814,7 @@ test('evaluation controls and projections remain usable at required viewports', 
       ).toBeVisible();
       const overflow = await page.evaluate(
         () =>
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth,
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       const overflowSources = await page.evaluate(() =>
         [...document.querySelectorAll<HTMLElement>('body *')]
@@ -880,10 +831,7 @@ test('evaluation controls and projections remain usable at required viewports', 
             text: element.textContent?.trim().slice(0, 80),
           })),
       );
-      expect(
-        overflow,
-        JSON.stringify(overflowSources),
-      ).toBeLessThanOrEqual(1);
+      expect(overflow, JSON.stringify(overflowSources)).toBeLessThanOrEqual(1);
 
       if ([744, 768, 820, 834].includes(viewport.width)) {
         const columns = await page
@@ -900,16 +848,14 @@ test('evaluation controls and projections remain usable at required viewports', 
   }
 
   await page.setViewportSize({ width: 320, height: 720 });
-  await page.getByRole('button', {
-    name: 'View details for case shared-miss, repetition 2',
-  }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Case shared-miss' }),
-  ).toBeVisible();
+  await page
+    .getByRole('button', {
+      name: 'View details for case shared-miss, repetition 2',
+    })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Case shared-miss' })).toBeVisible();
   const detailOverflow = await page.evaluate(
-    () =>
-      document.documentElement.scrollWidth -
-      document.documentElement.clientWidth,
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(detailOverflow).toBeLessThanOrEqual(1);
 });

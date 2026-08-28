@@ -1,17 +1,14 @@
-import { beforeEach, vi } from "vitest";
+import { beforeEach, vi } from 'vitest';
 
-import {
-  getAuthConfig,
-  getAuthSession,
-} from "@/features/auth/api/authApi";
-import { useAuth } from "@/features/auth/hooks/useAuth";
+import { getAuthConfig, getAuthSession } from '@/features/auth/api/authApi';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
-vi.mock("@/features/auth/api/authApi", () => ({
+vi.mock('@/features/auth/api/authApi', () => ({
   getAuthConfig: vi.fn(),
   getAuthSession: vi.fn(),
 }));
 
-vi.mock("@/features/auth/hooks/useAuth", () => ({
+vi.mock('@/features/auth/hooks/useAuth', () => ({
   useAuth: vi.fn(),
 }));
 
@@ -25,8 +22,8 @@ beforeEach(() => {
   vi.mocked(getAuthSession).mockResolvedValue({
     ok: false,
     error: {
-      code: "authentication_required",
-      detail: "A valid bearer token is required.",
+      code: 'authentication_required',
+      detail: 'A valid bearer token is required.',
       status: 401,
     },
   });
@@ -37,6 +34,6 @@ beforeEach(() => {
     logout: vi.fn(),
     retryAccessPolicy: vi.fn(),
     session: null,
-    status: "disabled",
+    status: 'disabled',
   });
 });

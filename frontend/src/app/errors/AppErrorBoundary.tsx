@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode, type JSX } from "react";
+import { Component, type ErrorInfo, type ReactNode, type JSX } from 'react';
 
 export interface AppErrorReport {
   readonly componentStackAvailable: boolean;
@@ -16,7 +16,7 @@ interface AppErrorBoundaryState {
 }
 
 function reportAppError(report: AppErrorReport): void {
-  console.error("Unexpected application render failure", report);
+  console.error('Unexpected application render failure', report);
 }
 
 function reloadApplication(): void {
@@ -34,7 +34,7 @@ export class AppErrorBoundary extends Component<
   }
 
   public componentDidCatch(error: unknown, info: ErrorInfo): void {
-    const errorName = error instanceof Error ? error.name : "UnknownError";
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
     (this.props.onError ?? reportAppError)({
       componentStackAvailable: info.componentStack !== null,
       errorName,
@@ -53,15 +53,11 @@ export class AppErrorBoundary extends Component<
           className="max-w-lg border border-(--line) bg-(--panel) p-8"
         >
           <p className="ui-label text-(--gold)">Application recovery</p>
-          <h1
-            className="font-display mt-3 text-3xl italic"
-            id="app-failure-heading"
-          >
+          <h1 className="font-display mt-3 text-3xl italic" id="app-failure-heading">
             Semantix could not finish loading
           </h1>
           <p className="mt-4 text-sm/6 text-(--text-muted)">
-            An unexpected interface error occurred. Reload the application to
-            try again.
+            An unexpected interface error occurred. Reload the application to try again.
           </p>
           <button
             className="ui-label mt-6 border border-(--gold) px-4 py-3 text-(--gold) focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-(--gold)"

@@ -79,28 +79,22 @@ function filterLabel(filter: OutcomeFilter): string {
   if (filter === 'all') {
     return 'All cases';
   }
-  return (
-    OUTCOME_OPTIONS.find((option) => option.outcome === filter)?.label ??
-    filter
-  );
+  return OUTCOME_OPTIONS.find((option) => option.outcome === filter)?.label ?? filter;
 }
 
 export function BenchmarkAnalysis({
   result,
 }: Readonly<{ result: BenchmarkRunResponse }>): JSX.Element {
-  const [outcomeFilter, setOutcomeFilter] =
-    useState<OutcomeFilter>('all');
+  const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>('all');
   const [search, setSearch] = useState('');
-  const [selectedCase, setSelectedCase] =
-    useState<BenchmarkQueryResult | null>(null);
+  const [selectedCase, setSelectedCase] = useState<BenchmarkQueryResult | null>(null);
   const returnFocusRef = useRef<HTMLButtonElement | null>(null);
 
   const orderedResults = useMemo(
     () =>
       [...result.query_results].sort(
         (left, right) =>
-          left.sequence - right.sequence ||
-          left.repetition - right.repetition,
+          left.sequence - right.sequence || left.repetition - right.repetition,
       ),
     [result.query_results],
   );
@@ -109,16 +103,13 @@ export function BenchmarkAnalysis({
       Object.fromEntries(
         OUTCOME_OPTIONS.map((option) => [
           option.outcome,
-          orderedResults.filter(
-            (query) => query.outcome === option.outcome,
-          ).length,
+          orderedResults.filter((query) => query.outcome === option.outcome).length,
         ]),
       ) as Record<BenchmarkOutcome, number>,
     [orderedResults],
   );
   const countsReconcile = OUTCOME_OPTIONS.every(
-    (option) =>
-      evidenceCounts[option.outcome] === result.metrics[option.metric],
+    (option) => evidenceCounts[option.outcome] === result.metrics[option.metric],
   );
   const normalizedSearch = search.trim().toLowerCase();
   const filteredResults = orderedResults.filter(
@@ -133,10 +124,7 @@ export function BenchmarkAnalysis({
     returnFocusRef.current = null;
   }
 
-  function openCase(
-    query: BenchmarkQueryResult,
-    trigger: HTMLButtonElement,
-  ): void {
+  function openCase(query: BenchmarkQueryResult, trigger: HTMLButtonElement): void {
     returnFocusRef.current = trigger;
     setSelectedCase(query);
   }
@@ -156,8 +144,7 @@ export function BenchmarkAnalysis({
         tone="error"
       >
         <p className="font-data mt-1 text-[11px]/5 text-(--text-soft)">
-          The aggregate confusion matrix does not match the decoded case
-          evidence.
+          The aggregate confusion matrix does not match the decoded case evidence.
         </p>
       </Alert>
     );
@@ -174,10 +161,9 @@ export function BenchmarkAnalysis({
           Confusion matrix and case evidence
         </h2>
         <p className="font-data mt-3 text-[11px]/5 text-(--text-muted)">
-          Filter the measured run by exact outcome, then inspect one case.
-          False positives are unexpected cache reuse; false negatives are
-          missed reuse opportunities. Counts describe this dataset and
-          threshold only.
+          Filter the measured run by exact outcome, then inspect one case. False
+          positives are unexpected cache reuse; false negatives are missed reuse
+          opportunities. Counts describe this dataset and threshold only.
         </p>
       </div>
 
@@ -191,9 +177,7 @@ export function BenchmarkAnalysis({
           const selected = outcomeFilter === option.outcome;
           return (
             <button
-              aria-label={`${option.label}: ${count} ${
-                count === 1 ? 'case' : 'cases'
-              }`}
+              aria-label={`${option.label}: ${count} ${count === 1 ? 'case' : 'cases'}`}
               aria-pressed={selected}
               className={`min-h-28 border p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold) ${
                 selected
@@ -275,8 +259,8 @@ export function BenchmarkAnalysis({
         aria-live="polite"
         className="font-data mt-4 block text-[10px]/5 text-(--text-muted)"
       >
-        Showing {filteredResults.length} of {orderedResults.length} cases.
-        Filter: {filterLabel(outcomeFilter)}
+        Showing {filteredResults.length} of {orderedResults.length} cases. Filter:{' '}
+        {filterLabel(outcomeFilter)}
         {normalizedSearch === '' ? '.' : `; search: ${search.trim()}.`}
       </output>
 
@@ -287,19 +271,13 @@ export function BenchmarkAnalysis({
       />
 
       {filteredResults.length === 0 && (
-        <output
-          className="font-data mt-6 block w-full border-y border-(--hairline) py-6 text-center text-[11px]/5 text-(--text-muted)"
-        >
+        <output className="font-data mt-6 block w-full border-y border-(--hairline) py-6 text-center text-[11px]/5 text-(--text-muted)">
           No measured cases match the current outcome and search filters.
         </output>
       )}
 
       {selectedCase !== null && (
-        <BenchmarkCaseDetail
-          onClose={closeCase}
-          query={selectedCase}
-          result={result}
-        />
+        <BenchmarkCaseDetail onClose={closeCase} query={selectedCase} result={result} />
       )}
     </section>
   );

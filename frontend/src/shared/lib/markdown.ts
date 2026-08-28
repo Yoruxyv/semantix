@@ -22,7 +22,7 @@ export function unwrapOuterMarkdownFence(text: string): string {
   let inner = trimmed.slice(openFence[0].length);
   // Only strip a trailing fence if it's on its own line at the very end —
   // response may also be truncated mid-stream with no closing fence at all.
-  inner = inner.replace(/\r?\n```[ \t]*$/, "");
+  inner = inner.replace(/\r?\n```[ \t]*$/, '');
   return inner;
 }
 
@@ -39,9 +39,9 @@ export function normalizeMathDelimiters(markdown: string): string {
     .split(CODE_SEGMENT)
     .map((segment) => {
       if (
-        segment.startsWith("```") ||
-        segment.startsWith("~~~") ||
-        segment.startsWith("`")
+        segment.startsWith('```') ||
+        segment.startsWith('~~~') ||
+        segment.startsWith('`')
       ) {
         return segment;
       }
@@ -50,7 +50,7 @@ export function normalizeMathDelimiters(markdown: string): string {
         .replace(DISPLAY_MATH, replaceDisplayMath)
         .replace(INLINE_MATH, replaceInlineMath);
     })
-    .join("");
+    .join('');
 }
 
 export function prepareMarkdown(markdown: string): string {

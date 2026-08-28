@@ -1,7 +1,7 @@
 import { Button } from '@/shared/components/ui';
 import { formatDecimal } from '@/shared/lib/formatters';
 
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 interface ThresholdControlsProps {
   appliedThreshold: number;
@@ -25,17 +25,12 @@ export function ThresholdControls({
   return (
     <div className="mt-7">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
-        <label
-          className="ui-label text-(--text-muted)"
-          htmlFor="projection-threshold"
-        >
+        <label className="ui-label text-(--text-muted)" htmlFor="projection-threshold">
           Projection threshold
         </label>
 
         <div className="font-data flex gap-4 text-[10px]">
-          <span className="text-(--teal)">
-            Preview {formatDecimal(threshold, 2)}
-          </span>
+          <span className="text-(--teal)">Preview {formatDecimal(threshold, 2)}</span>
 
           <span className="text-(--gold)">
             Backend applied {formatDecimal(appliedThreshold, 2)}
@@ -73,8 +68,8 @@ export function ThresholdControls({
           </Button>
         ) : (
           <p className="font-data max-w-sm text-[10px]/5 text-(--text-faint)">
-            Preview only. Applying the global threshold requires an
-            administrator with wildcard namespace access.
+            Preview only. Applying the global threshold requires an administrator with
+            wildcard namespace access.
           </p>
         )}
 
@@ -88,15 +83,11 @@ export function ThresholdControls({
         </button>
       </div>
 
-      <p
-        className="mt-5 max-w-xl text-xs/5 text-(--text-muted)"
-        id="threshold-note"
-      >
-        Every dot sits at its real similarity score. Vertical position only
-        prevents overlap. Hover, focus, or select a trace to inspect its prompt
-        and cache decision. Moving the slider previews which scored traces would
-        qualify; it does not change backend behavior until you select Apply to
-        cache.
+      <p className="mt-5 max-w-xl text-xs/5 text-(--text-muted)" id="threshold-note">
+        Every dot sits at its real similarity score. Vertical position only prevents
+        overlap. Hover, focus, or select a trace to inspect its prompt and cache
+        decision. Moving the slider previews which scored traces would qualify; it does
+        not change backend behavior until you select Apply to cache.
       </p>
     </div>
   );

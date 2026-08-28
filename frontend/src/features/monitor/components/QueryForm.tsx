@@ -1,21 +1,21 @@
-import { useState, type JSX, type SubmitEvent } from "react";
+import { useState, type JSX, type SubmitEvent } from 'react';
 
-import { useAuth } from "@/features/auth/hooks/useAuth";
-import { canSubmitQueries } from "@/features/auth/permissions";
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { canSubmitQueries } from '@/features/auth/permissions';
 import {
   CACHE_NAMESPACE_PATTERN_SOURCE,
   isCacheNamespace,
   MAX_CACHE_NAMESPACE_LENGTH,
-} from "@/features/cache/namespace";
-import { Button } from "@/shared/components/ui";
-import { formatCount } from "@/shared/lib/formatters";
+} from '@/features/cache/namespace';
+import { Button } from '@/shared/components/ui';
+import { formatCount } from '@/shared/lib/formatters';
 
 import {
   QUERY_POLICY_LABELS,
   type QueryPolicyMode,
   type QueryRequest,
   type QuerySubmission,
-} from "../types";
+} from '../types';
 
 interface QueryFormProps {
   isLoading: boolean;
@@ -23,8 +23,8 @@ interface QueryFormProps {
 }
 
 const EXAMPLE_PROMPTS = [
-  "Explain semantic caching in simple terms",
-  "How does cosine similarity work?",
+  'Explain semantic caching in simple terms',
+  'How does cosine similarity work?',
 ];
 
 const MAX_PROMPT_LENGTH = 2_000;
@@ -35,31 +35,31 @@ const POLICY_OPTIONS: ReadonlyArray<{
   mode: QueryPolicyMode;
 }> = [
   {
-    mode: "normal",
-    description: "Read an eligible match or store a newly generated response.",
+    mode: 'normal',
+    description: 'Read an eligible match or store a newly generated response.',
   },
   {
-    mode: "read-only",
-    description: "Read an eligible match but never store a generated response.",
+    mode: 'read-only',
+    description: 'Read an eligible match but never store a generated response.',
   },
   {
-    mode: "refresh",
-    description: "Skip cache lookup, generate a response, and write it to cache.",
+    mode: 'refresh',
+    description: 'Skip cache lookup, generate a response, and write it to cache.',
   },
   {
-    mode: "bypass",
-    description: "Skip cache reads and writes for this request.",
+    mode: 'bypass',
+    description: 'Skip cache reads and writes for this request.',
   },
   {
-    mode: "private",
+    mode: 'private',
     description:
-      "Skip cache reads and writes. Prompt and response content are omitted from the recent query trace.",
+      'Skip cache reads and writes. Prompt and response content are omitted from the recent query trace.',
   },
 ];
 
 const POLICY_FIELDS: Record<
   QueryPolicyMode,
-  Omit<QueryRequest, "namespace" | "prompt">
+  Omit<QueryRequest, 'namespace' | 'prompt'>
 > = {
   normal: {
     cache_enabled: true,
@@ -67,7 +67,7 @@ const POLICY_FIELDS: Record<
     cache_write_enabled: true,
     private: false,
   },
-  "read-only": {
+  'read-only': {
     cache_enabled: true,
     cache_read_enabled: true,
     cache_write_enabled: false,
@@ -94,7 +94,7 @@ const POLICY_FIELDS: Record<
 };
 
 const CONTROL_CLASS =
-  "mt-2 min-h-11 w-full min-w-0 border border-(--hairline) bg-(--surface) px-3 py-2 text-sm text-(--text) outline-none focus-visible:border-(--gold) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold)";
+  'mt-2 min-h-11 w-full min-w-0 border border-(--hairline) bg-(--surface) px-3 py-2 text-sm text-(--text) outline-none focus-visible:border-(--gold) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold)';
 
 export function QueryForm({
   isLoading,
@@ -103,18 +103,18 @@ export function QueryForm({
   const { session, status } = useAuth();
   const canSubmit = canSubmitQueries(status, session);
   const explicitNamespaces =
-    session?.namespaces.filter((namespace) => namespace !== "*") ?? [];
+    session?.namespaces.filter((namespace) => namespace !== '*') ?? [];
   const hasWildcardNamespace =
-    status === "disabled" || (session?.namespaces.includes("*") ?? false);
-  let defaultNamespace = "";
+    status === 'disabled' || (session?.namespaces.includes('*') ?? false);
+  let defaultNamespace = '';
   if (hasWildcardNamespace) {
-    defaultNamespace = "default";
+    defaultNamespace = 'default';
   } else if (explicitNamespaces.length === 1) {
-    defaultNamespace = explicitNamespaces[0] ?? "";
+    defaultNamespace = explicitNamespaces[0] ?? '';
   }
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState('');
   const [namespace, setNamespace] = useState(defaultNamespace);
-  const [policyMode, setPolicyMode] = useState<QueryPolicyMode>("normal");
+  const [policyMode, setPolicyMode] = useState<QueryPolicyMode>('normal');
   const [promptError, setPromptError] = useState<string | null>(null);
   const [namespaceError, setNamespaceError] = useState<string | null>(null);
   const normalizedNamespace = namespace.trim();
@@ -122,9 +122,7 @@ export function QueryForm({
     isCacheNamespace(normalizedNamespace) &&
     (hasWildcardNamespace || explicitNamespaces.includes(normalizedNamespace));
 
-  async function handleSubmit(
-    event: SubmitEvent<HTMLFormElement>,
-  ): Promise<void> {
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
 
     const normalizedPrompt = prompt.trim();
@@ -134,7 +132,7 @@ export function QueryForm({
     }
 
     if (normalizedPrompt.length === 0) {
-      setPromptError("A blank prompt has no semantic neighborhood.");
+      setPromptError('A blank prompt has no semantic neighborhood.');
       return;
     }
 
@@ -146,7 +144,7 @@ export function QueryForm({
     }
 
     if (!namespaceValid) {
-      setNamespaceError("Choose one authorized cache namespace.");
+      setNamespaceError('Choose one authorized cache namespace.');
       return;
     }
 
@@ -162,11 +160,11 @@ export function QueryForm({
     });
   }
 
-  let submitLabel = "Run query";
+  let submitLabel = 'Run query';
   if (isLoading) {
-    submitLabel = "Embedding + lookup…";
+    submitLabel = 'Embedding + lookup…';
   } else if (!canSubmit) {
-    submitLabel = "Operator access required";
+    submitLabel = 'Operator access required';
   }
 
   return (
@@ -178,8 +176,8 @@ export function QueryForm({
           </h1>
 
           <p className="mt-2 max-w-2xl text-sm/6 text-(--text-muted)">
-            Each prompt is embedded, compared with the nearest stored vector,
-            then either reused or sent upstream.
+            Each prompt is embedded, compared with the nearest stored vector, then
+            either reused or sent upstream.
           </p>
         </div>
 
@@ -188,21 +186,15 @@ export function QueryForm({
         </p>
       </div>
 
-      <form
-        aria-busy={isLoading}
-        onSubmit={(event) => void handleSubmit(event)}
-      >
-        <label
-          className="ui-label mb-2 block text-(--text-muted)"
-          htmlFor="prompt"
-        >
+      <form aria-busy={isLoading} onSubmit={(event) => void handleSubmit(event)}>
+        <label className="ui-label mb-2 block text-(--text-muted)" htmlFor="prompt">
           Query text
         </label>
 
         <textarea
           id="prompt"
           aria-describedby={
-            promptError === null ? "prompt-note" : "prompt-note prompt-error"
+            promptError === null ? 'prompt-note' : 'prompt-note prompt-error'
           }
           aria-invalid={promptError !== null}
           className="scrollbar-thin block min-h-36 w-full resize-y border border-(--hairline) bg-(--surface) p-4 text-sm/6 text-(--text) outline-none transition-colors placeholder:text-(--text-faint) hover:border-(--text-faint) focus-visible:border-(--gold) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold) disabled:cursor-not-allowed disabled:opacity-55"
@@ -249,9 +241,7 @@ export function QueryForm({
 
               {hasWildcardNamespace && (
                 <label className="mt-3 block">
-                  <span className="text-sm text-(--text-soft)">
-                    Explicit namespace
-                  </span>
+                  <span className="text-sm text-(--text-soft)">Explicit namespace</span>
                   <input
                     aria-describedby="query-namespace-note"
                     aria-invalid={namespaceError !== null}
@@ -295,7 +285,7 @@ export function QueryForm({
 
               {!hasWildcardNamespace && explicitNamespaces.length <= 1 && (
                 <p className="font-data mt-3 wrap-break-word text-xs text-(--text-soft)">
-                  {normalizedNamespace || "No authorized namespace"}
+                  {normalizedNamespace || 'No authorized namespace'}
                 </p>
               )}
 
@@ -303,8 +293,8 @@ export function QueryForm({
                 className="font-data mt-2 text-[10px]/5 text-(--text-faint)"
                 id="query-namespace-note"
               >
-                Requests use one authorized namespace. Wildcard access never
-                sends the global marker.
+                Requests use one authorized namespace. Wildcard access never sends the
+                global marker.
               </p>
 
               {namespaceError !== null && (
@@ -350,9 +340,9 @@ export function QueryForm({
                         </label>
                         <span
                           className={
-                            option.mode === "private"
-                              ? "font-data mt-1 block text-[10px]/5 text-(--gold)"
-                              : "font-data mt-1 block text-[10px]/5 text-(--text-faint)"
+                            option.mode === 'private'
+                              ? 'font-data mt-1 block text-[10px]/5 text-(--gold)'
+                              : 'font-data mt-1 block text-[10px]/5 text-(--text-faint)'
                           }
                           id={descriptionId}
                         >
@@ -371,16 +361,13 @@ export function QueryForm({
           aria-live="polite"
           className="font-data mt-4 block wrap-break-word border-l border-(--gold) pl-3 text-[11px]/5 text-(--text-muted)"
         >
-          Effective request: namespace{" "}
-          {namespaceValid ? normalizedNamespace : "not selected"} ·{" "}
+          Effective request: namespace{' '}
+          {namespaceValid ? normalizedNamespace : 'not selected'} ·{' '}
           {QUERY_POLICY_LABELS[policyMode]}.
         </output>
 
         {!canSubmit && (
-          <p
-            className="mt-4 text-xs/5 text-(--coral-text)"
-            id="query-access-note"
-          >
+          <p className="mt-4 text-xs/5 text-(--coral-text)" id="query-access-note">
             Operator or administrator access is required to run live queries.
           </p>
         )}
@@ -405,7 +392,7 @@ export function QueryForm({
           </div>
 
           <Button
-            aria-describedby={canSubmit ? undefined : "query-access-note"}
+            aria-describedby={canSubmit ? undefined : 'query-access-note'}
             className="w-full disabled:opacity-55 lg:w-auto"
             disabled={isLoading || !canSubmit || !namespaceValid}
             type="submit"

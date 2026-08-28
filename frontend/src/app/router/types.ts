@@ -1,11 +1,6 @@
-import type {
-  ComponentType,
-  LazyExoticComponent,
-} from "react";
+import type { ComponentType, LazyExoticComponent } from 'react';
 
-type RouteComponent =
-  | ComponentType
-  | LazyExoticComponent<ComponentType>;
+type RouteComponent = ComponentType | LazyExoticComponent<ComponentType>;
 
 interface BaseRouteDefinition {
   component: RouteComponent;
@@ -25,6 +20,4 @@ export interface PathRouteDefinition extends BaseRouteDefinition {
   path: string;
 }
 
-export type AppRouteDefinition =
-  | IndexRouteDefinition
-  | PathRouteDefinition;
+export type AppRouteDefinition = IndexRouteDefinition | PathRouteDefinition;

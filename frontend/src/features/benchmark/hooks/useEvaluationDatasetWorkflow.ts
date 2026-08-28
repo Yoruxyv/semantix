@@ -1,24 +1,24 @@
-import { useEffect, useRef, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
-import type { ApiValidationIssue } from "@/shared/api/types";
-import { benchmarkDatasetKeys } from "@/shared/query/queryKeys";
+import type { ApiValidationIssue } from '@/shared/api/types';
+import { benchmarkDatasetKeys } from '@/shared/query/queryKeys';
 
 import {
   persistEvaluationDataset,
   validateEvaluationDataset,
-} from "../api/benchmarkApi";
-import type { ThresholdSweep } from "../lib/thresholdSweep";
+} from '../api/benchmarkApi';
+import type { ThresholdSweep } from '../lib/thresholdSweep';
 import type {
   BenchmarkRunResponse,
   EvaluationDatasetPreview,
   PersistedEvaluationDatasetDetail,
-} from "../types";
+} from '../types';
 import {
   EVALUATION_IMPORT_FILE_MAX_BYTES,
   type BenchmarkForm,
-} from "./benchmarkController";
+} from './benchmarkController';
 
 interface EvaluationDatasetWorkflowOptions {
   authIdentity: string;
@@ -48,12 +48,8 @@ interface EvaluationDatasetWorkflow {
     retentionDays: number,
   ) => Promise<PersistedEvaluationDatasetDetail | null>;
   selectImportFile: (file: File) => Promise<void>;
-  selectPersistedDataset: (
-    dataset: PersistedEvaluationDatasetDetail,
-  ) => void;
-  validateDefinition: (
-    definition: unknown,
-  ) => Promise<EvaluationDatasetPreview | null>;
+  selectPersistedDataset: (dataset: PersistedEvaluationDatasetDetail) => void;
+  validateDefinition: (definition: unknown) => Promise<EvaluationDatasetPreview | null>;
 }
 
 export function useEvaluationDatasetWorkflow({
@@ -156,17 +152,12 @@ export function useEvaluationDatasetWorkflow({
         },
         controller.signal,
       );
-      if (
-        controller.signal.aborted ||
-        validationId !== validationSequence.current
-      ) {
+      if (controller.signal.aborted || validationId !== validationSequence.current) {
         return null;
       }
       if (!response.ok) {
         setPreview(null);
-        setImportError(
-          response.error.detail ?? "The imported dataset is invalid.",
-        );
+        setImportError(response.error.detail ?? 'The imported dataset is invalid.');
         setImportIssues(response.error.issues ?? []);
         return null;
       }
@@ -184,9 +175,9 @@ export function useEvaluationDatasetWorkflow({
     clearImport();
     const selectionId = validationSequence.current;
     setImportFileName(file.name);
-    setForm((current) => ({ ...current, datasetSource: "custom" }));
-    if (!file.name.toLowerCase().endsWith(".json")) {
-      setImportError("Choose a JSON file with a .json extension.");
+    setForm((current) => ({ ...current, datasetSource: 'custom' }));
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      setImportError('Choose a JSON file with a .json extension.');
       return;
     }
     if (file.size > EVALUATION_IMPORT_FILE_MAX_BYTES) {
@@ -203,7 +194,7 @@ export function useEvaluationDatasetWorkflow({
       if (selectionId !== validationSequence.current) {
         return;
       }
-      setImportError("The selected file is not valid JSON.");
+      setImportError('The selected file is not valid JSON.');
       return;
     }
     if (selectionId !== validationSequence.current) {
@@ -233,7 +224,7 @@ export function useEvaluationDatasetWorkflow({
     activeSave.current = controller;
     setIsSavingImport(true);
     setError(null);
-    setStatusMessage("Saving the validated dataset...");
+    setStatusMessage('Saving the validated dataset...');
     try {
       const response = await persistEvaluationDataset(
         {
@@ -247,10 +238,8 @@ export function useEvaluationDatasetWorkflow({
         return null;
       }
       if (!response.ok) {
-        setError(
-          response.error.detail ?? "The validated dataset could not be saved.",
-        );
-        setStatusMessage("Dataset save failed.");
+        setError(response.error.detail ?? 'The validated dataset could not be saved.');
+        setStatusMessage('Dataset save failed.');
         return null;
       }
       await queryClient.invalidateQueries({
@@ -271,22 +260,18 @@ export function useEvaluationDatasetWorkflow({
     }
   }
 
-  function selectPersistedDataset(
-    dataset: PersistedEvaluationDatasetDetail,
-  ): void {
+  function selectPersistedDataset(dataset: PersistedEvaluationDatasetDetail): void {
     setPersistedDataset(dataset);
     setForm((current) => ({
       ...current,
-      datasetSource: "persisted",
+      datasetSource: 'persisted',
       persistedDatasetId: dataset.dataset_id,
       persistedNamespace: dataset.namespace,
     }));
     setResult(null);
     setShowWarning(false);
     setError(null);
-    setStatusMessage(
-      `Selected persisted dataset ${dataset.name} for the next run.`,
-    );
+    setStatusMessage(`Selected persisted dataset ${dataset.name} for the next run.`);
   }
 
   function clearPersistedSelection(datasetId: string): void {
@@ -297,9 +282,9 @@ export function useEvaluationDatasetWorkflow({
       current.persistedDatasetId === datasetId
         ? {
             ...current,
-            datasetSource: "builtin",
-            persistedDatasetId: "",
-            persistedNamespace: "",
+            datasetSource: 'builtin',
+            persistedDatasetId: '',
+            persistedNamespace: '',
           }
         : current,
     );

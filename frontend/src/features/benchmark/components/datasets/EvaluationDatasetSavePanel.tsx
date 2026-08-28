@@ -107,8 +107,8 @@ export function EvaluationDatasetSavePanel({
         Save validated session dataset
       </h3>
       <p className="font-data mt-2 text-[10px]/5 text-(--text-muted)">
-        Saving is explicit. Validation by itself never writes dataset
-        content to PostgreSQL.
+        Saving is explicit. Validation by itself never writes dataset content to
+        PostgreSQL.
       </p>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <SaveNamespaceControl
@@ -145,9 +145,7 @@ export function EvaluationDatasetSavePanel({
         variant="primary"
         onClick={onSave}
       >
-        {isSaving
-          ? 'Saving validated dataset...'
-          : 'Save validated dataset'}
+        {isSaving ? 'Saving validated dataset...' : 'Save validated dataset'}
       </Button>
     </section>
   );

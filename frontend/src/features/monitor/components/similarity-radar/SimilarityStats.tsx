@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX } from 'react';
 interface SimilarityStatsProps {
   projectedHits: number;
   projectedMisses: number;

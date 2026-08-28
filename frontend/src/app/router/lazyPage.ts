@@ -1,14 +1,10 @@
-import {
-  lazy,
-  type ComponentType,
-  type LazyExoticComponent,
-} from "react";
+import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
 
 import type {
   AppRouteDefinition,
   IndexRouteDefinition,
   PathRouteDefinition,
-} from "./types";
+} from './types';
 
 interface LazyNamedPage {
   component: LazyExoticComponent<ComponentType>;
@@ -18,10 +14,7 @@ interface LazyNamedPage {
 function lazyNamedPage<
   TExportName extends string,
   TModule extends Record<TExportName, ComponentType>,
->(
-  importer: () => Promise<TModule>,
-  exportName: TExportName,
-): LazyNamedPage {
+>(importer: () => Promise<TModule>, exportName: TExportName): LazyNamedPage {
   let moduleRequest: Promise<TModule> | null = null;
 
   function loadModule(): Promise<TModule> {

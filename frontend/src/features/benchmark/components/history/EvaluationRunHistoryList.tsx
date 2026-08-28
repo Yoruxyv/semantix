@@ -1,10 +1,6 @@
 import type { JSX } from 'react';
 
-import {
-  Button,
-  EmptyState,
-  InlineConfirmation,
-} from '@/shared/components/ui';
+import { Button, EmptyState, InlineConfirmation } from '@/shared/components/ui';
 import {
   formatCount,
   formatLatency,
@@ -34,9 +30,7 @@ interface EvaluationRunHistoryListProps {
   onToggleComparison: (item: EvaluationRunHistoryItem) => void;
 }
 
-function stateClass(
-  state: EvaluationRunHistoryItem['terminal_state'],
-): string {
+function stateClass(state: EvaluationRunHistoryItem['terminal_state']): string {
   if (state === 'completed') {
     return 'text-(--teal)';
   }
@@ -53,9 +47,7 @@ function RunSummary({
     return (
       <p className="font-data mt-3 text-[10px]/5 text-(--text-muted)">
         {item.failure_code}
-        {item.safe_failure_detail === null
-          ? ''
-          : ` · ${item.safe_failure_detail}`}
+        {item.safe_failure_detail === null ? '' : ` · ${item.safe_failure_detail}`}
       </p>
     );
   }
@@ -124,8 +116,7 @@ export function EvaluationRunHistoryList({
         {catalog.items.map((item) => {
           const comparisonIndex = comparisonRunIds.indexOf(item.run_id);
           const selectedForComparison = comparisonIndex >= 0;
-          const comparisonFull =
-            comparisonRunIds.length >= 2 && !selectedForComparison;
+          const comparisonFull = comparisonRunIds.length >= 2 && !selectedForComparison;
 
           return (
             <article
@@ -157,19 +148,13 @@ export function EvaluationRunHistoryList({
               <dl className="font-data mt-4 grid grid-cols-2 gap-3 border-t border-(--hairline) pt-3 text-[10px]/5">
                 <div>
                   <dt className="text-(--text-faint)">Completed</dt>
-                  <dd
-                    className="mt-1 text-(--text-soft)"
-                    title={item.completed_at}
-                  >
+                  <dd className="mt-1 text-(--text-soft)" title={item.completed_at}>
                     {formatTimestamp(item.completed_at)}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-(--text-faint)">Expires</dt>
-                  <dd
-                    className="mt-1 text-(--gold)"
-                    title={item.expires_at}
-                  >
+                  <dd className="mt-1 text-(--gold)" title={item.expires_at}>
                     {formatTimestamp(item.expires_at)}
                   </dd>
                 </div>
@@ -218,8 +203,8 @@ export function EvaluationRunHistoryList({
                   message={
                     <>
                       Delete this retained aggregate from{' '}
-                      <strong>{item.namespace}</strong>? This does not delete
-                      the source dataset.
+                      <strong>{item.namespace}</strong>? This does not delete the source
+                      dataset.
                     </>
                   }
                   onCancel={onDeleteCancel}
@@ -237,20 +222,15 @@ export function EvaluationRunHistoryList({
         className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-(--hairline) pt-4"
       >
         <p className="font-data text-[10px]/5 text-(--text-faint)">
-          Showing {formatCount(offset + 1)}-
-          {formatCount(offset + catalog.items.length)} of{' '}
-          {formatCount(catalog.total)}
+          Showing {formatCount(offset + 1)}-{formatCount(offset + catalog.items.length)}{' '}
+          of {formatCount(catalog.total)}
         </p>
         <div className="flex gap-3">
           <Button
             disabled={offset === 0}
             size="compact"
             variant="secondary"
-            onClick={() =>
-              onOffsetChange(
-                Math.max(0, offset - PAGE_SIZE),
-              )
-            }
+            onClick={() => onOffsetChange(Math.max(0, offset - PAGE_SIZE))}
           >
             Previous
           </Button>
@@ -258,9 +238,7 @@ export function EvaluationRunHistoryList({
             disabled={!catalog.has_more}
             size="compact"
             variant="secondary"
-            onClick={() =>
-              onOffsetChange(offset + PAGE_SIZE)
-            }
+            onClick={() => onOffsetChange(offset + PAGE_SIZE)}
           >
             Next
           </Button>

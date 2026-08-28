@@ -82,13 +82,9 @@ function queryResult(value: unknown): BenchmarkQueryResult {
 
   let expectedOutcome: BenchmarkOutcome;
   if (value.actual_cache_hit) {
-    expectedOutcome = value.expected_cache_hit
-      ? 'true_positive'
-      : 'false_positive';
+    expectedOutcome = value.expected_cache_hit ? 'true_positive' : 'false_positive';
   } else {
-    expectedOutcome = value.expected_cache_hit
-      ? 'false_negative'
-      : 'true_negative';
+    expectedOutcome = value.expected_cache_hit ? 'false_negative' : 'true_negative';
   }
   if (
     value.outcome !== expectedOutcome ||
@@ -148,11 +144,8 @@ export function decodeBenchmarkRun(value: unknown): BenchmarkRunResponse {
     decodeThresholdEvaluationValue,
   );
   const queryResults = value.query_results.map(queryResult);
-  const expectedResultCount =
-    decodedDataset.query_count * value.repetitions;
-  const thresholds = thresholdEvaluations.map(
-    (evaluation) => evaluation.threshold,
-  );
+  const expectedResultCount = decodedDataset.query_count * value.repetitions;
+  const thresholds = thresholdEvaluations.map((evaluation) => evaluation.threshold);
   const measured = thresholdEvaluations.filter(
     (evaluation) => evaluation.result_kind === 'measured',
   );
@@ -185,14 +178,12 @@ export function decodeBenchmarkRun(value: unknown): BenchmarkRunResponse {
     ) ||
     decodedReproducibility.dataset_id !== decodedDataset.dataset_id ||
     decodedReproducibility.dataset_source !== decodedDataset.dataset_source ||
-    decodedReproducibility.dataset_schema_version !==
-      decodedDataset.schema_version ||
+    decodedReproducibility.dataset_schema_version !== decodedDataset.schema_version ||
     decodedReproducibility.dataset_version !== decodedDataset.version ||
     decodedReproducibility.dataset_digest !== decodedDataset.digest ||
     decodedReproducibility.measured_threshold !== value.threshold ||
     decodedReproducibility.repetitions !== value.repetitions ||
-    decodedReproducibility.reset_cache_before_run !==
-      value.reset_cache_before_run ||
+    decodedReproducibility.reset_cache_before_run !== value.reset_cache_before_run ||
     decodedReproducibility.estimated_cost_per_request_usd !==
       value.estimated_cost_per_request_usd ||
     decodedReproducibility.estimated_cost_per_1k_tokens_usd !==

@@ -1,9 +1,9 @@
-import { NotFoundPage } from "../pages/NotFoundPage";
-import benchmarkRoutes from "@/features/benchmark/benchmark.routes";
-import cacheRoutes from "@/features/cache/cache.routes";
-import monitorRoutes from "@/features/monitor/monitor.routes";
-import observabilityRoutes from "@/features/observability/observability.routes";
-import type { AppRouteDefinition } from "./types";
+import { NotFoundPage } from '../pages/NotFoundPage';
+import benchmarkRoutes from '@/features/benchmark/benchmark.routes';
+import cacheRoutes from '@/features/cache/cache.routes';
+import monitorRoutes from '@/features/monitor/monitor.routes';
+import observabilityRoutes from '@/features/observability/observability.routes';
+import type { AppRouteDefinition } from './types';
 
 const routes: AppRouteDefinition[] = [
   ...monitorRoutes,
@@ -11,21 +11,18 @@ const routes: AppRouteDefinition[] = [
   ...benchmarkRoutes,
   ...observabilityRoutes,
   {
-    key: "not-found",
-    path: "*",
+    key: 'not-found',
+    path: '*',
     component: NotFoundPage,
   },
 ];
 
-function matchesPath(
-  route: AppRouteDefinition,
-  pathname: string,
-): boolean {
+function matchesPath(route: AppRouteDefinition, pathname: string): boolean {
   if (route.index) {
-    return pathname === "/";
+    return pathname === '/';
   }
 
-  if (route.path === "*") {
+  if (route.path === '*') {
     return false;
   }
 

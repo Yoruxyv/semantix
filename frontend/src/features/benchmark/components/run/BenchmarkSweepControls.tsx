@@ -33,16 +33,13 @@ export function BenchmarkSweepControls({
       </button>
 
       <p className="font-data mt-2 text-[10px]/5 text-(--text-faint)">
-        {sweep.thresholds.length} projected thresholds, including the
-        measured value {formatDecimal(form.threshold, 2)}. Alternate values
-        reuse observed candidate scores and do not replay cache population.
+        {sweep.thresholds.length} projected thresholds, including the measured value{' '}
+        {formatDecimal(form.threshold, 2)}. Alternate values reuse observed candidate
+        scores and do not replay cache population.
       </p>
 
       {isSweepOpen && (
-        <div
-          className="mt-4 grid gap-4 sm:grid-cols-3"
-          id="benchmark-sweep-controls"
-        >
+        <div className="mt-4 grid gap-4 sm:grid-cols-3" id="benchmark-sweep-controls">
           <label className="block">
             <span className="ui-label text-(--text-muted)">Sweep start</span>
             <input
@@ -56,10 +53,7 @@ export function BenchmarkSweepControls({
               value={form.sweepStart}
               onChange={(event) =>
                 updateBenchmarkForm(controller, {
-                  sweepStart: benchmarkNumberValue(
-                    event.target.value,
-                    form.sweepStart,
-                  ),
+                  sweepStart: benchmarkNumberValue(event.target.value, form.sweepStart),
                 })
               }
             />
@@ -78,10 +72,7 @@ export function BenchmarkSweepControls({
               value={form.sweepEnd}
               onChange={(event) =>
                 updateBenchmarkForm(controller, {
-                  sweepEnd: benchmarkNumberValue(
-                    event.target.value,
-                    form.sweepEnd,
-                  ),
+                  sweepEnd: benchmarkNumberValue(event.target.value, form.sweepEnd),
                 })
               }
             />
@@ -101,10 +92,7 @@ export function BenchmarkSweepControls({
               value={form.sweepStep}
               onChange={(event) =>
                 updateBenchmarkForm(controller, {
-                  sweepStep: benchmarkNumberValue(
-                    event.target.value,
-                    form.sweepStep,
-                  ),
+                  sweepStep: benchmarkNumberValue(event.target.value, form.sweepStep),
                 })
               }
             />
@@ -130,8 +118,8 @@ export function BenchmarkSweepControls({
           className="font-data mt-3 text-[10px]/5 text-(--coral-text)"
           id="benchmark-run-permission"
         >
-          Viewer access can inspect dataset metadata, but Operator access is
-          required to initiate provider-backed evaluation runs.
+          Viewer access can inspect dataset metadata, but Operator access is required to
+          initiate provider-backed evaluation runs.
         </p>
       )}
     </div>

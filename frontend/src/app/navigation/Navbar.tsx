@@ -1,24 +1,19 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type JSX,
-} from "react";
-import { NavLink, useLocation } from "react-router";
+import { useEffect, useRef, useState, type JSX } from 'react';
+import { NavLink, useLocation } from 'react-router';
 
-import { useAuth } from "@/features/auth/hooks/useAuth";
-import { canAccessGlobalMetrics } from "@/features/auth/permissions";
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { canAccessGlobalMetrics } from '@/features/auth/permissions';
 
-import { preloadRouteModule } from "../router/routes";
-import { APP_PATHS, NAV_ITEMS } from "./navigationConfig";
-import { SessionUptime } from "./SessionUptime";
+import { preloadRouteModule } from '../router/routes';
+import { APP_PATHS, NAV_ITEMS } from './navigationConfig';
+import { SessionUptime } from './SessionUptime';
 
 const EXPANDED_NAV_MIN_WIDTH = 1_024;
 
 function navClass(isActive: boolean): string {
   const tone = isActive
-    ? "border-l-[var(--gold)] bg-[rgba(212,161,90,0.08)] text-[var(--gold)] lg:border-b-[var(--gold)] lg:border-l-transparent"
-    : "border-l-transparent text-[var(--text-muted)] hover:bg-[rgba(234,230,221,0.04)] hover:text-[var(--text)] lg:border-b-transparent";
+    ? 'border-l-[var(--gold)] bg-[rgba(212,161,90,0.08)] text-[var(--gold)] lg:border-b-[var(--gold)] lg:border-l-transparent'
+    : 'border-l-transparent text-[var(--text-muted)] hover:bg-[rgba(234,230,221,0.04)] hover:text-[var(--text)] lg:border-b-transparent';
 
   return `ui-label block border-b border-b-[var(--hairline)] border-l-2 px-3 py-3 transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)] lg:border-b lg:border-l-0 lg:py-2 ${tone}`;
 }
@@ -49,8 +44,8 @@ export function Navbar(): JSX.Element {
       }
     }
 
-    window.addEventListener("resize", closeExpandedMenu);
-    return () => window.removeEventListener("resize", closeExpandedMenu);
+    window.addEventListener('resize', closeExpandedMenu);
+    return () => window.removeEventListener('resize', closeExpandedMenu);
   }, []);
 
   useEffect(() => {
@@ -59,7 +54,7 @@ export function Navbar(): JSX.Element {
     }
 
     function closeOnEscape(event: KeyboardEvent): void {
-      if (event.key !== "Escape") {
+      if (event.key !== 'Escape') {
         return;
       }
 
@@ -73,8 +68,8 @@ export function Navbar(): JSX.Element {
       setIsMenuOpen(false);
     }
 
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
   }, [isMenuOpen]);
 
   return (
@@ -93,28 +88,25 @@ export function Navbar(): JSX.Element {
           ref={menuButtonRef}
           aria-controls="primary-navigation"
           aria-expanded={isMenuOpen}
-          aria-label={isMenuOpen ? "Close primary menu" : "Open primary menu"}
+          aria-label={isMenuOpen ? 'Close primary menu' : 'Open primary menu'}
           className="order-2 flex size-11 shrink-0 items-center justify-center border border-(--hairline) bg-(--surface) text-(--gold) transition-colors motion-reduce:transition-none hover:border-(--gold) focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-(--gold) lg:hidden"
           type="button"
           onClick={() => setIsMenuOpen((current) => !current)}
         >
-          <span
-            aria-hidden="true"
-            className="flex w-5 flex-col items-stretch gap-1.5"
-          >
+          <span aria-hidden="true" className="flex w-5 flex-col items-stretch gap-1.5">
             <span
               className={`block h-px bg-current transition-transform motion-reduce:transition-none ${
-                isMenuOpen ? "translate-y-[7px] rotate-45" : ""
+                isMenuOpen ? 'translate-y-[7px] rotate-45' : ''
               }`}
             />
             <span
               className={`block h-px bg-current transition-opacity motion-reduce:transition-none ${
-                isMenuOpen ? "opacity-0" : ""
+                isMenuOpen ? 'opacity-0' : ''
               }`}
             />
             <span
               className={`block h-px bg-current transition-transform motion-reduce:transition-none ${
-                isMenuOpen ? "translate-y-[-7px] -rotate-45" : ""
+                isMenuOpen ? 'translate-y-[-7px] -rotate-45' : ''
               }`}
             />
           </span>
@@ -123,7 +115,7 @@ export function Navbar(): JSX.Element {
         <nav
           ref={navigationRef}
           aria-label="Primary navigation"
-          className={`${isMenuOpen ? "block" : "hidden"} order-3 w-full border border-(--hairline) bg-(--surface) p-1 lg:col-start-2 lg:row-start-1 lg:block lg:w-fit lg:justify-self-center`}
+          className={`${isMenuOpen ? 'block' : 'hidden'} order-3 w-full border border-(--hairline) bg-(--surface) p-1 lg:col-start-2 lg:row-start-1 lg:block lg:w-fit lg:justify-self-center`}
           id="primary-navigation"
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:gap-1">

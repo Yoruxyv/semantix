@@ -1,23 +1,13 @@
-export type BenchmarkDatasetId = "quick" | "extended";
-export type EvaluationDatasetSourceKind = "builtin" | "inline" | "persisted";
+export type BenchmarkDatasetId = 'quick' | 'extended';
+export type EvaluationDatasetSourceKind = 'builtin' | 'inline' | 'persisted';
 export type EvaluationRunRetentionState =
-  | "not_retained"
-  | "retained"
-  | "retention_failed";
+  'not_retained' | 'retained' | 'retention_failed';
 
 export type BenchmarkOutcome =
-  | "true_positive"
-  | "true_negative"
-  | "false_positive"
-  | "false_negative";
+  'true_positive' | 'true_negative' | 'false_positive' | 'false_negative';
 
 export type ProviderCategory =
-  | "huggingface"
-  | "openai"
-  | "anthropic"
-  | "gemini"
-  | "ollama"
-  | "mock";
+  'huggingface' | 'openai' | 'anthropic' | 'gemini' | 'ollama' | 'mock';
 
 export interface BenchmarkDatasetSummary {
   dataset_id: string;
@@ -98,7 +88,7 @@ export interface PersistedEvaluationDatasetMetadata {
   namespace: string;
   name: string;
   description: string | null;
-  source_type: "imported";
+  source_type: 'imported';
   schema_version: 1;
   digest: string;
   case_count: number;
@@ -107,8 +97,7 @@ export interface PersistedEvaluationDatasetMetadata {
   expires_at: string;
 }
 
-export interface PersistedEvaluationDatasetDetail
-  extends PersistedEvaluationDatasetMetadata {
+export interface PersistedEvaluationDatasetDetail extends PersistedEvaluationDatasetMetadata {
   cases: ImportedEvaluationCase[];
 }
 
@@ -119,7 +108,7 @@ export interface PersistedEvaluationDatasetCatalogLimits {
 }
 
 export interface PersistedEvaluationDatasetListResponse {
-  storage_mode: "session" | "postgres";
+  storage_mode: 'session' | 'postgres';
   persistence_enabled: boolean;
   items: PersistedEvaluationDatasetMetadata[];
   total: number;
@@ -141,13 +130,12 @@ export interface DeletePersistedEvaluationDatasetResponse {
   namespace: string;
 }
 
-export interface EvaluationRunRequest
-  extends Omit<BenchmarkRunRequest, "dataset_id"> {
+export interface EvaluationRunRequest extends Omit<BenchmarkRunRequest, 'dataset_id'> {
   history_namespace?: string;
   dataset_source:
-    | { kind: "builtin"; dataset_id: BenchmarkDatasetId }
-    | { kind: "inline"; definition: unknown }
-    | { kind: "persisted"; dataset_id: string; namespace: string };
+    | { kind: 'builtin'; dataset_id: BenchmarkDatasetId }
+    | { kind: 'inline'; definition: unknown }
+    | { kind: 'persisted'; dataset_id: string; namespace: string };
 }
 
 export interface BenchmarkMetrics {
@@ -195,7 +183,7 @@ export interface BenchmarkQueryResult {
 
 export interface ThresholdEvaluation {
   threshold: number;
-  result_kind: "measured" | "projected";
+  result_kind: 'measured' | 'projected';
   hit_rate: number;
   precision: number;
   recall: number;
@@ -221,7 +209,7 @@ export interface BenchmarkReproducibilityMetadata {
   comparison_contract_version: 1;
   embedding_dimensions: number;
   embedding_space_fingerprint: string;
-  normalization_mode: "identity" | "typo_correction";
+  normalization_mode: 'identity' | 'typo_correction';
   normalization_fingerprint: string;
   measured_threshold: number;
   evaluation_thresholds: number[];
@@ -250,12 +238,12 @@ export interface BenchmarkRunResponse {
   reproducibility: BenchmarkReproducibilityMetadata;
   history_retention: EvaluationRunRetentionStatus;
   metrics: BenchmarkMetrics;
-  threshold_evaluation_mode: "frozen_candidate_projection";
+  threshold_evaluation_mode: 'frozen_candidate_projection';
   threshold_evaluations: ThresholdEvaluation[];
   query_results: BenchmarkQueryResult[];
 }
 
-export type EvaluationRunTerminalState = "completed" | "failed" | "timed_out";
+export type EvaluationRunTerminalState = 'completed' | 'failed' | 'timed_out';
 
 export interface EvaluationRunHistoryItem {
   run_id: string;
@@ -274,12 +262,12 @@ export interface EvaluationRunHistoryItem {
 }
 
 export interface EvaluationRunHistoryDetail extends EvaluationRunHistoryItem {
-  threshold_evaluation_mode: "frozen_candidate_projection";
+  threshold_evaluation_mode: 'frozen_candidate_projection';
   threshold_evaluations: ThresholdEvaluation[];
 }
 
 export interface EvaluationRunHistoryListResponse {
-  storage_mode: "disabled" | "postgres";
+  storage_mode: 'disabled' | 'postgres';
   retention_enabled: boolean;
   items: EvaluationRunHistoryItem[];
   total: number;

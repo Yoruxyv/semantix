@@ -1,26 +1,26 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type JSX, type ReactNode } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, type JSX, type ReactNode } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 
-import { APP_PATHS } from "@/app/navigation/navigationConfig";
-import { useAuth } from "@/features/auth/hooks/useAuth";
-import { canDeleteCacheEntries } from "@/features/auth/permissions";
-import { MarkdownContent } from "@/shared/components/markdown/MarkdownContent";
-import { Alert, Button, InlineConfirmation, PageHeader } from "@/shared/components/ui";
+import { APP_PATHS } from '@/app/navigation/navigationConfig';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { canDeleteCacheEntries } from '@/features/auth/permissions';
+import { MarkdownContent } from '@/shared/components/markdown/MarkdownContent';
+import { Alert, Button, InlineConfirmation, PageHeader } from '@/shared/components/ui';
 import {
   formatCompactDuration,
   formatCount,
   formatTimestamp,
-} from "@/shared/lib/formatters";
-import { dataFromApiResult } from "@/shared/query/apiResult";
-import { cacheEntryKeys } from "@/shared/query/queryKeys";
+} from '@/shared/lib/formatters';
+import { dataFromApiResult } from '@/shared/query/apiResult';
+import { cacheEntryKeys } from '@/shared/query/queryKeys';
 
-import { deleteCacheEntry, getCacheEntry } from "../api/cacheApi";
-import { useCacheControl } from "../hooks/useCacheControl";
+import { deleteCacheEntry, getCacheEntry } from '../api/cacheApi';
+import { useCacheControl } from '../hooks/useCacheControl';
 
 const CACHE_KEY_PATTERN = /^[a-f0-9]{64}$/;
 const UNAVAILABLE_MESSAGE =
-  "This cache entry could not be found or is no longer available.";
+  'This cache entry could not be found or is no longer available.';
 
 function shortCacheKey(cacheKey: string): string {
   return `${cacheKey.slice(0, 10)}...${cacheKey.slice(-6)}`;
@@ -28,20 +28,20 @@ function shortCacheKey(cacheKey: string): string {
 
 function returnSearchFromState(state: unknown): string {
   if (
-    typeof state === "object" &&
+    typeof state === 'object' &&
     state !== null &&
-    "cacheReturnSearch" in state &&
-    typeof state.cacheReturnSearch === "string" &&
-    (state.cacheReturnSearch === "" || state.cacheReturnSearch.startsWith("?"))
+    'cacheReturnSearch' in state &&
+    typeof state.cacheReturnSearch === 'string' &&
+    (state.cacheReturnSearch === '' || state.cacheReturnSearch.startsWith('?'))
   ) {
     return state.cacheReturnSearch;
   }
-  return "";
+  return '';
 }
 
 function DetailItem({
   children,
-  className = "",
+  className = '',
   label,
 }: Readonly<{
   children: ReactNode;
@@ -59,7 +59,7 @@ function DetailItem({
 }
 
 export function CacheEntryDetailPage(): JSX.Element {
-  const { cacheKey = "" } = useParams();
+  const { cacheKey = '' } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -81,16 +81,15 @@ export function CacheEntryDetailPage(): JSX.Element {
     gcTime: 5 * 60_000,
   });
   const deleteMutation = useMutation({
-    mutationFn: async () =>
-      dataFromApiResult(await deleteCacheEntry(cacheKey)),
+    mutationFn: async () => dataFromApiResult(await deleteCacheEntry(cacheKey)),
   });
 
   async function copyCacheKey(): Promise<void> {
     try {
       await navigator.clipboard.writeText(cacheKey);
-      setCopyStatus("Cache key copied.");
+      setCopyStatus('Cache key copied.');
     } catch {
-      setCopyStatus("Cache key could not be copied.");
+      setCopyStatus('Cache key could not be copied.');
     }
   }
 
@@ -108,10 +107,10 @@ export function CacheEntryDetailPage(): JSX.Element {
       ]);
       void navigate(returnTo, {
         replace: true,
-        state: { cacheMutationNotice: "Cache entry deleted." },
+        state: { cacheMutationNotice: 'Cache entry deleted.' },
       });
     } catch {
-      setDeleteError("The cache entry was not deleted.");
+      setDeleteError('The cache entry was not deleted.');
     }
   }
 
@@ -177,7 +176,7 @@ export function CacheEntryDetailPage(): JSX.Element {
           <header className="flex flex-wrap items-start justify-between gap-5">
             <div className="min-w-0">
               <p className="ui-label text-(--teal)">
-                {entry.is_expired ? "Expired" : "Active"}
+                {entry.is_expired ? 'Expired' : 'Active'}
               </p>
               <h2 className="font-display mt-2 wrap-break-word text-2xl italic">
                 {entry.prompt}
@@ -208,22 +207,18 @@ export function CacheEntryDetailPage(): JSX.Element {
             </DetailItem>
             <DetailItem label="Namespace">{entry.namespace}</DetailItem>
             <DetailItem label="Status">
-              {entry.is_expired ? "Expired" : "Active"}
+              {entry.is_expired ? 'Expired' : 'Active'}
             </DetailItem>
-            <DetailItem label="Created">
-              {formatTimestamp(entry.created_at)}
-            </DetailItem>
+            <DetailItem label="Created">{formatTimestamp(entry.created_at)}</DetailItem>
             <DetailItem label="Expires">
-              {formatTimestamp(entry.expires_at, "No expiry")}
+              {formatTimestamp(entry.expires_at, 'No expiry')}
             </DetailItem>
             <DetailItem label="TTL remaining">
               {formatCompactDuration(entry.remaining_ttl_seconds, {
-                fallback: "No expiry",
+                fallback: 'No expiry',
               })}
             </DetailItem>
-            <DetailItem label="Entry hits">
-              {formatCount(entry.hit_count)}
-            </DetailItem>
+            <DetailItem label="Entry hits">{formatCount(entry.hit_count)}</DetailItem>
             <DetailItem label="Last accessed">
               {formatTimestamp(entry.last_accessed_at)}
             </DetailItem>
@@ -257,9 +252,9 @@ export function CacheEntryDetailPage(): JSX.Element {
               isPending={deleteMutation.isPending}
               message={
                 <>
-                  Delete <code>{shortCacheKey(entry.cache_key)}</code> from
-                  namespace <code>{entry.namespace}</code>? Cached responses
-                  using it will no longer be reused.
+                  Delete <code>{shortCacheKey(entry.cache_key)}</code> from namespace{' '}
+                  <code>{entry.namespace}</code>? Cached responses using it will no
+                  longer be reused.
                 </>
               }
               pendingLabel="Deleting"

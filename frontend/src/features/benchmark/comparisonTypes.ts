@@ -1,9 +1,6 @@
 import type { EvaluationRunHistoryDetail } from './types';
 
-export type EvaluationComparisonStatus =
-  | 'compatible'
-  | 'warning'
-  | 'incompatible';
+export type EvaluationComparisonStatus = 'compatible' | 'warning' | 'incompatible';
 
 export type EvaluationComparisonBlockerCode =
   | 'namespace_mismatch'

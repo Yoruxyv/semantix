@@ -1,8 +1,4 @@
-import {
-  isNonEmptyString,
-  isNumberInRange,
-  isRecord,
-} from '@/shared/api/validators';
+import { isNonEmptyString, isNumberInRange, isRecord } from '@/shared/api/validators';
 
 import type {
   EvaluationComparisonBlocker,
@@ -184,8 +180,7 @@ export function decodeEvaluationRunComparison(
     !Array.isArray(value.compatibility.incompatibilities) ||
     !Array.isArray(value.compatibility.warnings) ||
     value.compatibility.case_evidence !== 'not_retained' ||
-    typeof value.compatibility.opaque_configuration_fingerprint_matches !==
-      'boolean' ||
+    typeof value.compatibility.opaque_configuration_fingerprint_matches !== 'boolean' ||
     !Array.isArray(value.threshold_deltas)
   ) {
     throw new Error('Invalid evaluation run comparison');

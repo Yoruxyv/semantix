@@ -106,7 +106,9 @@ const runAudit = async (profile, run) => {
     '--quiet',
   );
 
-  console.log(`\n${profile === 'desktop' ? 'Desktop' : 'Mobile'} ${run}/${LIGHTHOUSE_BUDGET.runCount}`);
+  console.log(
+    `\n${profile === 'desktop' ? 'Desktop' : 'Mobile'} ${run}/${LIGHTHOUSE_BUDGET.runCount}`,
+  );
   const exitCode = await runNode(args, { allowFailure: true });
 
   if (exitCode !== 0 && !hasCompleteReport(outputPath)) {
@@ -114,7 +116,9 @@ const runAudit = async (profile, run) => {
   }
 
   if (exitCode !== 0) {
-    console.warn('Lighthouse returned a cleanup error after writing a complete report; continuing.');
+    console.warn(
+      'Lighthouse returned a cleanup error after writing a complete report; continuing.',
+    );
   }
 };
 

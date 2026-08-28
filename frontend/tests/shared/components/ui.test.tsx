@@ -1,11 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  Alert,
-  Button,
-  InlineConfirmation,
-} from '@/shared/components/ui';
+import { Alert, Button, InlineConfirmation } from '@/shared/components/ui';
 
 afterEach(cleanup);
 
@@ -37,9 +33,7 @@ describe('shared UI primitives', () => {
     );
 
     expect(screen.getByRole('alert').textContent).toContain('Request failed');
-    expect(screen.getByRole('alert').textContent).toContain(
-      'Provider unavailable',
-    );
+    expect(screen.getByRole('alert').textContent).toContain('Provider unavailable');
   });
 
   it('runs inline confirmation callbacks', () => {
@@ -78,12 +72,10 @@ describe('shared UI primitives', () => {
     );
 
     expect(
-      screen.getByRole<HTMLButtonElement>('button', { name: 'Working' })
-        .disabled,
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Working' }).disabled,
     ).toBe(true);
     expect(
-      screen.getByRole<HTMLButtonElement>('button', { name: 'Cancel' })
-        .disabled,
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Cancel' }).disabled,
     ).toBe(true);
   });
 });

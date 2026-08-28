@@ -1,10 +1,10 @@
-import { Suspense, type JSX } from "react";
-import { Route, Routes } from "react-router";
+import { Suspense, type JSX } from 'react';
+import { Route, Routes } from 'react-router';
 
-import { AppLayout } from "../layouts/AppLayout";
-import { RouteLoader } from "./RouteLoader";
-import routes from "./routes";
-import type { AppRouteDefinition } from "./types";
+import { AppLayout } from '../layouts/AppLayout';
+import { RouteLoader } from './RouteLoader';
+import routes from './routes';
+import type { AppRouteDefinition } from './types';
 
 function renderRoute(route: AppRouteDefinition): JSX.Element {
   const Component = route.component;

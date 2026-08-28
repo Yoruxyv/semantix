@@ -70,12 +70,8 @@ function createMarkdownComponents(density: MarkdownDensity): Components {
         {children}
       </a>
     ),
-    ul: ({ ...props }) => (
-      <ul className={`${styles.list} list-disc`} {...props} />
-    ),
-    ol: ({ ...props }) => (
-      <ol className={`${styles.list} list-decimal`} {...props} />
-    ),
+    ul: ({ ...props }) => <ul className={`${styles.list} list-disc`} {...props} />,
+    ol: ({ ...props }) => <ol className={`${styles.list} list-decimal`} {...props} />,
     li: ({ ...props }) => <li className="leading-6" {...props} />,
     blockquote: ({ ...props }) => (
       <blockquote className={styles.blockquote} {...props} />
@@ -132,10 +128,7 @@ function createMarkdownComponents(density: MarkdownDensity): Components {
       />
     ),
     td: ({ ...props }) => (
-      <td
-        className="border-b border-[rgba(234,230,221,0.05)] px-2 py-1.5"
-        {...props}
-      />
+      <td className="border-b border-[rgba(234,230,221,0.05)] px-2 py-1.5" {...props} />
     ),
     hr: ({ ...props }) => (
       <hr className="my-3 border-0 border-t border-(--hairline)" {...props} />

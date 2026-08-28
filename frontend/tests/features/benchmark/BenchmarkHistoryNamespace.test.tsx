@@ -34,9 +34,7 @@ function renderDashboard() {
 }
 
 async function confirmReviewedRun(): Promise<void> {
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Review benchmark run' }),
-  );
+  fireEvent.click(screen.getByRole('button', { name: 'Review benchmark run' }));
   const confirm = await screen.findByRole('button', {
     name: 'Run benchmark now',
   });

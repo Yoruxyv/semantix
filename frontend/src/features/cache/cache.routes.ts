@@ -1,18 +1,18 @@
-import { defineLazyPathRoute } from "@/app/router/lazyPage";
-import { APP_PATHS } from "@/app/navigation/navigationConfig";
+import { defineLazyPathRoute } from '@/app/router/lazyPage';
+import { APP_PATHS } from '@/app/navigation/navigationConfig';
 
 const cacheRoutes = [
   defineLazyPathRoute(
-    "cache-entry-detail",
+    'cache-entry-detail',
     `${APP_PATHS.cache.slice(1)}/entries/:cacheKey`,
-    () => import("./pages/CacheEntryDetailPage"),
-    "CacheEntryDetailPage",
+    () => import('./pages/CacheEntryDetailPage'),
+    'CacheEntryDetailPage',
   ),
   defineLazyPathRoute(
     APP_PATHS.cache.slice(1),
-    "cache",
-    () => import("./pages/CachePage"),
-    "CachePage",
+    'cache',
+    () => import('./pages/CachePage'),
+    'CachePage',
   ),
 ];
 
