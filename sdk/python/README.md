@@ -1,7 +1,8 @@
 # Semantix Python client
 
-`semantix-client` is the typed Python client for the public Semantix HTTP API.
-It provides synchronous and asynchronous query clients, explicit cache policies,
+`semantix-client` is the distribution name for the typed Python client for the
+public Semantix HTTP API; Python code imports it as `semantix_client`. It
+provides synchronous and asynchronous query clients, explicit cache policies,
 immutable result models, bounded timeouts, and safe typed errors.
 
 > The SDK does not implement semantic caching locally. It communicates with a
@@ -24,6 +25,10 @@ contract is considered a breaking SDK change while the package matures toward
 1.0.
 
 ## Installation
+
+Distribution name: `semantix-client`.
+
+Python import name: `semantix_client`.
 
 Install a locally built wheel:
 
@@ -49,7 +54,7 @@ The package is not published to PyPI by Phase 10.
 ## Synchronous quick start
 
 ```python
-from semantix import CachePolicy, SemantixClient
+from semantix_client import CachePolicy, SemantixClient
 
 with SemantixClient(
     base_url="http://localhost:8000",
@@ -71,7 +76,7 @@ print(result.similarity_score)
 ```python
 import asyncio
 
-from semantix import AsyncSemantixClient, CachePolicy
+from semantix_client import AsyncSemantixClient, CachePolicy
 
 
 async def main() -> None:
@@ -159,7 +164,7 @@ All SDK-owned errors inherit from `SemantixError`:
 | `SemantixAPIError` | Other non-success HTTP status |
 
 ```python
-from semantix import SemantixError, SemantixRateLimitError
+from semantix_client import SemantixError, SemantixRateLimitError
 
 try:
     result = client.query("Question", namespace="support")
@@ -200,7 +205,9 @@ storage. A not-ready response raises `SemantixServerError`.
 - Tokens are held only for request authentication and are never persisted or
   included in result models.
 - Authorization and namespace checks are always server-side.
-- Responses are bounded before JSON decoding.
+- Requests ask for identity-encoded JSON. Encoded responses are rejected before
+  body consumption, and the response limit is enforced on raw bytes before JSON
+  decoding.
 - The SDK exposes no raw embeddings, provider credentials, private endpoints,
   or diagnostics surface.
 - Phase 09 cache-integrity and poisoning boundaries remain server-owned.
@@ -211,7 +218,7 @@ storage. A not-ready response raises `SemantixServerError`.
 uv run --no-sync ruff check .
 uv run --no-sync ruff format --check .
 uv run --no-sync mypy src tests
-uv run --no-sync pytest -m "not integration" --cov=semantix
+uv run --no-sync pytest -m "not integration" --cov=semantix_client
 python -m build
 python -m twine check dist/*
 ```

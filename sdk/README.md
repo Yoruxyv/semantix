@@ -8,7 +8,7 @@ engines, and they do not import server implementation modules.
 
 | SDK | Package documentation |
 |---|---|
-| Python | [Python client](python/README.md) |
+| Python | [`semantix-client` distribution, `semantix_client` import](python/README.md) |
 
 The Python package is the Phase 10 reference integration boundary. Future SDKs
 should follow the same server-authoritative authentication, namespace, and cache

@@ -2,7 +2,7 @@
 
 import json
 import math
-from collections.abc import AsyncIterator, Iterable, Mapping
+from collections.abc import Mapping
 from typing import cast
 from urllib.parse import urlsplit, urlunsplit
 
@@ -64,7 +64,10 @@ def _timeout(value: float) -> httpx.Timeout:
 
 
 def _headers(token: str | None) -> dict[str, str]:
-    headers = {"Accept": "application/json"}
+    headers = {
+        "Accept": "application/json",
+        "Accept-Encoding": "identity",
+    }
     if token is not None:
         if not token or token.isspace() or "\r" in token or "\n" in token:
             raise SemantixConfigurationError(
@@ -74,8 +77,9 @@ def _headers(token: str | None) -> dict[str, str]:
     return headers
 
 
-def _read_content(chunks: Iterable[bytes]) -> bytes:
+def _read_content(response: httpx.Response) -> bytes:
     content = bytearray()
+    chunks = (response.content,) if response.is_stream_consumed else response.iter_raw()
     for chunk in chunks:
         if len(content) + len(chunk) > _MAX_HTTP_RESPONSE_BYTES:
             raise _ResponseTooLargeError
@@ -83,9 +87,11 @@ def _read_content(chunks: Iterable[bytes]) -> bytes:
     return bytes(content)
 
 
-async def _read_content_async(chunks: AsyncIterator[bytes]) -> bytes:
+async def _read_content_async(response: httpx.Response) -> bytes:
+    if response.is_stream_consumed:
+        return _read_content(response)
     content = bytearray()
-    async for chunk in chunks:
+    async for chunk in response.aiter_raw():
         if len(content) + len(chunk) > _MAX_HTTP_RESPONSE_BYTES:
             raise _ResponseTooLargeError
         content.extend(chunk)
@@ -95,6 +101,17 @@ async def _read_content_async(chunks: AsyncIterator[bytes]) -> bytes:
 def _is_json_response(response: httpx.Response) -> bool:
     media_type = str(response.headers.get("content-type", "")).split(";", 1)[0].strip()
     return media_type == "application/json" or media_type.endswith("+json")
+
+
+def _reject_encoded_response(response: httpx.Response, token: str | None) -> None:
+    encoding = response.headers.get("content-encoding", "").strip().lower()
+    if encoding in {"", "identity"}:
+        return
+    if not response.is_success:
+        _raise_api_error(response, None, token=token)
+    raise SemantixResponseError(
+        "The Semantix server returned an unexpected content encoding."
+    )
 
 
 def _json(content: bytes) -> object:
@@ -210,8 +227,9 @@ class _SyncTransport:
     ) -> object:
         try:
             with self._client.stream(method, path, json=payload) as response:
+                _reject_encoded_response(response, self._token)
                 try:
-                    content = _read_content(response.iter_bytes())
+                    content = _read_content(response)
                 except _ResponseTooLargeError:
                     if not response.is_success:
                         _raise_api_error(response, None, token=self._token)
@@ -256,8 +274,9 @@ class _AsyncTransport:
     ) -> object:
         try:
             async with self._client.stream(method, path, json=payload) as response:
+                _reject_encoded_response(response, self._token)
                 try:
-                    content = await _read_content_async(response.aiter_bytes())
+                    content = await _read_content_async(response)
                 except _ResponseTooLargeError:
                     if not response.is_success:
                         _raise_api_error(response, None, token=self._token)

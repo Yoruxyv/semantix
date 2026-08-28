@@ -88,8 +88,8 @@ the active similarity threshold. See
 
 External Python applications can use the independently installable
 [`semantix-client`](sdk/python/README.md) package through the public HTTP API.
-It provides typed synchronous and asynchronous clients without installing or
-importing Semantix backend internals.
+Python code imports it as `semantix_client`. It provides typed synchronous and
+asynchronous clients without installing or importing Semantix backend internals.
 
 ## 🚀 Quick start
 

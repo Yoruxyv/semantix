@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from semantix import (
+from semantix_client import (
     AsyncSemantixClient,
     CachePolicy,
     SemantixAuthenticationError,

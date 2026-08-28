@@ -1,9 +1,23 @@
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable, Iterator
 
 import httpx
 import pytest
 
-from semantix import SemantixClient
+from semantix_client import SemantixClient
+
+
+class TrackingByteStream(httpx.SyncByteStream, httpx.AsyncByteStream):
+    def __init__(self, content: bytes) -> None:
+        self.content = content
+        self.iterated = False
+
+    def __iter__(self) -> Iterator[bytes]:
+        self.iterated = True
+        yield self.content
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        self.iterated = True
+        yield self.content
 
 
 def query_response(**overrides: object) -> dict[str, object]:

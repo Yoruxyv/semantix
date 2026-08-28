@@ -1,3 +1,4 @@
+import gzip
 import json
 from collections.abc import Callable
 from dataclasses import FrozenInstanceError
@@ -6,7 +7,7 @@ from typing import cast
 import httpx
 import pytest
 
-from semantix import (
+from semantix_client import (
     CachePolicy,
     QueryResult,
     SemantixAPIError,
@@ -22,7 +23,7 @@ from semantix import (
     SemantixValidationError,
 )
 
-from .conftest import query_response
+from .conftest import TrackingByteStream, query_response
 
 
 def request_json(request: httpx.Request) -> dict[str, object]:
@@ -47,6 +48,7 @@ def test_query_serializes_policy_and_authentication(
         payload = request_json(request)
         assert request.method == "POST"
         assert request.url.path == "/prefix/api/v1/query"
+        assert request.headers["accept-encoding"] == "identity"
         assert request.headers["authorization"] == "Bearer token-value"
         assert payload["prompt"] == "Where can I reset my password?"
         assert payload["namespace"] == "support"
@@ -80,7 +82,11 @@ def test_token_is_optional_and_default_namespace_is_serialized() -> None:
         assert "authorization" not in request.headers
         assert request.url.path == "/api/v1/query"
         assert request_json(request)["namespace"] == "default"
-        return httpx.Response(200, json=query_response())
+        return httpx.Response(
+            200,
+            json=query_response(),
+            headers={"Content-Encoding": "Identity"},
+        )
 
     client = SemantixClient(
         base_url="http://localhost:8000/",
@@ -233,8 +239,8 @@ def test_invalid_query_response_is_rejected(payload: dict[str, object]) -> None:
         (
             httpx.Response(
                 200,
-                content=b"x" * 1_048_577,
                 headers={"Content-Type": "application/json"},
+                stream=TrackingByteStream(b"x" * 1_048_577),
             ),
             "safety limit",
         ),
@@ -250,6 +256,25 @@ def test_unexpected_success_body_is_safely_rejected(
     ) as client:
         with pytest.raises(SemantixResponseError, match=message):
             client.query("question")
+
+
+def test_encoded_success_is_rejected_before_body_iteration() -> None:
+    stream = TrackingByteStream(gzip.compress(b"x" * 2_097_152))
+    response = httpx.Response(
+        200,
+        headers={
+            "Content-Encoding": "gzip",
+            "Content-Type": "application/json",
+        },
+        stream=stream,
+    )
+    with SemantixClient(
+        base_url="https://example.com",
+        _http_transport=httpx.MockTransport(lambda request: response),
+    ) as client:
+        with pytest.raises(SemantixResponseError, match="content encoding"):
+            client.query("question")
+    assert not stream.iterated
 
 
 @pytest.mark.parametrize(
@@ -287,6 +312,41 @@ def test_http_errors_are_typed(
     assert caught.value.error_code == "safe_code"
     assert caught.value.detail == "Safe detail."
     assert caught.value.retry_after_seconds == 12
+
+
+@pytest.mark.parametrize(
+    ("status", "exception_type"),
+    [
+        (401, SemantixAuthenticationError),
+        (403, SemantixAuthorizationError),
+        (422, SemantixValidationError),
+        (429, SemantixRateLimitError),
+        (500, SemantixServerError),
+        (409, SemantixAPIError),
+    ],
+)
+def test_encoded_http_error_preserves_status_type_without_reading_body(
+    status: int,
+    exception_type: type[SemantixAPIError],
+) -> None:
+    stream = TrackingByteStream(gzip.compress(b"private upstream body" * 100_000))
+    response = httpx.Response(
+        status,
+        headers={
+            "Content-Encoding": "gzip",
+            "Content-Type": "application/json",
+        },
+        stream=stream,
+    )
+    with SemantixClient(
+        base_url="https://example.com",
+        _http_transport=httpx.MockTransport(lambda request: response),
+    ) as client:
+        with pytest.raises(exception_type) as caught:
+            client.query("question")
+    assert caught.value.status_code == status
+    assert caught.value.error_code == "http_error"
+    assert not stream.iterated
 
 
 def test_non_json_error_body_is_not_exposed() -> None:
