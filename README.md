@@ -84,6 +84,13 @@ Semantix returns a cached response only when the nearest compatible entry meets
 the active similarity threshold. See
 [Cache policies](docs/guides/cache-policies.md) for the complete rules.
 
+## 🐍 Python SDK
+
+External Python applications can use the independently installable
+[`semantix-client`](sdk/python/README.md) package through the public HTTP API.
+It provides typed synchronous and asynchronous clients without installing or
+importing Semantix backend internals.
+
 ## 🚀 Quick start
 
 ### Requirements
@@ -341,6 +348,8 @@ rules, and contribution steps.
 semantix/
 ├── backend/
 ├── frontend/
+├── sdk/
+│   └── python/
 ├── ops/
 │   ├── ci/
 │   ├── load-testing/
@@ -381,6 +390,7 @@ The [documentation index](docs/README.md) groups the full guides by purpose.
 |---|---|
 | [Getting started](docs/guides/getting-started.md) | Local setup, environment files, and Docker workflows |
 | [Providers](docs/guides/providers.md) | Hosted, local, and mock provider configuration |
+| [Python SDK](sdk/python/README.md) | Install and use the typed public HTTP client |
 | [Architecture](docs/reference/architecture.md) | Runtime flow, feature ownership, and package boundaries |
 | [Hardened deployment](docs/operations/deployment.md) | Authentication, TLS, database roles, and production validation |
 

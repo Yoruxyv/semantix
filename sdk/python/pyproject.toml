@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=83.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "semantix-client"
+version = "0.1.0"
+description = "Typed Python client for the Semantix public HTTP API"
+readme = "README.md"
+requires-python = ">=3.11,<3.15"
+license = "MIT"
+dependencies = [
+  "httpx>=0.28.1,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.4,<2",
+  "mypy>=2.3.1,<3",
+  "pytest>=9.1.1,<10",
+  "pytest-asyncio>=1.4.0,<2",
+  "pytest-cov>=7.1.0,<8",
+  "ruff>=0.16.3,<0.17",
+  "twine>=6.2,<7",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+semantix = ["py.typed"]
+
+[tool.ruff]
+cache-dir = ".cache/ruff"
+extend-exclude = [".cache"]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B"]
+
+[tool.ruff.format]
+indent-style = "space"
+line-ending = "auto"
+quote-style = "double"
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+asyncio_mode = "auto"
+cache_dir = ".cache/pytest"
+markers = [
+  "integration: requires a live Semantix server configured by environment variables",
+]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["semantix"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src", "tests"]
+cache_dir = ".cache/mypy"
