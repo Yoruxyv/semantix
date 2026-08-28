@@ -22,7 +22,7 @@ dev = [
   "pytest-asyncio>=1.4.0,<2",
   "pytest-cov>=7.1.0,<8",
   "ruff>=0.16.3,<0.17",
-  "twine>=6.2,<7",
+  "twine>=6.2,<8",
 ]
 
 [tool.setuptools.packages.find]
