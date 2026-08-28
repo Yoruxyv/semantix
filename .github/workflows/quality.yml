@@ -97,6 +97,177 @@ jobs:
       - name: Run backend compatibility tests
         run: uv run --no-sync --python "${{ matrix.python-version }}" pytest -m "not pgvector"
 
+  sdk:
+    name: Python SDK quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: sdk/python
+    env:
+      ALLOWED_ORIGINS: '["http://127.0.0.1:4173"]'
+      AUTH_MODE: token
+      AUTH_PRINCIPALS: >-
+        [{"name":"sdk-operator","token_sha256":"ccfa50520ce4ed853c9d2e82d8caee8c34ac8c0fd22cfe2d4f387f6006dd194c","role":"operator","namespaces":["normal","read-only","refresh","bypass","private","async"]}]
+      CACHE_BACKEND: memory
+      EMBEDDING_PROVIDER: mock
+      EVALUATION_DATASET_STORAGE: session
+      EVALUATION_RUN_HISTORY_STORAGE: disabled
+      GENERATION_PROVIDER: mock
+      PYTHONPYCACHEPREFIX: /tmp/semantix-cache/python
+      RATE_LIMIT: 100/minute
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          version: "0.11.32"
+
+      - name: Sync locked SDK dependencies
+        run: uv sync --locked --extra dev
+
+      - name: Sync locked backend dependencies
+        working-directory: backend
+        run: uv sync --locked --extra dev
+
+      - name: Run SDK Ruff lint
+        run: uv run --no-sync ruff check --output-format=github .
+
+      - name: Check SDK Ruff formatting
+        run: uv run --no-sync ruff format --check .
+
+      - name: Run SDK mypy
+        run: uv run --no-sync mypy src tests
+
+      - name: Run SDK unit tests with coverage
+        run: uv run --no-sync pytest -m "not integration" --cov=semantix_client
+
+      - name: Run SDK real-HTTP integration tests
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd backend
+          uv run --no-sync uvicorn app.main:app --host 127.0.0.1 --port 18081 > /tmp/semantix-sdk-backend.log 2>&1 &
+          backend_pid=$!
+          trap 'kill "$backend_pid" 2>/dev/null || true; wait "$backend_pid" 2>/dev/null || true' EXIT
+
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:18081/health > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:18081/health > /dev/null
+
+          cd ../sdk/python
+          SEMANTIX_INTEGRATION_URL=http://127.0.0.1:18081 \
+            SEMANTIX_INTEGRATION_TOKEN=sdk-operator-token \
+            uv run --no-sync pytest -m integration
+
+      - name: Build wheel and source distribution
+        run: uv run --no-sync python -m build
+
+      - name: Check package artifacts
+        run: uv run --no-sync python -m twine check dist/*
+
+      - name: Inspect SDK package contents
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import tarfile
+          import zipfile
+
+          expected_license = Path("LICENSE").read_bytes()
+          wheel = next(Path("dist").glob("*.whl"))
+          sdist = next(Path("dist").glob("*.tar.gz"))
+
+          with zipfile.ZipFile(wheel) as archive:
+              names = archive.namelist()
+              assert any(name.startswith("semantix_client/") for name in names)
+              assert "semantix_client/py.typed" in names
+              assert not any(name.startswith("semantix/") for name in names)
+              licenses = [
+                  name
+                  for name in names
+                  if name.endswith(".dist-info/licenses/LICENSE")
+              ]
+              assert len(licenses) == 1
+              assert archive.read(licenses[0]) == expected_license
+
+          with tarfile.open(sdist) as archive:
+              names = archive.getnames()
+              assert any("/src/semantix_client/" in name for name in names)
+              assert not any("/src/semantix/" in name for name in names)
+              licenses = [
+                  name
+                  for name in names
+                  if name.count("/") == 1 and name.endswith("/LICENSE")
+              ]
+              assert len(licenses) == 1
+              license_file = archive.extractfile(licenses[0])
+              assert license_file is not None
+              assert license_file.read() == expected_license
+
+          print("SDK namespace and license artifacts verified")
+          PY
+
+      - name: Install built wheel in a clean environment
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/semantix-sdk-smoke"
+          "$RUNNER_TEMP/semantix-sdk-smoke/bin/python" -m pip install --disable-pip-version-check dist/*.whl
+          "$RUNNER_TEMP/semantix-sdk-smoke/bin/python" -c \
+            "from semantix_client import AsyncSemantixClient, CachePolicy, SemantixClient"
+          "$RUNNER_TEMP/semantix-sdk-smoke/bin/python" -c \
+            "import importlib.util; assert importlib.util.find_spec('semantix') is None; assert importlib.util.find_spec('fastapi') is None; assert importlib.util.find_spec('asyncpg') is None; assert importlib.util.find_spec('numpy') is None"
+
+  sdk-compatibility:
+    name: Python SDK compatibility (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: sdk/python
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.11"
+          - "3.12"
+          - "3.13"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          version: "0.11.32"
+
+      - name: Sync locked SDK dependencies
+        run: uv sync --locked --extra dev --python "${{ matrix.python-version }}"
+
+      - name: Run SDK compatibility tests
+        run: >-
+          uv run --no-sync --python "${{ matrix.python-version }}"
+          pytest -m "not integration"
+
   frontend:
     name: Frontend quality
     runs-on: ubuntu-latest
@@ -426,6 +597,8 @@ jobs:
     needs:
       - backend
       - backend-compatibility
+      - sdk
+      - sdk-compatibility
       - frontend
       - frontend-lighthouse
       - containers
@@ -449,9 +622,13 @@ jobs:
           HARDENED_WINDOWS_CHECKOUT_RESULT: ${{ needs.hardened-windows-checkout.result }}
           PGVECTOR_RESULT: ${{ needs.pgvector.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
+          SDK_COMPATIBILITY_RESULT: ${{ needs.sdk-compatibility.result }}
+          SDK_RESULT: ${{ needs.sdk.result }}
         run: |
           test "$BACKEND_RESULT" = "success"
           test "$BACKEND_COMPATIBILITY_RESULT" = "success"
+          test "$SDK_RESULT" = "success"
+          test "$SDK_COMPATIBILITY_RESULT" = "success"
           test "$FRONTEND_RESULT" = "success"
           test "$FRONTEND_LIGHTHOUSE_RESULT" = "success"
           test "$CONTAINERS_RESULT" = "success"
