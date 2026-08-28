@@ -141,8 +141,10 @@ jobs:
       ALLOWED_ORIGINS: '["http://127.0.0.1:4173"]'
       AUTH_MODE: disabled
       CACHE_BACKEND: memory
+      EMBEDDING_PROVIDER: mock
       EVALUATION_DATASET_STORAGE: session
       EVALUATION_RUN_HISTORY_STORAGE: disabled
+      GENERATION_PROVIDER: mock
       PYTHONPYCACHEPREFIX: /tmp/semantix-cache/python
     steps:
       - name: Check out repository
