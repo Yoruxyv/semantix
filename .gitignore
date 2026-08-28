@@ -22,6 +22,7 @@ frontend/dist/
 coverage/
 frontend/playwright-report/
 frontend/test-results/
+frontend/lighthouse-reports/
 .vite_cache/
 frontend/.vite-cache
 .lycheecache

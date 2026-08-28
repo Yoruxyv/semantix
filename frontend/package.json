@@ -19,7 +19,9 @@
     "lint:no-any": "eslint \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\"",
     "imports:preview": "node scripts/normalize-imports.mjs",
     "imports:fix": "node scripts/normalize-imports.mjs --write --strict",
-    "imports:check": "node scripts/normalize-imports.mjs --check --strict"
+    "imports:check": "node scripts/normalize-imports.mjs --check --strict",
+    "lighthouse": "node scripts/run-lighthouse.js",
+    "lighthouse:check": "node scripts/check-lighthouse-budget.js"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",
@@ -54,6 +56,7 @@
     "eslint-plugin-sonarjs": "^4.2.0",
     "globals": "^17.11.0",
     "jsdom": "^30.0.1",
+    "lighthouse": "13.4.1",
     "tailwindcss": "^4.3.2",
     "typescript": "^5.7.2",
     "vite": "7.3.6",

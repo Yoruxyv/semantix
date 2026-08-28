@@ -31,7 +31,13 @@ export default defineConfig([
   /*
    * Generated files, dependency folders, and build output.
    */
-  globalIgnores(['.vite-cache', 'coverage', 'dist', 'node_modules']),
+  globalIgnores([
+    '.vite-cache',
+    'coverage',
+    'dist',
+    'lighthouse-reports',
+    'node_modules',
+  ]),
 
   /*
    * JavaScript configuration and tooling files.
