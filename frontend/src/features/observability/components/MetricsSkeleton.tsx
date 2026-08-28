@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX } from 'react';
 const SKELETON_GROUPS = [4, 5, 3] as const;
 
 export function MetricsSkeleton(): JSX.Element {

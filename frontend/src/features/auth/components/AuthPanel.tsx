@@ -1,25 +1,20 @@
-import {
-  useEffect,
-  useState,
-  type JSX,
-  type SubmitEvent,
-} from "react";
+import { useEffect, useState, type JSX, type SubmitEvent } from 'react';
 
-import { useAuth } from "../hooks/useAuth";
+import { useAuth } from '../hooks/useAuth';
 
 const ACCESS_POLICY_ERROR =
-  "Access policy unavailable. Semantix could not determine the current " +
-  "authentication policy. Please wait a moment and try again.";
+  'Access policy unavailable. Semantix could not determine the current ' +
+  'authentication policy. Please wait a moment and try again.';
 const SESSION_VERIFICATION_ERROR =
-  "Session verification unavailable. Semantix could not verify the current " +
-  "authentication session. Please wait a moment and try again.";
+  'Session verification unavailable. Semantix could not verify the current ' +
+  'authentication session. Please wait a moment and try again.';
 
 function formatDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
-  return `${minutes.toString().padStart(2, "0")}:${remainingSeconds
+  return `${minutes.toString().padStart(2, '0')}:${remainingSeconds
     .toString()
-    .padStart(2, "0")}`;
+    .padStart(2, '0')}`;
 }
 
 interface BootstrapErrorPanelProps {
@@ -44,25 +39,18 @@ function BootstrapErrorPanel({
           className="absolute right-0 top-0 h-px w-24 bg-(--gold)"
         />
         <p className="ui-label text-(--gold)">
-          {isSessionError ? "Session verification" : "Access policy"}
+          {isSessionError ? 'Session verification' : 'Access policy'}
         </p>
         <h1
           className="font-display mt-3 text-3xl italic text-(--text)"
           id="access-policy-heading"
         >
-          {isSessionError
-            ? "Session verification paused"
-            : "Workspace access paused"}
+          {isSessionError ? 'Session verification paused' : 'Workspace access paused'}
         </h1>
         <div className="min-h-24 pt-4">
-          <p
-            className="max-w-md text-sm/6 text-(--text-muted)"
-            role="alert"
-          >
+          <p className="max-w-md text-sm/6 text-(--text-muted)" role="alert">
             {error ??
-              (isSessionError
-                ? SESSION_VERIFICATION_ERROR
-                : ACCESS_POLICY_ERROR)}
+              (isSessionError ? SESSION_VERIFICATION_ERROR : ACCESS_POLICY_ERROR)}
           </p>
           <button
             className="ui-label mt-5 min-h-11 border border-(--gold) bg-(--gold) px-5 py-2.5 text-(--ink) transition-colors hover:bg-transparent hover:text-(--gold) focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-(--gold)"
@@ -87,7 +75,7 @@ export function AuthPanel(): JSX.Element | null {
     session,
     status,
   } = useAuth();
-  const [token, setToken] = useState("");
+  const [token, setToken] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentTime, setCurrentTime] = useState(Date.now);
 
@@ -107,25 +95,25 @@ export function AuthPanel(): JSX.Element | null {
     return () => window.clearInterval(timer);
   }, [lockedUntil]);
 
-  if (status === "disabled" || status === "loading") {
+  if (status === 'disabled' || status === 'loading') {
     return null;
   }
 
-  if (status === "error" || status === "session-error") {
+  if (status === 'error' || status === 'session-error') {
     return (
       <BootstrapErrorPanel
         error={error}
-        isSessionError={status === "session-error"}
+        isSessionError={status === 'session-error'}
         retry={retryAccessPolicy}
       />
     );
   }
 
-  if (status === "authenticated" && session !== null) {
+  if (status === 'authenticated' && session !== null) {
     const namespaces =
-      session.namespaces.length === 1 && session.namespaces[0] === "*"
-        ? "All"
-        : session.namespaces.join(", ");
+      session.namespaces.length === 1 && session.namespaces[0] === '*'
+        ? 'All'
+        : session.namespaces.join(', ');
     return (
       <section
         aria-labelledby="authenticated-access-heading"
@@ -138,20 +126,14 @@ export function AuthPanel(): JSX.Element | null {
               className="size-2 shrink-0 rounded-full bg-(--teal) shadow-[0_0_0_4px_rgba(91,156,148,0.12)]"
             />
             <div className="min-w-0">
-              <p
-                className="ui-label text-(--teal)"
-                id="authenticated-access-heading"
-              >
+              <p className="ui-label text-(--teal)" id="authenticated-access-heading">
                 Authenticated access
               </p>
               <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                 <strong className="font-data text-[11px] font-medium text-(--text)">
                   {session.name}
                 </strong>
-                <span
-                  aria-hidden="true"
-                  className="text-[9px] text-(--text-faint)"
-                >
+                <span aria-hidden="true" className="text-[9px] text-(--text-faint)">
                   /
                 </span>
                 <span className="ui-label border border-(--hairline) px-1.5 py-0.5 text-[9px] text-(--text-muted)">
@@ -192,7 +174,7 @@ export function AuthPanel(): JSX.Element | null {
     const accepted = await authenticate(token);
     setIsSubmitting(false);
     if (accepted) {
-      setToken("");
+      setToken('');
     }
   }
 
@@ -236,25 +218,21 @@ export function AuthPanel(): JSX.Element | null {
             disabled={controlsDisabled}
             type="submit"
           >
-            {isSubmitting ? "Verifying…" : "Authenticate"}
+            {isSubmitting ? 'Verifying…' : 'Authenticate'}
           </button>
         </form>
 
         <div className="min-h-16 pt-4">
-          {error !== null &&
-            (lockedUntil === null || isLocked) && (
-              <div className="font-data text-[10px]/5 text-(--coral-text)">
-                <p role="alert">{error}</p>
-                {isLocked && (
-                  <p
-                    aria-live="polite"
-                    className="mt-1 text-(--text-muted)"
-                  >
-                    Try again in {formatDuration(remainingSeconds)}.
-                  </p>
-                )}
-              </div>
-            )}
+          {error !== null && (lockedUntil === null || isLocked) && (
+            <div className="font-data text-[10px]/5 text-(--coral-text)">
+              <p role="alert">{error}</p>
+              {isLocked && (
+                <p aria-live="polite" className="mt-1 text-(--text-muted)">
+                  Try again in {formatDuration(remainingSeconds)}.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </section>

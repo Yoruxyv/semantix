@@ -1,4 +1,4 @@
-const AUTH_TOKEN_KEY = "semantix.auth.token";
+const AUTH_TOKEN_KEY = 'semantix.auth.token';
 
 export function getAuthToken(): string | null {
   return window.sessionStorage.getItem(AUTH_TOKEN_KEY);

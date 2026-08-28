@@ -257,18 +257,8 @@ describe('application routing', () => {
   it.each([
     ['/', 'Probe the cache', 'Monitor', 'Monitor | Semantix'],
     ['/cache', 'Cache inspector', 'Cache', 'Cache | Semantix'],
-    [
-      '/evaluations',
-      'Evaluation laboratory',
-      'Evaluations',
-      'Evaluations | Semantix',
-    ],
-    [
-      '/observability',
-      'Observability',
-      'Observability',
-      'Observability | Semantix',
-    ],
+    ['/evaluations', 'Evaluation laboratory', 'Evaluations', 'Evaluations | Semantix'],
+    ['/observability', 'Observability', 'Observability', 'Observability | Semantix'],
   ])(
     'renders %s with an active navigation link and page title',
     async (path, heading, link, title) => {
@@ -308,11 +298,7 @@ describe('application routing', () => {
     ).toBe('page');
     expect(document.title).toBe('Cache | Semantix');
     expect(
-      await screen.findByText(
-        cacheEntry.response_preview,
-        {},
-        { timeout: 10_000 },
-      ),
+      await screen.findByText(cacheEntry.response_preview, {}, { timeout: 10_000 }),
     ).toBeTruthy();
     expect(getCacheEntry).toHaveBeenCalledWith(
       cacheEntry.cache_key,
@@ -333,31 +319,27 @@ describe('application routing', () => {
     expect(getCacheEntry).not.toHaveBeenCalled();
   });
 
-  it(
-    'uses the same neutral detail state for a missing entry',
-    async () => {
-      vi.mocked(getCacheEntry).mockResolvedValue({
-        ok: false,
-        error: {
-          code: 'cache_entry_not_found',
-          detail: 'Cache entry not found.',
-          status: 404,
-        },
-      });
+  it('uses the same neutral detail state for a missing entry', async () => {
+    vi.mocked(getCacheEntry).mockResolvedValue({
+      ok: false,
+      error: {
+        code: 'cache_entry_not_found',
+        detail: 'Cache entry not found.',
+        status: 404,
+      },
+    });
 
-      renderAt(`/cache/entries/${cacheEntry.cache_key}`);
+    renderAt(`/cache/entries/${cacheEntry.cache_key}`);
 
-      expect(
-        await screen.findByText(
-          'This cache entry could not be found or is no longer available.',
-          {},
-          { timeout: 10_000 },
-        ),
-      ).toBeTruthy();
-      expect(screen.queryByText('Cache entry not found.')).toBeNull();
-    },
-    10_000,
-  );
+    expect(
+      await screen.findByText(
+        'This cache entry could not be found or is no longer available.',
+        {},
+        { timeout: 10_000 },
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText('Cache entry not found.')).toBeNull();
+  }, 10_000);
 
   it('copies the cache key with accessible feedback', async () => {
     renderAt(`/cache/entries/${cacheEntry.cache_key}`);
@@ -376,9 +358,7 @@ describe('application routing', () => {
     renderAt(`/cache/entries/${cacheEntry.cache_key}`);
 
     await screen.findByRole('heading', { name: cacheEntry.prompt });
-    expect(
-      screen.queryByRole('button', { name: 'Delete cache entry' }),
-    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete cache entry' })).toBeNull();
   });
 
   it('deletes as an Admin-capable principal and returns to Cache', async () => {
@@ -386,9 +366,7 @@ describe('application routing', () => {
     await screen.findByRole('heading', { name: cacheEntry.prompt });
     const statsCallsBeforeDelete = vi.mocked(getCacheStats).mock.calls.length;
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Delete cache entry' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Delete cache entry' }));
     expect(
       screen.getByRole('group', {
         name: /Confirm deletion of cache entry/,
@@ -417,12 +395,10 @@ describe('application routing', () => {
     await screen.findByRole('heading', { name: 'Cache entry detail' });
     fireEvent.click(screen.getByRole('link', { name: 'Back to Cache' }));
 
-    expect(
-      await screen.findByDisplayValue('semantic'),
-    ).toBeTruthy();
-    expect(
-      (screen.getByLabelText('Namespace') as HTMLInputElement).value,
-    ).toBe('default');
+    expect(await screen.findByDisplayValue('semantic')).toBeTruthy();
+    expect((screen.getByLabelText('Namespace') as HTMLInputElement).value).toBe(
+      'default',
+    );
     expect(
       (screen.getByLabelText('Sort cache entries') as HTMLSelectElement).value,
     ).toBe('oldest');
@@ -438,9 +414,7 @@ describe('application routing', () => {
       }),
     ).toBeTruthy();
     expect(
-      screen
-        .getByRole('link', { name: 'Return to Monitor' })
-        .getAttribute('href'),
+      screen.getByRole('link', { name: 'Return to Monitor' }).getAttribute('href'),
     ).toBe('/');
     expect(document.title).toBe('Page not found | Semantix');
   });
@@ -463,9 +437,7 @@ describe('application routing', () => {
       name: 'Authentication required',
     });
     expect(gateHeading.closest('main')?.id).toBe('main-content');
-    expect(
-      screen.queryByText('Authenticate to load Semantix workspaces.'),
-    ).toBeNull();
+    expect(screen.queryByText('Authenticate to load Semantix workspaces.')).toBeNull();
     expect(screen.queryByText('Probe the cache')).toBeNull();
   });
 
@@ -542,9 +514,7 @@ describe('application routing', () => {
 
       renderAt('/observability');
 
-      expect(
-        screen.queryByRole('link', { name: 'Observability' }),
-      ).toBeNull();
+      expect(screen.queryByRole('link', { name: 'Observability' })).toBeNull();
       expect(
         await screen.findByRole('heading', {
           level: 1,
@@ -590,13 +560,9 @@ describe('application routing', () => {
       await screen.findByText('Backend applied 0.90');
 
       if (canApplyThreshold) {
-        expect(
-          screen.getByRole('button', { name: 'Apply to cache' }),
-        ).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Apply to cache' })).toBeTruthy();
       } else {
-        expect(
-          screen.queryByRole('button', { name: 'Apply to cache' }),
-        ).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Apply to cache' })).toBeNull();
         expect(screen.getByText(/Preview only/)).toBeTruthy();
       }
     },
@@ -619,9 +585,7 @@ describe('application routing', () => {
       </MemoryRouter>,
     );
 
-    expect(
-      (screen.getByLabelText('Query text') as HTMLTextAreaElement).value,
-    ).toBe('');
+    expect((screen.getByLabelText('Query text') as HTMLTextAreaElement).value).toBe('');
     expect(screen.queryByText('First principal content')).toBeNull();
     expect(screen.getByText(/namespace tenant-two/i)).toBeTruthy();
   });
@@ -907,8 +871,7 @@ describe('application routing', () => {
     );
     await waitFor(() =>
       expect(
-        (screen.getByLabelText('Projection threshold') as HTMLInputElement)
-          .value,
+        (screen.getByLabelText('Projection threshold') as HTMLInputElement).value,
       ).toBe('0.9'),
     );
 
@@ -961,9 +924,7 @@ describe('application routing', () => {
     await screen.findByText(cacheEntry.prompt);
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear all entries' }));
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Confirm clear cache' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm clear cache' }));
     await waitFor(() => expect(clearCache).toHaveBeenCalledOnce());
 
     fireEvent.click(screen.getByRole('link', { name: 'Monitor' }));

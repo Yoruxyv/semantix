@@ -97,9 +97,7 @@ const importedPreview = {
 function renderDashboard() {
   return render(<BenchmarkDashboard />, {
     wrapper: ({ children }: Readonly<{ children: ReactNode }>) => (
-      <QueryTestProvider client={queryClient}>
-        {children}
-      </QueryTestProvider>
+      <QueryTestProvider client={queryClient}>{children}</QueryTestProvider>
     ),
   });
 }
@@ -184,9 +182,7 @@ describe('BenchmarkDashboard', () => {
     fireEvent.change(screen.getByLabelText('Benchmark threshold'), {
       target: { value: '0.90' },
     });
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Review benchmark run' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Review benchmark run' }));
 
     expect(runBenchmark).not.toHaveBeenCalled();
     expect(screen.getByRole('alertdialog').textContent).toContain(
@@ -224,9 +220,7 @@ describe('BenchmarkDashboard', () => {
     expect(await screen.findByText('Measured run')).toBeTruthy();
     expect(screen.getByText('50.0%')).toBeTruthy();
     expect(
-      screen.getByText(
-        'Hit rate vs. threshold (frozen-candidate projection)',
-      ),
+      screen.getByText('Hit rate vs. threshold (frozen-candidate projection)'),
     ).toBeTruthy();
     expect(
       screen.getByText(
@@ -234,9 +228,7 @@ describe('BenchmarkDashboard', () => {
       ),
     ).toBeTruthy();
     expect(screen.getByText('Similarity-score distribution')).toBeTruthy();
-    expect(
-      screen.getByText('Confusion matrix and case evidence'),
-    ).toBeTruthy();
+    expect(screen.getByText('Confusion matrix and case evidence')).toBeTruthy();
     const table = screen.getByRole('table', {
       name: 'Per-query benchmark results',
     });
@@ -263,8 +255,7 @@ describe('BenchmarkDashboard', () => {
 
   it('shows loading and error states', async () => {
     let resolveRun:
-      | ((value: Awaited<ReturnType<typeof runBenchmark>>) => void)
-      | undefined;
+      ((value: Awaited<ReturnType<typeof runBenchmark>>) => void) | undefined;
     vi.mocked(runBenchmark).mockReturnValue(
       new Promise((resolve) => {
         resolveRun = resolve;
@@ -274,12 +265,8 @@ describe('BenchmarkDashboard', () => {
     await reviewAndConfirm();
 
     expect(screen.getByLabelText('Loading benchmark results')).toBeTruthy();
-    expect(
-      document.querySelectorAll('[data-skeleton-result-metric]'),
-    ).toHaveLength(18);
-    expect(
-      document.querySelectorAll('[data-skeleton-result-chart]'),
-    ).toHaveLength(5);
+    expect(document.querySelectorAll('[data-skeleton-result-metric]')).toHaveLength(18);
+    expect(document.querySelectorAll('[data-skeleton-result-chart]')).toHaveLength(5);
     await act(async () => {
       resolveRun?.({
         ok: false,
@@ -299,21 +286,13 @@ describe('BenchmarkDashboard', () => {
   });
 
   it('uses an accessible dataset skeleton only for initial catalog loading', () => {
-    vi.mocked(getBenchmarkDatasets).mockReturnValue(
-      new Promise(() => undefined),
-    );
+    vi.mocked(getBenchmarkDatasets).mockReturnValue(new Promise(() => undefined));
 
     renderDashboard();
 
-    expect(
-      screen.getByLabelText('Loading benchmark datasets'),
-    ).toBeTruthy();
-    expect(
-      screen.queryByLabelText('Loading benchmark results'),
-    ).toBeNull();
-    expect(
-      document.querySelectorAll('[data-skeleton-control]'),
-    ).toHaveLength(6);
+    expect(screen.getByLabelText('Loading benchmark datasets')).toBeTruthy();
+    expect(screen.queryByLabelText('Loading benchmark results')).toBeNull();
+    expect(document.querySelectorAll('[data-skeleton-control]')).toHaveLength(6);
     expect(screen.queryByLabelText('Benchmark dataset')).toBeNull();
   });
 
@@ -327,23 +306,16 @@ describe('BenchmarkDashboard', () => {
       ],
       default_dataset_id: 'quick' as const,
     };
-    queryClient.setQueryData(
-      benchmarkDatasetKeys.catalog(),
-      cachedCatalog,
-      {
-        updatedAt: Date.now() - BENCHMARK_DATASET_STALE_TIME_MS - 1,
-      },
-    );
-    const refresh =
-      deferred<Awaited<ReturnType<typeof getBenchmarkDatasets>>>();
+    queryClient.setQueryData(benchmarkDatasetKeys.catalog(), cachedCatalog, {
+      updatedAt: Date.now() - BENCHMARK_DATASET_STALE_TIME_MS - 1,
+    });
+    const refresh = deferred<Awaited<ReturnType<typeof getBenchmarkDatasets>>>();
     vi.mocked(getBenchmarkDatasets).mockReturnValue(refresh.promise);
 
     renderDashboard();
 
     expect(screen.getByLabelText('Benchmark dataset')).toBeTruthy();
-    expect(
-      screen.queryByLabelText('Loading benchmark datasets'),
-    ).toBeNull();
+    expect(screen.queryByLabelText('Loading benchmark datasets')).toBeNull();
     expect(screen.getByText('Refreshing dataset catalog')).toBeTruthy();
     await waitFor(() => expect(getBenchmarkDatasets).toHaveBeenCalledOnce());
 
@@ -355,9 +327,7 @@ describe('BenchmarkDashboard', () => {
     });
 
     await waitFor(() => {
-      expect(
-        screen.queryByText('Refreshing dataset catalog'),
-      ).toBeNull();
+      expect(screen.queryByText('Refreshing dataset catalog')).toBeNull();
     });
   });
 
@@ -413,9 +383,7 @@ describe('BenchmarkDashboard', () => {
       name: 'Review benchmark run',
     });
     expect((review as HTMLButtonElement).disabled).toBe(true);
-    expect(
-      screen.getByText(/Operator access is required/),
-    ).toBeTruthy();
+    expect(screen.getByText(/Operator access is required/)).toBeTruthy();
     expect(screen.getByText(/Dataset version 1.0.0/)).toBeTruthy();
     expect(runBenchmark).not.toHaveBeenCalled();
   });
@@ -447,11 +415,9 @@ describe('BenchmarkDashboard', () => {
     await screen.findByRole('button', { name: 'Review benchmark run' });
     fireEvent.click(screen.getByLabelText('Custom JSON dataset'));
     const input = screen.getByLabelText('JSON dataset file');
-    const file = new File(
-      [JSON.stringify(importedDefinition)],
-      'safety-set.json',
-      { type: 'application/json' },
-    );
+    const file = new File([JSON.stringify(importedDefinition)], 'safety-set.json', {
+      type: 'application/json',
+    });
 
     fireEvent.change(input, { target: { files: [file] } });
 
@@ -464,9 +430,7 @@ describe('BenchmarkDashboard', () => {
     );
     expect(runBenchmark).not.toHaveBeenCalled();
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Remove imported dataset' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Remove imported dataset' }));
 
     expect(screen.queryByText('Validated preview')).toBeNull();
     expect(document.activeElement).toBe(input);
@@ -477,9 +441,7 @@ describe('BenchmarkDashboard', () => {
     await screen.findByRole('button', { name: 'Review benchmark run' });
     fireEvent.click(screen.getByRole('button', { name: 'Datasets' }));
 
-    expect(
-      await screen.findByText('Persistence is disabled'),
-    ).toBeTruthy();
+    expect(await screen.findByText('Persistence is disabled')).toBeTruthy();
     expect(screen.getByText(/session-only evaluation datasets/)).toBeTruthy();
     expect(persistEvaluationDataset).not.toHaveBeenCalled();
   });
@@ -508,11 +470,9 @@ describe('BenchmarkDashboard', () => {
     fireEvent.change(screen.getByLabelText('JSON dataset file'), {
       target: {
         files: [
-          new File(
-            [JSON.stringify(importedDefinition)],
-            'persist-me.json',
-            { type: 'application/json' },
-          ),
+          new File([JSON.stringify(importedDefinition)], 'persist-me.json', {
+            type: 'application/json',
+          }),
         ],
       },
     });
@@ -521,9 +481,7 @@ describe('BenchmarkDashboard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Datasets' }));
     await screen.findByText('Save validated session dataset');
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Save validated dataset' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save validated dataset' }));
 
     await waitFor(() =>
       expect(persistEvaluationDataset).toHaveBeenCalledWith(
@@ -546,9 +504,7 @@ describe('BenchmarkDashboard', () => {
     expect(
       screen.getByLabelText(`Persisted dataset: ${persistedDataset.name}`),
     ).toBeTruthy();
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Review benchmark run' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Review benchmark run' }));
     fireEvent.click(screen.getByRole('button', { name: 'Run benchmark now' }));
 
     await waitFor(() =>
@@ -602,11 +558,9 @@ describe('BenchmarkDashboard', () => {
     fireEvent.change(screen.getByLabelText('JSON dataset file'), {
       target: {
         files: [
-          new File(
-            [JSON.stringify(importedDefinition)],
-            'multi.json',
-            { type: 'application/json' },
-          ),
+          new File([JSON.stringify(importedDefinition)], 'multi.json', {
+            type: 'application/json',
+          }),
         ],
       },
     });
@@ -684,9 +638,7 @@ describe('BenchmarkDashboard', () => {
     renderDashboard();
     await screen.findByRole('button', { name: 'Review benchmark run' });
     fireEvent.click(screen.getByRole('button', { name: 'Datasets' }));
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Delete dataset' }),
-    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete dataset' }));
 
     const confirmation = screen.getByRole('group', {
       name: `Confirm deletion of ${persistedDataset.name} from namespace ${persistedDataset.namespace}`,
@@ -725,11 +677,9 @@ describe('BenchmarkDashboard', () => {
     fireEvent.change(input, {
       target: {
         files: [
-          new File(
-            [JSON.stringify(importedDefinition)],
-            'newer.json',
-            { type: 'application/json' },
-          ),
+          new File([JSON.stringify(importedDefinition)], 'newer.json', {
+            type: 'application/json',
+          }),
         ],
       },
     });
@@ -772,7 +722,9 @@ describe('BenchmarkDashboard', () => {
       },
     });
 
-    expect(await screen.findByText('The selected file is not valid JSON.')).toBeTruthy();
+    expect(
+      await screen.findByText('The selected file is not valid JSON.'),
+    ).toBeTruthy();
     expect(validateEvaluationDataset).not.toHaveBeenCalled();
 
     vi.mocked(validateEvaluationDataset).mockResolvedValueOnce({
@@ -813,19 +765,15 @@ describe('BenchmarkDashboard', () => {
     fireEvent.change(screen.getByLabelText('JSON dataset file'), {
       target: {
         files: [
-          new File(
-            [JSON.stringify(importedDefinition)],
-            'inline.json',
-            { type: 'application/json' },
-          ),
+          new File([JSON.stringify(importedDefinition)], 'inline.json', {
+            type: 'application/json',
+          }),
         ],
       },
     });
     await screen.findByText('Validated preview');
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Review benchmark run' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Review benchmark run' }));
     expect(await screen.findByRole('alertdialog')).toBeTruthy();
     expect(validateEvaluationDataset).toHaveBeenCalledTimes(2);
 
@@ -852,11 +800,9 @@ describe('BenchmarkDashboard', () => {
     fireEvent.change(screen.getByLabelText('JSON dataset file'), {
       target: {
         files: [
-          new File(
-            [JSON.stringify(importedDefinition)],
-            'principal-bound.json',
-            { type: 'application/json' },
-          ),
+          new File([JSON.stringify(importedDefinition)], 'principal-bound.json', {
+            type: 'application/json',
+          }),
         ],
       },
     });
@@ -877,9 +823,7 @@ describe('BenchmarkDashboard', () => {
     });
     rendered.rerender(<BenchmarkDashboard />);
 
-    await waitFor(() =>
-      expect(screen.queryByText('Validated preview')).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByText('Validated preview')).toBeNull());
     expect(screen.queryByText('Selected: principal-bound.json')).toBeNull();
   });
 
@@ -891,11 +835,9 @@ describe('BenchmarkDashboard', () => {
     fireEvent.change(screen.getByLabelText('JSON dataset file'), {
       target: {
         files: [
-          new File(
-            [JSON.stringify(importedDefinition)],
-            'memory-only.json',
-            { type: 'application/json' },
-          ),
+          new File([JSON.stringify(importedDefinition)], 'memory-only.json', {
+            type: 'application/json',
+          }),
         ],
       },
     });

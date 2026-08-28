@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 const READING_ROWS = [0, 1, 2, 3, 4, 5] as const;
 
@@ -37,10 +37,7 @@ export function CacheReadingsSkeleton(): JSX.Element {
           <span className="mt-4 block h-3 w-72 max-w-full bg-[rgba(234,230,221,0.05)]" />
           <span className="mt-7 grid grid-cols-3 gap-px bg-(--hairline)">
             {[0, 1, 2].map((stat) => (
-              <span
-                className="block h-12 bg-(--ink) p-3"
-                key={stat}
-              />
+              <span className="block h-12 bg-(--ink) p-3" key={stat} />
             ))}
           </span>
           <span

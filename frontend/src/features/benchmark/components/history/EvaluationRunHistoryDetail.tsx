@@ -13,10 +13,7 @@ import type { EvaluationRunHistoryDetail } from '@/features/benchmark/types';
 
 function fingerprint(value: string): JSX.Element {
   return (
-    <code
-      className="font-data text-[10px] text-(--text-faint)"
-      title={value}
-    >
+    <code className="font-data text-[10px] text-(--text-faint)" title={value}>
       {value.slice(0, 12)}...
     </code>
   );
@@ -132,24 +129,12 @@ function TerminalEvidence({
                   className="border-b border-(--hairline)"
                   key={`${evaluation.threshold}-${evaluation.result_kind}`}
                 >
-                  <td className="px-3 py-2">
-                    {evaluation.threshold.toFixed(2)}
-                  </td>
-                  <td className="px-3 py-2">
-                    {evaluation.result_kind}
-                  </td>
-                  <td className="px-3 py-2">
-                    {formatPercent(evaluation.hit_rate)}
-                  </td>
-                  <td className="px-3 py-2">
-                    {formatPercent(evaluation.precision)}
-                  </td>
-                  <td className="px-3 py-2">
-                    {formatPercent(evaluation.recall)}
-                  </td>
-                  <td className="px-3 py-2">
-                    {formatPercent(evaluation.f1_score)}
-                  </td>
+                  <td className="px-3 py-2">{evaluation.threshold.toFixed(2)}</td>
+                  <td className="px-3 py-2">{evaluation.result_kind}</td>
+                  <td className="px-3 py-2">{formatPercent(evaluation.hit_rate)}</td>
+                  <td className="px-3 py-2">{formatPercent(evaluation.precision)}</td>
+                  <td className="px-3 py-2">{formatPercent(evaluation.recall)}</td>
+                  <td className="px-3 py-2">{formatPercent(evaluation.f1_score)}</td>
                   <td className="px-3 py-2">
                     {formatLatency(evaluation.average_latency_ms)}
                   </td>
@@ -231,9 +216,7 @@ export function EvaluationRunHistoryDetailPanel({
         <div>
           <dt className="text-(--text-faint)">Generation configuration</dt>
           <dd className="mt-1">
-            {fingerprint(
-              detail.reproducibility.generation_configuration_fingerprint,
-            )}
+            {fingerprint(detail.reproducibility.generation_configuration_fingerprint)}
           </dd>
         </div>
         <div>
@@ -258,9 +241,8 @@ export function EvaluationRunHistoryDetailPanel({
       </dl>
 
       <p className="font-data mt-5 border-l border-(--hairline) pl-3 text-[10px]/5 text-(--text-faint)">
-        Durable history is aggregate-only. Per-query prompts, generated
-        responses, matched cache keys, and other query-level evidence are not
-        retained.
+        Durable history is aggregate-only. Per-query prompts, generated responses,
+        matched cache keys, and other query-level evidence are not retained.
       </p>
 
       <TerminalEvidence detail={detail} />

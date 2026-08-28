@@ -1,19 +1,9 @@
-import {
-  useCallback,
-  useMemo,
-  useState,
-  type ReactNode,
-  type JSX,
-} from "react";
+import { useCallback, useMemo, useState, type ReactNode, type JSX } from 'react';
 
-import { MonitorContext } from "./monitorState";
-import { useCacheControl } from "@/features/cache/hooks/useCacheControl";
-import { useQuery } from "../hooks/useQuery";
-import type {
-  QueryEvidence,
-  QuerySubmission,
-  QueryTrace,
-} from "../types";
+import { MonitorContext } from './monitorState';
+import { useCacheControl } from '@/features/cache/hooks/useCacheControl';
+import { useQuery } from '../hooks/useQuery';
+import type { QueryEvidence, QuerySubmission, QueryTrace } from '../types';
 
 const MAX_TRACES = 40;
 
@@ -27,8 +17,7 @@ export function MonitorProvider({
   const { refreshCacheState } = useCacheControl();
   const { state: queryState, submit } = useQuery();
   const [traces, setTraces] = useState<QueryTrace[]>([]);
-  const [latestEvidence, setLatestEvidence] =
-    useState<QueryEvidence | null>(null);
+  const [latestEvidence, setLatestEvidence] = useState<QueryEvidence | null>(null);
   const submitPrompt = useCallback(
     async (submission: QuerySubmission): Promise<void> => {
       const result = await submit(submission.request);
@@ -36,7 +25,7 @@ export function MonitorProvider({
         return;
       }
 
-      const namespace = submission.request.namespace ?? "default";
+      const namespace = submission.request.namespace ?? 'default';
       setLatestEvidence({
         namespace,
         policyMode: submission.policyMode,
@@ -80,8 +69,6 @@ export function MonitorProvider({
   );
 
   return (
-    <MonitorContext.Provider value={contextValue}>
-      {children}
-    </MonitorContext.Provider>
+    <MonitorContext.Provider value={contextValue}>{children}</MonitorContext.Provider>
   );
 }

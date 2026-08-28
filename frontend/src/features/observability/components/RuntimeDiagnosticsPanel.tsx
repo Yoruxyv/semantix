@@ -1,14 +1,10 @@
-import { Alert, Button } from "@/shared/components/ui";
-import {
-  formatBytes,
-  formatCount,
-  formatTimestamp,
-} from "@/shared/lib/formatters";
+import { Alert, Button } from '@/shared/components/ui';
+import { formatBytes, formatCount, formatTimestamp } from '@/shared/lib/formatters';
 
-import { useRuntimeDiagnostics } from "../hooks/useRuntimeDiagnostics";
-import type { RuntimeDiagnostics } from "../types";
+import { useRuntimeDiagnostics } from '../hooks/useRuntimeDiagnostics';
+import type { RuntimeDiagnostics } from '../types';
 
-import type { JSX, ReactNode } from "react";
+import type { JSX, ReactNode } from 'react';
 
 interface DiagnosticItem {
   label: string;
@@ -25,81 +21,84 @@ function fingerprint(value: string): JSX.Element {
 }
 
 function enabled(value: boolean): string {
-  return value ? "Enabled" : "Disabled";
+  return value ? 'Enabled' : 'Disabled';
 }
 
 function groups(data: RuntimeDiagnostics): DiagnosticGroup[] {
   return [
     {
-      title: "Provider and cache environment",
+      title: 'Provider and cache environment',
       items: [
-        { label: "Embedding provider", value: data.embedding_provider_category },
-        { label: "Generation provider", value: data.generation_provider_category },
-        { label: "Embedding dimensions", value: formatCount(data.embedding_dimensions) },
-        { label: "Cache backend", value: data.cache_backend },
+        { label: 'Embedding provider', value: data.embedding_provider_category },
+        { label: 'Generation provider', value: data.generation_provider_category },
+        {
+          label: 'Embedding dimensions',
+          value: formatCount(data.embedding_dimensions),
+        },
+        { label: 'Cache backend', value: data.cache_backend },
       ],
     },
     {
-      title: "Matching configuration",
+      title: 'Matching configuration',
       items: [
         {
-          label: "Embedding-space fingerprint",
+          label: 'Embedding-space fingerprint',
           value: fingerprint(data.embedding_space_fingerprint),
         },
         {
-          label: "Generation configuration fingerprint",
+          label: 'Generation configuration fingerprint',
           value: fingerprint(data.generation_configuration_fingerprint),
         },
         {
-          label: "Prompt normalization",
-          value: `${data.normalization_mode === "typo_correction" ? "Enabled" : "Disabled"} · ${data.normalization_algorithm_version}`,
+          label: 'Prompt normalization',
+          value: `${data.normalization_mode === 'typo_correction' ? 'Enabled' : 'Disabled'} · ${data.normalization_algorithm_version}`,
         },
         {
-          label: "Normalization fingerprint",
+          label: 'Normalization fingerprint',
           value: fingerprint(data.normalization_fingerprint),
         },
       ],
     },
     {
-      title: "Evaluation safety limits",
+      title: 'Evaluation safety limits',
       items: [
         {
-          label: "Run timeout",
+          label: 'Run timeout',
           value: `${formatCount(data.evaluation_timeout_seconds)} seconds`,
         },
-        { label: "Maximum cases", value: formatCount(data.evaluation_max_cases) },
+        { label: 'Maximum cases', value: formatCount(data.evaluation_max_cases) },
         {
-          label: "Maximum repetitions",
+          label: 'Maximum repetitions',
           value: formatCount(data.evaluation_max_repetitions),
         },
         {
-          label: "Maximum thresholds",
+          label: 'Maximum thresholds',
           value: formatCount(data.evaluation_max_thresholds),
         },
         {
-          label: "Maximum request size",
+          label: 'Maximum request size',
           value: formatBytes(data.evaluation_max_request_bytes),
         },
       ],
     },
     {
-      title: "Process scope and readiness",
+      title: 'Process scope and readiness',
       items: [
-        { label: "Scope", value: "One backend process" },
+        { label: 'Scope', value: 'One backend process' },
         {
-          label: "Cache readiness",
-          value: data.cache_readiness === "ready" ? "Ready" : "Unavailable",
+          label: 'Cache readiness',
+          value: data.cache_readiness === 'ready' ? 'Ready' : 'Unavailable',
         },
-        { label: "Application version", value: data.application_version },
+        { label: 'Application version', value: data.application_version },
         {
-          label: "Dataset persistence",
+          label: 'Dataset persistence',
           value: enabled(data.evaluation_dataset_persistence_enabled),
         },
         {
-          label: "Run-history persistence",
+          label: 'Run-history persistence',
           value: enabled(data.evaluation_history_persistence_enabled),
         },
-        { label: "Observed", value: formatTimestamp(data.observed_at) },
+        { label: 'Observed', value: formatTimestamp(data.observed_at) },
       ],
     },
   ];
@@ -116,21 +115,18 @@ export function RuntimeDiagnosticsPanel(): JSX.Element {
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-2xl">
-          <h2
-            className="font-display text-3xl italic"
-            id="runtime-diagnostics-heading"
-          >
+          <h2 className="font-display text-3xl italic" id="runtime-diagnostics-heading">
             Runtime diagnostics
           </h2>
           <p className="mt-2 text-sm/6 text-(--text-muted)">
-            Safe, read-only evidence for comparing evaluation environments. The
-            values describe this backend process only.
+            Safe, read-only evidence for comparing evaluation environments. The values
+            describe this backend process only.
           </p>
         </div>
 
         <Button
           aria-busy={isRefreshing}
-          disabled={isRefreshing || state.status === "loading"}
+          disabled={isRefreshing || state.status === 'loading'}
           size="large"
           variant="secondary"
           onClick={refresh}
@@ -139,7 +135,7 @@ export function RuntimeDiagnosticsPanel(): JSX.Element {
         </Button>
       </div>
 
-      {state.status === "loading" && (
+      {state.status === 'loading' && (
         <output
           aria-label="Loading runtime diagnostics"
           className="mt-6 block border border-(--hairline) bg-(--surface) p-6 text-sm text-(--text-muted)"
@@ -148,7 +144,7 @@ export function RuntimeDiagnosticsPanel(): JSX.Element {
         </output>
       )}
 
-      {state.status === "error" && (
+      {state.status === 'error' && (
         <Alert
           className="mt-6 border border-(--coral) bg-(--surface) p-6"
           role="alert"
@@ -157,32 +153,29 @@ export function RuntimeDiagnosticsPanel(): JSX.Element {
         >
           <p className="mt-3 text-sm text-(--text-muted)">
             {state.error.detail ??
-              "The runtime diagnostics endpoint could not be reached."}
+              'The runtime diagnostics endpoint could not be reached.'}
           </p>
         </Alert>
       )}
 
-      {state.status === "ready" && (
+      {state.status === 'ready' && (
         <>
           {(refreshError !== null || isStale) && (
             <Alert
               aria-live="polite"
               className="mt-6 border border-(--hairline) bg-(--surface) p-4"
               title="Diagnostics may be stale"
-              tone={refreshError === null ? "info" : "error"}
+              tone={refreshError === null ? 'info' : 'error'}
             >
               <p className="mt-2 text-sm text-(--text-muted)">
                 {refreshError?.detail ??
-                  "Refresh to confirm the current process configuration."}
+                  'Refresh to confirm the current process configuration.'}
               </p>
             </Alert>
           )}
 
           {isRefreshing && (
-            <output
-              aria-live="polite"
-              className="ui-label mt-6 block text-(--gold)"
-            >
+            <output aria-live="polite" className="ui-label mt-6 block text-(--gold)">
               Refreshing runtime diagnostics
             </output>
           )}

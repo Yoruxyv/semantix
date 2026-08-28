@@ -38,12 +38,7 @@ function Workspace({ mainRef }: WorkspaceProps): JSX.Element {
         </Alert>
       )}
 
-      <main
-        className="py-10 sm:py-12"
-        id="main-content"
-        ref={mainRef}
-        tabIndex={-1}
-      >
+      <main className="py-10 sm:py-12" id="main-content" ref={mainRef} tabIndex={-1}>
         <Outlet />
       </main>
     </>
@@ -53,8 +48,7 @@ function Workspace({ mainRef }: WorkspaceProps): JSX.Element {
 function AppShell(): JSX.Element {
   const { session, status } = useAuth();
   const mainRef = useRef<HTMLElement>(null);
-  const canAccessWorkspace =
-    status === 'disabled' || status === 'authenticated';
+  const canAccessWorkspace = status === 'disabled' || status === 'authenticated';
   const workspaceKey = JSON.stringify([
     status,
     session?.name ?? null,
@@ -67,12 +61,7 @@ function AppShell(): JSX.Element {
   let content: JSX.Element;
   if (status === 'loading') {
     content = (
-      <main
-        className="py-8 sm:py-10"
-        id="main-content"
-        ref={mainRef}
-        tabIndex={-1}
-      >
+      <main className="py-8 sm:py-10" id="main-content" ref={mainRef} tabIndex={-1}>
         <RouteLoader />
       </main>
     );
@@ -87,12 +76,7 @@ function AppShell(): JSX.Element {
     );
   } else {
     content = (
-      <main
-        className="py-8 sm:py-10"
-        id="main-content"
-        ref={mainRef}
-        tabIndex={-1}
-      >
+      <main className="py-8 sm:py-10" id="main-content" ref={mainRef} tabIndex={-1}>
         <AuthPanel />
       </main>
     );

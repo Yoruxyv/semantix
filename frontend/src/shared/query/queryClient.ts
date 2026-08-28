@@ -1,6 +1,6 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient } from '@tanstack/react-query';
 
-import { ApiResultError } from "./apiResult";
+import { ApiResultError } from './apiResult';
 
 export const DEFAULT_QUERY_GC_TIME_MS = 5 * 60 * 1_000;
 
@@ -9,10 +9,7 @@ function isDeterministicClientError(error: unknown): boolean {
     return false;
   }
 
-  if (
-    error.code === "authentication_required" ||
-    error.code === "invalid_token"
-  ) {
+  if (error.code === 'authentication_required' || error.code === 'invalid_token') {
     return true;
   }
 

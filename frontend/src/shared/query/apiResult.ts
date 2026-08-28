@@ -1,4 +1,4 @@
-import type { ApiError, ApiResult } from "../api/types";
+import type { ApiError, ApiResult } from '../api/types';
 
 export class ApiResultError extends Error {
   readonly code: string;
@@ -7,7 +7,7 @@ export class ApiResultError extends Error {
 
   constructor(error: ApiError) {
     super(error.detail ?? error.code);
-    this.name = "ApiResultError";
+    this.name = 'ApiResultError';
     this.code = error.code;
     this.detail = error.detail;
     this.status = error.status;
@@ -32,8 +32,8 @@ export function apiErrorFromUnknown(error: unknown): ApiError {
   }
 
   return {
-    code: "unexpected_error",
-    detail: error instanceof Error ? error.message : "An unexpected error occurred.",
+    code: 'unexpected_error',
+    detail: error instanceof Error ? error.message : 'An unexpected error occurred.',
     status: null,
   };
 }

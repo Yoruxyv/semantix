@@ -1,16 +1,10 @@
 import type { JSX } from 'react';
 
-import {
-  formatBytes,
-  formatCount,
-  formatTimestamp,
-} from '@/shared/lib/formatters';
+import { formatBytes, formatCount, formatTimestamp } from '@/shared/lib/formatters';
 
 import type { PersistedEvaluationDatasetMetadata } from '@/features/benchmark/types';
 
-function Digest({
-  value,
-}: Readonly<{ value: string }>): JSX.Element {
+function Digest({ value }: Readonly<{ value: string }>): JSX.Element {
   return (
     <code
       aria-label={`SHA-256 digest ${value}`}
@@ -61,10 +55,7 @@ export function EvaluationDatasetMetadata({
       </div>
       <div className="col-span-2">
         <dt className="text-(--text-faint)">Expires</dt>
-        <dd
-          className="mt-1 wrap-break-word text-(--gold)"
-          title={dataset.expires_at}
-        >
+        <dd className="mt-1 wrap-break-word text-(--gold)" title={dataset.expires_at}>
           {formatTimestamp(dataset.expires_at)}
         </dd>
       </div>

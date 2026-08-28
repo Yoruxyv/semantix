@@ -1,9 +1,6 @@
-import { BrowserRouter } from "react-router";
+import { BrowserRouter } from 'react-router';
 
-import type {
-  JSX,
-  ReactNode,
-} from "react";
+import type { JSX, ReactNode } from 'react';
 
 interface AppBrowserRouterProps {
   children: ReactNode;
@@ -12,7 +9,5 @@ interface AppBrowserRouterProps {
 export function AppBrowserRouter({
   children,
 }: Readonly<AppBrowserRouterProps>): JSX.Element {
-  return (
-    <BrowserRouter useTransitions={false}>{children}</BrowserRouter>
-  );
+  return <BrowserRouter useTransitions={false}>{children}</BrowserRouter>;
 }

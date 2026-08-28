@@ -1,8 +1,6 @@
 import type { JSX } from 'react';
 
-import type {
-  EvaluationComparisonMetricDeltas,
-} from '@/features/benchmark/comparisonTypes';
+import type { EvaluationComparisonMetricDeltas } from '@/features/benchmark/comparisonTypes';
 import type { BenchmarkMetrics } from '@/features/benchmark/types';
 import {
   formatCount,
@@ -54,8 +52,7 @@ function outcome(delta: number | null, objective: Objective): string {
     return 'Changed';
   }
   const improved =
-    (objective === 'higher' && delta > 0) ||
-    (objective === 'lower' && delta < 0);
+    (objective === 'higher' && delta > 0) || (objective === 'lower' && delta < 0);
   return improved ? 'Improved' : 'Regressed';
 }
 
@@ -72,9 +69,7 @@ function objectiveDescription(objective: Objective): string {
   return 'no quality direction implied';
 }
 
-function MetricCard({
-  metric,
-}: Readonly<{ metric: MetricDefinition }>): JSX.Element {
+function MetricCard({ metric }: Readonly<{ metric: MetricDefinition }>): JSX.Element {
   return (
     <article className="border border-(--hairline) p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -91,9 +86,7 @@ function MetricCard({
         <div>
           <dt className="text-(--text-faint)">Candidate</dt>
           <dd className="mt-1 text-(--text-soft)">
-            {metric.candidate === null
-              ? 'n/a'
-              : metric.formatValue(metric.candidate)}
+            {metric.candidate === null ? 'n/a' : metric.formatValue(metric.candidate)}
           </dd>
         </div>
         <div>
@@ -305,8 +298,8 @@ export function EvaluationRunComparisonMetrics({
         Aggregate metric deltas
       </h4>
       <p className="font-data mt-2 text-[10px]/5 text-(--text-muted)">
-        Every delta is candidate minus baseline. Improvement labels state the
-        metric objective explicitly; threshold changes are never labeled optimal.
+        Every delta is candidate minus baseline. Improvement labels state the metric
+        objective explicitly; threshold changes are never labeled optimal.
       </p>
       <div className="mt-4 grid gap-3 xl:grid-cols-2">
         {metrics.map((metric) => (

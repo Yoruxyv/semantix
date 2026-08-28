@@ -11,12 +11,7 @@ const DATE_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
 });
 
 function isValidDuration(value: DurationValue): value is number {
-  return (
-    value !== null &&
-    value !== undefined &&
-    Number.isFinite(value) &&
-    value >= 0
-  );
+  return value !== null && value !== undefined && Number.isFinite(value) && value >= 0;
 }
 
 export function formatCompactDuration(

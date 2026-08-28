@@ -29,9 +29,7 @@ import {
 const DATASET_IDS: readonly BenchmarkDatasetId[] = ['quick', 'extended'];
 const isDatasetId = createEnumGuard(DATASET_IDS);
 
-export function decodeBenchmarkDatasets(
-  value: unknown,
-): BenchmarkDatasetListResponse {
+export function decodeBenchmarkDatasets(value: unknown): BenchmarkDatasetListResponse {
   if (
     !isRecord(value) ||
     !Array.isArray(value.datasets) ||
@@ -42,11 +40,7 @@ export function decodeBenchmarkDatasets(
   }
 
   const datasets = value.datasets.map(decodeBenchmarkDatasetSummaryValue);
-  if (
-    !datasets.some(
-      (item) => item.dataset_id === value.default_dataset_id,
-    )
-  ) {
+  if (!datasets.some((item) => item.dataset_id === value.default_dataset_id)) {
     throw new Error('Invalid default benchmark dataset');
   }
 
@@ -90,8 +84,7 @@ export function decodeEvaluationDatasetPreview(
     !Array.isArray(value.categories) ||
     value.categories.length === 0 ||
     !value.categories.every(
-      (category) =>
-        isNonEmptyString(category) && category.length <= 100,
+      (category) => isNonEmptyString(category) && category.length <= 100,
     ) ||
     !isNonNegativeInteger(value.decoded_bytes) ||
     value.decoded_bytes < 1 ||
@@ -151,9 +144,7 @@ function importedCase(value: unknown): ImportedEvaluationCase {
   return value as unknown as ImportedEvaluationCase;
 }
 
-function persistedMetadata(
-  value: unknown,
-): PersistedEvaluationDatasetMetadata {
+function persistedMetadata(value: unknown): PersistedEvaluationDatasetMetadata {
   if (
     !isRecord(value) ||
     typeof value.dataset_id !== 'string' ||
@@ -186,8 +177,7 @@ export function decodePersistedEvaluationDatasets(
 ): PersistedEvaluationDatasetListResponse {
   if (
     !isRecord(value) ||
-    (value.storage_mode !== 'session' &&
-      value.storage_mode !== 'postgres') ||
+    (value.storage_mode !== 'session' && value.storage_mode !== 'postgres') ||
     typeof value.persistence_enabled !== 'boolean' ||
     !Array.isArray(value.items) ||
     !isNonNegativeInteger(value.total) ||
@@ -211,10 +201,8 @@ export function decodePersistedEvaluationDatasets(
   if (
     value.persistence_enabled !== (value.storage_mode === 'postgres') ||
     items.length > value.limit ||
-    value.has_more !==
-      (value.offset + items.length < value.total) ||
-    value.limits.default_retention_days >
-      value.limits.max_retention_days ||
+    value.has_more !== value.offset + items.length < value.total ||
+    value.limits.default_retention_days > value.limits.max_retention_days ||
     (!value.persistence_enabled && (items.length > 0 || value.total > 0))
   ) {
     throw new Error('Invalid persisted evaluation dataset catalog accounting');

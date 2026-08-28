@@ -1,12 +1,6 @@
-import type {
-  QueryRequest,
-  QueryResponse,
-} from "../types";
-import type { ApiResult } from "@/shared/api/types";
-import {
-  request,
-  withSignal,
-} from "@/shared/api/httpClient";
+import type { QueryRequest, QueryResponse } from '../types';
+import type { ApiResult } from '@/shared/api/types';
+import { request, withSignal } from '@/shared/api/httpClient';
 import {
   isNonEmptyString,
   isNonNegativeNumber,
@@ -17,34 +11,30 @@ import {
   isNumberInRange,
   isRecord,
   isSha256Hex,
-} from "@/shared/api/validators";
+} from '@/shared/api/validators';
 import {
   SIMILARITY_MAX,
   SIMILARITY_MIN,
   THRESHOLD_MAX,
   THRESHOLD_MIN,
-} from "@/shared/domain/similarity";
+} from '@/shared/domain/similarity';
 
 function decodeQueryResponse(value: unknown): QueryResponse {
   if (
     !isRecord(value) ||
-    typeof value.response !== "string" ||
-    typeof value.cache_hit !== "boolean" ||
-    !isNumberInRange(
-      value.similarity_threshold,
-      THRESHOLD_MIN,
-      THRESHOLD_MAX,
-    ) ||
+    typeof value.response !== 'string' ||
+    typeof value.cache_hit !== 'boolean' ||
+    !isNumberInRange(value.similarity_threshold, THRESHOLD_MIN, THRESHOLD_MAX) ||
     !isNullableString(value.matched_prompt) ||
     !isNullableString(value.matched_cache_key) ||
     !isNullableIsoDate(value.cache_entry_created_at) ||
     !isNullableNonNegativeNumber(value.cache_entry_age_seconds) ||
-    typeof value.generation_skipped !== "boolean" ||
-    typeof value.provider_called !== "boolean" ||
+    typeof value.generation_skipped !== 'boolean' ||
+    typeof value.provider_called !== 'boolean' ||
     !isNonNegativeNumber(value.latency_ms) ||
     !isNullableFiniteNumber(value.similarity_score)
   ) {
-    throw new Error("Invalid query response");
+    throw new Error('Invalid query response');
   }
 
   const hasValidMatchMetadata = value.cache_hit
@@ -65,13 +55,9 @@ function decodeQueryResponse(value: unknown): QueryResponse {
   if (
     !hasValidMatchMetadata ||
     (value.similarity_score !== null &&
-      !isNumberInRange(
-        value.similarity_score,
-        SIMILARITY_MIN,
-        SIMILARITY_MAX,
-      ))
+      !isNumberInRange(value.similarity_score, SIMILARITY_MIN, SIMILARITY_MAX))
   ) {
-    throw new Error("Invalid query explainability metadata");
+    throw new Error('Invalid query explainability metadata');
   }
 
   return {
@@ -94,11 +80,11 @@ export function submitQuery(
   signal?: AbortSignal,
 ): Promise<ApiResult<QueryResponse>> {
   return request(
-    "/api/v1/query",
+    '/api/v1/query',
     decodeQueryResponse,
     withSignal(
       {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify(payload),
       },
       signal,

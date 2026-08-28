@@ -5,7 +5,12 @@ import {
   LIGHTHOUSE_BUDGET,
 } from './check-lighthouse-budget';
 
-const report = ({ performance = 100, accessibility = 100, bestPractices = 100, seo = 100 } = {}) => ({
+const report = ({
+  performance = 100,
+  accessibility = 100,
+  bestPractices = 100,
+  seo = 100,
+} = {}) => ({
   categories: {
     performance: { score: performance / 100 },
     accessibility: { score: accessibility / 100 },
@@ -47,9 +52,7 @@ describe('Lighthouse budget evaluation', () => {
     const result = evaluate((index) => ({ performance: scores[index] }));
 
     expect(result.performanceMean).toBe(94.8);
-    expect(result.failures).toContain(
-      'Mobile performance mean 94.8 < required 95',
-    );
+    expect(result.failures).toContain('Mobile performance mean 94.8 < required 95');
   });
 
   it('fails an individual performance run below 90', () => {
@@ -68,7 +71,9 @@ describe('Lighthouse budget evaluation', () => {
   ])('fails when %s is below 90', (label, overrides) => {
     const result = evaluate(overrides);
 
-    expect(result.failures.some((failure) => failure.includes(`${label} 89`))).toBe(true);
+    expect(result.failures.some((failure) => failure.includes(`${label} 89`))).toBe(
+      true,
+    );
   });
 
   it('formats passing results as a deterministic plain-text table', () => {
@@ -95,8 +100,6 @@ PASS`);
     const output = formatResult(evaluate({ accessibility: 89 }));
 
     expect(output).toContain('\nFAIL:\n');
-    expect(output).toContain(
-      '- Mobile run 1 Accessibility 89 < required 90',
-    );
+    expect(output).toContain('- Mobile run 1 Accessibility 89 < required 90');
   });
 });

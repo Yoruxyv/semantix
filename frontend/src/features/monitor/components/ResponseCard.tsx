@@ -8,11 +8,7 @@ import {
   formatSimilarity,
 } from '@/shared/lib/formatters';
 import { hasSimilarityScore } from '@/shared/domain/similarity';
-import {
-  QUERY_POLICY_LABELS,
-  type QueryEvidence,
-  type QueryResponse,
-} from '../types';
+import { QUERY_POLICY_LABELS, type QueryEvidence, type QueryResponse } from '../types';
 
 interface ResponseCardProps {
   evidence?: QueryEvidence | null;
@@ -74,9 +70,7 @@ export function ResponseCard({
   });
   const explanation = explainDecision(result);
   const isCoalesced =
-    !result.cache_hit &&
-    result.generation_skipped &&
-    !result.provider_called;
+    !result.cache_hit && result.generation_skipped && !result.provider_called;
   let verdict = {
     accentColor: 'var(--coral)',
     label: 'FRESH RESPONSE',
@@ -109,36 +103,31 @@ export function ResponseCard({
     );
   const evidenceItems = [
     {
-      className:
-        'py-3 min-[520px]:border-r min-[520px]:border-(--hairline)',
+      className: 'py-3 min-[520px]:border-r min-[520px]:border-(--hairline)',
       label: 'Similarity',
       value: similarity,
-      valueClassName:
-        'font-data mt-1 text-xs tabular-nums text-(--teal)',
+      valueClassName: 'font-data mt-1 text-xs tabular-nums text-(--teal)',
     },
     {
       className:
         'border-t border-(--hairline) py-3 min-[520px]:border-t-0 min-[520px]:pl-4 min-[860px]:border-r min-[860px]:border-(--hairline)',
       label: 'Threshold used',
       value: threshold,
-      valueClassName:
-        'font-data mt-1 text-xs tabular-nums text-(--text-soft)',
+      valueClassName: 'font-data mt-1 text-xs tabular-nums text-(--text-soft)',
     },
     {
       className:
         'border-t border-(--hairline) py-3 min-[520px]:border-r min-[520px]:border-(--hairline) min-[860px]:border-t-0 min-[860px]:pl-4',
       label: 'Generation',
       value: result.generation_skipped ? 'Skipped' : 'Ran',
-      valueClassName:
-        'font-data mt-1 text-xs tabular-nums text-(--text-soft)',
+      valueClassName: 'font-data mt-1 text-xs tabular-nums text-(--text-soft)',
     },
     {
       className:
         'border-t border-(--hairline) py-3 min-[520px]:pl-4 min-[860px]:border-t-0',
       label: 'Provider',
       value: result.provider_called ? 'Called' : 'Not called',
-      valueClassName:
-        'font-data mt-1 text-xs tabular-nums text-(--text-soft)',
+      valueClassName: 'font-data mt-1 text-xs tabular-nums text-(--text-soft)',
     },
     {
       className:
@@ -153,16 +142,13 @@ export function ResponseCard({
         'border-t border-(--hairline) py-3 min-[520px]:border-r min-[520px]:border-(--hairline) min-[520px]:pl-4',
       label: 'Cache entry age',
       value: cacheAgeValue,
-      valueClassName:
-        'font-data mt-1 text-xs tabular-nums text-(--text-soft)',
+      valueClassName: 'font-data mt-1 text-xs tabular-nums text-(--text-soft)',
     },
     {
-      className:
-        'border-t border-(--hairline) py-3 min-[520px]:pl-4',
+      className: 'border-t border-(--hairline) py-3 min-[520px]:pl-4',
       label: 'Request latency',
       value: formatLatency(result.latency_ms),
-      valueClassName:
-        'font-data mt-1 text-xs tabular-nums text-(--text-soft)',
+      valueClassName: 'font-data mt-1 text-xs tabular-nums text-(--text-soft)',
     },
   ] satisfies EvidenceItem[];
 

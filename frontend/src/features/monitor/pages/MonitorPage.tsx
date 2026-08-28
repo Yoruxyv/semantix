@@ -1,19 +1,19 @@
-import { CacheReadingsSkeleton } from "../components/CacheReadingsSkeleton";
-import { FieldMetrics } from "../components/FieldMetrics";
-import { QueryForm } from "../components/QueryForm";
-import { QueryLog } from "../components/QueryLog";
-import { ResponseSkeleton } from "../components/ResponseSkeleton";
-import { SimilarityRadar } from "../components/similarity-radar/SimilarityRadar";
-import { useAuth } from "@/features/auth/hooks/useAuth";
-import { canApplyGlobalThreshold } from "@/features/auth/permissions";
-import { useCacheControl } from "@/features/cache/hooks/useCacheControl";
-import { useMonitor } from "../hooks/useMonitor";
-import { Alert } from "@/shared/components/ui";
+import { CacheReadingsSkeleton } from '../components/CacheReadingsSkeleton';
+import { FieldMetrics } from '../components/FieldMetrics';
+import { QueryForm } from '../components/QueryForm';
+import { QueryLog } from '../components/QueryLog';
+import { ResponseSkeleton } from '../components/ResponseSkeleton';
+import { SimilarityRadar } from '../components/similarity-radar/SimilarityRadar';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { canApplyGlobalThreshold } from '@/features/auth/permissions';
+import { useCacheControl } from '@/features/cache/hooks/useCacheControl';
+import { useMonitor } from '../hooks/useMonitor';
+import { Alert } from '@/shared/components/ui';
 
-import { lazy, Suspense, type JSX } from "react";
+import { lazy, Suspense, type JSX } from 'react';
 
 const ResponseCard = lazy(() =>
-  import("../components/ResponseCard").then((module) => ({
+  import('../components/ResponseCard').then((module) => ({
     default: module.ResponseCard,
   })),
 );
@@ -33,7 +33,7 @@ export function MonitorPage(): JSX.Element {
 
   return (
     <>
-      {cacheState.status === "error" && (
+      {cacheState.status === 'error' && (
         <Alert
           className="mb-8 border-y border-(--coral) bg-[rgba(194,96,74,0.06)] px-4 py-5"
           role="alert"
@@ -48,17 +48,17 @@ export function MonitorPage(): JSX.Element {
 
       <section className="mb-12 border-b border-(--hairline) pb-10">
         <QueryForm
-          isLoading={queryState.status === "loading"}
+          isLoading={queryState.status === 'loading'}
           onSubmit={submitPrompt}
         />
 
-        {queryState.status === "loading" && (
+        {queryState.status === 'loading' && (
           <div className="mt-8">
             <ResponseSkeleton />
           </div>
         )}
 
-        {queryState.status === "error" && (
+        {queryState.status === 'error' && (
           <Alert
             className="mt-6 border-l-2 border-(--coral) bg-[rgba(194,96,74,0.06)] px-4 py-3"
             role="alert"
@@ -66,12 +66,12 @@ export function MonitorPage(): JSX.Element {
             tone="error"
           >
             <p className="font-data mt-1 text-[11px]/5 text-(--text-soft)">
-              {queryState.error.detail ?? "The provider returned no detail."}
+              {queryState.error.detail ?? 'The provider returned no detail.'}
             </p>
           </Alert>
         )}
 
-        {queryState.status === "success" && (
+        {queryState.status === 'success' && (
           <div className="mt-8">
             <Suspense fallback={<ResponseSkeleton />}>
               <ResponseCard evidence={latestEvidence} result={queryState.data} />
@@ -80,15 +80,12 @@ export function MonitorPage(): JSX.Element {
         )}
       </section>
 
-      {cacheState.status === "loading" && <CacheReadingsSkeleton />}
+      {cacheState.status === 'loading' && <CacheReadingsSkeleton />}
 
-      {cacheState.status === "ready" && previewThreshold !== null && (
+      {cacheState.status === 'ready' && previewThreshold !== null && (
         <>
           {isRefreshingCacheState && (
-            <output
-              aria-live="polite"
-              className="ui-label mb-5 block text-(--gold)"
-            >
+            <output aria-live="polite" className="ui-label mb-5 block text-(--gold)">
               Refreshing cache readings
             </output>
           )}

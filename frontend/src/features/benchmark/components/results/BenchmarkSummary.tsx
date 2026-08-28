@@ -32,9 +32,7 @@ function Metric({ label, tone, value }: Readonly<MetricProps>): JSX.Element {
   return (
     <div className="border-t border-(--hairline) pt-3">
       <dt className="ui-label text-(--text-faint)">{label}</dt>
-      <dd className={`font-data mt-2 text-lg tabular-nums ${valueClass}`}>
-        {value}
-      </dd>
+      <dd className={`font-data mt-2 text-lg tabular-nums ${valueClass}`}>{value}</dd>
     </div>
   );
 }
@@ -141,8 +139,8 @@ export function BenchmarkSummary({
           </h2>
           <p className="font-data mt-2 text-xs text-(--text-muted)">
             Threshold {formatDecimal(result.threshold, 2)} -{' '}
-            {formatCount(result.repetitions)}{' '}
-            repetition{result.repetitions === 1 ? '' : 's'}
+            {formatCount(result.repetitions)} repetition
+            {result.repetitions === 1 ? '' : 's'}
           </p>
         </div>
       </div>
@@ -171,9 +169,7 @@ export function BenchmarkSummary({
         <dl className="font-data mt-4 grid gap-x-8 gap-y-4 text-[10px]/5 sm:grid-cols-2">
           <div>
             <dt className="text-(--text-faint)">Run ID</dt>
-            <dd className="mt-1 break-all text-(--text-soft)">
-              {result.run_id}
-            </dd>
+            <dd className="mt-1 break-all text-(--text-soft)">{result.run_id}</dd>
           </div>
           <div>
             <dt className="text-(--text-faint)">Started / completed</dt>
@@ -194,15 +190,13 @@ export function BenchmarkSummary({
               {result.dataset.schema_version === null
                 ? ''
                 : ` schema v${result.dataset.schema_version}`}{' '}
-              · dataset v{result.dataset.version} -{' '}
-              {result.dataset.digest}
+              · dataset v{result.dataset.version} - {result.dataset.digest}
             </dd>
           </div>
           <div>
             <dt className="text-(--text-faint)">Measured configuration</dt>
             <dd className="mt-1 text-(--text-soft)">
-              Threshold{' '}
-              {formatDecimal(result.reproducibility.measured_threshold, 2)} -{' '}
+              Threshold {formatDecimal(result.reproducibility.measured_threshold, 2)} -{' '}
               {result.repetitions} repetition
               {result.repetitions === 1 ? '' : 's'} - cache reset{' '}
               {result.reset_cache_before_run
@@ -243,11 +237,8 @@ export function BenchmarkSummary({
             <dt className="text-(--text-faint)">Application / timeout</dt>
             <dd className="mt-1 text-(--text-soft)">
               API {result.reproducibility.application_version} -{' '}
-              {formatDecimal(
-                result.reproducibility.evaluation_timeout_seconds,
-                0,
-              )}{' '}
-              s wall-clock limit
+              {formatDecimal(result.reproducibility.evaluation_timeout_seconds, 0)} s
+              wall-clock limit
             </dd>
           </div>
           <div>
@@ -262,9 +253,9 @@ export function BenchmarkSummary({
       </section>
 
       <p className="font-data mt-5 text-[10px]/5 text-(--text-faint)">
-        Latency and classification values are measured. Latency saved, token
-        count, provider cost savings, and threshold-series latency are estimates
-        based on this run - not billing records or exact token usage.
+        Latency and classification values are measured. Latency saved, token count,
+        provider cost savings, and threshold-series latency are estimates based on this
+        run - not billing records or exact token usage.
       </p>
     </section>
   );

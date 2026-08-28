@@ -1,16 +1,10 @@
-import type {
-  BenchmarkQueryResult,
-  BenchmarkRunResponse,
-} from '../types';
+import type { BenchmarkQueryResult, BenchmarkRunResponse } from '../types';
 
 type CsvValue = string | number | boolean | null;
 
 interface CsvColumn {
   header: string;
-  value: (
-    result: BenchmarkRunResponse,
-    query: BenchmarkQueryResult,
-  ) => CsvValue;
+  value: (result: BenchmarkRunResponse, query: BenchmarkQueryResult) => CsvValue;
 }
 
 const CSV_COLUMNS: readonly CsvColumn[] = [
@@ -38,8 +32,7 @@ const CSV_COLUMNS: readonly CsvColumn[] = [
   },
   {
     header: 'evaluation_thresholds',
-    value: (result) =>
-      JSON.stringify(result.reproducibility.evaluation_thresholds),
+    value: (result) => JSON.stringify(result.reproducibility.evaluation_thresholds),
   },
   {
     header: 'threshold_evaluation_mode',
@@ -47,8 +40,7 @@ const CSV_COLUMNS: readonly CsvColumn[] = [
   },
   {
     header: 'configuration_fingerprint',
-    value: (result) =>
-      result.reproducibility.configuration_fingerprint,
+    value: (result) => result.reproducibility.configuration_fingerprint,
   },
   { header: 'repetitions', value: (result) => result.repetitions },
   {
@@ -61,13 +53,11 @@ const CSV_COLUMNS: readonly CsvColumn[] = [
   },
   {
     header: 'embedding_provider_category',
-    value: (result) =>
-      result.reproducibility.embedding_provider_category,
+    value: (result) => result.reproducibility.embedding_provider_category,
   },
   {
     header: 'generation_provider_category',
-    value: (result) =>
-      result.reproducibility.generation_provider_category,
+    value: (result) => result.reproducibility.generation_provider_category,
   },
   {
     header: 'embedding_dimensions',
@@ -75,8 +65,7 @@ const CSV_COLUMNS: readonly CsvColumn[] = [
   },
   {
     header: 'embedding_space_fingerprint',
-    value: (result) =>
-      result.reproducibility.embedding_space_fingerprint,
+    value: (result) => result.reproducibility.embedding_space_fingerprint,
   },
   {
     header: 'normalization_mode',
@@ -84,13 +73,11 @@ const CSV_COLUMNS: readonly CsvColumn[] = [
   },
   {
     header: 'normalization_fingerprint',
-    value: (result) =>
-      result.reproducibility.normalization_fingerprint,
+    value: (result) => result.reproducibility.normalization_fingerprint,
   },
   {
     header: 'evaluation_timeout_seconds',
-    value: (result) =>
-      result.reproducibility.evaluation_timeout_seconds,
+    value: (result) => result.reproducibility.evaluation_timeout_seconds,
   },
   { header: 'sequence', value: (_result, query) => query.sequence },
   { header: 'repetition', value: (_result, query) => query.repetition },
@@ -136,9 +123,7 @@ function csvCell(value: CsvValue): string {
     return '';
   }
   const text =
-    typeof value === 'string' && /^[=+\-@]/.test(value)
-      ? `'${value}`
-      : String(value);
+    typeof value === 'string' && /^[=+\-@]/.test(value) ? `'${value}` : String(value);
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
@@ -149,9 +134,7 @@ export function buildBenchmarkJson(result: BenchmarkRunResponse): string {
 export function buildBenchmarkCsv(result: BenchmarkRunResponse): string {
   const header = CSV_COLUMNS.map((column) => column.header).join(',');
   const rows = result.query_results.map((query) =>
-    CSV_COLUMNS.map((column) =>
-      csvCell(column.value(result, query)),
-    ).join(','),
+    CSV_COLUMNS.map((column) => csvCell(column.value(result, query))).join(','),
   );
   return [header, ...rows].join('\r\n');
 }

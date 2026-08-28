@@ -14,9 +14,7 @@ describe('MarkdownContent URL safety', () => {
   ])('preserves an allowed %s link', (label, url) => {
     render(<MarkdownContent markdown={`[${label}](${url})`} />);
 
-    expect(screen.getByRole('link', { name: label }).getAttribute('href')).toBe(
-      url,
-    );
+    expect(screen.getByRole('link', { name: label }).getAttribute('href')).toBe(url);
   });
 
   it.each([

@@ -1,5 +1,5 @@
-import type { MockedFunction } from "vitest";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { MockedFunction } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   deletePersistedEvaluationDataset,
@@ -9,41 +9,41 @@ import {
   persistEvaluationDataset,
   runBenchmark,
   validateEvaluationDataset,
-} from "@/features/benchmark/api/benchmarkApi";
-import { benchmarkResult, persistedDataset } from "./support";
+} from '@/features/benchmark/api/benchmarkApi';
+import { benchmarkResult, persistedDataset } from './support';
 
 const dataset = {
-  dataset_id: "quick",
-  dataset_source: "builtin",
+  dataset_id: 'quick',
+  dataset_source: 'builtin',
   schema_version: null,
-  version: "1.0.0",
-  digest: "d".repeat(64),
-  name: "Quick set",
-  description: "Controlled prompts",
+  version: '1.0.0',
+  digest: 'd'.repeat(64),
+  name: 'Quick set',
+  description: 'Controlled prompts',
   query_count: 1,
   expected_hits: 0,
   expected_misses: 1,
-  categories: ["seed"],
+  categories: ['seed'],
 };
 
-describe("benchmark API client", () => {
+describe('benchmark API client', () => {
   let fetchMock: MockedFunction<typeof fetch>;
 
   beforeEach(() => {
     fetchMock = vi.fn<typeof fetch>();
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal('fetch', fetchMock);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("decodes benchmark datasets", async () => {
+  it('decodes benchmark datasets', async () => {
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({
           datasets: [dataset],
-          default_dataset_id: "quick",
+          default_dataset_id: 'quick',
         }),
         { status: 200 },
       ),
@@ -57,16 +57,13 @@ describe("benchmark API client", () => {
     }
   });
 
-  it("submits explicit provider approval and preserves null scores", async () => {
+  it('submits explicit provider approval and preserves null scores', async () => {
     fetchMock.mockResolvedValue(
-      new Response(
-        JSON.stringify(benchmarkResult),
-        { status: 200 },
-      ),
+      new Response(JSON.stringify(benchmarkResult), { status: 200 }),
     );
 
     const response = await runBenchmark({
-      dataset_source: { kind: "builtin", dataset_id: "quick" },
+      dataset_source: { kind: 'builtin', dataset_id: 'quick' },
       threshold: 0.9,
       evaluation_thresholds: [0.8, 0.9, 0.95],
       repetitions: 1,
@@ -81,27 +78,27 @@ describe("benchmark API client", () => {
       expect(response.data.query_results[0]?.similarity_score).toBeNull();
     }
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/api/v1/evaluations/runs"),
+      expect.stringContaining('/api/v1/evaluations/runs'),
       expect.objectContaining({
-        method: "POST",
+        method: 'POST',
         body: expect.stringContaining('"allow_external_provider_calls":true'),
       }),
     );
   });
 
-  it("validates inline data through the provider-free preview route", async () => {
+  it('validates inline data through the provider-free preview route', async () => {
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({
           schema_version: 1,
-          dataset_id: "custom:1234567890abcdef",
-          digest: "d".repeat(64),
-          name: "Custom set",
+          dataset_id: 'custom:1234567890abcdef',
+          digest: 'd'.repeat(64),
+          name: 'Custom set',
           description: null,
           case_count: 1,
           expected_hits: 0,
           expected_misses: 1,
-          categories: ["uncategorized"],
+          categories: ['uncategorized'],
           decoded_bytes: 120,
           warnings: [],
           query_executions: 1,
@@ -126,23 +123,23 @@ describe("benchmark API client", () => {
 
     expect(response.ok).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/api/v1/evaluations/datasets/validate"),
-      expect.objectContaining({ method: "POST" }),
+      expect.stringContaining('/api/v1/evaluations/datasets/validate'),
+      expect.objectContaining({ method: 'POST' }),
     );
   });
 
-  it("strictly decodes structured dataset validation issues", async () => {
+  it('strictly decodes structured dataset validation issues', async () => {
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({
-          error: "evaluation_dataset_invalid",
-          detail: "The imported evaluation dataset is invalid.",
+          error: 'evaluation_dataset_invalid',
+          detail: 'The imported evaluation dataset is invalid.',
           issues: [
             {
-              code: "duplicate_case_id",
-              detail: "Case IDs must be unique.",
-              pointer: "/cases/1/case_id",
-              case_id: "duplicate",
+              code: 'duplicate_case_id',
+              detail: 'Case IDs must be unique.',
+              pointer: '/cases/1/case_id',
+              case_id: 'duplicate',
               case_index: 1,
             },
           ],
@@ -160,21 +157,21 @@ describe("benchmark API client", () => {
     expect(response.ok).toBe(false);
     if (!response.ok) {
       expect(response.error.issues?.[0]).toEqual({
-        code: "duplicate_case_id",
-        detail: "Case IDs must be unique.",
-        pointer: "/cases/1/case_id",
-        case_id: "duplicate",
+        code: 'duplicate_case_id',
+        detail: 'Case IDs must be unique.',
+        pointer: '/cases/1/case_id',
+        case_id: 'duplicate',
         case_index: 1,
       });
     }
   });
 
-  it("uses the scoped persisted catalog CRUD routes", async () => {
+  it('uses the scoped persisted catalog CRUD routes', async () => {
     fetchMock
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            storage_mode: "postgres",
+            storage_mode: 'postgres',
             persistence_enabled: true,
             items: [persistedDataset],
             total: 1,
@@ -208,31 +205,29 @@ describe("benchmark API client", () => {
       );
 
     const catalog = await getPersistedEvaluationDatasets({
-      namespace: "tenant-a",
+      namespace: 'tenant-a',
     });
-    const detail = await getPersistedEvaluationDataset(
-      persistedDataset.dataset_id,
-    );
+    const detail = await getPersistedEvaluationDataset(persistedDataset.dataset_id);
     const created = await persistEvaluationDataset({
-      namespace: "tenant-a",
+      namespace: 'tenant-a',
       dataset: { schema_version: 1 },
       retention_days: 30,
     });
     const deleted = await deletePersistedEvaluationDataset(
       persistedDataset.dataset_id,
-      "tenant-a",
+      'tenant-a',
     );
 
     expect(catalog.ok && catalog.data.total).toBe(1);
-    expect(detail.ok && detail.data.cases[1]?.case_id).toBe("repeat");
-    expect(created.ok && created.data.namespace).toBe("tenant-a");
+    expect(detail.ok && detail.data.cases[1]?.case_id).toBe('repeat');
+    expect(created.ok && created.data.namespace).toBe('tenant-a');
     expect(deleted.ok && deleted.data.deleted).toBe(true);
     expect(fetchMock.mock.calls[0]?.[0]).toContain(
-      "namespace=tenant-a&offset=0&limit=20",
+      'namespace=tenant-a&offset=0&limit=20',
     );
     expect(fetchMock.mock.calls[2]?.[1]).toEqual(
       expect.objectContaining({
-        method: "POST",
+        method: 'POST',
         body: expect.stringContaining('"retention_days":30'),
       }),
     );

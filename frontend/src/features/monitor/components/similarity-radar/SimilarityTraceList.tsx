@@ -2,7 +2,7 @@ import { formatSimilarity } from '@/shared/lib/formatters';
 import { cacheDecisionLabel } from '@/shared/domain/similarity';
 import { formatPrompt, type PlotPoint } from './model';
 
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 interface SimilarityTraceListProps {
   activePointId: string | null;
@@ -36,9 +36,7 @@ export function SimilarityTraceList({
 
       {points.map((point) => {
         const isActive = point.id === activePointId;
-        const previewColor = point.isProjectedHit
-          ? 'var(--gold)'
-          : 'var(--coral-text)';
+        const previewColor = point.isProjectedHit ? 'var(--gold)' : 'var(--coral-text)';
 
         return (
           <button
@@ -59,9 +57,7 @@ export function SimilarityTraceList({
           >
             <span
               className={
-                isActive
-                  ? 'truncate text-(--text)'
-                  : 'truncate text-(--text-muted)'
+                isActive ? 'truncate text-(--text)' : 'truncate text-(--text-muted)'
               }
               title={point.prompt}
             >

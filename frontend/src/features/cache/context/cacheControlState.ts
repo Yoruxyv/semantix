@@ -1,6 +1,6 @@
-import { createContext } from "react";
+import { createContext } from 'react';
 
-import type { CacheStatsResponse } from "../types";
+import type { CacheStatsResponse } from '../types';
 
 export interface CacheControlData {
   appliedThreshold: number;
@@ -8,9 +8,9 @@ export interface CacheControlData {
 }
 
 export type CacheControlReadState =
-  | { status: "loading" }
-  | { status: "ready"; data: CacheControlData }
-  | { status: "error"; error: string };
+  | { status: 'loading' }
+  | { status: 'ready'; data: CacheControlData }
+  | { status: 'error'; error: string };
 
 export interface CacheControlContextValue {
   cacheState: CacheControlReadState;
@@ -24,5 +24,4 @@ export interface CacheControlContextValue {
   setPreviewThreshold: (value: number) => void;
 }
 
-export const CacheControlContext =
-  createContext<CacheControlContextValue | null>(null);
+export const CacheControlContext = createContext<CacheControlContextValue | null>(null);

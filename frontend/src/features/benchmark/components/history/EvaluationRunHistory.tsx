@@ -11,10 +11,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { canDeleteEvaluationRunHistory } from '@/features/auth/permissions';
 import { isCacheNamespace } from '@/features/cache/namespace';
 import { Alert } from '@/shared/components/ui';
-import {
-  apiErrorFromUnknown,
-  dataFromApiResult,
-} from '@/shared/query/apiResult';
+import { apiErrorFromUnknown, dataFromApiResult } from '@/shared/query/apiResult';
 import { benchmarkHistoryKeys } from '@/shared/query/queryKeys';
 
 import type { EvaluationRunHistoryItem } from '@/features/benchmark/types';
@@ -64,11 +61,7 @@ export function EvaluationRunHistory(): JSX.Element {
   const resetComparison = comparison.clear;
 
   useEffect(() => {
-    const nextNamespace = defaultNamespace(
-      auth.status,
-      namespaces,
-      hasGlobalNamespace,
-    );
+    const nextNamespace = defaultNamespace(auth.status, namespaces, hasGlobalNamespace);
     setNamespaceInput(nextNamespace);
     setNamespace(nextNamespace);
     setOffset(0);
@@ -85,11 +78,7 @@ export function EvaluationRunHistory(): JSX.Element {
   ]);
 
   const catalogQuery = useQuery({
-    queryKey: benchmarkHistoryKeys.list(
-      namespace,
-      offset,
-      PAGE_SIZE,
-    ),
+    queryKey: benchmarkHistoryKeys.list(namespace, offset, PAGE_SIZE),
     queryFn: async ({ signal }) =>
       dataFromApiResult(
         await getEvaluationRunHistory(
@@ -113,15 +102,10 @@ export function EvaluationRunHistory(): JSX.Element {
         await getEvaluationRunHistoryDetail(selectedRunId, signal),
       );
     },
-    enabled:
-      selectedRunId !== null &&
-      catalogQuery.data?.retention_enabled === true,
+    enabled: selectedRunId !== null && catalogQuery.data?.retention_enabled === true,
   });
 
-  const canDelete = canDeleteEvaluationRunHistory(
-    auth.status,
-    auth.session,
-  );
+  const canDelete = canDeleteEvaluationRunHistory(auth.status, auth.session);
 
   function applyNamespace(): void {
     const trimmed = namespaceInput.trim();
@@ -141,10 +125,7 @@ export function EvaluationRunHistory(): JSX.Element {
     setDeletingRunId(item.run_id);
     setActionError(null);
     try {
-      const response = await deleteEvaluationRunHistory(
-        item.run_id,
-        item.namespace,
-      );
+      const response = await deleteEvaluationRunHistory(item.run_id, item.namespace);
       if (!response.ok) {
         setActionError(
           response.error.detail ?? 'The retained run could not be deleted.',
@@ -170,12 +151,12 @@ export function EvaluationRunHistory(): JSX.Element {
 
   const catalog = catalogQuery.data;
   const catalogError = catalogQuery.isError
-    ? apiErrorFromUnknown(catalogQuery.error).detail ??
-      'Evaluation run history could not be loaded.'
+    ? (apiErrorFromUnknown(catalogQuery.error).detail ??
+      'Evaluation run history could not be loaded.')
     : null;
   const detailError = detailQuery.isError
-    ? apiErrorFromUnknown(detailQuery.error).detail ??
-      'The retained run detail could not be loaded.'
+    ? (apiErrorFromUnknown(detailQuery.error).detail ??
+      'The retained run detail could not be loaded.')
     : null;
 
   return (
@@ -189,10 +170,9 @@ export function EvaluationRunHistory(): JSX.Element {
           Run history
         </h2>
         <p className="mt-2 max-w-3xl text-sm/6 text-(--text-muted)">
-          Browse terminal aggregate results retained by namespace. Select
-          exactly two retained runs for a server-checked comparison. History
-          never stores per-query prompts, generated responses, or matched cache
-          keys.
+          Browse terminal aggregate results retained by namespace. Select exactly two
+          retained runs for a server-checked comparison. History never stores per-query
+          prompts, generated responses, or matched cache keys.
         </p>
       </header>
 
@@ -224,12 +204,7 @@ export function EvaluationRunHistory(): JSX.Element {
       )}
 
       {catalogError !== null && (
-        <Alert
-          className="mt-5"
-          role="alert"
-          title="History unavailable"
-          tone="error"
-        >
+        <Alert className="mt-5" role="alert" title="History unavailable" tone="error">
           <p className="font-data mt-1 text-[10px]/5 text-(--text-soft)">
             {catalogError}
           </p>
@@ -243,20 +218,15 @@ export function EvaluationRunHistory(): JSX.Element {
           tone="warning"
         >
           <p className="font-data mt-1 text-[10px]/5 text-(--text-soft)">
-            This deployment does not retain evaluation runs in PostgreSQL.
-            Measured runs can still complete normally, but no durable history is
-            available to browse or compare.
+            This deployment does not retain evaluation runs in PostgreSQL. Measured runs
+            can still complete normally, but no durable history is available to browse
+            or compare.
           </p>
         </Alert>
       )}
 
       {actionError !== null && (
-        <Alert
-          className="mt-5"
-          role="alert"
-          title="History action failed"
-          tone="error"
-        >
+        <Alert className="mt-5" role="alert" title="History action failed" tone="error">
           <p className="font-data mt-1 text-[10px]/5 text-(--text-soft)">
             {actionError}
           </p>

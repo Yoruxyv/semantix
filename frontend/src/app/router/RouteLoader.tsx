@@ -1,7 +1,7 @@
-import type { JSX } from "react";
-import { useLocation } from "react-router";
+import type { JSX } from 'react';
+import { useLocation } from 'react-router';
 
-import { WorkspaceRouteSkeleton } from "./WorkspaceRouteSkeleton";
+import { WorkspaceRouteSkeleton } from './WorkspaceRouteSkeleton';
 
 export function RouteLoader(): JSX.Element {
   const { pathname } = useLocation();
@@ -12,9 +12,7 @@ export function RouteLoader(): JSX.Element {
       aria-live="polite"
       className="block min-h-64 animate-pulse border-y border-(--hairline) py-8"
     >
-      <span className="ui-label block text-(--text-muted)">
-        Loading workspace
-      </span>
+      <span className="ui-label block text-(--text-muted)">Loading workspace</span>
       <WorkspaceRouteSkeleton pathname={pathname} />
     </output>
   );

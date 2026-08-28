@@ -1,12 +1,8 @@
 import { CacheEntryCard } from './CacheEntryCard';
 import type { CacheInspectorController } from '../hooks/useCacheInspector';
-import {
-  Alert,
-  Button,
-  EmptyState,
-} from '@/shared/components/ui';
+import { Alert, Button, EmptyState } from '@/shared/components/ui';
 
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 interface CacheInspectorResultsProps {
   inspector: CacheInspectorController;

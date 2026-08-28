@@ -1,16 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
+import { useEffect, useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 
-import { runBenchmark } from "../api/benchmarkApi";
-import type { ThresholdSweep } from "../lib/thresholdSweep";
-import type {
-  BenchmarkRunResponse,
-  EvaluationDatasetPreview,
-} from "../types";
-import {
-  requestFromForm,
-  type BenchmarkForm,
-} from "./benchmarkController";
+import { runBenchmark } from '../api/benchmarkApi';
+import type { ThresholdSweep } from '../lib/thresholdSweep';
+import type { BenchmarkRunResponse, EvaluationDatasetPreview } from '../types';
+import { requestFromForm, type BenchmarkForm } from './benchmarkController';
 
 interface EvaluationRunWorkflowOptions {
   authIdentity: string;
@@ -24,9 +18,7 @@ interface EvaluationRunWorkflowOptions {
   setShowWarning: Dispatch<SetStateAction<boolean>>;
   setStatusMessage: Dispatch<SetStateAction<string>>;
   sweep: ThresholdSweep;
-  validateDefinition: (
-    definition: unknown,
-  ) => Promise<EvaluationDatasetPreview | null>;
+  validateDefinition: (definition: unknown) => Promise<EvaluationDatasetPreview | null>;
 }
 
 interface EvaluationRunWorkflow {
@@ -69,15 +61,9 @@ export function useEvaluationRunWorkflow({
       setResult(null);
       setShowWarning(false);
       setError(null);
-      setStatusMessage("");
+      setStatusMessage('');
     }
-  }, [
-    authIdentity,
-    setError,
-    setResult,
-    setShowWarning,
-    setStatusMessage,
-  ]);
+  }, [authIdentity, setError, setResult, setShowWarning, setStatusMessage]);
 
   useEffect(
     () => () => {
@@ -97,7 +83,7 @@ export function useEvaluationRunWorkflow({
     ) {
       return;
     }
-    if (form.datasetSource === "custom") {
+    if (form.datasetSource === 'custom') {
       if (importedDefinition === null) {
         return;
       }
@@ -115,7 +101,7 @@ export function useEvaluationRunWorkflow({
       !hasRunnableDataset ||
       !historyNamespaceValid ||
       sweep.error !== null ||
-      (form.datasetSource === "custom" && importedDefinition === null)
+      (form.datasetSource === 'custom' && importedDefinition === null)
     ) {
       return;
     }
@@ -127,7 +113,7 @@ export function useEvaluationRunWorkflow({
     setShowWarning(false);
     setIsRunning(true);
     setError(null);
-    setStatusMessage("Evaluation run started.");
+    setStatusMessage('Evaluation run started.');
 
     try {
       const response = await runBenchmark(
@@ -139,14 +125,12 @@ export function useEvaluationRunWorkflow({
       }
 
       if (!response.ok) {
-        setError(response.error.detail ?? "The evaluation run failed.");
-        setStatusMessage("Evaluation run failed.");
+        setError(response.error.detail ?? 'The evaluation run failed.');
+        setStatusMessage('Evaluation run failed.');
         return;
       }
       setResult(response.data);
-      setStatusMessage(
-        "Evaluation run completed. Results are available below.",
-      );
+      setStatusMessage('Evaluation run completed. Results are available below.');
     } finally {
       if (runId === runSequence.current) {
         activeRun.current = null;

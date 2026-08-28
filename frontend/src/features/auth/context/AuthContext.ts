@@ -1,14 +1,14 @@
-import { createContext } from "react";
+import { createContext } from 'react';
 
-import type { AuthSession } from "../types";
+import type { AuthSession } from '../types';
 
 export type AuthStatus =
-  | "loading"
-  | "disabled"
-  | "unauthenticated"
-  | "authenticated"
-  | "session-error"
-  | "error";
+  | 'loading'
+  | 'disabled'
+  | 'unauthenticated'
+  | 'authenticated'
+  | 'session-error'
+  | 'error';
 
 export interface AuthContextValue {
   authenticate: (token: string) => Promise<boolean>;

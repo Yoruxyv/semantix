@@ -1,9 +1,5 @@
 import { isCacheNamespace } from '@/features/cache/namespace';
-import {
-  isIsoDate,
-  isNonNegativeInteger,
-  isRecord,
-} from '@/shared/api/validators';
+import { isIsoDate, isNonNegativeInteger, isRecord } from '@/shared/api/validators';
 
 import type {
   DeleteEvaluationRunHistoryResponse,
@@ -42,10 +38,7 @@ function isNullableBoundedString(
   value: unknown,
   maximumLength: number,
 ): value is string | null {
-  return (
-    value === null ||
-    (typeof value === 'string' && value.length <= maximumLength)
-  );
+  return value === null || (typeof value === 'string' && value.length <= maximumLength);
 }
 
 function historyItem(value: unknown): EvaluationRunHistoryItem {
@@ -89,8 +82,7 @@ function historyItem(value: unknown): EvaluationRunHistoryItem {
   const datasetContractMatches =
     decodedReproducibility.dataset_id === decodedDataset.dataset_id &&
     decodedReproducibility.dataset_source === decodedDataset.dataset_source &&
-    decodedReproducibility.dataset_schema_version ===
-      decodedDataset.schema_version &&
+    decodedReproducibility.dataset_schema_version === decodedDataset.schema_version &&
     decodedReproducibility.dataset_version === decodedDataset.version &&
     decodedReproducibility.dataset_digest === decodedDataset.digest;
 
@@ -196,9 +188,7 @@ export function decodeEvaluationRunHistoryDetail(
       throw new Error('Failed evaluation history cannot contain thresholds');
     }
   } else {
-    const thresholds = thresholdEvaluations.map(
-      (evaluation) => evaluation.threshold,
-    );
+    const thresholds = thresholdEvaluations.map((evaluation) => evaluation.threshold);
     const measured = thresholdEvaluations.filter(
       (evaluation) => evaluation.result_kind === 'measured',
     );

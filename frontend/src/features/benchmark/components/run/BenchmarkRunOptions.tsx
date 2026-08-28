@@ -30,9 +30,7 @@ export function BenchmarkRunOptions({
   return (
     <>
       <label className="block">
-        <span className="ui-label text-(--text-muted)">
-          Similarity threshold
-        </span>
+        <span className="ui-label text-(--text-muted)">Similarity threshold</span>
 
         <span className="font-data mt-2 flex min-h-11 items-center gap-3">
           <input
@@ -46,10 +44,7 @@ export function BenchmarkRunOptions({
             value={form.threshold}
             onChange={(event) =>
               updateBenchmarkForm(controller, {
-                threshold: benchmarkNumberValue(
-                  event.target.value,
-                  form.threshold,
-                ),
+                threshold: benchmarkNumberValue(event.target.value, form.threshold),
               })
             }
           />
@@ -73,10 +68,7 @@ export function BenchmarkRunOptions({
           value={form.repetitions}
           onChange={(event) =>
             updateBenchmarkForm(controller, {
-              repetitions: benchmarkNumberValue(
-                event.target.value,
-                form.repetitions,
-              ),
+              repetitions: benchmarkNumberValue(event.target.value, form.repetitions),
             })
           }
         />
@@ -107,9 +99,7 @@ export function BenchmarkRunOptions({
       </label>
 
       <label className="block">
-        <span className="ui-label text-(--text-muted)">
-          Cost / 1K tokens (USD)
-        </span>
+        <span className="ui-label text-(--text-muted)">Cost / 1K tokens (USD)</span>
 
         <input
           aria-label="Estimated cost per 1K tokens"

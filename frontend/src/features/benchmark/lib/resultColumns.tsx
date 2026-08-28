@@ -1,17 +1,11 @@
 import type { ReactNode } from 'react';
 
-import {
-  formatCount,
-  formatLatency,
-  formatSimilarity,
-} from '@/shared/lib/formatters';
+import { formatCount, formatLatency, formatSimilarity } from '@/shared/lib/formatters';
 import { cacheDecisionLabel } from '@/shared/domain/similarity';
 import type { BenchmarkQueryResult } from '../types';
 
 export interface BenchmarkResultColumn {
-  cellClassName:
-    | string
-    | ((result: BenchmarkQueryResult) => string);
+  cellClassName: string | ((result: BenchmarkQueryResult) => string);
   header: string;
   headerClassName?: string;
   id: string;
@@ -48,8 +42,7 @@ export const BENCHMARK_RESULT_COLUMNS: readonly BenchmarkResultColumn[] = [
     render: (result) => formatLabel(result.category),
   },
   {
-    cellClassName:
-      'max-w-md px-3 py-4 leading-5 text-(--text-soft)',
+    cellClassName: 'max-w-md px-3 py-4 leading-5 text-(--text-soft)',
     header: 'Query',
     id: 'query',
     render: (result) => result.prompt,
@@ -58,8 +51,7 @@ export const BENCHMARK_RESULT_COLUMNS: readonly BenchmarkResultColumn[] = [
     cellClassName: 'px-3 py-4 text-(--text-muted)',
     header: 'Expected',
     id: 'expected',
-    render: (result) =>
-      cacheDecisionLabel(result.expected_cache_hit),
+    render: (result) => cacheDecisionLabel(result.expected_cache_hit),
   },
   {
     cellClassName: (result) =>

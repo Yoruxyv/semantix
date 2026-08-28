@@ -1,11 +1,8 @@
-import { CacheInspectorControls } from "./CacheInspectorControls";
-import { CacheInspectorResults } from "./CacheInspectorResults";
-import {
-  useCacheInspector,
-  type CacheMutation,
-} from "../hooks/useCacheInspector";
+import { CacheInspectorControls } from './CacheInspectorControls';
+import { CacheInspectorResults } from './CacheInspectorResults';
+import { useCacheInspector, type CacheMutation } from '../hooks/useCacheInspector';
 
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 export type { CacheMutation };
 

@@ -1,7 +1,7 @@
-import type { JSX } from "react";
-import { Navigate, useLocation } from "react-router";
+import type { JSX } from 'react';
+import { Navigate, useLocation } from 'react-router';
 
-import { APP_PATHS } from "@/app/navigation/navigationConfig";
+import { APP_PATHS } from '@/app/navigation/navigationConfig';
 
 export function LegacyBenchmarksRedirect(): JSX.Element {
   const { hash, search } = useLocation();

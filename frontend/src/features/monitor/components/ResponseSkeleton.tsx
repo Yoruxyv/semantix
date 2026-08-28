@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 const EVIDENCE_ITEMS = [0, 1, 2, 3, 4, 5, 6] as const;
 
@@ -28,7 +28,7 @@ export function ResponseSkeleton(): JSX.Element {
         {EVIDENCE_ITEMS.map((item) => (
           <span
             className={`min-h-16 border-b border-(--hairline) py-3 ${
-              item === 4 ? "min-[520px]:col-span-2 min-[860px]:col-span-2" : ""
+              item === 4 ? 'min-[520px]:col-span-2 min-[860px]:col-span-2' : ''
             }`}
             data-skeleton-evidence-metric
             key={item}

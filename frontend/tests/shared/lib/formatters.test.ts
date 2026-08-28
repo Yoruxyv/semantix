@@ -15,9 +15,7 @@ import {
 
 describe('shared formatters', () => {
   it('formats counts using the runtime locale', () => {
-    expect(formatCount(1_000)).toBe(
-      new Intl.NumberFormat().format(1_000),
-    );
+    expect(formatCount(1_000)).toBe(new Intl.NumberFormat().format(1_000));
   });
 
   it('formats missing and invalid numeric values with fallbacks', () => {

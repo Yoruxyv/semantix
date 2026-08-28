@@ -1,5 +1,5 @@
-import { request, withSignal } from "@/shared/api/httpClient";
-import type { ApiResult } from "@/shared/api/types";
+import { request, withSignal } from '@/shared/api/httpClient';
+import type { ApiResult } from '@/shared/api/types';
 import {
   createEnumGuard,
   isIsoDate,
@@ -9,27 +9,24 @@ import {
   isNullableNonNegativeNumber,
   isRecord,
   isSha256Hex,
-} from "@/shared/api/validators";
+} from '@/shared/api/validators';
 
-import type { RuntimeDiagnostics, RuntimeMetrics } from "../types";
+import type { RuntimeDiagnostics, RuntimeMetrics } from '../types';
 
 const isProviderCategory = createEnumGuard([
-  "huggingface",
-  "openai",
-  "anthropic",
-  "gemini",
-  "ollama",
-  "mock",
+  'huggingface',
+  'openai',
+  'anthropic',
+  'gemini',
+  'ollama',
+  'mock',
 ] as const);
-const isCacheBackend = createEnumGuard(["memory", "pgvector"] as const);
-const isCacheReadiness = createEnumGuard(["ready", "unavailable"] as const);
-const isNormalizationMode = createEnumGuard([
-  "identity",
-  "typo_correction",
-] as const);
+const isCacheBackend = createEnumGuard(['memory', 'pgvector'] as const);
+const isCacheReadiness = createEnumGuard(['ready', 'unavailable'] as const);
+const isNormalizationMode = createEnumGuard(['identity', 'typo_correction'] as const);
 const isNormalizationAlgorithmVersion = createEnumGuard([
-  "identity-v1",
-  "symspell-compound-v1",
+  'identity-v1',
+  'symspell-compound-v1',
 ] as const);
 
 function decodeRuntimeMetrics(value: unknown): RuntimeMetrics {
@@ -50,7 +47,7 @@ function decodeRuntimeMetrics(value: unknown): RuntimeMetrics {
     !isNonNegativeInteger(value.evictions) ||
     !isNonNegativeInteger(value.expirations)
   ) {
-    throw new Error("Invalid runtime metrics response");
+    throw new Error('Invalid runtime metrics response');
   }
 
   return {
@@ -61,8 +58,7 @@ function decodeRuntimeMetrics(value: unknown): RuntimeMetrics {
     cache_hits: value.cache_hits,
     cache_misses: value.cache_misses,
     provider_calls: value.provider_calls,
-    in_flight_coalesced_requests:
-      value.in_flight_coalesced_requests,
+    in_flight_coalesced_requests: value.in_flight_coalesced_requests,
     average_latency_ms: value.average_latency_ms,
     p95_latency_ms: value.p95_latency_ms,
     latency_sample_size: value.latency_sample_size,
@@ -76,9 +72,9 @@ export function getRuntimeMetrics(
   signal?: AbortSignal,
 ): Promise<ApiResult<RuntimeMetrics>> {
   return request(
-    "/api/v1/metrics",
+    '/api/v1/metrics',
     decodeRuntimeMetrics,
-    withSignal({ method: "GET" }, signal),
+    withSignal({ method: 'GET' }, signal),
   );
 }
 
@@ -87,7 +83,7 @@ function decodeRuntimeDiagnostics(value: unknown): RuntimeDiagnostics {
     !isRecord(value) ||
     Object.keys(value).length !== 20 ||
     !isIsoDate(value.observed_at) ||
-    value.process_scope !== "single_backend_process" ||
+    value.process_scope !== 'single_backend_process' ||
     !isNonEmptyString(value.application_version) ||
     !isProviderCategory(value.embedding_provider_category) ||
     !isProviderCategory(value.generation_provider_category) ||
@@ -98,9 +94,7 @@ function decodeRuntimeDiagnostics(value: unknown): RuntimeDiagnostics {
     !isCacheBackend(value.cache_backend) ||
     !isCacheReadiness(value.cache_readiness) ||
     !isNormalizationMode(value.normalization_mode) ||
-    !isNormalizationAlgorithmVersion(
-      value.normalization_algorithm_version,
-    ) ||
+    !isNormalizationAlgorithmVersion(value.normalization_algorithm_version) ||
     !isSha256Hex(value.normalization_fingerprint) ||
     !isNonNegativeNumber(value.evaluation_timeout_seconds) ||
     value.evaluation_timeout_seconds === 0 ||
@@ -112,10 +106,10 @@ function decodeRuntimeDiagnostics(value: unknown): RuntimeDiagnostics {
     value.evaluation_max_thresholds < 2 ||
     !isNonNegativeInteger(value.evaluation_max_request_bytes) ||
     value.evaluation_max_request_bytes < 1_024 ||
-    typeof value.evaluation_dataset_persistence_enabled !== "boolean" ||
-    typeof value.evaluation_history_persistence_enabled !== "boolean"
+    typeof value.evaluation_dataset_persistence_enabled !== 'boolean' ||
+    typeof value.evaluation_history_persistence_enabled !== 'boolean'
   ) {
-    throw new Error("Invalid runtime diagnostics response");
+    throw new Error('Invalid runtime diagnostics response');
   }
 
   return {
@@ -126,13 +120,11 @@ function decodeRuntimeDiagnostics(value: unknown): RuntimeDiagnostics {
     generation_provider_category: value.generation_provider_category,
     embedding_dimensions: value.embedding_dimensions,
     embedding_space_fingerprint: value.embedding_space_fingerprint,
-    generation_configuration_fingerprint:
-      value.generation_configuration_fingerprint,
+    generation_configuration_fingerprint: value.generation_configuration_fingerprint,
     cache_backend: value.cache_backend,
     cache_readiness: value.cache_readiness,
     normalization_mode: value.normalization_mode,
-    normalization_algorithm_version:
-      value.normalization_algorithm_version,
+    normalization_algorithm_version: value.normalization_algorithm_version,
     normalization_fingerprint: value.normalization_fingerprint,
     evaluation_timeout_seconds: value.evaluation_timeout_seconds,
     evaluation_max_cases: value.evaluation_max_cases,
@@ -150,8 +142,8 @@ export function getRuntimeDiagnostics(
   signal?: AbortSignal,
 ): Promise<ApiResult<RuntimeDiagnostics>> {
   return request(
-    "/api/v1/diagnostics",
+    '/api/v1/diagnostics',
     decodeRuntimeDiagnostics,
-    withSignal({ method: "GET" }, signal),
+    withSignal({ method: 'GET' }, signal),
   );
 }

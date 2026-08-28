@@ -29,9 +29,7 @@ function RunContext({
       <dl className="font-data mt-4 grid gap-3 text-[10px]/5 sm:grid-cols-2">
         <div>
           <dt className="text-(--text-faint)">Namespace</dt>
-          <dd className="mt-1 wrap-break-word text-(--text-soft)">
-            {run.namespace}
-          </dd>
+          <dd className="mt-1 wrap-break-word text-(--text-soft)">{run.namespace}</dd>
         </div>
         <div>
           <dt className="text-(--text-faint)">State</dt>
@@ -65,8 +63,7 @@ function CompatibilitySummary({
     return (
       <Alert role="alert" title="Comparison blocked" tone="error">
         <p className="font-data mt-1 text-[10px]/5 text-(--text-soft)">
-          These retained runs are not directly comparable. No metric deltas are
-          shown.
+          These retained runs are not directly comparable. No metric deltas are shown.
         </p>
         <ul className="font-data mt-3 list-disc space-y-2 pl-5 text-[10px]/5 text-(--text-soft)">
           {compatibility.incompatibilities.map((issue) => (
@@ -118,9 +115,7 @@ export function EvaluationRunComparisonResult({
   return (
     <section aria-labelledby="comparison-result-heading" className="mt-6">
       <header className="border-y border-(--hairline) py-4">
-        <p className="ui-label text-(--teal)">
-          Server-backed compatibility assessment
-        </p>
+        <p className="ui-label text-(--teal)">Server-backed compatibility assessment</p>
         <h3
           className="font-display mt-2 text-xl italic text-(--text)"
           id="comparison-result-heading"
@@ -141,17 +136,16 @@ export function EvaluationRunComparisonResult({
       {!comparison.compatibility.opaque_configuration_fingerprint_matches && (
         <p className="font-data mt-4 border-l border-(--hairline) pl-3 text-[10px]/5 text-(--text-faint)">
           The opaque overall configuration fingerprint differs. This value is
-          explanatory only; the server uses explicit compatibility fields for
-          blocking and warning decisions.
+          explanatory only; the server uses explicit compatibility fields for blocking
+          and warning decisions.
         </p>
       )}
 
       <p className="font-data mt-4 border-l border-(--hairline) pl-3 text-[10px]/5 text-(--text-faint)">
-        Historical case evidence is {comparison.compatibility.case_evidence.replace(
-          '_',
-          ' ',
-        )}. Comparison uses retained aggregate metrics only; no prompts,
-        generated responses, or matched cache keys are exposed.
+        Historical case evidence is{' '}
+        {comparison.compatibility.case_evidence.replace('_', ' ')}. Comparison uses
+        retained aggregate metrics only; no prompts, generated responses, or matched
+        cache keys are exposed.
       </p>
 
       {comparison.metric_deltas !== null &&
@@ -160,9 +154,7 @@ export function EvaluationRunComparisonResult({
           <>
             <EvaluationRunComparisonMetrics
               baseline={baselineMetrics}
-              baselineThreshold={
-                comparison.baseline.reproducibility.measured_threshold
-              }
+              baselineThreshold={comparison.baseline.reproducibility.measured_threshold}
               candidate={candidateMetrics}
               candidateThreshold={
                 comparison.candidate.reproducibility.measured_threshold

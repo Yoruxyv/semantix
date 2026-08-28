@@ -1,6 +1,6 @@
-import { useEffect, useState, type JSX } from "react";
+import { useEffect, useState, type JSX } from 'react';
 
-import { formatClockDuration } from "@/shared/lib/formatters";
+import { formatClockDuration } from '@/shared/lib/formatters';
 
 const SESSION_STARTED_AT = Date.now();
 
@@ -9,7 +9,7 @@ interface SessionUptimeProps {
 }
 
 export function SessionUptime({
-  className = "",
+  className = '',
 }: Readonly<SessionUptimeProps>): JSX.Element {
   const [elapsed, setElapsed] = useState(0);
 

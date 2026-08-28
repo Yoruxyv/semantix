@@ -9,11 +9,7 @@ export interface ClearCacheResponse {
   cleared: true;
 }
 
-export type CacheEntrySort =
-  | "newest"
-  | "oldest"
-  | "most_hit"
-  | "nearest_expiry";
+export type CacheEntrySort = 'newest' | 'oldest' | 'most_hit' | 'nearest_expiry';
 
 export interface CacheEntryMetadata {
   cache_key: string;

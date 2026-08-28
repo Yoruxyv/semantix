@@ -1,10 +1,10 @@
-import type { QueryTrace } from "@/features/monitor/types";
+import type { QueryTrace } from '@/features/monitor/types';
 import {
   hasSimilarityScore,
   meetsSimilarityThreshold,
   SIMILARITY_MAX,
   SIMILARITY_MIN,
-} from "@/shared/domain/similarity";
+} from '@/shared/domain/similarity';
 
 export const VIEW_WIDTH = 640;
 export const VIEW_HEIGHT = 230;
@@ -24,58 +24,38 @@ export interface PlotPoint extends ScoredTrace {
 }
 
 function clampScore(score: number): number {
-  return Math.max(
-    SIMILARITY_MIN,
-    Math.min(SIMILARITY_MAX, score),
-  );
+  return Math.max(SIMILARITY_MIN, Math.min(SIMILARITY_MAX, score));
 }
 
-function isScoredTrace(
-  trace: QueryTrace,
-): trace is ScoredTrace {
+function isScoredTrace(trace: QueryTrace): trace is ScoredTrace {
   return hasSimilarityScore(trace.similarity);
 }
 
 export function scoreToX(score: number): number {
   const normalizedScore =
-    (clampScore(score) - SIMILARITY_MIN) /
-    (SIMILARITY_MAX - SIMILARITY_MIN);
-  return (
-    PLOT_LEFT +
-    normalizedScore * (PLOT_RIGHT - PLOT_LEFT)
-  );
+    (clampScore(score) - SIMILARITY_MIN) / (SIMILARITY_MAX - SIMILARITY_MIN);
+  return PLOT_LEFT + normalizedScore * (PLOT_RIGHT - PLOT_LEFT);
 }
 
 function stableJitter(id: string): number {
   let hash = 0;
 
   for (const character of id) {
-    hash =
-      (hash * 31 + character.charCodeAt(0)) >>> 0;
+    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
   }
 
   return PLOT_TOP + (hash % (PLOT_BOTTOM - PLOT_TOP));
 }
 
-export function buildPlotPoints(
-  traces: QueryTrace[],
-  threshold: number,
-): PlotPoint[] {
-  return traces
-    .filter(isScoredTrace)
-    .map((trace) => ({
-      ...trace,
-      isProjectedHit: meetsSimilarityThreshold(
-        trace.similarity,
-        threshold,
-      ),
-      x: scoreToX(trace.similarity),
-      y: stableJitter(trace.id),
-    }));
+export function buildPlotPoints(traces: QueryTrace[], threshold: number): PlotPoint[] {
+  return traces.filter(isScoredTrace).map((trace) => ({
+    ...trace,
+    isProjectedHit: meetsSimilarityThreshold(trace.similarity, threshold),
+    x: scoreToX(trace.similarity),
+    y: stableJitter(trace.id),
+  }));
 }
 
 export function formatPrompt(prompt: string): string {
-  return prompt.length <= 52
-    ? prompt
-    : `${prompt.slice(0, 49)}…`;
+  return prompt.length <= 52 ? prompt : `${prompt.slice(0, 49)}…`;
 }

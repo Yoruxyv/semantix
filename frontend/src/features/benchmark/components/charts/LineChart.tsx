@@ -1,6 +1,6 @@
 import { formatDecimal } from '@/shared/lib/formatters';
 
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 interface ChartPoint {
   kind: 'measured' | 'projected';
@@ -43,9 +43,7 @@ export function LineChart({
   const maxY = rawMaxY === minY ? minY + 1 : rawMaxY;
   const chartTitleId = `${title.replaceAll(' ', '-')}-chart-title`;
   const x = (value: number): number =>
-    LEFT +
-    ((value - minX) / Math.max(maxX - minX, 0.001)) *
-      (WIDTH - LEFT - RIGHT);
+    LEFT + ((value - minX) / Math.max(maxX - minX, 0.001)) * (WIDTH - LEFT - RIGHT);
   const y = (value: number): number =>
     TOP + ((maxY - value) / (maxY - minY)) * (HEIGHT - TOP - BOTTOM);
 
@@ -58,8 +56,7 @@ export function LineChart({
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
       >
         <title id={chartTitleId}>
-          {title}. Thresholds {formatDecimal(minX, 2)} through{' '}
-          {formatDecimal(maxX, 2)}.
+          {title}. Thresholds {formatDecimal(minX, 2)} through {formatDecimal(maxX, 2)}.
         </title>
         {GRID_FRACTIONS.map((fraction) => {
           const value = minY + (maxY - minY) * fraction;
@@ -155,10 +152,7 @@ export function LineChart({
           <span>Measured threshold (outlined circle)</span>
         </span>
         <span className="font-data flex items-center gap-2 text-[9px] text-(--text-muted)">
-          <span
-            aria-hidden="true"
-            className="size-1.5 bg-(--text-muted)"
-          />{' '}
+          <span aria-hidden="true" className="size-1.5 bg-(--text-muted)" />{' '}
           <span>Projected threshold (filled square)</span>
         </span>
       </div>

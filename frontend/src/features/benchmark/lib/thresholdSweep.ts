@@ -43,11 +43,7 @@ export function compileThresholdSweep(
     };
   }
 
-  const values = new Set<number>([
-    startValue,
-    endValue,
-    scaled(measuredThreshold),
-  ]);
+  const values = new Set<number>([startValue, endValue, scaled(measuredThreshold)]);
   for (
     let value = startValue;
     value <= endValue && values.size <= MAX_EVALUATION_THRESHOLDS;

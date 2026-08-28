@@ -1,10 +1,10 @@
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from 'react';
 
-import type { AuthStatus } from "@/features/auth/context/AuthContext";
-import { isCacheNamespace } from "@/features/cache/namespace";
-import type { ApiValidationIssue } from "@/shared/api/types";
+import type { AuthStatus } from '@/features/auth/context/AuthContext';
+import { isCacheNamespace } from '@/features/cache/namespace';
+import type { ApiValidationIssue } from '@/shared/api/types';
 
-import type { ThresholdSweep } from "../lib/thresholdSweep";
+import type { ThresholdSweep } from '../lib/thresholdSweep';
 import type {
   BenchmarkDatasetId,
   BenchmarkDatasetSummary,
@@ -12,7 +12,7 @@ import type {
   EvaluationDatasetPreview,
   EvaluationRunRequest,
   PersistedEvaluationDatasetDetail,
-} from "../types";
+} from '../types';
 
 export const BENCHMARK_DATASET_STALE_TIME_MS = 10 * 60 * 1_000;
 export const BENCHMARK_DATASET_GC_TIME_MS = 30 * 60 * 1_000;
@@ -20,7 +20,7 @@ export const EVALUATION_IMPORT_FILE_MAX_BYTES = 65_536;
 
 export interface BenchmarkForm {
   datasetId: BenchmarkDatasetId;
-  datasetSource: "builtin" | "custom" | "persisted";
+  datasetSource: 'builtin' | 'custom' | 'persisted';
   persistedDatasetId: string;
   persistedNamespace: string;
   historyNamespace: string;
@@ -66,9 +66,7 @@ export interface BenchmarkController {
     namespace: string | undefined,
     retentionDays: number,
   ) => Promise<PersistedEvaluationDatasetDetail | null>;
-  selectPersistedDataset: (
-    dataset: PersistedEvaluationDatasetDetail,
-  ) => void;
+  selectPersistedDataset: (dataset: PersistedEvaluationDatasetDetail) => void;
   selectImportFile: (file: File) => Promise<void>;
   setForm: Dispatch<SetStateAction<BenchmarkForm>>;
 }
@@ -81,24 +79,22 @@ interface HistoryNamespacePolicy {
 export function historyNamespacePolicy(
   authStatus: AuthStatus,
   namespaces: readonly string[],
-  datasetSource: BenchmarkForm["datasetSource"],
+  datasetSource: BenchmarkForm['datasetSource'],
   requestedNamespace: string,
 ): HistoryNamespacePolicy {
-  if (datasetSource !== "builtin") {
+  if (datasetSource !== 'builtin') {
     return { required: false, valid: true };
   }
 
-  const concreteNamespaces = namespaces.filter(
-    (namespace) => namespace !== "*",
-  );
-  const hasGlobalNamespace = namespaces.includes("*");
+  const concreteNamespaces = namespaces.filter((namespace) => namespace !== '*');
+  const hasGlobalNamespace = namespaces.includes('*');
   const required =
-    authStatus === "disabled" ||
-    (authStatus === "authenticated" &&
+    authStatus === 'disabled' ||
+    (authStatus === 'authenticated' &&
       (hasGlobalNamespace || concreteNamespaces.length !== 1));
   const requested = requestedNamespace.trim();
 
-  if (requested === "") {
+  if (requested === '') {
     return { required, valid: !required };
   }
 
@@ -107,7 +103,7 @@ export function historyNamespacePolicy(
   }
 
   if (
-    authStatus === "authenticated" &&
+    authStatus === 'authenticated' &&
     !hasGlobalNamespace &&
     !concreteNamespaces.includes(requested)
   ) {
@@ -118,11 +114,11 @@ export function historyNamespacePolicy(
 }
 
 export const DEFAULT_BENCHMARK_FORM: BenchmarkForm = {
-  datasetId: "quick",
-  datasetSource: "builtin",
-  persistedDatasetId: "",
-  persistedNamespace: "",
-  historyNamespace: "",
+  datasetId: 'quick',
+  datasetSource: 'builtin',
+  persistedDatasetId: '',
+  persistedNamespace: '',
+  historyNamespace: '',
   threshold: 0.92,
   repetitions: 1,
   resetCacheBeforeRun: true,
@@ -138,13 +134,12 @@ export function customSummary(
 ): BenchmarkDatasetSummary {
   return {
     dataset_id: preview.dataset_id,
-    dataset_source: "inline",
+    dataset_source: 'inline',
     schema_version: preview.schema_version,
     version: String(preview.schema_version),
     digest: preview.digest,
     name: preview.name,
-    description:
-      preview.description ?? "Session-local imported evaluation dataset.",
+    description: preview.description ?? 'Session-local imported evaluation dataset.',
     query_count: preview.case_count,
     expected_hits: preview.expected_hits,
     expected_misses: preview.expected_misses,
@@ -155,23 +150,18 @@ export function customSummary(
 export function persistedSummary(
   detail: PersistedEvaluationDatasetDetail,
 ): BenchmarkDatasetSummary {
-  const expectedHits = detail.cases.filter(
-    (item) => item.expected_cache_hit,
-  ).length;
+  const expectedHits = detail.cases.filter((item) => item.expected_cache_hit).length;
   const categories = [
-    ...new Set(
-      detail.cases.map((item) => item.category ?? "uncategorized"),
-    ),
+    ...new Set(detail.cases.map((item) => item.category ?? 'uncategorized')),
   ];
   return {
     dataset_id: detail.dataset_id,
-    dataset_source: "persisted",
+    dataset_source: 'persisted',
     schema_version: detail.schema_version,
     version: String(detail.schema_version),
     digest: detail.digest,
     name: detail.name,
-    description:
-      detail.description ?? "Persisted imported evaluation dataset.",
+    description: detail.description ?? 'Persisted imported evaluation dataset.',
     query_count: detail.case_count,
     expected_hits: expectedHits,
     expected_misses: detail.case_count - expectedHits,
@@ -184,21 +174,21 @@ export function requestFromForm(
   evaluationThresholds: number[],
   importedDefinition: unknown,
 ): EvaluationRunRequest {
-  let datasetSource: EvaluationRunRequest["dataset_source"];
-  if (form.datasetSource === "custom") {
-    datasetSource = { kind: "inline", definition: importedDefinition };
-  } else if (form.datasetSource === "persisted") {
+  let datasetSource: EvaluationRunRequest['dataset_source'];
+  if (form.datasetSource === 'custom') {
+    datasetSource = { kind: 'inline', definition: importedDefinition };
+  } else if (form.datasetSource === 'persisted') {
     datasetSource = {
-      kind: "persisted",
+      kind: 'persisted',
       dataset_id: form.persistedDatasetId,
       namespace: form.persistedNamespace,
     };
   } else {
-    datasetSource = { kind: "builtin", dataset_id: form.datasetId };
+    datasetSource = { kind: 'builtin', dataset_id: form.datasetId };
   }
 
   return {
-    ...(form.datasetSource === "builtin" && form.historyNamespace.trim() !== ""
+    ...(form.datasetSource === 'builtin' && form.historyNamespace.trim() !== ''
       ? { history_namespace: form.historyNamespace.trim() }
       : {}),
     dataset_source: datasetSource,

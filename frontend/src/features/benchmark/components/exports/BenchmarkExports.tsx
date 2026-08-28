@@ -2,7 +2,7 @@ import type { BenchmarkRunResponse } from '@/features/benchmark/types';
 import { downloadBenchmark } from '@/features/benchmark/lib/exportBuilders';
 import { Button } from '@/shared/components/ui';
 
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 const EXPORT_OPTIONS = [
   { format: 'json', label: 'Export JSON' },

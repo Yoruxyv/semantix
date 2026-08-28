@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 const RESULT_METRICS = Array.from({ length: 18 }, (_, index) => index);
 const RESULT_CHARTS = Array.from({ length: 5 }, (_, index) => index);
@@ -10,9 +10,7 @@ export function BenchmarkResultsSkeleton(): JSX.Element {
       aria-live="polite"
       className="mt-8 block animate-pulse"
     >
-      <span className="ui-label text-(--gold)">
-        Running controlled query sequence
-      </span>
+      <span className="ui-label text-(--gold)">Running controlled query sequence</span>
       <span className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4">
         {RESULT_METRICS.map((item) => (
           <span

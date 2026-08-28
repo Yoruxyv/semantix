@@ -44,13 +44,9 @@ export function PageHeader({
   title,
   tone = 'gold',
 }: Readonly<PageHeaderProps>): JSX.Element {
-  const hasActions =
-    actions !== undefined && actions !== null && actions !== false;
+  const hasActions = actions !== undefined && actions !== null && actions !== false;
 
-  const classes = [
-    hasActions ? ACTION_LAYOUT_CLASSES[size] : undefined,
-    className,
-  ]
+  const classes = [hasActions ? ACTION_LAYOUT_CLASSES[size] : undefined, className]
     .filter(Boolean)
     .join(' ');
 

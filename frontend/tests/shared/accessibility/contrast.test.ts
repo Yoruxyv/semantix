@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 interface Color {
   alpha: number;
@@ -9,10 +9,7 @@ interface Color {
   red: number;
 }
 
-const styles = readFileSync(
-  resolve(process.cwd(), "src/index.css"),
-  "utf8",
-);
+const styles = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
 
 function token(name: string): string {
   const match = new RegExp(`--${name}:\\s*([^;]+);`).exec(styles);
@@ -36,9 +33,13 @@ function parseHex(value: string): Color {
 }
 
 function parseRgba(value: string): Color {
-  const match =
-    /^rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\s*\)$/.exec(value);
-  if (match?.[1] === undefined || match[2] === undefined || match[3] === undefined || match[4] === undefined) {
+  const match = /^rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\s*\)$/.exec(value);
+  if (
+    match?.[1] === undefined ||
+    match[2] === undefined ||
+    match[3] === undefined ||
+    match[4] === undefined
+  ) {
     throw new Error(`Unsupported rgba color: ${value}`);
   }
   return {
@@ -50,7 +51,7 @@ function parseRgba(value: string): Color {
 }
 
 function parseColor(value: string): Color {
-  return value.startsWith("#") ? parseHex(value) : parseRgba(value);
+  return value.startsWith('#') ? parseHex(value) : parseRgba(value);
 }
 
 function composite(foreground: Color, background: Color): Color {
@@ -80,31 +81,22 @@ function luminance(color: Color): number {
 
 function contrast(foreground: string, background: string): number {
   const backgroundColor = parseColor(token(background));
-  const foregroundColor = composite(
-    parseColor(token(foreground)),
-    backgroundColor,
-  );
-  const lighter = Math.max(
-    luminance(foregroundColor),
-    luminance(backgroundColor),
-  );
-  const darker = Math.min(
-    luminance(foregroundColor),
-    luminance(backgroundColor),
-  );
+  const foregroundColor = composite(parseColor(token(foreground)), backgroundColor);
+  const lighter = Math.max(luminance(foregroundColor), luminance(backgroundColor));
+  const darker = Math.min(luminance(foregroundColor), luminance(backgroundColor));
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-describe("small-text color contrast", () => {
+describe('small-text color contrast', () => {
   it.each([
-    ["text-muted", "ink"],
-    ["text-muted", "surface"],
-    ["text-faint", "ink"],
-    ["text-faint", "surface"],
-    ["coral-text", "ink"],
-    ["coral-text", "surface"],
-    ["ink", "coral-text"],
-  ])("%s meets WCAG AA against %s", (foreground, background) => {
+    ['text-muted', 'ink'],
+    ['text-muted', 'surface'],
+    ['text-faint', 'ink'],
+    ['text-faint', 'surface'],
+    ['coral-text', 'ink'],
+    ['coral-text', 'surface'],
+    ['ink', 'coral-text'],
+  ])('%s meets WCAG AA against %s', (foreground, background) => {
     expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
   });
 });

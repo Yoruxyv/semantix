@@ -2,10 +2,7 @@ import type { JSX } from 'react';
 
 import { Button } from '@/shared/components/ui';
 import { cacheDecisionLabel } from '@/shared/domain/similarity';
-import {
-  formatLatency,
-  formatSimilarity,
-} from '@/shared/lib/formatters';
+import { formatLatency, formatSimilarity } from '@/shared/lib/formatters';
 import type {
   BenchmarkQueryResult,
   BenchmarkRunResponse,
@@ -89,17 +86,14 @@ export function BenchmarkCaseDetail({
 
       <p className="font-data mt-5 text-[11px]/5 text-(--text-muted)">
         This case was measured at threshold{' '}
-        {result.reproducibility.measured_threshold.toFixed(2)}. Threshold chart
-        values are frozen-candidate projections and do not replay this case or
-        alter the active cache threshold.
+        {result.reproducibility.measured_threshold.toFixed(2)}. Threshold chart values
+        are frozen-candidate projections and do not replay this case or alter the active
+        cache threshold.
       </p>
 
       <dl className="mt-6 grid gap-5 sm:grid-cols-2">
         <EvidenceItem label="Case ID" value={query.case_id} wrap />
-        <EvidenceItem
-          label="Category"
-          value={formatLabel(query.category)}
-        />
+        <EvidenceItem label="Category" value={formatLabel(query.category)} />
         <EvidenceItem
           label="Expected decision"
           value={cacheDecisionLabel(query.expected_cache_hit)}
@@ -115,10 +109,7 @@ export function BenchmarkCaseDetail({
           label="Actual decision"
           value={cacheDecisionLabel(query.actual_cache_hit)}
         />
-        <EvidenceItem
-          label="Outcome"
-          value={formatLabel(query.outcome)}
-        />
+        <EvidenceItem label="Outcome" value={formatLabel(query.outcome)} />
         <EvidenceItem
           label="Provider called"
           value={query.provider_called ? 'Yes' : 'No'}
@@ -127,10 +118,7 @@ export function BenchmarkCaseDetail({
           label="Similarity score"
           value={formatSimilarity(query.similarity_score)}
         />
-        <EvidenceItem
-          label="Latency"
-          value={formatLatency(query.latency_ms)}
-        />
+        <EvidenceItem label="Latency" value={formatLatency(query.latency_ms)} />
         <EvidenceItem
           label="Measured threshold"
           value={result.reproducibility.measured_threshold.toFixed(2)}

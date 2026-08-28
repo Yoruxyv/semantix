@@ -22,10 +22,9 @@ export function useEvaluationRunComparison(): EvaluationRunComparisonController 
   const [selectedRuns, setSelectedRuns] = useState<EvaluationRunHistoryItem[]>([]);
 
   const comparison = useMutation({
-    mutationFn: async (runs: readonly [
-      EvaluationRunHistoryItem,
-      EvaluationRunHistoryItem,
-    ]) =>
+    mutationFn: async (
+      runs: readonly [EvaluationRunHistoryItem, EvaluationRunHistoryItem],
+    ) =>
       dataFromApiResult(
         await compareEvaluationRuns({
           baseline_run_id: runs[0].run_id,

@@ -1,20 +1,17 @@
-import {
-  CacheInspector,
-  type CacheMutation,
-} from "../components/CacheInspector";
-import { useLocation } from "react-router";
-import { useCacheControl } from "../hooks/useCacheControl";
-import { useMonitor } from "@/features/monitor/hooks/useMonitor";
-import { Alert, PageHeader } from "@/shared/components/ui";
+import { CacheInspector, type CacheMutation } from '../components/CacheInspector';
+import { useLocation } from 'react-router';
+import { useCacheControl } from '../hooks/useCacheControl';
+import { useMonitor } from '@/features/monitor/hooks/useMonitor';
+import { Alert, PageHeader } from '@/shared/components/ui';
 
-import type { JSX } from "react";
+import type { JSX } from 'react';
 
 function cacheMutationNotice(state: unknown): string | null {
   if (
-    typeof state === "object" &&
+    typeof state === 'object' &&
     state !== null &&
-    "cacheMutationNotice" in state &&
-    typeof state.cacheMutationNotice === "string"
+    'cacheMutationNotice' in state &&
+    typeof state.cacheMutationNotice === 'string'
   ) {
     return state.cacheMutationNotice;
   }
@@ -28,7 +25,7 @@ export function CachePage(): JSX.Element {
   const { clearTraces } = useMonitor();
 
   async function handleMutation(mutation: CacheMutation): Promise<void> {
-    if (mutation === "clear") {
+    if (mutation === 'clear') {
       clearTraces();
     }
     await refreshCacheState(false);
@@ -52,9 +49,7 @@ export function CachePage(): JSX.Element {
         </Alert>
       )}
 
-      <CacheInspector
-        onMutation={(mutation) => void handleMutation(mutation)}
-      />
+      <CacheInspector onMutation={(mutation) => void handleMutation(mutation)} />
     </>
   );
 }

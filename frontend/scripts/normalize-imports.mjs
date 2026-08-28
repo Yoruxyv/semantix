@@ -1,22 +1,22 @@
-import fs from "node:fs";
-import path from "node:path";
-import process from "node:process";
-import { fileURLToPath } from "node:url";
-import ts from "typescript";
+import fs from 'node:fs';
+import path from 'node:path';
+import process from 'node:process';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
-const frontendRoot = path.resolve(scriptDirectory, "..");
-const srcRoot = path.join(frontendRoot, "src");
-const testsRoot = path.join(frontendRoot, "tests");
-const tsconfigPath = path.join(frontendRoot, "tsconfig.json");
+const frontendRoot = path.resolve(scriptDirectory, '..');
+const srcRoot = path.join(frontendRoot, 'src');
+const testsRoot = path.join(frontendRoot, 'tests');
+const tsconfigPath = path.join(frontendRoot, 'tsconfig.json');
 
 const flags = new Set(process.argv.slice(2));
-const shouldWrite = flags.has("--write");
-const shouldCheck = flags.has("--check");
-const strict = flags.has("--strict");
-const verbose = flags.has("--verbose") || !shouldWrite;
+const shouldWrite = flags.has('--write');
+const shouldCheck = flags.has('--check');
+const strict = flags.has('--strict');
+const verbose = flags.has('--verbose') || !shouldWrite;
 
-if (flags.has("--help")) {
+if (flags.has('--help')) {
   console.log(`Usage:
   node scripts/normalize-imports.mjs             Preview changes
   node scripts/normalize-imports.mjs --write     Apply changes
@@ -28,21 +28,15 @@ if (flags.has("--help")) {
 }
 
 if (shouldWrite && shouldCheck) {
-  console.error("Choose either --write or --check, not both.");
+  console.error('Choose either --write or --check, not both.');
   process.exit(2);
 }
 
-const allowedFlags = new Set([
-  "--write",
-  "--check",
-  "--strict",
-  "--verbose",
-  "--help",
-]);
+const allowedFlags = new Set(['--write', '--check', '--strict', '--verbose', '--help']);
 const unknownFlags = [...flags].filter((flag) => !allowedFlags.has(flag));
 
 if (unknownFlags.length > 0) {
-  console.error(`Unknown flag(s): ${unknownFlags.join(", ")}`);
+  console.error(`Unknown flag(s): ${unknownFlags.join(', ')}`);
   process.exit(2);
 }
 
@@ -50,7 +44,7 @@ function formatDiagnostics(diagnostics) {
   return ts.formatDiagnosticsWithColorAndContext(diagnostics, {
     getCanonicalFileName: (fileName) => fileName,
     getCurrentDirectory: () => frontendRoot,
-    getNewLine: () => "\n",
+    getNewLine: () => '\n',
   });
 }
 
@@ -76,17 +70,16 @@ if (parsedConfig.errors.length > 0) {
 
 const compilerOptions = parsedConfig.options;
 const ignoredDirectoryNames = new Set([
-  ".git",
-  ".vite-cache",
-  "coverage",
-  "dist",
-  "node_modules",
+  '.git',
+  '.vite-cache',
+  'coverage',
+  'dist',
+  'node_modules',
 ]);
 
 function isTypeScriptSource(filePath) {
   return (
-    /\.(?:ts|tsx|mts|cts)$/i.test(filePath) &&
-    !/\.d\.(?:ts|mts|cts)$/i.test(filePath)
+    /\.(?:ts|tsx|mts|cts)$/i.test(filePath) && !/\.d\.(?:ts|mts|cts)$/i.test(filePath)
   );
 }
 
@@ -130,22 +123,22 @@ function isInside(parentDirectory, candidatePath) {
   const relativePath = path.relative(parentDirectory, candidatePath);
 
   return (
-    relativePath === "" ||
+    relativePath === '' ||
     (!relativePath.startsWith(`..${path.sep}`) &&
-      relativePath !== ".." &&
+      relativePath !== '..' &&
       !path.isAbsolute(relativePath))
   );
 }
 
 function toPosix(filePath) {
-  return filePath.split(path.sep).join("/");
+  return filePath.split(path.sep).join('/');
 }
 
 function splitSpecifierSuffix(specifier) {
   const suffixIndex = specifier.search(/[?#]/u);
 
   if (suffixIndex === -1) {
-    return { base: specifier, suffix: "" };
+    return { base: specifier, suffix: '' };
   }
 
   return {
@@ -160,24 +153,21 @@ function resolveCandidate(basePath) {
   }
 
   const extensions = [
-    ".ts",
-    ".tsx",
-    ".mts",
-    ".cts",
-    ".js",
-    ".jsx",
-    ".mjs",
-    ".cjs",
-    ".json",
+    '.ts',
+    '.tsx',
+    '.mts',
+    '.cts',
+    '.js',
+    '.jsx',
+    '.mjs',
+    '.cjs',
+    '.json',
   ];
 
   for (const extension of extensions) {
     const fileCandidate = `${basePath}${extension}`;
 
-    if (
-      fs.existsSync(fileCandidate) &&
-      fs.statSync(fileCandidate).isFile()
-    ) {
+    if (fs.existsSync(fileCandidate) && fs.statSync(fileCandidate).isFile()) {
       return path.resolve(fileCandidate);
     }
   }
@@ -185,10 +175,7 @@ function resolveCandidate(basePath) {
   for (const extension of extensions) {
     const indexCandidate = path.join(basePath, `index${extension}`);
 
-    if (
-      fs.existsSync(indexCandidate) &&
-      fs.statSync(indexCandidate).isFile()
-    ) {
+    if (fs.existsSync(indexCandidate) && fs.statSync(indexCandidate).isFile()) {
       return path.resolve(indexCandidate);
     }
   }
@@ -208,14 +195,12 @@ function resolveModulePath(specifier, containingFile) {
     return path.resolve(resolvedByTypeScript);
   }
 
-  if (specifier.startsWith("@/")) {
+  if (specifier.startsWith('@/')) {
     return resolveCandidate(path.join(srcRoot, specifier.slice(2)));
   }
 
-  if (specifier.startsWith(".")) {
-    return resolveCandidate(
-      path.resolve(path.dirname(containingFile), specifier),
-    );
+  if (specifier.startsWith('.')) {
+    return resolveCandidate(path.resolve(path.dirname(containingFile), specifier));
   }
 
   return null;
@@ -223,10 +208,10 @@ function resolveModulePath(specifier, containingFile) {
 
 function moduleStem(resolvedFilePath) {
   let stem = resolvedFilePath
-    .replace(/\.d\.(?:ts|mts|cts)$/iu, "")
-    .replace(/\.[cm]?[jt]sx?$/iu, "");
+    .replace(/\.d\.(?:ts|mts|cts)$/iu, '')
+    .replace(/\.[cm]?[jt]sx?$/iu, '');
 
-  if (path.basename(stem).toLowerCase() === "index") {
+  if (path.basename(stem).toLowerCase() === 'index') {
     stem = path.dirname(stem);
   }
 
@@ -238,13 +223,13 @@ function architectureOwner(filePath) {
     return null;
   }
 
-  const parts = toPosix(path.relative(srcRoot, filePath)).split("/");
+  const parts = toPosix(path.relative(srcRoot, filePath)).split('/');
 
-  if (parts[0] === "features" && parts[1] !== undefined) {
+  if (parts[0] === 'features' && parts[1] !== undefined) {
     return `feature:${parts[1]}`;
   }
 
-  if (parts[0] === "app" || parts[0] === "shared") {
+  if (parts[0] === 'app' || parts[0] === 'shared') {
     return parts[0];
   }
 
@@ -252,9 +237,7 @@ function architectureOwner(filePath) {
 }
 
 function buildAliasSpecifier(resolvedFilePath) {
-  const relativePath = toPosix(
-    path.relative(srcRoot, moduleStem(resolvedFilePath)),
-  );
+  const relativePath = toPosix(path.relative(srcRoot, moduleStem(resolvedFilePath)));
 
   return `@/${relativePath}`;
 }
@@ -264,7 +247,7 @@ function buildRelativeSpecifier(containingFile, resolvedFilePath) {
     path.relative(path.dirname(containingFile), moduleStem(resolvedFilePath)),
   );
 
-  if (!relativePath.startsWith(".")) {
+  if (!relativePath.startsWith('.')) {
     relativePath = `./${relativePath}`;
   }
 
@@ -274,8 +257,8 @@ function buildRelativeSpecifier(containingFile, resolvedFilePath) {
 function leadingParentCount(specifier) {
   let count = 0;
 
-  for (const segment of specifier.split("/")) {
-    if (segment !== "..") {
+  for (const segment of specifier.split('/')) {
+    if (segment !== '..') {
       break;
     }
     count += 1;
@@ -300,16 +283,11 @@ function preferredSpecifier(containingFile, resolvedFilePath) {
     return aliasSpecifier;
   }
 
-  const relativeSpecifier = buildRelativeSpecifier(
-    containingFile,
-    resolvedFilePath,
-  );
+  const relativeSpecifier = buildRelativeSpecifier(containingFile, resolvedFilePath);
   const sourceOwner = architectureOwner(containingFile);
   const targetOwner = architectureOwner(resolvedFilePath);
   const crossesArchitectureBoundary =
-    sourceOwner !== null &&
-    targetOwner !== null &&
-    sourceOwner !== targetOwner;
+    sourceOwner !== null && targetOwner !== null && sourceOwner !== targetOwner;
   const isDeepRelativeImport = leadingParentCount(relativeSpecifier) >= 2;
 
   // Policy:
@@ -322,20 +300,14 @@ function preferredSpecifier(containingFile, resolvedFilePath) {
 }
 
 function isStringModuleSpecifier(node) {
-  return (
-    ts.isStringLiteral(node) ||
-    ts.isNoSubstitutionTemplateLiteral(node)
-  );
+  return ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node);
 }
 
 function collectModuleSpecifierNodes(sourceFile) {
   const nodes = [];
 
   function visit(node) {
-    if (
-      ts.isImportDeclaration(node) &&
-      isStringModuleSpecifier(node.moduleSpecifier)
-    ) {
+    if (ts.isImportDeclaration(node) && isStringModuleSpecifier(node.moduleSpecifier)) {
       nodes.push(node.moduleSpecifier);
     } else if (
       ts.isExportDeclaration(node) &&
@@ -352,11 +324,9 @@ function collectModuleSpecifierNodes(sourceFile) {
       nodes.push(node.moduleReference.expression);
     } else if (ts.isCallExpression(node) && node.arguments.length === 1) {
       const argument = node.arguments[0];
-      const isDynamicImport =
-        node.expression.kind === ts.SyntaxKind.ImportKeyword;
+      const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
       const isRequireCall =
-        ts.isIdentifier(node.expression) &&
-        node.expression.text === "require";
+        ts.isIdentifier(node.expression) && node.expression.text === 'require';
 
       if (
         argument !== undefined &&
@@ -384,17 +354,14 @@ function scriptKindFor(filePath) {
   return ts.ScriptKind.TS;
 }
 
-const files = [
-  ...collectFiles(srcRoot),
-  ...collectFiles(testsRoot),
-];
+const files = [...collectFiles(srcRoot), ...collectFiles(testsRoot)];
 
 let changedFileCount = 0;
 let replacementCount = 0;
 let unresolvedCount = 0;
 
 for (const filePath of files) {
-  const originalText = fs.readFileSync(filePath, "utf8");
+  const originalText = fs.readFileSync(filePath, 'utf8');
   const sourceFile = ts.createSourceFile(
     filePath,
     originalText,
@@ -407,10 +374,7 @@ for (const filePath of files) {
   for (const moduleNode of collectModuleSpecifierNodes(sourceFile)) {
     const originalSpecifier = moduleNode.text;
 
-    if (
-      !originalSpecifier.startsWith(".") &&
-      !originalSpecifier.startsWith("@/")
-    ) {
+    if (!originalSpecifier.startsWith('.') && !originalSpecifier.startsWith('@/')) {
       continue;
     }
 
@@ -470,11 +434,9 @@ for (const filePath of files) {
 
   let updatedText = originalText;
 
-  for (
-    const replacement of replacements.sort(
-      (left, right) => right.start - left.start,
-    )
-  ) {
+  for (const replacement of replacements.sort(
+    (left, right) => right.start - left.start,
+  )) {
     updatedText =
       updatedText.slice(0, replacement.start) +
       replacement.text +
@@ -482,11 +444,11 @@ for (const filePath of files) {
   }
 
   if (shouldWrite) {
-    fs.writeFileSync(filePath, updatedText, "utf8");
+    fs.writeFileSync(filePath, updatedText, 'utf8');
   }
 }
 
-const mode = shouldWrite ? "updated" : shouldCheck ? "check" : "preview";
+const mode = shouldWrite ? 'updated' : shouldCheck ? 'check' : 'preview';
 
 console.log(`\nImport normalization ${mode} complete.`);
 console.log(`Files scanned   : ${files.length}`);

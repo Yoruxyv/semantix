@@ -1,25 +1,25 @@
-import type { MockedFunction } from "vitest";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { MockedFunction } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { submitQuery } from "@/features/monitor/api/queryApi";
+import { submitQuery } from '@/features/monitor/api/queryApi';
 
-describe("query API client", () => {
+describe('query API client', () => {
   let fetchMock: MockedFunction<typeof fetch>;
 
   beforeEach(() => {
     fetchMock = vi.fn<typeof fetch>();
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal('fetch', fetchMock);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("accepts explainability metadata for a coalesced miss", async () => {
+  it('accepts explainability metadata for a coalesced miss', async () => {
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({
-          response: "Shared in-flight response",
+          response: 'Shared in-flight response',
           cache_hit: false,
           similarity_score: null,
           similarity_threshold: 0.92,
@@ -35,12 +35,12 @@ describe("query API client", () => {
       ),
     );
 
-    const result = await submitQuery({ prompt: "same prompt" });
+    const result = await submitQuery({ prompt: 'same prompt' });
 
     expect(result).toEqual({
       ok: true,
       data: {
-        response: "Shared in-flight response",
+        response: 'Shared in-flight response',
         cache_hit: false,
         similarity_score: null,
         similarity_threshold: 0.92,

@@ -54,10 +54,7 @@ export function isNullableBoundedString(
   value: unknown,
   maximumLength: number,
 ): value is string | null {
-  return (
-    value === null ||
-    (isNonEmptyString(value) && value.length <= maximumLength)
-  );
+  return value === null || (isNonEmptyString(value) && value.length <= maximumLength);
 }
 
 export function decodeBenchmarkDatasetSummaryValue(
@@ -88,8 +85,7 @@ export function decodeBenchmarkDatasetSummaryValue(
     !Array.isArray(value.categories) ||
     value.categories.length === 0 ||
     !value.categories.every(
-      (category) =>
-        isNonEmptyString(category) && category.length <= 100,
+      (category) => isNonEmptyString(category) && category.length <= 100,
     )
   ) {
     throw new Error('Invalid benchmark dataset');
@@ -99,8 +95,7 @@ export function decodeBenchmarkDatasetSummaryValue(
     value.expected_hits + value.expected_misses !== value.query_count ||
     new Set(value.categories).size !== value.categories.length ||
     (value.dataset_source === 'builtin' && value.schema_version !== null) ||
-    ((value.dataset_source === 'inline' ||
-      value.dataset_source === 'persisted') &&
+    ((value.dataset_source === 'inline' || value.dataset_source === 'persisted') &&
       value.schema_version !== 1)
   ) {
     throw new Error('Invalid benchmark dataset accounting');
@@ -121,9 +116,7 @@ export function decodeBenchmarkDatasetSummaryValue(
   };
 }
 
-export function decodeBenchmarkMetricsValue(
-  value: unknown,
-): BenchmarkMetrics {
+export function decodeBenchmarkMetricsValue(value: unknown): BenchmarkMetrics {
   if (!isRecord(value)) {
     throw new Error('Invalid benchmark metrics');
   }
@@ -173,10 +166,7 @@ export function decodeBenchmarkMetricsValue(
   if (
     cacheHits + cacheMisses !== totalQueries ||
     providerCalls + providerCallsAvoided !== totalQueries ||
-    truePositiveHits +
-      trueNegativeMisses +
-      falsePositiveHits +
-      falseNegativeMisses !==
+    truePositiveHits + trueNegativeMisses + falsePositiveHits + falseNegativeMisses !==
       totalQueries ||
     truePositiveHits + falsePositiveHits !== cacheHits ||
     trueNegativeMisses + falseNegativeMisses !== cacheMisses ||
@@ -189,9 +179,7 @@ export function decodeBenchmarkMetricsValue(
   return value as unknown as BenchmarkMetrics;
 }
 
-export function decodeThresholdEvaluationValue(
-  value: unknown,
-): ThresholdEvaluation {
+export function decodeThresholdEvaluationValue(value: unknown): ThresholdEvaluation {
   if (
     !isRecord(value) ||
     !isNumberInRange(value.threshold, 0, 1) ||
@@ -275,15 +263,12 @@ export function decodeBenchmarkReproducibilityValue(
 
   const thresholds = value.evaluation_thresholds as number[];
   if (
-    (value.dataset_source === 'builtin' &&
-      value.dataset_schema_version !== null) ||
-    ((value.dataset_source === 'inline' ||
-      value.dataset_source === 'persisted') &&
+    (value.dataset_source === 'builtin' && value.dataset_schema_version !== null) ||
+    ((value.dataset_source === 'inline' || value.dataset_source === 'persisted') &&
       value.dataset_schema_version !== 1) ||
     thresholds.some(
       (threshold, index) =>
-        index > 0 &&
-        threshold <= (thresholds[index - 1] ?? threshold),
+        index > 0 && threshold <= (thresholds[index - 1] ?? threshold),
     )
   ) {
     throw new Error('Invalid benchmark reproducibility thresholds');

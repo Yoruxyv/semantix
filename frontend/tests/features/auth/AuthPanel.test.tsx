@@ -1,23 +1,17 @@
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-} from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { AuthPanel } from "@/features/auth/components/AuthPanel";
-import { useAuth } from "@/features/auth/hooks/useAuth";
+import { AuthPanel } from '@/features/auth/components/AuthPanel';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
-describe("AuthPanel", () => {
+describe('AuthPanel', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
     vi.useRealTimers();
   });
 
-  it("renders no authentication UI when authentication is disabled", () => {
+  it('renders no authentication UI when authentication is disabled', () => {
     vi.mocked(useAuth).mockReturnValue({
       authenticate: vi.fn(async () => false),
       error: null,
@@ -25,7 +19,7 @@ describe("AuthPanel", () => {
       logout: vi.fn(),
       retryAccessPolicy: vi.fn(),
       session: null,
-      status: "disabled",
+      status: 'disabled',
     });
 
     const { container } = render(<AuthPanel />);
@@ -33,7 +27,7 @@ describe("AuthPanel", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders no authentication UI while the access policy is loading", () => {
+  it('renders no authentication UI while the access policy is loading', () => {
     vi.mocked(useAuth).mockReturnValue({
       authenticate: vi.fn(async () => false),
       error: null,
@@ -41,7 +35,7 @@ describe("AuthPanel", () => {
       logout: vi.fn(),
       retryAccessPolicy: vi.fn(),
       session: null,
-      status: "loading",
+      status: 'loading',
     });
 
     const { container } = render(<AuthPanel />);
@@ -49,58 +43,58 @@ describe("AuthPanel", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("shows a policy error with Retry and no token form", () => {
+  it('shows a policy error with Retry and no token form', () => {
     const retryAccessPolicy = vi.fn();
     vi.mocked(useAuth).mockReturnValue({
       authenticate: vi.fn(async () => false),
       error:
-        "Access policy unavailable. Semantix could not determine the current " +
-        "authentication policy. Please wait a moment and try again.",
+        'Access policy unavailable. Semantix could not determine the current ' +
+        'authentication policy. Please wait a moment and try again.',
       lockedUntil: null,
       logout: vi.fn(),
       retryAccessPolicy,
       session: null,
-      status: "error",
+      status: 'error',
     });
 
     render(<AuthPanel />);
 
-    expect(screen.getByRole("alert").textContent).toBe(
-      "Access policy unavailable. Semantix could not determine the current " +
-        "authentication policy. Please wait a moment and try again.",
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Access policy unavailable. Semantix could not determine the current ' +
+        'authentication policy. Please wait a moment and try again.',
     );
-    expect(screen.queryByLabelText("Access token")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(screen.queryByLabelText('Access token')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(retryAccessPolicy).toHaveBeenCalledOnce();
   });
 
-  it("shows a session-verification error with Retry and no token form", () => {
+  it('shows a session-verification error with Retry and no token form', () => {
     const retryAccessPolicy = vi.fn();
     vi.mocked(useAuth).mockReturnValue({
       authenticate: vi.fn(async () => false),
       error:
-        "Session verification unavailable. Semantix could not verify the " +
-        "current authentication session. Please wait a moment and try again.",
+        'Session verification unavailable. Semantix could not verify the ' +
+        'current authentication session. Please wait a moment and try again.',
       lockedUntil: null,
       logout: vi.fn(),
       retryAccessPolicy,
       session: null,
-      status: "session-error",
+      status: 'session-error',
     });
 
     render(<AuthPanel />);
 
     expect(
-      screen.getByRole("heading", {
-        name: "Session verification paused",
+      screen.getByRole('heading', {
+        name: 'Session verification paused',
       }),
     ).toBeTruthy();
-    expect(screen.queryByLabelText("Access token")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(screen.queryByLabelText('Access token')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(retryAccessPolicy).toHaveBeenCalledOnce();
   });
 
-  it("shows principal, role, namespaces, and sign-out in the access bar", () => {
+  it('shows principal, role, namespaces, and sign-out in the access bar', () => {
     const logout = vi.fn();
     vi.mocked(useAuth).mockReturnValue({
       authenticate: vi.fn(async () => true),
@@ -109,25 +103,25 @@ describe("AuthPanel", () => {
       logout,
       retryAccessPolicy: vi.fn(),
       session: {
-        name: "Ada",
-        role: "admin",
-        namespaces: ["alpha", "beta"],
+        name: 'Ada',
+        role: 'admin',
+        namespaces: ['alpha', 'beta'],
       },
-      status: "authenticated",
+      status: 'authenticated',
     });
 
     render(<AuthPanel />);
 
-    expect(screen.getByText("Authenticated access")).toBeTruthy();
-    expect(screen.getByText("Ada")).toBeTruthy();
-    expect(screen.getByText("admin")).toBeTruthy();
-    expect(screen.getByText("Namespaces: alpha, beta")).toBeTruthy();
+    expect(screen.getByText('Authenticated access')).toBeTruthy();
+    expect(screen.getByText('Ada')).toBeTruthy();
+    expect(screen.getByText('admin')).toBeTruthy();
+    expect(screen.getByText('Namespaces: alpha, beta')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(logout).toHaveBeenCalledOnce();
   });
 
-  it("displays wildcard namespace access as all namespaces", () => {
+  it('displays wildcard namespace access as all namespaces', () => {
     vi.mocked(useAuth).mockReturnValue({
       authenticate: vi.fn(async () => true),
       error: null,
@@ -135,20 +129,20 @@ describe("AuthPanel", () => {
       logout: vi.fn(),
       retryAccessPolicy: vi.fn(),
       session: {
-        name: "Global administrator",
-        role: "admin",
-        namespaces: ["*"],
+        name: 'Global administrator',
+        role: 'admin',
+        namespaces: ['*'],
       },
-      status: "authenticated",
+      status: 'authenticated',
     });
 
     render(<AuthPanel />);
 
-    expect(screen.getByText("Namespaces: All")).toBeTruthy();
-    expect(screen.queryByText("Namespaces: *")).toBeNull();
+    expect(screen.getByText('Namespaces: All')).toBeTruthy();
+    expect(screen.queryByText('Namespaces: *')).toBeNull();
   });
 
-  it("updates only inline feedback after a rejected token", () => {
+  it('updates only inline feedback after a rejected token', () => {
     const authenticate = vi.fn(async () => false);
     vi.mocked(useAuth).mockReturnValue({
       authenticate,
@@ -157,67 +151,67 @@ describe("AuthPanel", () => {
       logout: vi.fn(),
       retryAccessPolicy: vi.fn(),
       session: null,
-      status: "unauthenticated",
+      status: 'unauthenticated',
     });
     const { rerender } = render(<AuthPanel />);
-    const heading = screen.getByRole("heading", {
-      name: "Authentication required",
+    const heading = screen.getByRole('heading', {
+      name: 'Authentication required',
     });
-    const gate = heading.closest("section");
+    const gate = heading.closest('section');
 
     vi.mocked(useAuth).mockReturnValue({
       authenticate,
-      error: "The access token was rejected.",
+      error: 'The access token was rejected.',
       lockedUntil: null,
       logout: vi.fn(),
       retryAccessPolicy: vi.fn(),
       session: null,
-      status: "unauthenticated",
+      status: 'unauthenticated',
     });
     rerender(<AuthPanel />);
 
-    expect(screen.getByRole("alert").textContent).toBe(
-      "The access token was rejected.",
+    expect(screen.getByRole('alert').textContent).toBe(
+      'The access token was rejected.',
     );
     expect(
       screen
-        .getByRole("heading", { name: "Authentication required" })
-        .closest("section"),
+        .getByRole('heading', { name: 'Authentication required' })
+        .closest('section'),
     ).toBe(gate);
-    expect(screen.getByLabelText("Access token")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Authenticate" })).toBeTruthy();
+    expect(screen.getByLabelText('Access token')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Authenticate' })).toBeTruthy();
     expect(
-      screen.getByText("Enter your Semantix access token to continue."),
+      screen.getByText('Enter your Semantix access token to continue.'),
     ).toBeTruthy();
   });
 
-  it("disables controls and counts down from the absolute lock timestamp", () => {
+  it('disables controls and counts down from the absolute lock timestamp', () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-07-29T05:00:00Z"));
+    vi.setSystemTime(new Date('2026-07-29T05:00:00Z'));
     vi.mocked(useAuth).mockReturnValue({
       authenticate: vi.fn(async () => false),
-      error: "Too many failed authentication attempts.",
+      error: 'Too many failed authentication attempts.',
       lockedUntil: Date.now() + 30_000,
       logout: vi.fn(),
       retryAccessPolicy: vi.fn(),
       session: null,
-      status: "unauthenticated",
+      status: 'unauthenticated',
     });
 
     render(<AuthPanel />);
 
-    const input = screen.getByLabelText("Access token") as HTMLInputElement;
-    const button = screen.getByRole("button", {
-      name: "Authenticate",
+    const input = screen.getByLabelText('Access token') as HTMLInputElement;
+    const button = screen.getByRole('button', {
+      name: 'Authenticate',
     }) as HTMLButtonElement;
     expect(input.disabled).toBe(true);
     expect(button.disabled).toBe(true);
-    expect(screen.getByText("Try again in 00:30.")).toBeTruthy();
+    expect(screen.getByText('Try again in 00:30.')).toBeTruthy();
 
     act(() => {
       vi.advanceTimersByTime(1_000);
     });
-    expect(screen.getByText("Try again in 00:29.")).toBeTruthy();
+    expect(screen.getByText('Try again in 00:29.')).toBeTruthy();
 
     act(() => {
       vi.advanceTimersByTime(29_000);
@@ -227,7 +221,7 @@ describe("AuthPanel", () => {
     expect(screen.queryByText(/Try again in/)).toBeNull();
   });
 
-  it("announces when authentication is being verified", async () => {
+  it('announces when authentication is being verified', async () => {
     let resolveAuthentication: ((accepted: boolean) => void) | undefined;
     const authenticate = vi.fn(
       () =>
@@ -242,28 +236,28 @@ describe("AuthPanel", () => {
       logout: vi.fn(),
       retryAccessPolicy: vi.fn(),
       session: null,
-      status: "unauthenticated",
+      status: 'unauthenticated',
     });
     render(<AuthPanel />);
 
-    const tokenInput = screen.getByLabelText("Access token");
-    expect((tokenInput as HTMLInputElement).type).toBe("password");
+    const tokenInput = screen.getByLabelText('Access token');
+    expect((tokenInput as HTMLInputElement).type).toBe('password');
     fireEvent.change(tokenInput, {
-      target: { value: "test-token" },
+      target: { value: 'test-token' },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Authenticate" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Authenticate' }));
 
     expect(
       (
-        screen.getByRole("button", {
-          name: "Verifying…",
+        screen.getByRole('button', {
+          name: 'Verifying…',
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
 
     await act(async () => {
       if (resolveAuthentication === undefined) {
-        throw new Error("Authentication promise was not created");
+        throw new Error('Authentication promise was not created');
       }
       resolveAuthentication(false);
     });
