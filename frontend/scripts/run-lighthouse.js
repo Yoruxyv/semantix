@@ -155,6 +155,9 @@ try {
   rmSync(reportDirectory, { recursive: true, force: true });
   mkdirSync(reportDirectory);
 
+  await runAudit('desktop', 'warm-up');
+  rmSync(resolve(reportDirectory, 'desktop-warm-up.json'));
+
   for (const profile of ['desktop', 'mobile']) {
     for (let run = 1; run <= LIGHTHOUSE_BUDGET.runCount; run += 1) {
       await runAudit(profile, run);
