@@ -14,10 +14,11 @@ updates:
       - "*"
     multi-ecosystem-group: semantix-routine
     rebase-strategy: disabled
-    ignore:
+    allow:
       - dependency-name: "*"
         update-types:
-          - version-update:semver-major
+          - version-update:semver-patch
+          - version-update:semver-minor
 
   - package-ecosystem: docker
     directory: /
@@ -25,10 +26,11 @@ updates:
       - "*"
     multi-ecosystem-group: semantix-routine
     rebase-strategy: disabled
-    ignore:
+    allow:
       - dependency-name: "*"
         update-types:
-          - version-update:semver-major
+          - version-update:semver-patch
+          - version-update:semver-minor
 
   - package-ecosystem: docker
     directory: /backend
@@ -36,10 +38,11 @@ updates:
       - "*"
     multi-ecosystem-group: semantix-routine
     rebase-strategy: disabled
-    ignore:
+    allow:
       - dependency-name: "*"
         update-types:
-          - version-update:semver-major
+          - version-update:semver-patch
+          - version-update:semver-minor
 
   - package-ecosystem: docker
     directory: /frontend
@@ -47,10 +50,11 @@ updates:
       - "*"
     multi-ecosystem-group: semantix-routine
     rebase-strategy: disabled
-    ignore:
+    allow:
       - dependency-name: "*"
         update-types:
-          - version-update:semver-major
+          - version-update:semver-patch
+          - version-update:semver-minor
 
   - package-ecosystem: pip
     directory: /backend
@@ -58,10 +62,11 @@ updates:
       - "*"
     multi-ecosystem-group: semantix-routine
     rebase-strategy: disabled
-    ignore:
+    allow:
       - dependency-name: "*"
         update-types:
-          - version-update:semver-major
+          - version-update:semver-patch
+          - version-update:semver-minor
 
   - package-ecosystem: pip
     directory: /sdk/python
@@ -69,10 +74,11 @@ updates:
       - "*"
     multi-ecosystem-group: semantix-routine
     rebase-strategy: disabled
-    ignore:
+    allow:
       - dependency-name: "*"
         update-types:
-          - version-update:semver-major
+          - version-update:semver-patch
+          - version-update:semver-minor
 
   - package-ecosystem: npm
     directory: /frontend
@@ -80,7 +86,8 @@ updates:
       - "*"
     multi-ecosystem-group: semantix-routine
     rebase-strategy: disabled
-    ignore:
+    allow:
       - dependency-name: "*"
         update-types:
-          - version-update:semver-major
+          - version-update:semver-patch
+          - version-update:semver-minor
