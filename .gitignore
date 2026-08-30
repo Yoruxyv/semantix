@@ -23,7 +23,7 @@ coverage/
 frontend/playwright-report/
 frontend/test-results/
 frontend/lighthouse-reports/
-sdk/python/dist/
+sdk/dist/
 .vite_cache/
 frontend/.vite-cache
 .lycheecache
