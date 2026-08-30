@@ -14,7 +14,7 @@ root [README](../README.md) remains the short project overview and quick start.
 | [Benchmarking](guides/benchmarking.md) | Datasets, metrics, safeguards, projections, and exports |
 | [Evaluation history](guides/evaluation-history.md) | Durable aggregate run history, retention, namespaces, comparison compatibility, and recovery |
 | [Prompt normalization](guides/prompt-typo-normalization.md) | Optional typo-correction behavior and limitations |
-| [Python SDK](../sdk/python/README.md) | Install and use the typed sync and async public HTTP clients |
+| [Python SDK](../sdk/README.md) | Install and use the typed sync and async public HTTP clients |
 | [Development](guides/development.md) | Supported toolchains, quality checks, architecture rules, and contributions |
 
 ## Reference

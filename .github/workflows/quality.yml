@@ -103,7 +103,7 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: sdk/python
+        working-directory: sdk
     env:
       ALLOWED_ORIGINS: '["http://127.0.0.1:4173"]'
       AUTH_MODE: token
@@ -168,7 +168,7 @@ jobs:
           done
           curl --fail --silent http://127.0.0.1:18081/health > /dev/null
 
-          cd ../sdk/python
+          cd ../sdk
           SEMANTIX_INTEGRATION_URL=http://127.0.0.1:18081 \
             SEMANTIX_INTEGRATION_TOKEN=sdk-operator-token \
             uv run --no-sync pytest -m integration
@@ -237,7 +237,7 @@ jobs:
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: sdk/python
+        working-directory: sdk
     strategy:
       fail-fast: false
       matrix:

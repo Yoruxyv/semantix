@@ -87,9 +87,23 @@ the active similarity threshold. See
 ## 🐍 Python SDK
 
 External Python applications can use the independently installable
-[`semantix-client`](sdk/python/README.md) package through the public HTTP API.
+`semantix-client` distribution through the public HTTP API.
 Python code imports it as `semantix_client`. It provides typed synchronous and
 asynchronous clients without installing or importing Semantix backend internals.
+
+The package is not currently published to PyPI; install it from a built wheel or
+directly from the repository as described in the full guide.
+
+```python
+from semantix_client import SemantixClient
+
+with SemantixClient(base_url="http://localhost:8000") as client:
+    result = client.query("Explain semantic caching", namespace="default")
+
+print(result.response, result.cache_hit)
+```
+
+[Full Python SDK guide →](sdk/README.md)
 
 ## 🚀 Quick start
 
@@ -390,7 +404,7 @@ The [documentation index](docs/README.md) groups the full guides by purpose.
 |---|---|
 | [Getting started](docs/guides/getting-started.md) | Local setup, environment files, and Docker workflows |
 | [Providers](docs/guides/providers.md) | Hosted, local, and mock provider configuration |
-| [Python SDK](sdk/python/README.md) | Install and use the typed public HTTP client |
+| [Python SDK](sdk/README.md) | Install and use the typed public HTTP client |
 | [Architecture](docs/reference/architecture.md) | Runtime flow, feature ownership, and package boundaries |
 | [Hardened deployment](docs/operations/deployment.md) | Authentication, TLS, database roles, and production validation |
 

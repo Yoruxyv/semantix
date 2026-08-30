@@ -69,7 +69,7 @@ updates:
           - version-update:semver-minor
 
   - package-ecosystem: pip
-    directory: /sdk/python
+    directory: /sdk
     patterns:
       - "*"
     multi-ecosystem-group: semantix-routine
