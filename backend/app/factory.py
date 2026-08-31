@@ -21,6 +21,8 @@ from app.core.version import API_VERSION
 from app.lifecycle import create_lifespan
 from app.middleware.body_limit import RequestBodyLimitMiddleware
 from app.middleware.rate_limit import limiter
+from app.providers.factory import create_default_provider_registry
+from app.providers.registry import ProviderRegistry
 from app.security.auth_attempts import AuthenticationAttemptTracker
 
 API_TITLE = "Semantic Cache API"
@@ -32,18 +34,29 @@ def create_app(
     settings: Settings | None = None,
     *,
     auth_attempt_clock: Callable[[], float] | None = None,
+    provider_registry: ProviderRegistry | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
+    resolved_registry = provider_registry or create_default_provider_registry(
+        resolved_settings
+    )
+    provider_selection = resolved_registry.resolve(
+        resolved_settings.embedding_provider,
+        resolved_settings.generation_provider,
+    )
 
     configure_logging(
         resolved_settings.log_level,
-        resolved_settings.configured_secrets(),
+        (
+            resolved_settings.configured_secrets()
+            + resolved_registry.configured_secrets()
+        ),
     )
 
     application = FastAPI(
         title=API_TITLE,
         version=API_VERSION,
-        lifespan=create_lifespan(resolved_settings),
+        lifespan=create_lifespan(resolved_settings, provider_selection),
     )
     application.state.settings = resolved_settings
     application.state.rate_limit_scope = uuid4().hex
@@ -57,8 +70,8 @@ def create_app(
     _register_exception_handlers(application)
 
     application.state.limiter = limiter
-    application.state.embedding_provider_name = resolved_settings.embedding_provider
-    application.state.generation_provider_name = resolved_settings.generation_provider
+    application.state.embedding_provider_name = provider_selection.embedding_name
+    application.state.generation_provider_name = provider_selection.generation_name
     application.include_router(api_router)
 
     return application

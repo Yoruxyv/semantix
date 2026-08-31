@@ -114,6 +114,19 @@ describe('runtime diagnostics API', () => {
     );
   });
 
+  it('accepts bounded custom provider names', async () => {
+    const payload = {
+      ...diagnosticsPayload,
+      embedding_provider_category: 'company.embed-v1',
+      generation_provider_category: 'company:generation_v1',
+    };
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }));
+
+    const result = await getRuntimeDiagnostics();
+
+    expect(result).toEqual({ ok: true, data: payload });
+  });
+
   it.each([
     {
       name: 'malformed fingerprint',
@@ -126,6 +139,10 @@ describe('runtime diagnostics API', () => {
     {
       name: 'unexpected field',
       payload: { ...diagnosticsPayload, database_url: 'private' },
+    },
+    {
+      name: 'malformed provider name',
+      payload: { ...diagnosticsPayload, embedding_provider_category: '../provider' },
     },
   ])('rejects $name', async ({ payload }) => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }));

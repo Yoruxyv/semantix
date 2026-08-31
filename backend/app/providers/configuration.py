@@ -1,29 +1,37 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+import re
+from typing import TYPE_CHECKING, Annotated
 
-from pydantic import SecretStr
+from pydantic import SecretStr, StringConstraints
 
 if TYPE_CHECKING:
     from app.core.config import Settings
 
-EmbeddingProviderName = Literal[
-    "huggingface",
-    "openai",
-    "gemini",
-    "ollama",
-    "mock",
+PROVIDER_NAME_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,49}$"
+ProviderName = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=50,
+        pattern=PROVIDER_NAME_PATTERN,
+    ),
 ]
-GenerationProviderName = Literal[
-    "huggingface",
-    "openai",
-    "anthropic",
-    "gemini",
-    "ollama",
-    "mock",
-]
+EmbeddingProviderName = ProviderName
+GenerationProviderName = ProviderName
 MOCK_EMBEDDING_MODEL_ID = "stable-token-hash-v1"
 MOCK_GENERATION_MODEL_ID = "mock-prefix-v1"
+
+
+def validate_provider_name(value: str) -> str:
+    normalized = value.strip()
+    if re.fullmatch(PROVIDER_NAME_PATTERN, normalized) is None:
+        raise ValueError(
+            "Provider names must be 1-50 characters and contain only letters, "
+            "digits, '.', '_', '-', or ':'"
+        )
+    return normalized
 
 
 def validate_provider_configuration(settings: Settings) -> None:
@@ -43,6 +51,10 @@ def selected_embedding_dimensions(settings: Settings) -> int:
             value = settings.ollama_embedding_dimensions
         case "mock":
             value = settings.mock_embedding_dimensions
+        case _:
+            raise RuntimeError(
+                "Custom embedding metadata is resolved by the provider registry"
+            )
 
     if value is None:
         raise RuntimeError("Selected embedding dimensions were not validated")
@@ -61,6 +73,10 @@ def selected_embedding_space(settings: Settings) -> str:
             model = settings.ollama_embedding_model
         case "mock":
             model = MOCK_EMBEDDING_MODEL_ID
+        case _:
+            raise RuntimeError(
+                "Custom embedding metadata is resolved by the provider registry"
+            )
 
     if model is None:
         raise RuntimeError("Selected embedding model was not validated")
@@ -81,6 +97,10 @@ def selected_generation_configuration(settings: Settings) -> dict[str, object]:
             model = settings.ollama_generation_model
         case "mock":
             model = MOCK_GENERATION_MODEL_ID
+        case _:
+            raise RuntimeError(
+                "Custom generation metadata is resolved by the provider registry"
+            )
 
     if model is None:
         raise RuntimeError("Selected generation model was not validated")

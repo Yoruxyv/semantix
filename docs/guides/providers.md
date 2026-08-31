@@ -5,6 +5,11 @@ Semantix selects embedding and generation providers independently behind the
 logic, benchmarks, and query orchestration do not import concrete adapters.
 Hugging Face remains the default for both capabilities.
 
+Deployments that need a private or organization-specific adapter can use the
+explicit server-side registry described in
+[Custom provider adapters](provider-extensions.md). This does not add provider
+logic or credentials to the Python HTTP SDK.
+
 ## Capabilities
 
 | Provider | Embeddings | Generation | Credentials required |

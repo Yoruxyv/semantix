@@ -25,8 +25,8 @@ from app.core.version import API_VERSION
 from app.embedding.service import EmbeddingService
 from app.infrastructure.lifecycle import database_pool_lifespan
 from app.observability.metrics import RuntimeMetrics
-from app.providers.configuration import selected_generation_configuration
 from app.providers.factory import create_provider_bundle
+from app.providers.registry import ResolvedProviderSelection
 from app.query.application.service import QueryService
 from app.query.domain.normalization import create_prompt_normalizer
 
@@ -36,7 +36,10 @@ Lifespan = Callable[
 ]
 
 
-def create_lifespan(settings: Settings) -> Lifespan:
+def create_lifespan(
+    settings: Settings,
+    provider_selection: ResolvedProviderSelection,
+) -> Lifespan:
     @asynccontextmanager
     async def lifespan(
         application: FastAPI,
@@ -54,6 +57,7 @@ def create_lifespan(settings: Settings) -> Lifespan:
             providers = create_provider_bundle(
                 client,
                 settings,
+                selection=provider_selection,
             )
             embedding_service = EmbeddingService(
                 providers.embedding_provider,
@@ -65,6 +69,7 @@ def create_lifespan(settings: Settings) -> Lifespan:
                 cache_backend_lifespan(
                     settings,
                     dimensions=providers.embedding_dimensions,
+                    embedding_space=providers.embedding_space,
                     events=runtime_metrics,
                     pool=database_pool,
                 ) as backend,
@@ -137,14 +142,14 @@ def create_lifespan(settings: Settings) -> Lifespan:
                     prompt_normalizer=prompt_normalizer,
                     runtime_configuration=BenchmarkRuntimeConfiguration(
                         application_version=API_VERSION,
-                        embedding_provider_category=settings.embedding_provider,
-                        generation_provider_category=settings.generation_provider,
+                        embedding_provider_category=providers.embedding_provider_name,
+                        generation_provider_category=providers.generation_provider_name,
                         embedding_dimensions=providers.embedding_dimensions,
                         embedding_space_fingerprint=_fingerprint(
-                            settings.embedding_space
+                            providers.embedding_space
                         ),
                         generation_configuration_fingerprint=_fingerprint(
-                            selected_generation_configuration(settings)
+                            dict(providers.generation_configuration)
                         ),
                         normalization_mode=(
                             "typo_correction"

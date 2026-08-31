@@ -6,9 +6,6 @@ export type EvaluationRunRetentionState =
 export type BenchmarkOutcome =
   'true_positive' | 'true_negative' | 'false_positive' | 'false_negative';
 
-export type ProviderCategory =
-  'huggingface' | 'openai' | 'anthropic' | 'gemini' | 'ollama' | 'mock';
-
 export interface BenchmarkDatasetSummary {
   dataset_id: string;
   dataset_source: EvaluationDatasetSourceKind;
@@ -203,8 +200,8 @@ export interface BenchmarkReproducibilityMetadata {
   dataset_schema_version: number | null;
   dataset_version: string;
   dataset_digest: string;
-  embedding_provider_category: ProviderCategory;
-  generation_provider_category: ProviderCategory;
+  embedding_provider_category: string;
+  generation_provider_category: string;
   generation_configuration_fingerprint: string;
   comparison_contract_version: 1;
   embedding_dimensions: number;

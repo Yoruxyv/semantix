@@ -64,8 +64,11 @@ content.
 - `app/core` owns configuration, errors, logging, and shared limits.
 
 Routes and application services depend on protocols rather than concrete
-provider or storage adapters. Startup composition in `app/lifecycle.py` and
-provider/cache factories selects implementations from validated settings.
+provider or storage adapters. Application creation freezes an explicit
+provider registry, resolves the selected capabilities, and passes the resolved
+metadata through `ProviderBundle` to lifespan and cache composition. The
+default registry preserves all built-in providers; deployment bootstraps may
+register trusted custom adapters before calling `create_app`.
 
 ## Provider and cache ports
 

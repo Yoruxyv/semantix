@@ -6,6 +6,7 @@ import {
   isNonNegativeNumber,
   isNullableNonNegativeNumber,
   isNumberInRange,
+  isProviderName,
   isRecord,
 } from '@/shared/api/validators';
 
@@ -14,18 +15,8 @@ import type {
   BenchmarkMetrics,
   BenchmarkReproducibilityMetadata,
   EvaluationDatasetSourceKind,
-  ProviderCategory,
   ThresholdEvaluation,
 } from '../types';
-
-const PROVIDER_CATEGORIES: readonly ProviderCategory[] = [
-  'huggingface',
-  'openai',
-  'anthropic',
-  'gemini',
-  'ollama',
-  'mock',
-];
 const RESULT_KINDS = ['measured', 'projected'] as const;
 const NORMALIZATION_MODES = ['identity', 'typo_correction'] as const;
 const DATASET_SOURCE_KINDS: readonly EvaluationDatasetSourceKind[] = [
@@ -34,7 +25,6 @@ const DATASET_SOURCE_KINDS: readonly EvaluationDatasetSourceKind[] = [
   'persisted',
 ];
 
-const isProviderCategory = createEnumGuard(PROVIDER_CATEGORIES);
 const isResultKind = createEnumGuard(RESULT_KINDS);
 const isNormalizationMode = createEnumGuard(NORMALIZATION_MODES);
 const isDatasetSourceKind = createEnumGuard(DATASET_SOURCE_KINDS);
@@ -228,8 +218,8 @@ export function decodeBenchmarkReproducibilityValue(
     value.dataset_version.length > 50 ||
     typeof value.dataset_digest !== 'string' ||
     !SHA256_PATTERN.test(value.dataset_digest) ||
-    !isProviderCategory(value.embedding_provider_category) ||
-    !isProviderCategory(value.generation_provider_category) ||
+    !isProviderName(value.embedding_provider_category) ||
+    !isProviderName(value.generation_provider_category) ||
     typeof value.generation_configuration_fingerprint !== 'string' ||
     !SHA256_PATTERN.test(value.generation_configuration_fingerprint) ||
     value.comparison_contract_version !== 1 ||

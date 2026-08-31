@@ -86,6 +86,36 @@ describe('benchmark API client', () => {
     );
   });
 
+  it('decodes bounded custom provider names in reproducibility metadata', async () => {
+    const payload = {
+      ...benchmarkResult,
+      reproducibility: {
+        ...benchmarkResult.reproducibility,
+        embedding_provider_category: 'company.embed-v1',
+        generation_provider_category: 'company:generation_v1',
+      },
+    };
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }));
+
+    const response = await runBenchmark({
+      dataset_source: { kind: 'builtin', dataset_id: 'quick' },
+      threshold: 0.9,
+      evaluation_thresholds: [0.8, 0.9, 0.95],
+      repetitions: 1,
+      reset_cache_before_run: true,
+      estimated_cost_per_request_usd: 0,
+      estimated_cost_per_1k_tokens_usd: 0,
+      allow_external_provider_calls: true,
+    });
+
+    expect(response.ok).toBe(true);
+    if (response.ok) {
+      expect(response.data.reproducibility.embedding_provider_category).toBe(
+        'company.embed-v1',
+      );
+    }
+  });
+
   it('validates inline data through the provider-free preview route', async () => {
     fetchMock.mockResolvedValue(
       new Response(
