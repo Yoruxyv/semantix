@@ -3,6 +3,8 @@ import logging
 from datetime import UTC, datetime
 from typing import Final
 
+_UVICORN_LOGGER_NAMES: Final = ("uvicorn", "uvicorn.error", "uvicorn.access")
+
 
 class RedactingJsonFormatter(logging.Formatter):
     def __init__(self, secrets: tuple[str, ...]) -> None:
@@ -29,9 +31,14 @@ class RedactingJsonFormatter(logging.Formatter):
 
 
 def configure_logging(level: str, secrets: tuple[str, ...]) -> None:
+    formatter = RedactingJsonFormatter(secrets)
     handler = logging.StreamHandler()
-    handler.setFormatter(RedactingJsonFormatter(secrets))
+    handler.setFormatter(formatter)
     root = logging.getLogger()
     root.handlers.clear()
     root.addHandler(handler)
     root.setLevel(level)
+
+    for logger_name in _UVICORN_LOGGER_NAMES:
+        for uvicorn_handler in logging.getLogger(logger_name).handlers:
+            uvicorn_handler.setFormatter(formatter)
