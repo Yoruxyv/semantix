@@ -44,19 +44,23 @@ def create_app(
         resolved_settings.embedding_provider,
         resolved_settings.generation_provider,
     )
+    logging_secrets = (
+        resolved_settings.configured_secrets() + resolved_registry.configured_secrets()
+    )
 
     configure_logging(
         resolved_settings.log_level,
-        (
-            resolved_settings.configured_secrets()
-            + resolved_registry.configured_secrets()
-        ),
+        logging_secrets,
     )
 
     application = FastAPI(
         title=API_TITLE,
         version=API_VERSION,
-        lifespan=create_lifespan(resolved_settings, provider_selection),
+        lifespan=create_lifespan(
+            resolved_settings,
+            provider_selection,
+            logging_secrets=logging_secrets,
+        ),
     )
     application.state.settings = resolved_settings
     application.state.rate_limit_scope = uuid4().hex

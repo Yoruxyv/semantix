@@ -21,6 +21,7 @@ from app.benchmark.infrastructure.postgres_repository import (
 from app.cache.application.service import SemanticCache
 from app.cache.infrastructure.factory import cache_backend_lifespan
 from app.core.config import Settings
+from app.core.logging import configure_logging
 from app.core.version import API_VERSION
 from app.embedding.service import EmbeddingService
 from app.infrastructure.lifecycle import database_pool_lifespan
@@ -39,11 +40,14 @@ Lifespan = Callable[
 def create_lifespan(
     settings: Settings,
     provider_selection: ResolvedProviderSelection,
+    *,
+    logging_secrets: tuple[str, ...],
 ) -> Lifespan:
     @asynccontextmanager
     async def lifespan(
         application: FastAPI,
     ) -> AsyncIterator[None]:
+        configure_logging(settings.log_level, logging_secrets)
         prompt_normalizer = create_prompt_normalizer(
             enabled=settings.prompt_typo_correction_enabled,
             max_edit_distance=settings.prompt_typo_max_edit_distance,
