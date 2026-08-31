@@ -27,7 +27,11 @@ def test_sync_client_crosses_real_http_query_boundary() -> None:
         assert client.health().status == "ok"
         assert client.ready().status == "ready"
 
-        miss = client.query("sdk normal prompt", namespace="normal")
+        miss = client.query(
+            "sdk normal prompt",
+            namespace="normal",
+            cache_ttl_seconds=60,
+        )
         hit = client.query("sdk normal prompt", namespace="normal")
         assert not miss.cache_hit and miss.provider_called
         assert hit.cache_hit and hit.generation_skipped and not hit.provider_called
@@ -52,6 +56,7 @@ def test_sync_client_crosses_real_http_query_boundary() -> None:
             "sdk refresh prompt",
             namespace="refresh",
             policy=CachePolicy.REFRESH,
+            cache_ttl_seconds=60,
         )
         assert not refreshed.cache_hit and refreshed.provider_called
 
@@ -83,6 +88,10 @@ def test_sync_client_crosses_real_http_query_boundary() -> None:
 async def test_async_client_crosses_real_http_query_boundary() -> None:
     base_url, token = integration_settings()
     async with AsyncSemantixClient(base_url=base_url, token=token) as client:
-        result = await client.query("sdk async prompt", namespace="async")
+        result = await client.query(
+            "sdk async prompt",
+            namespace="async",
+            cache_ttl_seconds=60,
+        )
         assert result.response == "[mock provider] sdk async prompt"
         assert not result.cache_hit and result.provider_called

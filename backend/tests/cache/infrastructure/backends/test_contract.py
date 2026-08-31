@@ -10,6 +10,7 @@ from app.cache.domain.keys import prompt_cache_key
 from app.cache.domain.metadata import TRUNCATED_RESPONSE_PREVIEW_MESSAGE
 from app.cache.domain.namespaces import DEFAULT_CACHE_NAMESPACE
 from app.cache.domain.protocols import CacheBackend
+from app.cache.infrastructure.backends.memory import InMemoryCacheBackend
 from app.cache.infrastructure.factory import cache_backend_lifespan
 from app.core.config import Settings
 from app.core.exceptions import CacheStorageError
@@ -247,6 +248,110 @@ async def test_expiry_and_lru_capacity(
             )
             is not None
         )
+
+
+@pytest.mark.asyncio
+async def test_per_write_ttl_overrides_default_and_replacement(
+    backend_builder: BackendBuilder,
+) -> None:
+    async with backend_builder(10, 60) as backend:
+        original = cache_entry("ttl override", "original", vector_index=0)
+        await backend.put(original, ttl_seconds=30)
+        first = await backend.get_entry(
+            original.cache_key,
+            authorized_namespaces=None,
+        )
+        assert first is not None
+        assert first.remaining_ttl_seconds == pytest.approx(30, abs=2)
+
+        replacement = original.model_copy(update={"response": "replacement"})
+        await backend.put(replacement, ttl_seconds=10)
+        current = await backend.get_entry(
+            original.cache_key,
+            authorized_namespaces=None,
+        )
+        assert current is not None
+        assert current.response == "replacement"
+        assert current.remaining_ttl_seconds == pytest.approx(10, abs=2)
+
+    async with backend_builder(10, None) as backend:
+        requested = cache_entry("requested ttl", "response", vector_index=0)
+        await backend.put(requested, ttl_seconds=30)
+        metadata = await backend.get_entry(
+            requested.cache_key,
+            authorized_namespaces=None,
+        )
+        assert metadata is not None
+        assert metadata.remaining_ttl_seconds == pytest.approx(30, abs=2)
+
+
+@pytest.mark.asyncio
+async def test_cache_hit_does_not_extend_entry_ttl(
+    backend_builder: BackendBuilder,
+) -> None:
+    async with backend_builder(10, 60) as backend:
+        entry = cache_entry("fixed ttl", "response", vector_index=0)
+        await backend.put(entry, ttl_seconds=30)
+        before = await backend.get_entry(
+            entry.cache_key,
+            authorized_namespaces=None,
+        )
+        candidate = await backend.find_nearest(
+            unit_vector(),
+            namespace=DEFAULT_CACHE_NAMESPACE,
+        )
+        assert before is not None
+        assert candidate is not None
+        assert await backend.record_hit(
+            candidate.entry.cache_key,
+            expected_created_at=candidate.entry.created_at,
+        )
+        after = await backend.get_entry(
+            entry.cache_key,
+            authorized_namespaces=None,
+        )
+
+        assert after is not None
+        assert after.expires_at == before.expires_at
+
+
+@pytest.mark.asyncio
+async def test_memory_ttl_expiry_is_deterministic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = 100.0
+    monkeypatch.setattr(
+        "app.cache.infrastructure.backends.memory.time.monotonic", lambda: now
+    )
+    backend = InMemoryCacheBackend(
+        10,
+        60,
+        dimensions=TEST_EMBEDDING_DIMENSIONS,
+    )
+    entry = cache_entry("deterministic ttl", "response", vector_index=0)
+
+    await backend.put(entry, ttl_seconds=10)
+    now = 109.0
+    assert await backend.get_entry(entry.cache_key, authorized_namespaces=None)
+    now = 110.0
+    assert not await backend.get_entry(entry.cache_key, authorized_namespaces=None)
+
+    now = 200.0
+    await backend.put(entry)
+    now = 259.0
+    assert await backend.get_entry(entry.cache_key, authorized_namespaces=None)
+    now = 260.0
+    assert not await backend.get_entry(entry.cache_key, authorized_namespaces=None)
+
+    no_expiry = InMemoryCacheBackend(
+        10,
+        None,
+        dimensions=TEST_EMBEDDING_DIMENSIONS,
+    )
+    now = 300.0
+    await no_expiry.put(entry)
+    now = 1_000_000.0
+    assert await no_expiry.get_entry(entry.cache_key, authorized_namespaces=None)
 
 
 @pytest.mark.asyncio

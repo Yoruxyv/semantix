@@ -6,6 +6,7 @@ import pytest
 from app.cache.application.service import SemanticCache
 from app.cache.domain.models import CacheCandidate
 from app.cache.infrastructure.backends.memory import InMemoryCacheBackend
+from app.core.limits import MAX_REQUEST_CACHE_TTL_SECONDS
 from tests.support import (
     TEST_EMBEDDING_DIMENSIONS,
     memory_backend,
@@ -88,6 +89,29 @@ async def test_ttl_expiry() -> None:
     await cache.store("one", "answer", miss.embedding)
     await asyncio.sleep(0.02)
     assert not (await cache.lookup("similar")).cache_hit
+
+
+def test_resolves_requested_ttl_against_the_server_default() -> None:
+    finite = SemanticCache(
+        Embeddings(),
+        memory_backend(ttl_seconds=60),
+        0.92,
+    )
+    unlimited = SemanticCache(
+        Embeddings(),
+        memory_backend(ttl_seconds=None),
+        0.92,
+    )
+
+    assert finite.resolve_ttl(None) == 60
+    assert finite.resolve_ttl(30) == 30
+    assert finite.resolve_ttl(120) == 60
+    assert unlimited.resolve_ttl(None) is None
+    assert unlimited.resolve_ttl(30) == 30
+    with pytest.raises(ValueError, match="supported range"):
+        finite.resolve_ttl(0)
+    with pytest.raises(ValueError, match="supported range"):
+        finite.resolve_ttl(MAX_REQUEST_CACHE_TTL_SECONDS + 1)
 
 
 @pytest.mark.asyncio

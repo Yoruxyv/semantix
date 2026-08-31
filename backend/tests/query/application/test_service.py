@@ -158,6 +158,76 @@ async def test_coalesces_twenty_simultaneous_identical_misses() -> None:
 
 
 @pytest.mark.asyncio
+async def test_coalesces_requests_with_the_same_effective_ttl() -> None:
+    provider = ControlledProvider()
+    service = QueryService(
+        SemanticCache(
+            Embeddings(),
+            memory_backend(ttl_seconds=3_600),
+            0.92,
+        ),
+        provider,
+    )
+    requests = [
+        asyncio.create_task(
+            service.execute(
+                "same ttl prompt",
+                policy=QueryCachePolicy(cache_ttl_seconds=ttl_seconds),
+            )
+        )
+        for ttl_seconds in (3_600, 7_200)
+    ]
+
+    await asyncio.wait_for(provider.started.wait(), timeout=1)
+    provider.release.set()
+    responses = await asyncio.gather(*requests)
+
+    assert provider.call_count == 1
+    assert sum(response.provider_called for response in responses) == 1
+
+
+@pytest.mark.asyncio
+async def test_does_not_coalesce_requests_with_different_effective_ttls() -> None:
+    provider = ControlledProvider(expected_calls=2)
+    backend = memory_backend()
+    service = QueryService(SemanticCache(Embeddings(), backend, 0.92), provider)
+    requests = [
+        asyncio.create_task(
+            service.execute(
+                "different ttl prompt",
+                policy=QueryCachePolicy(cache_ttl_seconds=ttl_seconds),
+            )
+        )
+        for ttl_seconds in (30, 60)
+    ]
+
+    await asyncio.wait_for(provider.started.wait(), timeout=1)
+    provider.release.set()
+    responses = await asyncio.gather(*requests)
+
+    assert provider.call_count == 2
+    assert all(response.provider_called for response in responses)
+    assert (await backend.stats(None)).size == 1
+
+
+@pytest.mark.asyncio
+async def test_rejects_ttl_without_cache_writes_before_provider() -> None:
+    provider = Provider()
+    service = query_service(provider)
+
+    with pytest.raises(ValueError, match="permits writes"):
+        await service.execute(
+            "invalid ttl policy",
+            policy=QueryCachePolicy(
+                write_enabled=False,
+                cache_ttl_seconds=60,
+            ),
+        )
+
+    assert provider.call_count == 0
+
+
+@pytest.mark.asyncio
 async def test_failed_generation_is_removed_before_retry() -> None:
     provider = ControlledProvider(failures_remaining=1)
     service = query_service(provider)
@@ -373,12 +443,13 @@ async def test_private_prompt_bypasses_cache_reads_writes_and_logs(
 @pytest.mark.asyncio
 async def test_read_bypass_refreshes_cache_when_writes_remain_enabled() -> None:
     provider = SequenceProvider(["original response", "refreshed response"])
-    service = query_service(provider)
+    backend = memory_backend()
+    service = QueryService(SemanticCache(Embeddings(), backend, 0.92), provider)
     await service.execute("refresh prompt")
 
     refreshed = await service.execute(
         "refresh prompt",
-        policy=QueryCachePolicy(read_enabled=False),
+        policy=QueryCachePolicy(read_enabled=False, cache_ttl_seconds=30),
     )
     cached = await service.execute("refresh prompt")
 
@@ -387,6 +458,12 @@ async def test_read_bypass_refreshes_cache_when_writes_remain_enabled() -> None:
     assert cached.response == "refreshed response"
     assert cached.cache_hit is True
     assert provider.call_count == 2
+    metadata = await backend.get_entry(
+        prompt_cache_key("refresh prompt"),
+        authorized_namespaces=None,
+    )
+    assert metadata is not None
+    assert metadata.remaining_ttl_seconds == pytest.approx(30, abs=1)
 
 
 @pytest.mark.asyncio

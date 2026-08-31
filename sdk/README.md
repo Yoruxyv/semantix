@@ -245,6 +245,26 @@ secrets automatically. `BYPASS` and `PRIVATE` have the same cache read/write
 behavior, but only `PRIVATE` requests receive the server's private trace
 minimization.
 
+### Per-request cache TTL
+
+Normal and Refresh queries may request a cache lifetime in whole seconds:
+
+```python
+result = client.query(
+    "Cache this briefly",
+    namespace="support",
+    policy=CachePolicy.NORMAL,
+    cache_ttl_seconds=900,
+)
+```
+
+The accepted server range is `1` through `31,536,000`. A finite server default
+caps longer requests; if the server has no default TTL, the requested value is
+used directly. Omitting `cache_ttl_seconds` makes the SDK omit the JSON field,
+which preserves compatibility with older Semantix servers and uses the current
+server default. Passing it with `READ_ONLY`, `BYPASS`, or `PRIVATE` is rejected
+by supporting servers because those policies cannot write a cache entry.
+
 ## Health and readiness
 
 The clients expose two public probes. `health()` returns an immutable

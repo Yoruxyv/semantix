@@ -51,6 +51,10 @@ class InMemoryCacheBackend:
         self._counters: dict[str, CacheCounters] = {}
         self._lock = asyncio.Lock()
 
+    @property
+    def default_ttl_seconds(self) -> float | None:
+        return self._ttl_seconds
+
     def _purge(self, now_monotonic: float | None = None) -> None:
         now = time.monotonic() if now_monotonic is None else now_monotonic
         expired_keys = [
@@ -98,7 +102,17 @@ class InMemoryCacheBackend:
                 similarity_score=max(-1.0, min(1.0, float(scores[index]))),
             )
 
-    async def put(self, entry: CacheEntry) -> None:
+    async def put(
+        self,
+        entry: CacheEntry,
+        *,
+        ttl_seconds: float | None = None,
+    ) -> None:
+        effective_ttl_seconds = (
+            self._ttl_seconds if ttl_seconds is None else ttl_seconds
+        )
+        if effective_ttl_seconds is not None and effective_ttl_seconds <= 0:
+            raise ValueError("Invalid cache policy")
         validated_cache_vector(
             entry.embedding,
             dimensions=self._dimensions,
@@ -117,9 +131,9 @@ class InMemoryCacheBackend:
             stored_at = datetime.now(UTC)
             expires_at_monotonic = None
             expires_at = None
-            if self._ttl_seconds is not None:
-                expires_at_monotonic = time.monotonic() + self._ttl_seconds
-                expires_at = stored_at + timedelta(seconds=self._ttl_seconds)
+            if effective_ttl_seconds is not None:
+                expires_at_monotonic = time.monotonic() + effective_ttl_seconds
+                expires_at = stored_at + timedelta(seconds=effective_ttl_seconds)
             self._items[entry.cache_key] = StoredCacheItem(
                 entry=entry.model_copy(deep=True),
                 expires_at_monotonic=expires_at_monotonic,

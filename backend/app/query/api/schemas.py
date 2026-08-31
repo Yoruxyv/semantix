@@ -5,7 +5,11 @@ from pydantic import Field, field_validator, model_validator
 
 from app.api.schemas import StrictModel
 from app.cache.domain.namespaces import DEFAULT_CACHE_NAMESPACE, CacheNamespace
-from app.core.limits import MAX_PROMPT_LENGTH, MAX_RESPONSE_LENGTH
+from app.core.limits import (
+    MAX_PROMPT_LENGTH,
+    MAX_REQUEST_CACHE_TTL_SECONDS,
+    MAX_RESPONSE_LENGTH,
+)
 from app.query.domain.policies import QueryCachePolicy
 
 _CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
@@ -19,6 +23,12 @@ class QueryRequest(StrictModel):
     cache_read_enabled: bool = True
     cache_write_enabled: bool = True
     private: bool = False
+    cache_ttl_seconds: int | None = Field(
+        default=None,
+        ge=1,
+        le=MAX_REQUEST_CACHE_TTL_SECONDS,
+        strict=True,
+    )
 
     @field_validator("prompt", mode="before")
     @classmethod
@@ -29,6 +39,17 @@ class QueryRequest(StrictModel):
             " ", _CONTROL_CHARACTERS.sub(" ", value)
         ).strip()
 
+    @model_validator(mode="after")
+    def validate_cache_ttl_policy(self) -> "QueryRequest":
+        cache_write_allowed = (
+            self.cache_enabled and self.cache_write_enabled and not self.private
+        )
+        if self.cache_ttl_seconds is not None and not cache_write_allowed:
+            raise ValueError(
+                "cache_ttl_seconds requires a cache policy that permits writes"
+            )
+        return self
+
     @property
     def cache_policy(self) -> QueryCachePolicy:
         cache_allowed = self.cache_enabled and not self.private
@@ -36,6 +57,7 @@ class QueryRequest(StrictModel):
             namespace=self.namespace,
             read_enabled=cache_allowed and self.cache_read_enabled,
             write_enabled=cache_allowed and self.cache_write_enabled,
+            cache_ttl_seconds=self.cache_ttl_seconds,
         )
 
 

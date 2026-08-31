@@ -53,6 +53,20 @@ async def test_async_query_serialization_and_lifecycle() -> None:
 
 
 @pytest.mark.asyncio
+async def test_async_query_serializes_requested_cache_ttl() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        payload = cast(dict[str, object], json.loads(request.content))
+        assert payload["cache_ttl_seconds"] == 900
+        return httpx.Response(200, json=query_response())
+
+    async with AsyncSemantixClient(
+        base_url="https://example.com",
+        _http_transport=httpx.MockTransport(handler),
+    ) as client:
+        await client.query("question", cache_ttl_seconds=900)
+
+
+@pytest.mark.asyncio
 async def test_async_health_and_readiness() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/health":

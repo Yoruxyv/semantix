@@ -77,6 +77,10 @@ class PgVectorCacheBackend:
         self._embedding_space = embedding_space
         self._events = events
 
+    @property
+    def default_ttl_seconds(self) -> float | None:
+        return self._ttl_seconds
+
     @asynccontextmanager
     async def _connection(self) -> AsyncIterator[Connection]:
         try:
@@ -125,7 +129,17 @@ class PgVectorCacheBackend:
             similarity_score=score,
         )
 
-    async def put(self, entry: CacheEntry) -> None:
+    async def put(
+        self,
+        entry: CacheEntry,
+        *,
+        ttl_seconds: float | None = None,
+    ) -> None:
+        effective_ttl_seconds = (
+            self._ttl_seconds if ttl_seconds is None else ttl_seconds
+        )
+        if effective_ttl_seconds is not None and effective_ttl_seconds <= 0:
+            raise ValueError("Invalid cache policy")
         embedding = validated_cache_vector(
             entry.embedding,
             dimensions=self._dimensions,
@@ -147,7 +161,7 @@ class PgVectorCacheBackend:
                 entry.response,
                 vector_literal(embedding),
                 entry.created_at,
-                self._ttl_seconds,
+                effective_ttl_seconds,
             )
             overflow_result = await connection.execute(
                 DELETE_OVERFLOW,
