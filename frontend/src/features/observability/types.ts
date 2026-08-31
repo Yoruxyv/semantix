@@ -15,15 +15,12 @@ export interface RuntimeMetrics {
   expirations: number;
 }
 
-export type ProviderCategory =
-  'huggingface' | 'openai' | 'anthropic' | 'gemini' | 'ollama' | 'mock';
-
 export interface RuntimeDiagnostics {
   observed_at: string;
   process_scope: 'single_backend_process';
   application_version: string;
-  embedding_provider_category: ProviderCategory;
-  generation_provider_category: ProviderCategory;
+  embedding_provider_category: string;
+  generation_provider_category: string;
   embedding_dimensions: number;
   embedding_space_fingerprint: string;
   generation_configuration_fingerprint: string;

@@ -9,6 +9,7 @@ root [README](../README.md) remains the short project overview and quick start.
 |---|---|
 | [Getting started](guides/getting-started.md) | Environment files, local toolchains, Docker workflows, and troubleshooting |
 | [Providers](guides/providers.md) | Hugging Face, OpenAI, Anthropic, Gemini, Ollama, and mock configuration |
+| [Custom provider adapters](guides/provider-extensions.md) | Explicit trusted server-side adapter registration and lifecycle contract |
 | [pgvector](guides/pgvector.md) | Persistent cache storage, ports, migrations, and database verification |
 | [Cache policies](guides/cache-policies.md) | Thresholds, TTL, LRU, namespaces, privacy, and request coalescing |
 | [Benchmarking](guides/benchmarking.md) | Datasets, metrics, safeguards, projections, and exports |

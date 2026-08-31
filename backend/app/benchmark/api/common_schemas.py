@@ -9,6 +9,7 @@ from app.core.limits import (
     MAX_EVALUATION_DATASET_DESCRIPTION_LENGTH,
     MAX_EVALUATION_DATASET_NAME_LENGTH,
 )
+from app.providers.configuration import ProviderName
 
 BenchmarkDatasetId = Literal["quick", "extended"]
 BenchmarkCategory = str
@@ -20,14 +21,7 @@ BenchmarkOutcome = Literal[
 ]
 ThresholdEvaluationMode = Literal["frozen_candidate_projection"]
 ThresholdResultKind = Literal["measured", "projected"]
-ProviderCategory = Literal[
-    "huggingface",
-    "openai",
-    "anthropic",
-    "gemini",
-    "ollama",
-    "mock",
-]
+ProviderCategory = ProviderName
 NormalizationMode = Literal["identity", "typo_correction"]
 EvaluationDatasetSourceKind = Literal["builtin", "inline", "persisted"]
 EvaluationRunRetentionState = Literal[

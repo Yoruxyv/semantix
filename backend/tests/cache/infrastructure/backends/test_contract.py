@@ -58,6 +58,7 @@ def backend_builder(
         async with cache_backend_lifespan(
             settings,
             dimensions=TEST_EMBEDDING_DIMENSIONS,
+            embedding_space=settings.embedding_space,
         ) as backend:
             try:
                 yield backend

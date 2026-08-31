@@ -8,6 +8,7 @@ from app.providers.adapters.anthropic import AnthropicProvider
 from app.providers.adapters.gemini import GeminiProvider
 from app.providers.adapters.huggingface import HuggingFaceProvider
 from app.providers.adapters.openai import OpenAIProvider
+from app.providers.configuration import selected_generation_configuration
 from app.providers.factory import (
     create_embedding_provider,
     create_generation_provider,
@@ -43,6 +44,10 @@ async def test_factory_reuses_default_provider() -> None:
         HuggingFaceProvider,
     )
     assert bundle.embedding_provider is bundle.generation_provider
+    assert bundle.embedding_space == settings.embedding_space
+    assert dict(bundle.generation_configuration) == (
+        selected_generation_configuration(settings)
+    )
 
 
 @pytest.mark.asyncio

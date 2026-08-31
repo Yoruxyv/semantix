@@ -7,20 +7,13 @@ import {
   isNonNegativeNumber,
   isNonNegativeInteger,
   isNullableNonNegativeNumber,
+  isProviderName,
   isRecord,
   isSha256Hex,
 } from '@/shared/api/validators';
 
 import type { RuntimeDiagnostics, RuntimeMetrics } from '../types';
 
-const isProviderCategory = createEnumGuard([
-  'huggingface',
-  'openai',
-  'anthropic',
-  'gemini',
-  'ollama',
-  'mock',
-] as const);
 const isCacheBackend = createEnumGuard(['memory', 'pgvector'] as const);
 const isCacheReadiness = createEnumGuard(['ready', 'unavailable'] as const);
 const isNormalizationMode = createEnumGuard(['identity', 'typo_correction'] as const);
@@ -85,8 +78,8 @@ function decodeRuntimeDiagnostics(value: unknown): RuntimeDiagnostics {
     !isIsoDate(value.observed_at) ||
     value.process_scope !== 'single_backend_process' ||
     !isNonEmptyString(value.application_version) ||
-    !isProviderCategory(value.embedding_provider_category) ||
-    !isProviderCategory(value.generation_provider_category) ||
+    !isProviderName(value.embedding_provider_category) ||
+    !isProviderName(value.generation_provider_category) ||
     !isNonNegativeInteger(value.embedding_dimensions) ||
     value.embedding_dimensions === 0 ||
     !isSha256Hex(value.embedding_space_fingerprint) ||

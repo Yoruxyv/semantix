@@ -42,3 +42,7 @@ class MockGenerationProvider:
 
     async def generate(self, prompt: str) -> str:
         return f"{MOCK_GENERATION_PREFIX} {prompt}"
+
+
+class MockProvider(MockEmbeddingProvider, MockGenerationProvider):
+    """Dual-capability deterministic provider used by startup composition."""

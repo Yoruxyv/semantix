@@ -52,6 +52,7 @@ async def test_embedding_spaces_remain_isolated_across_restarts() -> None:
     async with cache_backend_lifespan(
         first_settings,
         dimensions=TEST_EMBEDDING_DIMENSIONS,
+        embedding_space=first_settings.embedding_space,
     ) as first:
         await first.clear(None)
         await first.put(stored)
@@ -64,6 +65,7 @@ async def test_embedding_spaces_remain_isolated_across_restarts() -> None:
     async with cache_backend_lifespan(
         second_settings,
         dimensions=TEST_EMBEDDING_DIMENSIONS,
+        embedding_space=second_settings.embedding_space,
     ) as second:
         await second.clear(None)
         assert (await second.stats(None)).size == 0
@@ -84,6 +86,7 @@ async def test_embedding_spaces_remain_isolated_across_restarts() -> None:
     async with cache_backend_lifespan(
         first_settings,
         dimensions=TEST_EMBEDDING_DIMENSIONS,
+        embedding_space=first_settings.embedding_space,
     ) as first:
         nearest = await first.find_nearest(
             unit_vector(),
@@ -110,6 +113,7 @@ async def test_embedding_spaces_remain_isolated_across_restarts() -> None:
     async with cache_backend_lifespan(
         second_settings,
         dimensions=TEST_EMBEDDING_DIMENSIONS,
+        embedding_space=second_settings.embedding_space,
     ) as second:
         nearest = await second.find_nearest(
             unit_vector(),
@@ -117,4 +121,71 @@ async def test_embedding_spaces_remain_isolated_across_restarts() -> None:
         )
         assert nearest is not None
         assert nearest.entry.response == "second response"
+        await second.clear(None)
+
+
+@pytest.mark.asyncio
+async def test_custom_provider_spaces_isolate_equal_dimension_vectors() -> None:
+    database_url = os.getenv("PGVECTOR_TEST_DATABASE_URL")
+    if not database_url:
+        pytest.skip("PGVECTOR_TEST_DATABASE_URL is not configured")
+
+    settings = pgvector_settings(
+        database_url,
+        embedding_model="unused-built-in-space",
+    )
+    first_space = "custom-provider-a:embedding-v1"
+    second_space = "custom-provider-b:embedding-v1"
+    stored = cache_entry(
+        "same prompt and vector",
+        "provider A response",
+        vector_index=0,
+    )
+
+    async with cache_backend_lifespan(
+        settings,
+        dimensions=TEST_EMBEDDING_DIMENSIONS,
+        embedding_space=first_space,
+    ) as first:
+        await first.clear(None)
+        await first.put(stored)
+
+    async with cache_backend_lifespan(
+        settings,
+        dimensions=TEST_EMBEDDING_DIMENSIONS,
+        embedding_space=second_space,
+    ) as second:
+        await second.clear(None)
+        assert (
+            await second.find_nearest(
+                unit_vector(),
+                namespace=DEFAULT_CACHE_NAMESPACE,
+            )
+            is None
+        )
+        await second.put(
+            CacheEntry(
+                **stored.model_dump(exclude={"response"}),
+                response="provider B response",
+            )
+        )
+
+    async with cache_backend_lifespan(
+        settings,
+        dimensions=TEST_EMBEDDING_DIMENSIONS,
+        embedding_space=first_space,
+    ) as first:
+        nearest = await first.find_nearest(
+            unit_vector(),
+            namespace=DEFAULT_CACHE_NAMESPACE,
+        )
+        assert nearest is not None
+        assert nearest.entry.response == "provider A response"
+        await first.clear(None)
+
+    async with cache_backend_lifespan(
+        settings,
+        dimensions=TEST_EMBEDDING_DIMENSIONS,
+        embedding_space=second_space,
+    ) as second:
         await second.clear(None)

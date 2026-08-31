@@ -15,6 +15,7 @@ async def cache_backend_lifespan(
     settings: Settings,
     *,
     dimensions: int,
+    embedding_space: str,
     events: CacheEventRecorder | None = None,
     pool: Pool | None = None,
 ) -> AsyncIterator[CacheBackend]:
@@ -33,7 +34,7 @@ async def cache_backend_lifespan(
             settings.max_cache_size,
             settings.cache_ttl_seconds,
             dimensions=dimensions,
-            embedding_space=settings.embedding_space,
+            embedding_space=embedding_space,
             events=events,
         )
         return
@@ -47,7 +48,7 @@ async def cache_backend_lifespan(
             settings.max_cache_size,
             settings.cache_ttl_seconds,
             dimensions=dimensions,
-            embedding_space=settings.embedding_space,
+            embedding_space=embedding_space,
             events=events,
         )
     finally:

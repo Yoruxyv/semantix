@@ -50,6 +50,10 @@ export function isSha256Hex(value: unknown): value is string {
   return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 }
 
+export function isProviderName(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,49}$/.test(value);
+}
+
 export function createEnumGuard<const TValue extends string>(
   values: readonly TValue[],
 ): (value: unknown) => value is TValue {
