@@ -23,6 +23,7 @@ coverage/
 frontend/playwright-report/
 frontend/test-results/
 frontend/lighthouse-reports/
+sdk/build/
 sdk/dist/
 .vite_cache/
 frontend/.vite-cache

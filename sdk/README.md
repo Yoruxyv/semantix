@@ -458,6 +458,19 @@ Perform this manually after the documentation PR is merged. The goal is to
 experience the SDK as an external developer, so after building the wheel do not
 inspect Semantix source to complete the exercise.
 
+Use a disposable namespace for each policy scenario. Inspect or clear only that
+namespace before and after the scenario:
+
+```powershell
+curl.exe "http://localhost:8000/api/v1/cache/entries?namespace=sdk-dogfood-read-only&offset=0&limit=100&sort=newest"
+curl.exe -X DELETE "http://localhost:8000/api/v1/cache?namespace=sdk-dogfood-read-only"
+```
+
+Prefer namespace-scoped deletion for dogfood isolation. Omitting `namespace`
+clears the entire active cache and should not be used casually. With
+authentication enabled, inspection requires Viewer access and deletion requires
+Admin access; see the [cache API reference](../docs/reference/api.md#cache-inspector-query).
+
 - [ ] Start a disposable, network-free Semantix server with mock embedding and
       generation providers.
 - [ ] For authentication checks, enable token mode with one Operator token
