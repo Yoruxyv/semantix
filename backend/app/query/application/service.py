@@ -1,5 +1,5 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Protocol
@@ -64,9 +64,21 @@ class QueryService:
         if self._metrics is not None:
             self._metrics.record_request_started()
         try:
+            if policy.cache_ttl_seconds is not None and not policy.write_enabled:
+                raise ValueError(
+                    "cache_ttl_seconds requires a cache policy that permits writes"
+                )
+            effective_policy = replace(
+                policy,
+                cache_ttl_seconds=(
+                    self._cache.resolve_ttl(policy.cache_ttl_seconds)
+                    if policy.write_enabled
+                    else None
+                ),
+            )
             coalesced = await self._coalescer.run(
-                policy.coalescing_key(prompt),
-                lambda: self._resolve(prompt, policy),
+                effective_policy.coalescing_key(prompt),
+                lambda: self._resolve(prompt, effective_policy),
             )
             resolution = coalesced.value
             lookup = resolution.lookup
@@ -145,6 +157,7 @@ class QueryService:
                 response,
                 None if lookup is None else lookup.embedding,
                 namespace=policy.namespace,
+                ttl_seconds=policy.cache_ttl_seconds,
             )
         return _QueryResolution(lookup=lookup, response=response)
 

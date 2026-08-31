@@ -52,6 +52,7 @@ def test_query_serializes_policy_and_authentication(
         assert request.headers["authorization"] == "Bearer token-value"
         assert payload["prompt"] == "Where can I reset my password?"
         assert payload["namespace"] == "support"
+        assert "cache_ttl_seconds" not in payload
         assert (
             payload["cache_enabled"],
             payload["cache_read_enabled"],
@@ -75,6 +76,18 @@ def test_query_serializes_policy_and_authentication(
     assert not result.cache_hit
     with pytest.raises(FrozenInstanceError):
         result.response = "changed"  # type: ignore[misc]
+
+
+def test_query_serializes_requested_cache_ttl() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request_json(request)["cache_ttl_seconds"] == 900
+        return httpx.Response(200, json=query_response())
+
+    with SemantixClient(
+        base_url="https://example.com",
+        _http_transport=httpx.MockTransport(handler),
+    ) as client:
+        client.query("question", cache_ttl_seconds=900)
 
 
 def test_token_is_optional_and_default_namespace_is_serialized() -> None:

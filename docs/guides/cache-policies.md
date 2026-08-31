@@ -45,6 +45,19 @@ change backend decisions until applied.
 `CACHE_TTL_SECONDS` controls entry lifetime. Expired entries are removed before
 cache operations and inspector results.
 
+API and Python SDK callers may request `cache_ttl_seconds` from `1` through
+`31,536,000` on Normal or Refresh requests. The server remains authoritative:
+a finite `CACHE_TTL_SECONDS` caps the request, while a server configured with
+no default TTL uses the requested value. Omission or `null` keeps the configured
+default and never means no expiry. Cache hits do not extend an entry's lifetime;
+a Refresh write replaces the entry and starts its effective TTL at that write.
+
+Read only, Bypass, and Private requests cannot write, so supplying a request TTL
+with those modes returns HTTP `422` before provider work. Concurrent misses may
+coalesce only when their effective TTL and other cache-policy fields match.
+Different TTLs still write the existing namespace-scoped key, so the normal
+replacement semantics apply; TTL is not part of the persistent cache key.
+
 `MAX_CACHE_SIZE` bounds entries in the active embedding space. When insertion
 would exceed that limit, the least recently used entry is evicted. Reads update
 hit count and recency.
@@ -77,12 +90,12 @@ query namespace.
 
 Query requests support:
 
-| Input | Effect |
-|---|---|
-| `cache_enabled=false` | Disable both reads and writes |
-| `cache_read_enabled=false` | Skip lookup |
+| Input                       | Effect                        |
+| --------------------------- | ----------------------------- |
+| `cache_enabled=false`       | Disable both reads and writes |
+| `cache_read_enabled=false`  | Skip lookup                   |
 | `cache_write_enabled=false` | Do not store generated output |
-| `private=true` | Disable reads and writes |
+| `private=true`              | Disable reads and writes      |
 
 `cache_enabled=false` overrides the granular flags. `private=true` also forces
 both operations off. Semantix does not attempt automatic secret detection;

@@ -18,6 +18,9 @@ class CacheBackend(Protocol):
     Persistent implementations must partition incompatible embedding spaces.
     """
 
+    @property
+    def default_ttl_seconds(self) -> float | None: ...
+
     async def find_nearest(
         self,
         embedding: Sequence[float],
@@ -25,7 +28,12 @@ class CacheBackend(Protocol):
         namespace: str,
     ) -> CacheCandidate | None: ...
 
-    async def put(self, entry: CacheEntry) -> None: ...
+    async def put(
+        self,
+        entry: CacheEntry,
+        *,
+        ttl_seconds: float | None = None,
+    ) -> None: ...
     async def record_hit(
         self,
         cache_key: str,

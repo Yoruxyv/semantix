@@ -5,32 +5,32 @@ Application errors use a stable object containing `error` and `detail`.
 
 ## Endpoints
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| `POST` | `/api/v1/query` | Submit a query |
-| `GET` | `/api/v1/cache/stats` | Read global or namespace cache statistics |
-| `GET` | `/api/v1/cache/threshold` | Read the active similarity threshold |
-| `PUT` | `/api/v1/cache/threshold` | Update the active threshold |
-| `GET` | `/api/v1/cache/entries` | Search, sort, and paginate safe cache metadata |
-| `GET` | `/api/v1/cache/entries/{cache_key}` | Read one authorized cache entry with its complete response |
-| `DELETE` | `/api/v1/cache/entries/{cache_key}` | Delete one entry |
-| `DELETE` | `/api/v1/cache` | Clear all entries or one namespace |
-| `GET` | `/api/v1/benchmarks/datasets` | List controlled benchmark datasets |
-| `POST` | `/api/v1/benchmarks/run` | Run an isolated benchmark |
-| `GET` | `/api/v1/evaluations/datasets` | List built-in evaluation datasets |
-| `POST` | `/api/v1/evaluations/datasets/validate` | Validate and preview a session-local JSON dataset |
-| `GET` | `/api/v1/evaluations/datasets/persisted` | List namespace-authorized persisted datasets |
-| `POST` | `/api/v1/evaluations/datasets/persisted` | Persist one validated schema v1 dataset |
-| `GET` | `/api/v1/evaluations/datasets/persisted/{dataset_id}` | Read persisted metadata and ordered cases |
-| `DELETE` | `/api/v1/evaluations/datasets/persisted/{dataset_id}` | Delete one persisted dataset and its cases |
-| `POST` | `/api/v1/evaluations/runs` | Run a built-in, inline, or persisted evaluation dataset |
-| `GET` | `/api/v1/evaluations/runs` | List authorized retained aggregate evaluation history |
-| `GET` | `/api/v1/evaluations/runs/{run_id}` | Read one authorized retained aggregate run |
-| `DELETE` | `/api/v1/evaluations/runs/{run_id}` | Delete one retained run from a concrete namespace |
-| `POST` | `/api/v1/evaluations/runs/compare` | Compare exactly two retained runs with server-backed compatibility checks |
-| `GET` | `/api/v1/metrics` | Read process-local aggregate metrics (global admin only) |
-| `GET` | `/api/v1/diagnostics` | Read allowlisted process diagnostics (global admin only) |
-| `GET` | `/health` | Read application and provider-type health |
+| Method   | Endpoint                                              | Purpose                                                                   |
+| -------- | ----------------------------------------------------- | ------------------------------------------------------------------------- |
+| `POST`   | `/api/v1/query`                                       | Submit a query                                                            |
+| `GET`    | `/api/v1/cache/stats`                                 | Read global or namespace cache statistics                                 |
+| `GET`    | `/api/v1/cache/threshold`                             | Read the active similarity threshold                                      |
+| `PUT`    | `/api/v1/cache/threshold`                             | Update the active threshold                                               |
+| `GET`    | `/api/v1/cache/entries`                               | Search, sort, and paginate safe cache metadata                            |
+| `GET`    | `/api/v1/cache/entries/{cache_key}`                   | Read one authorized cache entry with its complete response                |
+| `DELETE` | `/api/v1/cache/entries/{cache_key}`                   | Delete one entry                                                          |
+| `DELETE` | `/api/v1/cache`                                       | Clear all entries or one namespace                                        |
+| `GET`    | `/api/v1/benchmarks/datasets`                         | List controlled benchmark datasets                                        |
+| `POST`   | `/api/v1/benchmarks/run`                              | Run an isolated benchmark                                                 |
+| `GET`    | `/api/v1/evaluations/datasets`                        | List built-in evaluation datasets                                         |
+| `POST`   | `/api/v1/evaluations/datasets/validate`               | Validate and preview a session-local JSON dataset                         |
+| `GET`    | `/api/v1/evaluations/datasets/persisted`              | List namespace-authorized persisted datasets                              |
+| `POST`   | `/api/v1/evaluations/datasets/persisted`              | Persist one validated schema v1 dataset                                   |
+| `GET`    | `/api/v1/evaluations/datasets/persisted/{dataset_id}` | Read persisted metadata and ordered cases                                 |
+| `DELETE` | `/api/v1/evaluations/datasets/persisted/{dataset_id}` | Delete one persisted dataset and its cases                                |
+| `POST`   | `/api/v1/evaluations/runs`                            | Run a built-in, inline, or persisted evaluation dataset                   |
+| `GET`    | `/api/v1/evaluations/runs`                            | List authorized retained aggregate evaluation history                     |
+| `GET`    | `/api/v1/evaluations/runs/{run_id}`                   | Read one authorized retained aggregate run                                |
+| `DELETE` | `/api/v1/evaluations/runs/{run_id}`                   | Delete one retained run from a concrete namespace                         |
+| `POST`   | `/api/v1/evaluations/runs/compare`                    | Compare exactly two retained runs with server-backed compatibility checks |
+| `GET`    | `/api/v1/metrics`                                     | Read process-local aggregate metrics (global admin only)                  |
+| `GET`    | `/api/v1/diagnostics`                                 | Read allowlisted process diagnostics (global admin only)                  |
+| `GET`    | `/health`                                             | Read application and provider-type health                                 |
 
 The frontend exposes the evaluation laboratory at canonical route
 `/evaluations`; `/benchmarks` is a replace-redirect kept for compatibility.
@@ -46,7 +46,8 @@ Canonical backend contracts use `/api/v1/evaluations/*`. The existing
   "cache_enabled": true,
   "cache_read_enabled": true,
   "cache_write_enabled": true,
-  "private": false
+  "private": false,
+  "cache_ttl_seconds": 900
 }
 ```
 
@@ -54,6 +55,15 @@ Only `prompt` is required. `cache_enabled=false` overrides both granular flags.
 `private=true` also disables reads and writes. Disabling reads while keeping
 writes enabled refreshes the entry from the provider; disabling writes still
 permits an eligible cached response.
+
+`cache_ttl_seconds` is optional and accepts an integer from `1` through
+`31,536,000`. Omission or `null` uses the server's configured
+`CACHE_TTL_SECONDS`; it never means unlimited retention. The server caps a
+requested value at a finite configured default, while a server configured
+without a default TTL uses the requested value directly. The field is valid
+only when the effective policy permits writes (Normal or Refresh). Read only,
+Bypass, and Private requests that supply it are rejected with HTTP `422` before
+embedding or generation work. Query responses do not expose the effective TTL.
 
 The endpoint requires Operator capability. Namespace authorization remains
 server-side: a sole concrete namespace can be inferred for older clients, but

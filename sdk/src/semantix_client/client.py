@@ -46,6 +46,7 @@ class SemantixClient:
         *,
         namespace: str = "default",
         policy: CachePolicy = CachePolicy.NORMAL,
+        cache_ttl_seconds: int | None = None,
     ) -> QueryResult:
         """Submit a query to Semantix.
 
@@ -53,6 +54,7 @@ class SemantixClient:
             prompt: User prompt sent through the public query API.
             namespace: Concrete server-authorized cache namespace.
             policy: Cache read/write behavior for this request.
+            cache_ttl_seconds: Optional requested cache lifetime in seconds.
 
         Returns:
             Immutable query evidence returned by Semantix.
@@ -67,6 +69,8 @@ class SemantixClient:
             "namespace": namespace,
             **_policy_fields(policy),
         }
+        if cache_ttl_seconds is not None:
+            payload["cache_ttl_seconds"] = cache_ttl_seconds
         return _decode_query_result(
             self._transport.request("POST", "api/v1/query", payload=payload)
         )

@@ -15,6 +15,7 @@ from app.cache.domain.namespaces import (
 )
 from app.cache.domain.protocols import CacheBackend, CacheEventRecorder
 from app.core.exceptions import CacheEntryNotFoundError
+from app.core.limits import MAX_REQUEST_CACHE_TTL_SECONDS
 from app.providers.protocols import EmbeddingGenerator
 
 
@@ -44,6 +45,18 @@ class SemanticCache:
     @property
     def similarity_threshold(self) -> float:
         return self._similarity_threshold
+
+    def resolve_ttl(self, requested_ttl_seconds: float | None) -> float | None:
+        default_ttl_seconds = self._backend.default_ttl_seconds
+        if requested_ttl_seconds is None:
+            return None if default_ttl_seconds is None else float(default_ttl_seconds)
+        if not 0 < requested_ttl_seconds <= MAX_REQUEST_CACHE_TTL_SECONDS:
+            raise ValueError("cache_ttl_seconds is outside the supported range")
+        return float(
+            requested_ttl_seconds
+            if default_ttl_seconds is None
+            else min(requested_ttl_seconds, default_ttl_seconds)
+        )
 
     def update_similarity_threshold(self, threshold: float) -> float:
         if not 0 <= threshold <= 1:
@@ -113,6 +126,7 @@ class SemanticCache:
         embedding: Sequence[float] | None = None,
         *,
         namespace: str = DEFAULT_CACHE_NAMESPACE,
+        ttl_seconds: float | None = None,
     ) -> bool:
         if not response.strip():
             return False
@@ -130,7 +144,8 @@ class SemanticCache:
                 response=response,
                 embedding=[float(value) for value in resolved_embedding],
                 created_at=datetime.now(UTC),
-            )
+            ),
+            ttl_seconds=ttl_seconds,
         )
         return True
 
