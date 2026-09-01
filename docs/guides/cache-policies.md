@@ -58,9 +58,13 @@ coalesce only when their effective TTL and other cache-policy fields match.
 Different TTLs still write the existing namespace-scoped key, so the normal
 replacement semantics apply; TTL is not part of the persistent cache key.
 
-`MAX_CACHE_SIZE` bounds entries in the active embedding space. When insertion
-would exceed that limit, the least recently used entry is evicted. Reads update
-hit count and recency.
+`MAX_CACHE_SIZE` bounds entries in the active embedding space. The process-local
+memory backend accepts at most `5,000` entries to keep semantic scan work
+bounded and preserve server responsiveness. Use pgvector for larger or
+persistent production caches. Values above the memory limit fail configuration
+validation; they are not clamped and do not switch backends automatically.
+When insertion would exceed the configured limit, the least recently used entry
+is evicted. Reads update hit count and recency.
 
 The memory backend resets all entries and counters when its process restarts.
 The pgvector backend persists entries, counters, hit counts, and access times.

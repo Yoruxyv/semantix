@@ -1,13 +1,18 @@
 import asyncio
 import os
+import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from uuid import uuid4
 
+import numpy as np
 import pytest
+from numpy.typing import NDArray
 
+import app.cache.infrastructure.backends.memory as memory_backend_module
 from app.cache.domain.keys import prompt_cache_key
 from app.cache.domain.metadata import TRUNCATED_RESPONSE_PREVIEW_MESSAGE
+from app.cache.domain.models import CacheCandidate, CacheEntry
 from app.cache.domain.namespaces import DEFAULT_CACHE_NAMESPACE
 from app.cache.domain.protocols import CacheBackend
 from app.cache.infrastructure.backends.memory import InMemoryCacheBackend
@@ -543,3 +548,153 @@ async def test_record_hit_rejects_an_overwritten_candidate(
             current_candidate.entry.cache_key,
             expected_created_at=current_candidate.entry.created_at,
         )
+
+
+@pytest.mark.asyncio
+async def test_memory_lookup_calculation_releases_the_state_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = InMemoryCacheBackend(
+        10,
+        None,
+        dimensions=TEST_EMBEDDING_DIMENSIONS,
+    )
+    original = memory_backend_module._find_nearest_in_snapshot
+    calculation_started = threading.Event()
+    continue_calculation = threading.Event()
+    worker_threads: list[int] = []
+
+    def paused_calculation(
+        query: NDArray[np.float64],
+        entries: tuple[CacheEntry, ...],
+    ) -> CacheCandidate:
+        worker_threads.append(threading.get_ident())
+        calculation_started.set()
+        assert continue_calculation.wait(timeout=5)
+        return original(query, entries)
+
+    monkeypatch.setattr(
+        memory_backend_module,
+        "_find_nearest_in_snapshot",
+        paused_calculation,
+    )
+    first = cache_entry("first", "first response", vector_index=0)
+    await backend.put(first)
+    lookup = asyncio.create_task(
+        backend.find_nearest(
+            unit_vector(),
+            namespace=DEFAULT_CACHE_NAMESPACE,
+        )
+    )
+
+    assert await asyncio.to_thread(calculation_started.wait, 1)
+    second = cache_entry("second", "second response", vector_index=1)
+    await asyncio.wait_for(backend.put(second), timeout=1)
+    continue_calculation.set()
+    candidate = await lookup
+
+    assert len(worker_threads) == 1
+    assert worker_threads[0] != threading.get_ident()
+    assert candidate is not None
+    assert candidate.entry.cache_key == first.cache_key
+
+
+@pytest.mark.asyncio
+async def test_memory_lookup_drops_a_concurrently_deleted_candidate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = InMemoryCacheBackend(
+        10,
+        None,
+        dimensions=TEST_EMBEDDING_DIMENSIONS,
+    )
+    original = memory_backend_module._find_nearest_in_snapshot
+    calculation_started = threading.Event()
+    continue_calculation = threading.Event()
+
+    def paused_calculation(
+        query: NDArray[np.float64],
+        entries: tuple[CacheEntry, ...],
+    ) -> CacheCandidate:
+        calculation_started.set()
+        assert continue_calculation.wait(timeout=5)
+        return original(query, entries)
+
+    monkeypatch.setattr(
+        memory_backend_module,
+        "_find_nearest_in_snapshot",
+        paused_calculation,
+    )
+    entry = cache_entry("deleted", "response", vector_index=0)
+    await backend.put(entry)
+    lookup = asyncio.create_task(
+        backend.find_nearest(
+            unit_vector(),
+            namespace=DEFAULT_CACHE_NAMESPACE,
+        )
+    )
+
+    assert await asyncio.to_thread(calculation_started.wait, 1)
+    assert await backend.delete_entry(
+        entry.cache_key,
+        authorized_namespaces=None,
+    )
+    continue_calculation.set()
+
+    assert await lookup is None
+
+
+@pytest.mark.asyncio
+async def test_cancelled_memory_lookup_keeps_its_worker_slot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = InMemoryCacheBackend(
+        10,
+        None,
+        dimensions=TEST_EMBEDDING_DIMENSIONS,
+    )
+    original = memory_backend_module._find_nearest_in_snapshot
+    calculation_started = threading.Event()
+    continue_calculation = threading.Event()
+    worker_calls = 0
+
+    def paused_first_calculation(
+        query: NDArray[np.float64],
+        entries: tuple[CacheEntry, ...],
+    ) -> CacheCandidate:
+        nonlocal worker_calls
+        worker_calls += 1
+        if worker_calls == 1:
+            calculation_started.set()
+            assert continue_calculation.wait(timeout=5)
+        return original(query, entries)
+
+    monkeypatch.setattr(
+        memory_backend_module,
+        "_find_nearest_in_snapshot",
+        paused_first_calculation,
+    )
+    await backend.put(cache_entry("entry", "response", vector_index=0))
+    first = asyncio.create_task(
+        backend.find_nearest(
+            unit_vector(),
+            namespace=DEFAULT_CACHE_NAMESPACE,
+        )
+    )
+    assert await asyncio.to_thread(calculation_started.wait, 1)
+
+    first.cancel()
+    second = asyncio.create_task(
+        backend.find_nearest(
+            unit_vector(),
+            namespace=DEFAULT_CACHE_NAMESPACE,
+        )
+    )
+    await asyncio.sleep(0)
+    assert worker_calls == 1
+
+    continue_calculation.set()
+    with pytest.raises(asyncio.CancelledError):
+        await first
+    assert await second is not None
+    assert worker_calls == 2

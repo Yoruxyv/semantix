@@ -2,7 +2,9 @@
 
 Semantix uses the in-memory cache by default. The optional pgvector backend
 implements the same cache port and preserves entries, namespace counters, hit
-counts, and access timestamps across backend restarts.
+counts, and access timestamps across backend restarts. Use it for larger or
+persistent production cache workloads; the process-local memory backend is
+intentionally limited to `5,000` entries to preserve server responsiveness.
 
 ## Configuration
 

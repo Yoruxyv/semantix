@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from app.cache.infrastructure.database import create_pool, load_migrations
 from app.core.config import Settings
+from app.core.limits import MAX_MEMORY_CACHE_SIZE
 
 ORIGINS = ["http://localhost:5173"]
 
@@ -24,6 +25,41 @@ def test_memory_backend_does_not_require_database_configuration() -> None:
     assert settings.evaluation_dataset_storage == "session"
     assert settings.evaluation_run_history_storage == "disabled"
     assert settings.database_required is False
+
+
+def test_memory_cache_capacity_is_bounded_for_process_liveness() -> None:
+    configured = Settings(
+        cache_backend="memory",
+        max_cache_size=MAX_MEMORY_CACHE_SIZE,
+        hf_api_key="test-only-placeholder",
+        allowed_origins=ORIGINS,
+    )
+
+    assert configured.max_cache_size == MAX_MEMORY_CACHE_SIZE
+
+    for unsafe_size in (MAX_MEMORY_CACHE_SIZE + 1, 50_000, 100_000):
+        with pytest.raises(
+            ValidationError,
+            match="MAX_CACHE_SIZE.*CACHE_BACKEND=memory.*pgvector",
+        ):
+            Settings(
+                cache_backend="memory",
+                max_cache_size=unsafe_size,
+                hf_api_key="test-only-placeholder",
+                allowed_origins=ORIGINS,
+            )
+
+
+def test_pgvector_retains_the_existing_cache_capacity_limit() -> None:
+    configured = Settings(
+        cache_backend="pgvector",
+        max_cache_size=100_000,
+        database_url="postgresql://user:secret@database:5432/semantix",
+        hf_api_key="test-only-placeholder",
+        allowed_origins=ORIGINS,
+    )
+
+    assert configured.max_cache_size == 100_000
 
 
 def test_pgvector_requires_a_postgresql_database_url() -> None:
