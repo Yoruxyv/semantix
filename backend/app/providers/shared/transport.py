@@ -1,5 +1,6 @@
 """Retrying JSON transport shared by HTTP provider adapters."""
 
+import asyncio
 import json
 from collections.abc import Callable, Mapping
 from http import HTTPStatus
@@ -30,6 +31,10 @@ _STREAM_CHUNK_BYTES = 64 * 1024
 
 class _ProviderResponseTooLargeError(InvalidProviderResponseError):
     """Non-retryable rejection of an oversized decoded provider response."""
+
+
+class _ProviderOperationDeadlineExceeded(Exception):
+    """Internal signal for synchronous work crossing the operation deadline."""
 
 
 def create_retry_factory(
@@ -63,15 +68,31 @@ async def post_json(
     retry_factory: RetryFactory,
     max_response_bytes: int = DEFAULT_PROVIDER_MAX_RESPONSE_BYTES,
 ) -> object:
-    async for attempt in retry_factory():
-        with attempt:
-            return await _post_once(
-                client,
-                endpoint,
-                headers=headers,
-                body=body,
-                max_response_bytes=max_response_bytes,
-            )
+    loop = asyncio.get_running_loop()
+    timeout_seconds = client.timeout.read
+    deadline = None if timeout_seconds is None else loop.time() + timeout_seconds
+    operation_timeout = asyncio.timeout_at(deadline)
+
+    try:
+        async with operation_timeout:
+            async for attempt in retry_factory():
+                with attempt:
+                    result = await _post_once(
+                        client,
+                        endpoint,
+                        headers=headers,
+                        body=body,
+                        max_response_bytes=max_response_bytes,
+                    )
+                    if deadline is not None and loop.time() >= deadline:
+                        raise _ProviderOperationDeadlineExceeded
+                    return result
+    except _ProviderOperationDeadlineExceeded as exc:
+        raise ProviderRetryableError("Network failure") from exc
+    except TimeoutError as exc:
+        if not operation_timeout.expired():
+            raise
+        raise ProviderRetryableError("Network failure") from exc
 
     raise ProviderRetryableError("Retry policy ended")
 
