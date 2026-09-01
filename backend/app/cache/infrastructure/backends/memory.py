@@ -26,6 +26,24 @@ from app.cache.infrastructure.backends.memory_records import (
 from app.core.exceptions import CacheStorageError
 
 
+def _find_nearest_in_snapshot(
+    query: NDArray[np.float64],
+    entries: tuple[CacheEntry, ...],
+) -> CacheCandidate:
+    matrix: NDArray[np.float64] = np.asarray(
+        [entry.embedding for entry in entries], dtype=np.float64
+    )
+    norms = np.linalg.norm(matrix, axis=1)
+    if np.any(norms <= np.finfo(np.float64).eps):
+        raise CacheStorageError("Zero magnitude embedding")
+    scores = (matrix @ query) / (norms * float(np.linalg.norm(query)))
+    index = int(np.argmax(scores))
+    return CacheCandidate(
+        entry=entries[index].model_copy(deep=True),
+        similarity_score=max(-1.0, min(1.0, float(scores[index]))),
+    )
+
+
 class InMemoryCacheBackend:
     """Single-process cosine vector store with TTL and LRU invalidation."""
 
@@ -50,6 +68,7 @@ class InMemoryCacheBackend:
         self._items: OrderedDict[str, StoredCacheItem] = OrderedDict()
         self._counters: dict[str, CacheCounters] = {}
         self._lock = asyncio.Lock()
+        self._lookup_slot = asyncio.Semaphore(1)
 
     @property
     def default_ttl_seconds(self) -> float | None:
@@ -79,28 +98,39 @@ class InMemoryCacheBackend:
             dimensions=self._dimensions,
             description="Query",
         )
-        async with self._lock:
-            self._purge()
-            items = [
-                item
-                for item in self._items.values()
-                if item.entry.namespace == namespace
-            ]
-            if not items:
+        async with self._lookup_slot:
+            async with self._lock:
+                self._purge()
+                entries = tuple(
+                    item.entry
+                    for item in self._items.values()
+                    if item.entry.namespace == namespace
+                )
+            if not entries:
                 return None
-            matrix: NDArray[np.float64] = np.asarray(
-                [item.entry.embedding for item in items], dtype=np.float64
+
+            worker = asyncio.create_task(
+                asyncio.to_thread(_find_nearest_in_snapshot, query, entries)
             )
-            norms = np.linalg.norm(matrix, axis=1)
-            query_norm = float(np.linalg.norm(query))
-            if np.any(norms <= np.finfo(np.float64).eps):
-                raise CacheStorageError("Zero magnitude embedding")
-            scores = (matrix @ query) / (norms * query_norm)
-            index = int(np.argmax(scores))
-            return CacheCandidate(
-                entry=items[index].entry.model_copy(deep=True),
-                similarity_score=max(-1.0, min(1.0, float(scores[index]))),
-            )
+            try:
+                candidate = await asyncio.shield(worker)
+            except asyncio.CancelledError:
+                # Thread cancellation is not cooperative; retain the bounded slot.
+                try:
+                    await worker
+                except Exception:
+                    pass
+                raise
+
+            async with self._lock:
+                self._purge()
+                current = self._items.get(candidate.entry.cache_key)
+                if (
+                    current is None
+                    or current.entry.created_at != candidate.entry.created_at
+                ):
+                    return None
+            return candidate
 
     async def put(
         self,

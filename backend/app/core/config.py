@@ -22,6 +22,7 @@ from app.core.limits import (
     DEFAULT_EVALUATION_DATASET_MAX_PERSISTED_PER_NAMESPACE,
     DEFAULT_EVALUATION_DATASET_MAX_RETENTION_DAYS,
     DEFAULT_EVALUATION_MAX_WORKLOAD_QUERIES,
+    MAX_MEMORY_CACHE_SIZE,
 )
 from app.providers.configuration import (
     EmbeddingProviderName,
@@ -257,6 +258,16 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_selected_configuration(self) -> "Settings":
         validate_provider_configuration(self)
+
+        if (
+            self.cache_backend == "memory"
+            and self.max_cache_size > MAX_MEMORY_CACHE_SIZE
+        ):
+            raise ValueError(
+                f"MAX_CACHE_SIZE cannot exceed {MAX_MEMORY_CACHE_SIZE} when "
+                "CACHE_BACKEND=memory; use CACHE_BACKEND=pgvector for larger "
+                "persistent caches"
+            )
 
         if self.database_required:
             self._require_secret(self.database_url, "DATABASE_URL")
