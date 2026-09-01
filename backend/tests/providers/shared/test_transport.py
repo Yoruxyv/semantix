@@ -1,9 +1,18 @@
+import asyncio
 import gzip
+import json
 import logging
+import time
 from collections.abc import AsyncIterator
 
 import httpx
 import pytest
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_fixed,
+)
 
 from app.core.exceptions import (
     InvalidProviderResponseError,
@@ -29,6 +38,32 @@ class TrackingStream(httpx.AsyncByteStream):
         for chunk in self._chunks:
             self.chunks_read += 1
             yield chunk
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+class DelayedStream(TrackingStream):
+    def __init__(self, chunks: tuple[bytes, ...], delay_seconds: float) -> None:
+        super().__init__(chunks)
+        self._delay_seconds = delay_seconds
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        for chunk in self._chunks:
+            await asyncio.sleep(self._delay_seconds)
+            self.chunks_read += 1
+            yield chunk
+
+
+class StallingStream(httpx.AsyncByteStream):
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+        self.closed = False
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        self.started.set()
+        await asyncio.sleep(60)
+        yield b""
 
     async def aclose(self) -> None:
         self.closed = True
@@ -125,6 +160,195 @@ async def test_network_errors_exhaust_retries() -> None:
         )
 
     assert calls == 3
+
+
+@pytest.mark.asyncio
+async def test_total_deadline_bounds_continuous_response_drip() -> None:
+    content = b'{"ok":true}'
+    stream = DelayedStream(tuple(bytes((value,)) for value in content), 0.01)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, request=request, stream=stream)
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), timeout=0.05
+    ) as client:
+        started = asyncio.get_running_loop().time()
+        with pytest.raises(ProviderRetryableError) as error:
+            await post_json(
+                client,
+                "https://api.example.test/resource",
+                headers={"Authorization": "Bearer provider-secret"},
+                body={},
+                retry_factory=no_wait_retrying,
+            )
+        elapsed = asyncio.get_running_loop().time() - started
+
+    assert elapsed < 0.25
+    assert stream.chunks_read < len(content)
+    assert stream.closed
+    assert error.value.error_code == "service_unavailable"
+    assert "provider-secret" not in str(error.value)
+
+
+@pytest.mark.asyncio
+async def test_response_completing_just_inside_deadline_succeeds() -> None:
+    content = b'{"ok":true}'
+    stream = DelayedStream(tuple(bytes((value,)) for value in content), 0.005)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, request=request, stream=stream)
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), timeout=0.2
+    ) as client:
+        result = await post_json(
+            client,
+            "https://api.example.test/resource",
+            headers={},
+            body={},
+            retry_factory=no_wait_retrying,
+        )
+
+    assert result == {"ok": True}
+    assert stream.closed
+
+
+@pytest.mark.asyncio
+async def test_response_completing_after_deadline_fails() -> None:
+    stream = DelayedStream((b'{"ok":true}',), 0.08)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, request=request, stream=stream)
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), timeout=0.04
+    ) as client:
+        with pytest.raises(ProviderRetryableError):
+            await post_json(
+                client,
+                "https://api.example.test/resource",
+                headers={},
+                body={},
+                retry_factory=no_wait_retrying,
+            )
+
+    assert stream.chunks_read == 0
+    assert stream.closed
+
+
+@pytest.mark.asyncio
+async def test_total_deadline_includes_retry_backoff() -> None:
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(503, request=request)
+
+    def slow_retrying() -> AsyncRetrying:
+        return AsyncRetrying(
+            retry=retry_if_exception_type(ProviderRetryableError),
+            stop=stop_after_attempt(3),
+            wait=wait_fixed(0.1),
+            reraise=True,
+        )
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), timeout=0.05
+    ) as client:
+        started = asyncio.get_running_loop().time()
+        with pytest.raises(ProviderRetryableError):
+            await post_json(
+                client,
+                "https://api.example.test/resource",
+                headers={},
+                body={},
+                retry_factory=slow_retrying,
+            )
+        elapsed = asyncio.get_running_loop().time() - started
+
+    assert calls == 1
+    assert elapsed < 0.25
+
+
+@pytest.mark.asyncio
+async def test_deadline_wins_before_stream_crosses_response_limit() -> None:
+    stream = DelayedStream((b"x", b"x", b"x"), 0.03)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, request=request, stream=stream)
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), timeout=0.05
+    ) as client:
+        with pytest.raises(ProviderRetryableError):
+            await post_json(
+                client,
+                "https://api.example.test/resource",
+                headers={},
+                body={},
+                retry_factory=no_wait_retrying,
+                max_response_bytes=1,
+            )
+
+    assert stream.chunks_read == 1
+    assert stream.closed
+
+
+@pytest.mark.asyncio
+async def test_external_cancellation_is_not_mapped_to_provider_timeout() -> None:
+    stream = StallingStream()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, request=request, stream=stream)
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), timeout=5
+    ) as client:
+        operation = asyncio.create_task(
+            post_json(
+                client,
+                "https://api.example.test/resource",
+                headers={},
+                body={},
+                retry_factory=no_wait_retrying,
+            )
+        )
+        await asyncio.wait_for(stream.started.wait(), timeout=1)
+        operation.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await operation
+
+    assert stream.closed
+
+
+@pytest.mark.asyncio
+async def test_synchronous_json_parse_cannot_return_after_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_loads = json.loads
+
+    def slow_loads(value: str | bytes | bytearray) -> object:
+        time.sleep(0.05)
+        return original_loads(value)
+
+    monkeypatch.setattr(json, "loads", slow_loads)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, request=request, json={"ok": True})
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), timeout=0.02
+    ) as client:
+        with pytest.raises(ProviderRetryableError):
+            await post_json(
+                client,
+                "https://api.example.test/resource",
+                headers={},
+                body={},
+                retry_factory=no_wait_retrying,
+            )
 
 
 @pytest.mark.asyncio

@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from app.cache.application.service import SemanticCache
 from app.cache.domain.namespaces import DEFAULT_CACHE_NAMESPACE
 from app.core.config import Settings
-from app.core.exceptions import ProviderRequestError
+from app.core.exceptions import ProviderRequestError, ProviderRetryableError
 from app.core.limits import MAX_REQUEST_CACHE_TTL_SECONDS, MAX_RESPONSE_LENGTH
 from app.factory import create_app
 from app.query.api.router import query
@@ -37,13 +37,18 @@ class FailingProvider:
         )
 
 
+class DeadlineProvider:
+    async def generate(self, prompt: str) -> str:
+        raise ProviderRetryableError("Network failure")
+
+
 class OversizedProvider:
     async def generate(self, prompt: str) -> str:
         return "x" * (MAX_RESPONSE_LENGTH + 1)
 
 
 def query_service(
-    provider: Provider | FailingProvider | OversizedProvider,
+    provider: Provider | FailingProvider | DeadlineProvider | OversizedProvider,
 ) -> QueryService:
     return QueryService(
         SemanticCache(
@@ -267,6 +272,27 @@ def test_provider_error_response_hides_api_key(
     assert response.status_code == 502
     assert response.json()["error"] == "upstream_error"
     assert "test-only-placeholder" not in response.text
+
+
+def test_provider_deadline_uses_existing_safe_public_error(
+    settings: Settings,
+) -> None:
+    app = create_app(settings)
+
+    with TestClient(app) as client:
+        app.state.query_service = query_service(DeadlineProvider())
+        response = client.post(
+            "/api/v1/query",
+            json={"prompt": "one"},
+        )
+        health = client.get("/health")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "error": "service_unavailable",
+        "detail": "The AI service is temporarily unavailable.",
+    }
+    assert health.status_code == 200
 
 
 def test_oversized_provider_response_uses_stable_upstream_error(

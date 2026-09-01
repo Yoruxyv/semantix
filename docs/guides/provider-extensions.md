@@ -145,7 +145,8 @@ For JSON-over-HTTP adapters, `app.providers.extension` also exports the
 supported `post_json`, `create_retry_factory`, and `RetryFactory` transport
 surface. `post_json` preserves the existing bounded streamed reads,
 `Accept-Encoding: identity`, encoded-response rejection, provider error
-mapping, and bounded retry contract. Pass
+mapping, bounded retry contract, and one total deadline across all retries and
+backoff using the shared client's configured provider timeout. Pass
 `context.provider_max_response_bytes` when the default response bound is not
 appropriate for the deployment configuration.
 

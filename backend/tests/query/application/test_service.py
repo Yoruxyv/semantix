@@ -9,6 +9,7 @@ from app.cache.domain.keys import prompt_cache_key
 from app.core.exceptions import (
     InvalidProviderResponseError,
     ProviderRequestError,
+    ProviderRetryableError,
 )
 from app.core.limits import MAX_RESPONSE_LENGTH
 from app.observability.metrics import RuntimeMetrics
@@ -72,6 +73,21 @@ class SequenceProvider:
         if isinstance(outcome, Exception):
             raise outcome
         return outcome
+
+
+class DeadlineProvider:
+    def __init__(self) -> None:
+        self.call_count = 0
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def generate(self, prompt: str) -> str:
+        self.call_count += 1
+        if self.call_count == 1:
+            self.started.set()
+            await self.release.wait()
+            raise ProviderRetryableError("Network failure")
+        return "recovered"
 
 
 def query_service(provider: GenerationProvider) -> QueryService:
@@ -240,6 +256,31 @@ async def test_failed_generation_is_removed_before_retry() -> None:
 
     assert response.response == "answer:retry prompt"
     assert response.provider_called is True
+    assert provider.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_deadline_failure_is_shared_cleaned_and_not_cached() -> None:
+    provider = DeadlineProvider()
+    backend = memory_backend()
+    service = QueryService(SemanticCache(Embeddings(), backend, 0.92), provider)
+    requests = [
+        asyncio.create_task(service.execute("deadline prompt")) for _ in range(100)
+    ]
+
+    await asyncio.wait_for(provider.started.wait(), timeout=1)
+    await asyncio.sleep(0)
+    provider.release.set()
+    failures = await asyncio.gather(*requests, return_exceptions=True)
+
+    assert provider.call_count == 1
+    assert all(isinstance(error, ProviderRetryableError) for error in failures)
+    assert (await backend.stats(None)).size == 0
+
+    recovered = await service.execute("deadline prompt")
+
+    assert recovered.response == "recovered"
+    assert recovered.provider_called is True
     assert provider.call_count == 2
 
 
