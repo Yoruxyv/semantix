@@ -39,6 +39,8 @@ def configure_logging(level: str, secrets: tuple[str, ...]) -> None:
     root.addHandler(handler)
     root.setLevel(level)
 
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
     for logger_name in _UVICORN_LOGGER_NAMES:
         for uvicorn_handler in logging.getLogger(logger_name).handlers:
             uvicorn_handler.setFormatter(formatter)
