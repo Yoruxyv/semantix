@@ -70,3 +70,24 @@ async def test_chunked_oversized_body_is_rejected_while_streaming() -> None:
     assert sent[0]["status"] == 413
     body = cast(bytes, sent[1]["body"])
     assert json.loads(body)["error"] == "request_too_large"
+
+
+@pytest.mark.asyncio
+async def test_exact_boundary_is_forwarded_to_the_app() -> None:
+    sent = await run_request(
+        [(b"content-length", b"8")],
+        [{"type": "http.request", "body": b"12345678", "more_body": False}],
+    )
+    assert sent[0]["status"] == 204
+
+
+@pytest.mark.parametrize("value", [b"-1", b"invalid"])
+@pytest.mark.asyncio
+async def test_malformed_content_length_remains_a_client_error(value: bytes) -> None:
+    sent = await run_request(
+        [(b"content-length", value)],
+        [{"type": "http.request", "body": b"", "more_body": False}],
+    )
+    assert sent[0]["status"] == 400
+    body = cast(bytes, sent[1]["body"])
+    assert json.loads(body)["error"] == "invalid_content_length"
