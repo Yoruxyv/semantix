@@ -1,10 +1,31 @@
 import json
+from typing import cast
 
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 
-class RequestBodyTooLargeError(Exception):
-    pass
+class RequestBodyTooLargeError(HTTPException):
+    error_code = "request_too_large"
+
+    def __init__(self, max_body_bytes: int) -> None:
+        super().__init__(
+            status_code=413,
+            detail=f"Request body exceeds the {max_body_bytes}-byte limit.",
+        )
+
+
+async def request_body_too_large_handler(
+    _request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    error = cast(RequestBodyTooLargeError, exc)
+    return JSONResponse(
+        status_code=error.status_code,
+        content={"error": error.error_code, "detail": error.detail},
+    )
 
 
 class RequestBodyLimitMiddleware:
@@ -59,7 +80,7 @@ class RequestBodyLimitMiddleware:
             if message["type"] == "http.request":
                 consumed += len(message.get("body", b""))
                 if consumed > self._max_body_bytes:
-                    raise RequestBodyTooLargeError
+                    raise RequestBodyTooLargeError(self._max_body_bytes)
             return message
 
         async def tracked_send(message: Message) -> None:
@@ -76,11 +97,12 @@ class RequestBodyLimitMiddleware:
             await self._send_too_large(send)
 
     async def _send_too_large(self, send: Send) -> None:
+        error = RequestBodyTooLargeError(self._max_body_bytes)
         await self._send_error(
             send,
-            413,
-            "request_too_large",
-            f"Request body exceeds the {self._max_body_bytes}-byte limit.",
+            error.status_code,
+            error.error_code,
+            str(error.detail),
         )
 
     @staticmethod

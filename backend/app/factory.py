@@ -19,7 +19,11 @@ from app.core.exceptions import (
 from app.core.logging import configure_logging
 from app.core.version import API_VERSION
 from app.lifecycle import create_lifespan
-from app.middleware.body_limit import RequestBodyLimitMiddleware
+from app.middleware.body_limit import (
+    RequestBodyLimitMiddleware,
+    RequestBodyTooLargeError,
+    request_body_too_large_handler,
+)
 from app.middleware.rate_limit import limiter
 from app.providers.factory import create_default_provider_registry
 from app.providers.registry import ProviderRegistry
@@ -96,6 +100,10 @@ def _configure_middleware(application: FastAPI, settings: Settings) -> None:
 
 
 def _register_exception_handlers(application: FastAPI) -> None:
+    application.add_exception_handler(
+        RequestBodyTooLargeError,
+        request_body_too_large_handler,
+    )
     application.add_exception_handler(AppError, app_error_handler)
     application.add_exception_handler(RequestValidationError, validation_error_handler)
     application.add_exception_handler(RateLimitExceeded, rate_limit_error_handler)
