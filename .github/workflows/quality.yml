@@ -447,16 +447,21 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/semantix-autocrlf/frontend"
           npm ci
+
+          # Install OS dependencies once. Retrying --with-deps after a timeout
+          # can leave apt/dpkg work alive and make the retry fail on its lock.
+          npx playwright install-deps chromium
+
           for attempt in 1 2; do
             if timeout --kill-after=30s 5m \
-              npx playwright install --with-deps chromium; then
+              npx playwright install chromium; then
               exit 0
             fi
             if [[ "$attempt" == "2" ]]; then
               echo "::error::Playwright browser installation failed twice"
               exit 1
             fi
-            echo "::warning::Playwright browser installation stalled or failed; retrying once"
+            echo "::warning::Playwright browser download stalled or failed; retrying once"
             sleep 5
           done
 
