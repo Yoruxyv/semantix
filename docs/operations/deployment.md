@@ -283,6 +283,8 @@ Set `SEMANTIX_HOST_PROXY_RULE_FILE` to that file's absolute host path before sta
 
 The supplied backend runs one process. Rate-limit state remains process-local. Multiple workers or replicas require shared limiter storage before deployment.
 
+See the [Phase 12A multi-replica readiness audit](multi-replica-readiness.md) for the full state inventory and rollout gates.
+
 ## URL configuration validation
 
 `ALLOWED_ORIGINS` entries must be bare HTTP or HTTPS origins: a host
