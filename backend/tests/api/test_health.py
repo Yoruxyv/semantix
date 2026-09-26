@@ -6,7 +6,11 @@ from fastapi.testclient import TestClient
 from app.benchmark.application.service import BenchmarkService
 from app.benchmark.domain.protocols import EvaluationDatasetRepository
 from app.core.config import Settings
-from app.core.exceptions import CacheStorageError, EvaluationDatasetStorageError
+from app.core.exceptions import (
+    CacheStorageError,
+    CoordinationStorageError,
+    EvaluationDatasetStorageError,
+)
 from app.factory import create_app
 
 
@@ -81,3 +85,16 @@ def test_ready_returns_503_when_dataset_storage_is_unavailable() -> None:
         "error": "not_ready",
         "detail": "A required storage dependency is unavailable.",
     }
+
+
+def test_ready_returns_503_when_coordination_is_unavailable() -> None:
+    class FailingCoordination:
+        async def read_threshold(self) -> float:
+            raise CoordinationStorageError
+
+    with TestClient(create_app(settings())) as client:
+        cast(FastAPI, client.app).state.coordination = FailingCoordination()
+        response = client.get("/ready")
+
+    assert response.status_code == 503
+    assert response.json()["error"] == "not_ready"

@@ -116,7 +116,7 @@ semantix/
 
 Deployment yang disediakan sengaja bersifat single-instance dan local-first:
 
-- rate limiting, coalescing, dan metrik runtime bersifat process-local;
+- coalescing dan metrik runtime bersifat process-local; rate limiting produksi dan lockout sesi autentikasi memakai PostgreSQL bersama;
 - endpoint cache-management tidak terautentikasi;
 - CORS dikonfigurasi untuk origin frontend lokal yang telah diketahui;
 - tidak ada distributed lock, message bus, atau platform metrik eksternal yang disertakan.

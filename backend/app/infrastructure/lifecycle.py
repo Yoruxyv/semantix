@@ -8,10 +8,12 @@ from app.cache.infrastructure import database as cache_database
 from app.core.config import Settings
 from app.core.exceptions import (
     CacheStorageError,
+    CoordinationStorageError,
     DatabaseStorageError,
     EvaluationDatasetStorageError,
     EvaluationRunHistoryStorageError,
 )
+from app.infrastructure import coordination_database
 from app.infrastructure.database import create_pool
 
 
@@ -24,6 +26,7 @@ async def database_pool_lifespan(settings: Settings) -> AsyncIterator[Pool | Non
     error_type: (
         type[DatabaseStorageError]
         | type[CacheStorageError]
+        | type[CoordinationStorageError]
         | type[EvaluationDatasetStorageError]
         | type[EvaluationRunHistoryStorageError]
     )
@@ -31,6 +34,8 @@ async def database_pool_lifespan(settings: Settings) -> AsyncIterator[Pool | Non
         error_type = CacheStorageError
     elif settings.evaluation_dataset_storage == "postgres":
         error_type = EvaluationDatasetStorageError
+    elif settings.coordination_backend == "postgres":
+        error_type = CoordinationStorageError
     else:
         error_type = EvaluationRunHistoryStorageError
     pool = await create_pool(
@@ -43,6 +48,8 @@ async def database_pool_lifespan(settings: Settings) -> AsyncIterator[Pool | Non
     )
     try:
         if settings.database_migration_mode == "auto":
+            if settings.coordination_backend == "postgres":
+                await coordination_database.apply_migrations(pool)
             if settings.cache_backend == "pgvector":
                 await cache_database.apply_migrations(pool)
             if (

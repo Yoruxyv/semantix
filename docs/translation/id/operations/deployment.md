@@ -124,7 +124,7 @@ Hanya authentication attempt yang gagal terhadap `/api/v1/auth/session` yang mem
 
 Request yang dibuat selama lock aktif menerima HTTP `429`, header `Retry-After`, dan standard JSON error `authentication_temporarily_locked`. Request tersebut tidak memperpanjang lock atau dihitung sebagai failure tambahan. Authentication failure pada protected endpoint lain tidak memajukan state ini.
 
-Lockout state disimpan dalam memory, bersifat process-local, dan di-reset ketika backend process restart. Single-process deployment yang disediakan karena itu menerapkan progression dalam process tersebut. Multiple backend worker atau replica akan memiliki state independen masing-masing dan memerlukan shared lockout store sebelum dianggap memberikan protection yang setara.
+Production Compose menyimpan lockout state di PostgreSQL sehingga progression bertahan setelah backend restart dan berlaku lintas replica berdasarkan client address tepercaya. Pengembangan lokal secara default memakai memory process. Jika koordinasi PostgreSQL tidak tersedia, autentikasi sesi mengembalikan HTTP `503` tanpa melewati perlindungan lockout.
 
 ## Peran
 
@@ -172,7 +172,7 @@ Buat token dengan `python -c "import secrets; print(secrets.token_hex(32))"`. Si
 
 Atur `SEMANTIX_HOST_PROXY_RULE_FILE` ke path absolut file tersebut pada host sebelum menjalankan production Compose. Compose memasangnya secara read-only menggantikan file aturan gateway yang nonaktif. Verifikasi alamat sumber pada host Docker tujuan; `172.28.0.1` adalah nilai Docker Desktop yang diuji, bukan asumsi untuk semua platform. Jaga file aturan tetap privat dan tidak dilacak Git. Gateway menerima alamat dari proxy hanya jika **sumber dan token** cocok. Token, `X-Real-IP`, dan `Forwarded` dihapus sebelum backend. Jika trust tidak cocok, gateway memakai peer yang dilihatnya; alamat forwarded yang rusak ditolak secara aman oleh backend. Proxy perantara yang tidak tepercaya tetap menjadi klien yang dilihat proxy host kecuali diautentikasi secara terpisah di sana. Batasi `TRUSTED_PROXY_CIDRS` pada network gateway backend yang nyata; jangan tambahkan rentang publik yang luas.
 
-Backend yang disediakan menjalankan satu process. Rate-limit state tetap process-local. Multiple worker atau replica memerlukan shared limiter storage sebelum deployment.
+Production Compose memakai PostgreSQL untuk bucket `RATE_LIMIT` bersama per client dan per route. `/auth/session` tetap di luar kuota biasa dan dilindungi progressive lockout. Pengembangan lokal secara default memakai memory process. Saat koordinasi PostgreSQL tidak tersedia, route yang dibatasi mengembalikan HTTP `503`, tanpa fallback ke counter terpisah per replica. Query coalescing lintas replica tetap ditunda. Similarity threshold global juga disimpan di PostgreSQL: `SIMILARITY_THRESHOLD` hanya mengisi nilai awal saat tabel kosong; perubahan Admin berikutnya bertahan setelah restart backend dan dibaca semua replica. `GET /ready` memeriksa otoritas ini dan mengembalikan `503` jika tidak tersedia.
 
 ## URL configuration validation
 
@@ -199,9 +199,9 @@ Jaga agar value proxy dan backend tetap selaras. Backend limit merupakan final a
 Production database memiliki dua role. Gunakan random password yang aman untuk URL pada contoh Compose, atau lakukan percent-encode pada credential sebelum menempatkannya dalam PostgreSQL URL.
 
 * `POSTGRES_MIGRATION_USER` memiliki extension/schema migration work;
-* `POSTGRES_RUNTIME_USER` hanya menerima schema usage dan DML privilege pada runtime cache table.
+* `POSTGRES_RUNTIME_USER` hanya menerima schema usage dan DML privilege pada tabel cache, evaluasi, dan koordinasi yang dikonfigurasi.
 
-Initialization script membuat runtime login. One-shot `migrate` service terhubung menggunakan `MIGRATION_DATABASE_URL`, menginstal pgvector, menerapkan versioned migration, memberikan runtime privilege, lalu keluar. Backend hanya berjalan setelah job tersebut berhasil.
+Initialization script membuat runtime login. One-shot `migrate` service terhubung menggunakan `MIGRATION_DATABASE_URL`, menginstal pgvector, menerapkan versioned migration termasuk koordinasi `0004`, memberikan runtime privilege, lalu keluar. Backend hanya berjalan setelah job tersebut berhasil.
 
 Applied migration mencatat checksum SHA-256. Startup menolak packaged migration yang isinya tidak lagi cocok dengan recorded checksum. Legacy `0001` row tanpa checksum hanya di-backfill setelah released cache table dan required column diverifikasi; version berikutnya tanpa checksum akan fail closed dan memerlukan operator review.
 

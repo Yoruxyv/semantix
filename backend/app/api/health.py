@@ -2,7 +2,11 @@ from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 
 from app.api.schemas import HealthResponse, ReadinessResponse
-from app.core.exceptions import CacheStorageError, EvaluationDatasetStorageError
+from app.core.exceptions import (
+    CacheStorageError,
+    CoordinationStorageError,
+    EvaluationDatasetStorageError,
+)
 
 router = APIRouter(tags=["health"])
 
@@ -25,7 +29,10 @@ async def ready(request: Request) -> ReadinessResponse | JSONResponse:
     try:
         await request.app.state.semantic_cache.stats()
         await request.app.state.benchmark_service.dataset_catalog_readiness()
-    except (CacheStorageError, EvaluationDatasetStorageError):
+        coordination = request.app.state.coordination
+        if coordination is not None:
+            await coordination.read_threshold()
+    except (CacheStorageError, CoordinationStorageError, EvaluationDatasetStorageError):
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={

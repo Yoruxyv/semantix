@@ -101,7 +101,7 @@ class QueryService:
                 cache_hit=cache_hit,
                 similarity_score=(None if lookup is None else lookup.similarity_score),
                 similarity_threshold=(
-                    self._cache.similarity_threshold
+                    await self._cache.read_similarity_threshold()
                     if lookup is None
                     else lookup.similarity_threshold
                 ),

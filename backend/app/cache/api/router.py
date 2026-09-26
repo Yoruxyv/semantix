@@ -117,7 +117,7 @@ async def get_threshold(
     cache: SemanticCacheDependency,
     principal: ViewerPrincipal,
 ) -> CacheThresholdResponse:
-    return CacheThresholdResponse(threshold=cache.similarity_threshold)
+    return CacheThresholdResponse(threshold=await cache.read_similarity_threshold())
 
 
 @router.put("/threshold", response_model=CacheThresholdResponse)
@@ -128,5 +128,5 @@ async def update_threshold(
     cache: SemanticCacheDependency,
     principal: GlobalAdminPrincipal,
 ) -> CacheThresholdResponse:
-    threshold = cache.update_similarity_threshold(payload.threshold)
+    threshold = await cache.write_similarity_threshold(payload.threshold)
     return CacheThresholdResponse(threshold=threshold)

@@ -199,8 +199,8 @@ semantix/
 
 The supplied deployment is intentionally single-instance and local-first:
 
-- rate limiting, coalescing, runtime metrics, and runtime diagnostics are
-  process-local;
+- coalescing, runtime metrics, and runtime diagnostics are process-local;
+  production rate limiting and session-auth lockouts use PostgreSQL;
 - authentication can be disabled for trusted local development or configured
   with namespace-scoped token principals;
 - CORS is configured for known local frontend origins;

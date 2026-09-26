@@ -58,7 +58,7 @@ Hardened stack yang disediakan bukan merupakan complete multi-tenant service. St
 
 ## Keterbatasan desain yang diketahui
 
-* Rate limiting, metrics, dan request coalescing tetap bersifat process-local. Runtime
+* Metrics dan request coalescing tetap bersifat process-local; rate limiting produksi dan lockout sesi autentikasi memakai koordinasi PostgreSQL bersama. Runtime
   metrics merupakan global operational surface yang dibatasi untuk global
   administrator; namespace user memiliki scoped cache statistics sebagai gantinya.
 * Hosted provider menerima prompt yang dipilih oleh authorized operator.

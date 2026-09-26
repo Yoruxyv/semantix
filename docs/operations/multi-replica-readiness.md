@@ -1,6 +1,6 @@
 # Phase 12A: multi-replica readiness audit
 
-**Verdict: not ready for two backend replicas.** This is a source-based audit of the current production configuration, not a deployment change. The existing production Compose file starts one backend process with `pgvector` cache, PostgreSQL, token authentication, and a five-connection maximum pool per process. A second replica would share PostgreSQL data but would split rate-limit counters, progressive session-auth lockouts, and the mutable cache threshold. It would also multiply provider and database demand without a defined drain procedure. No load balancer or CQRS change is part of this phase.
+**Phase 12A verdict: not ready for two backend replicas.** This is the source-based audit snapshot taken before Phase 12B. At that point production Compose started one backend process with `pgvector` cache, PostgreSQL, token authentication, and a five-connection maximum pool per process. A second replica would have shared PostgreSQL data but split rate-limit counters, progressive session-auth lockouts, and the mutable cache threshold. It would also have multiplied provider and database demand without a defined drain procedure. No load balancer or CQRS change was part of the audit.
 
 The classifications below describe the **required ownership**, not a claim that current code already meets it. “Shared” means all replicas in one deployment see the same authoritative state. “Replica-local” means no cross-replica consistency is needed.
 
@@ -61,5 +61,17 @@ Keep the one-replica production topology until all of these are demonstrated wit
 4. The calculated DB connection ceiling and provider quotas permit the chosen replica count with headroom.
 5. One replica can be removed, drained, and stopped during active query/evaluation work without orphaned provider calls or misleading retained history.
 6. Per-replica health/metrics and shared cache statistics are labeled and interpreted according to their actual scope.
+
+## Phase 12B status
+
+Production Compose now selects PostgreSQL coordination for atomic route rate
+buckets, progressive session-auth lockouts, and the global threshold. The
+migration job creates these tables and grants the runtime role access. Local
+development still defaults to process memory. Shared coordination fails closed
+when PostgreSQL is unavailable; optional cross-replica query coalescing remains
+deferred. The original matrix above records the Phase 12A baseline.
+
+The overall rollout verdict remains **not ready**: this phase does not add a
+multi-replica router, provider capacity budget, or graceful drain contract.
 
 **MULTI-REPLICA READINESS AUDIT COMPLETE**

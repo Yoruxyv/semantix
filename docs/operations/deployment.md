@@ -185,11 +185,11 @@ header, and the standard `authentication_temporarily_locked` error. They do
 not extend the lock or count as additional failures. Authentication failures
 on other protected endpoints do not advance this state.
 
-Lockout state is held in memory, is process-local, and resets when the backend
-process restarts. The supplied single-process deployment therefore enforces
-the progression within that process. Multiple backend workers or replicas
-would each have independent state and require a shared lockout store before
-being treated as equivalent protection.
+Production Compose stores lockout state in PostgreSQL, so the progression
+survives backend restarts and is enforced across replicas using the trusted
+client address. Local development defaults to process memory. If PostgreSQL
+coordination is unavailable, session authentication returns HTTP `503`
+instead of accepting attempts without lockout protection.
 
 ## Roles
 
@@ -281,7 +281,19 @@ Generate the token with `python -c "import secrets; print(secrets.token_hex(32))
 
 Set `SEMANTIX_HOST_PROXY_RULE_FILE` to that file's absolute host path before starting production Compose. Compose mounts it read-only over the gateway's disabled rule file. Verify the observed source on the target Docker host; `172.28.0.1` is the tested Docker Desktop value, not a portable assumption. Keep the rule file private and untracked. The gateway accepts the proxy-supplied address only when **both** the source and token match. It strips the token, `X-Real-IP`, and `Forwarded` before the backend. Missing or mismatched trust falls back to the gateway-observed peer; malformed forwarded addresses fail closed in the backend. An untrusted intermediate proxy remains the host proxy's observed client unless separately authenticated there. Keep `TRUSTED_PROXY_CIDRS` limited to the backend's actual gateway network; do not add broad public ranges.
 
-The supplied backend runs one process. Rate-limit state remains process-local. Multiple workers or replicas require shared limiter storage before deployment.
+Production Compose uses PostgreSQL as the shared authority for per-client,
+per-route `RATE_LIMIT` buckets. It keeps `/auth/session` outside this ordinary
+quota; the progressive lockout above applies there. Local development defaults
+to process memory. If PostgreSQL coordination is unavailable, limited routes
+return HTTP `503` instead of falling back to independent replica counters.
+Expired rate buckets and stale lockout rows are cleaned up opportunistically.
+Cross-replica query coalescing remains local by design.
+
+The global similarity threshold is also stored in PostgreSQL in production.
+`SIMILARITY_THRESHOLD` seeds it only when the coordination table is empty;
+later Admin updates survive backend restarts and are read by every replica.
+Use the authorized threshold API to change a persisted value.
+`GET /ready` checks this authority and returns `503` if it is unavailable.
 
 See the [Phase 12A multi-replica readiness audit](multi-replica-readiness.md) for the full state inventory and rollout gates.
 
@@ -334,15 +346,17 @@ route behind the same authenticated proxy boundary as the other `/api` routes.
 The production database has two roles. Use URL-safe random passwords for the Compose example, or percent-encode credentials before placing them in a PostgreSQL URL.
 
 - `POSTGRES_MIGRATION_USER` owns extension/schema migration work;
-- `POSTGRES_RUNTIME_USER` receives only schema usage and DML privileges on the configured cache and evaluation dataset tables.
+- `POSTGRES_RUNTIME_USER` receives only schema usage and DML privileges on the configured cache, evaluation, and coordination tables.
 
 The initialization script creates the runtime login. The one-shot `migrate`
 service connects with `MIGRATION_DATABASE_URL`, applies migrations for the
-enabled cache and evaluation storage features, grants their runtime privileges,
+enabled cache, evaluation, and coordination features, grants runtime privileges,
 and exits. Cache migration `0001` installs pgvector and cache tables;
 evaluation migration `0002` adds dataset and case tables; migration `0003`
 adds exactly two aggregate history tables, `evaluation_runs` and
-`evaluation_run_thresholds`. The backend starts only after that job succeeds.
+`evaluation_run_thresholds`. Coordination migration `0004` adds rate buckets,
+session-auth lockout state, and the global similarity threshold. The backend
+starts only after that job succeeds.
 
 Applied migrations record a SHA-256 checksum. Startup rejects a packaged
 migration whose contents no longer match its recorded checksum. A legacy
@@ -351,10 +365,10 @@ tables and required columns are verified; later checksum-less versions fail
 closed and require operator review.
 
 One PostgreSQL pool is shared by whichever PostgreSQL-backed Semantix features
-are enabled: pgvector cache, persisted evaluation datasets, and durable run
-history. A memory live cache can use either evaluation persistence feature
-independently; pgvector cache can keep datasets session-only and history
-disabled.
+are enabled: pgvector cache, persisted evaluation datasets, durable run
+history, and PostgreSQL coordination. A memory live cache can use either
+evaluation persistence feature independently; pgvector cache can keep datasets
+session-only and history disabled.
 
 The backend receives only `DATABASE_URL` for the runtime role and sets:
 
