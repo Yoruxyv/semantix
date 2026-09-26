@@ -63,5 +63,15 @@ def test_gateway_observed_peer_is_authoritative() -> None:
 
 
 def test_malformed_forwarded_header_fails_closed_to_the_peer() -> None:
-    request = request_for("172.28.0.5", "not-an-ip", ["172.28.0.0/24"])
-    assert client_address(request) == "172.28.0.5"
+    for forwarded in ("not-an-ip", "198.51.100.10,,203.0.113.50"):
+        request = request_for("172.28.0.5", forwarded, ["172.28.0.0/24"])
+        assert client_address(request) == "172.28.0.5"
+
+
+def test_unknown_intermediate_proxy_cannot_claim_an_earlier_address() -> None:
+    request = request_for(
+        "172.28.0.5",
+        "198.51.100.10, 203.0.113.50",
+        ["172.28.0.0/24"],
+    )
+    assert client_address(request) == "203.0.113.50"
