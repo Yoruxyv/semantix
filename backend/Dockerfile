@@ -25,6 +25,12 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get install --only-upgrade --yes --no-install-recommends \
+        libc-bin \
+        libc6 \
+        perl-base \
+        gzip \
+        libpcre2-8-0 \
+        libsqlite3-0 \
         libssl3t64 \
         openssl \
         openssl-provider-legacy \
