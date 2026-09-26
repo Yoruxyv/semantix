@@ -9,6 +9,7 @@ import pytest
 from asyncpg.pool import Pool
 from httpx import ASGITransport, AsyncClient
 
+from app.cache.infrastructure import database as cache_database
 from app.core.config import Settings
 from app.core.exceptions import CoordinationStorageError
 from app.factory import create_app
@@ -29,6 +30,7 @@ async def coordination_pool() -> AsyncIterator[Pool]:
     pool = await asyncpg.create_pool(url, min_size=1, max_size=8)
     async with pool.acquire() as connection:
         await connection.execute("DROP SCHEMA IF EXISTS semantix CASCADE")
+    await cache_database.apply_migrations(pool)
     await apply_migrations(pool)
     try:
         yield pool
