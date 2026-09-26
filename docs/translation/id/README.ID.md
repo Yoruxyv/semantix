@@ -320,7 +320,7 @@ Backend dan frontend menggunakan kepemilikan feature-first. Lihat [Architecture]
 
 - Similarity semantik bersifat probabilistik dan harus dievaluasi untuk setiap model dan beban kerja (workload).
 - Hosted provider dapat menerima prompt dan dapat menimbulkan biaya, latensi, serta kebutuhan penanganan data eksternal.
-- Metrik runtime, rate limiting, dan request coalescing bersifat process-local.
+- Metrik runtime dan request coalescing bersifat process-local; rate limiting produksi memakai koordinasi PostgreSQL bersama.
 - Stack hardened adalah baseline single-instance, bukan platform multi-tenant atau multi-replica yang lengkap.
 - Provider mock ditujukan untuk pengujian, demonstrasi, dan pengembangan UI.
 

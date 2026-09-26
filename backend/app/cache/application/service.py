@@ -13,7 +13,7 @@ from app.cache.domain.namespaces import (
     DEFAULT_CACHE_NAMESPACE,
     AuthorizedNamespaceScope,
 )
-from app.cache.domain.protocols import CacheBackend, CacheEventRecorder
+from app.cache.domain.protocols import CacheBackend, CacheEventRecorder, ThresholdStore
 from app.core.exceptions import CacheEntryNotFoundError
 from app.core.limits import MAX_REQUEST_CACHE_TTL_SECONDS
 from app.providers.protocols import EmbeddingGenerator
@@ -32,6 +32,7 @@ class SemanticCache:
         *,
         prompt_normalizer: Callable[[str], str] = _preserve_prompt,
         events: CacheEventRecorder | None = None,
+        threshold_store: ThresholdStore | None = None,
     ) -> None:
         if not 0 <= similarity_threshold <= 1:
             raise ValueError("similarity_threshold must be between 0 and 1")
@@ -41,6 +42,7 @@ class SemanticCache:
         self._similarity_threshold = similarity_threshold
         self._prompt_normalizer = prompt_normalizer
         self._events = events
+        self._threshold_store = threshold_store
 
     @property
     def similarity_threshold(self) -> float:
@@ -65,13 +67,25 @@ class SemanticCache:
         self._similarity_threshold = threshold
         return self._similarity_threshold
 
+    async def read_similarity_threshold(self) -> float:
+        if self._threshold_store is not None:
+            return await self._threshold_store.read_threshold()
+        return self._similarity_threshold
+
+    async def write_similarity_threshold(self, threshold: float) -> float:
+        if not 0 <= threshold <= 1:
+            raise ValueError("threshold must be between 0 and 1")
+        if self._threshold_store is not None:
+            return await self._threshold_store.write_threshold(threshold)
+        return self.update_similarity_threshold(threshold)
+
     async def lookup(
         self,
         prompt: str,
         *,
         namespace: str = DEFAULT_CACHE_NAMESPACE,
     ) -> CacheLookupResult:
-        similarity_threshold = self._similarity_threshold
+        similarity_threshold = await self.read_similarity_threshold()
         matching_prompt = self._prompt_normalizer(prompt)
         embedding = [
             float(value)

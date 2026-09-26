@@ -87,6 +87,22 @@ class DatabaseStorageError(AppError):
     )
 
 
+class CoordinationStorageError(AppError):
+    status_code, error_code, public_detail = (
+        503,
+        "coordination_unavailable",
+        "A required coordination service is temporarily unavailable.",
+    )
+
+
+class SharedRateLimitExceeded(AppError):
+    status_code, error_code, public_detail = (
+        429,
+        "rate_limit_exceeded",
+        "Too many requests. Please try again later.",
+    )
+
+
 class EvaluationDatasetStorageError(AppError):
     status_code, error_code, public_detail = (
         500,

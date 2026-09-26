@@ -1,9 +1,14 @@
 from pathlib import Path
+from types import SimpleNamespace
 
+import pytest
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
+from app.core.exceptions import CoordinationStorageError, SharedRateLimitExceeded
 from app.factory import create_app
+from app.middleware.rate_limit import app_rate_limit, limiter
 
 RATE_LIMITED_PATH = "/api/v1/cache/stats"
 
@@ -134,3 +139,52 @@ def test_limiter_state_and_settings_are_scoped_per_application() -> None:
         assert second.get(RATE_LIMITED_PATH).status_code == 200
         assert second.get(RATE_LIMITED_PATH).status_code == 200
         assert second.get(RATE_LIMITED_PATH).status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_postgres_limiter_uses_one_authority_without_local_fallback() -> None:
+    class FakeCoordination:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str, str, int, int]] = []
+            self.unavailable = False
+
+        async def allow_request(
+            self, address: str, route: str, quota: str, amount: int, seconds: int
+        ) -> bool:
+            if self.unavailable:
+                raise CoordinationStorageError
+            self.calls.append((address, route, quota, amount, seconds))
+            return len(self.calls) == 1
+
+    @limiter.limit(app_rate_limit)
+    async def limited(request: Request) -> str:
+        return "accepted"
+
+    application = FastAPI()
+    application.state.settings = settings("1/minute").model_copy(
+        update={"coordination_backend": "postgres"}
+    )
+    coordinator = FakeCoordination()
+    application.state.coordination = coordinator
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/v1/cache/stats",
+            "headers": [],
+            "client": ("198.51.100.10", 50000),
+            "app": application,
+            "route": SimpleNamespace(path="/api/v1/cache/stats"),
+        }
+    )
+
+    assert await limited(request=request) == "accepted"
+    with pytest.raises(SharedRateLimitExceeded):
+        await limited(request=request)
+    assert coordinator.calls == [
+        ("198.51.100.10", "/api/v1/cache/stats", "1/minute", 1, 60),
+        ("198.51.100.10", "/api/v1/cache/stats", "1/minute", 1, 60),
+    ]
+    coordinator.unavailable = True
+    with pytest.raises(CoordinationStorageError):
+        await limited(request=request)

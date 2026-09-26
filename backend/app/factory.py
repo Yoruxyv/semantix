@@ -77,7 +77,7 @@ def create_app(
     _configure_middleware(application, resolved_settings)
     _register_exception_handlers(application)
 
-    application.state.limiter = limiter
+    application.state.limiter = limiter.local
     application.state.embedding_provider_name = provider_selection.embedding_name
     application.state.generation_provider_name = provider_selection.generation_name
     application.include_router(api_router)

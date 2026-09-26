@@ -24,6 +24,7 @@ from app.core.config import Settings
 from app.core.logging import configure_logging
 from app.core.version import API_VERSION
 from app.embedding.service import EmbeddingService
+from app.infrastructure.coordination import PostgresCoordination
 from app.infrastructure.lifecycle import database_pool_lifespan
 from app.observability.metrics import RuntimeMetrics
 from app.providers.factory import create_provider_bundle
@@ -78,6 +79,18 @@ def create_lifespan(
                     pool=database_pool,
                 ) as backend,
             ):
+                coordination = None
+                if settings.coordination_backend == "postgres":
+                    if database_pool is None:
+                        raise RuntimeError(
+                            "PostgreSQL coordination requires a database pool"
+                        )
+                    coordination = PostgresCoordination(database_pool)
+                    await coordination.initialize_threshold(
+                        settings.similarity_threshold
+                    )
+                application.state.coordination = coordination
+
                 dataset_repository: EvaluationDatasetRepository | None = None
                 if settings.evaluation_dataset_storage == "postgres":
                     if database_pool is None:
@@ -128,6 +141,7 @@ def create_lifespan(
                     settings.similarity_threshold,
                     prompt_normalizer=prompt_normalizer,
                     events=runtime_metrics,
+                    threshold_store=coordination,
                 )
                 application.state.embedding_provider = providers.embedding_provider
                 application.state.generation_provider = providers.generation_provider

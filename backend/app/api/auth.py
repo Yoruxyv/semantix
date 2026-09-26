@@ -5,6 +5,7 @@ from app.core.exceptions import (
     AuthenticationRequiredError,
     AuthenticationTemporarilyLockedError,
 )
+from app.infrastructure.coordination import PostgresCoordination
 from app.middleware.client_address import client_address
 from app.security.auth import authenticate
 from app.security.auth_attempts import AuthenticationAttemptTracker
@@ -32,23 +33,38 @@ async def auth_session(
             namespaces=sorted(principal.namespaces),
         )
 
-    tracker: AuthenticationAttemptTracker = (
-        request.app.state.authentication_attempt_tracker
-    )
     address = client_address(request)
-    retry_after = tracker.retry_after(address)
-    if retry_after is not None:
-        raise AuthenticationTemporarilyLockedError(retry_after)
-
-    try:
-        principal = authenticate(request)
-    except AuthenticationRequiredError:
-        retry_after = tracker.record_failure(address)
+    if settings.coordination_backend == "postgres":
+        coordinator: PostgresCoordination = request.app.state.coordination
+        try:
+            principal = authenticate(request)
+        except AuthenticationRequiredError:
+            retry_after = await coordinator.record_session_attempt(
+                address, succeeded=False
+            )
+            if retry_after is not None:
+                raise AuthenticationTemporarilyLockedError(retry_after) from None
+            raise
+        retry_after = await coordinator.record_session_attempt(address, succeeded=True)
         if retry_after is not None:
-            raise AuthenticationTemporarilyLockedError(retry_after) from None
-        raise
+            raise AuthenticationTemporarilyLockedError(retry_after)
+    else:
+        tracker: AuthenticationAttemptTracker = (
+            request.app.state.authentication_attempt_tracker
+        )
+        retry_after = tracker.retry_after(address)
+        if retry_after is not None:
+            raise AuthenticationTemporarilyLockedError(retry_after)
 
-    tracker.reset(address)
+        try:
+            principal = authenticate(request)
+        except AuthenticationRequiredError:
+            retry_after = tracker.record_failure(address)
+            if retry_after is not None:
+                raise AuthenticationTemporarilyLockedError(retry_after) from None
+            raise
+        tracker.reset(address)
+
     return AuthSessionResponse(
         name=principal.name,
         role=principal.role,

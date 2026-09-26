@@ -111,7 +111,8 @@ threshold-specific evidence, not proof of universal poisoning immunity. See
 
 ## Known design limitations
 
-- Rate limiting, metrics, and request coalescing remain process-local. Runtime
+- Metrics and request coalescing remain process-local; production rate limiting
+  and session-auth lockouts use shared PostgreSQL coordination. Runtime
   metrics are a global operational surface restricted to global
   administrators; namespace users have scoped cache statistics instead.
 - Runtime diagnostics are also global-admin-only and describe one backend

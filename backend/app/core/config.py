@@ -37,6 +37,7 @@ from app.providers.shared.urls import (
 )
 
 CacheBackendName = Literal["memory", "pgvector"]
+CoordinationBackendName = Literal["memory", "postgres"]
 AuthMode = Literal["disabled", "token"]
 AuthRole = Literal["viewer", "operator", "admin"]
 DatabaseMigrationMode = Literal["auto", "external"]
@@ -174,6 +175,7 @@ class Settings(BaseSettings):
     database_connect_timeout_seconds: float = Field(default=10.0, gt=0, le=120)
     database_command_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
     database_migration_mode: DatabaseMigrationMode = "auto"
+    coordination_backend: CoordinationBackendName = "memory"
 
     auth_mode: AuthMode = "disabled"
     auth_principals: list[AuthPrincipalSettings] = Field(default_factory=list)
@@ -345,6 +347,7 @@ class Settings(BaseSettings):
             self.cache_backend == "pgvector"
             or self.evaluation_dataset_storage == "postgres"
             or self.evaluation_run_history_storage == "postgres"
+            or self.coordination_backend == "postgres"
         )
 
     def configured_secrets(self) -> tuple[str, ...]:

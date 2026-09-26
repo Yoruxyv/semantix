@@ -1,10 +1,18 @@
 from dataclasses import dataclass
 from hashlib import sha256
 
+import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 from httpx import Response
 
+from app.api.auth import auth_session
 from app.core.config import Settings
+from app.core.exceptions import (
+    AuthenticationRequiredError,
+    AuthenticationTemporarilyLockedError,
+    CoordinationStorageError,
+)
 from app.factory import create_app
 
 VALID_TOKEN = "valid-operator-token"
@@ -267,3 +275,49 @@ def test_lockout_response_does_not_expose_authentication_secrets() -> None:
     assert VALID_TOKEN not in response.text
     assert configured_hash not in response.text
     assert "operator" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_shared_session_lockout_never_falls_back_to_process_memory() -> None:
+    class FakeCoordination:
+        def __init__(self) -> None:
+            self.locked = False
+            self.unavailable = False
+            self.attempts: list[bool] = []
+
+        async def record_session_attempt(
+            self, address: str, *, succeeded: bool
+        ) -> int | None:
+            assert address == "198.51.100.10"
+            if self.unavailable:
+                raise CoordinationStorageError
+            self.attempts.append(succeeded)
+            return 30 if self.locked else None
+
+    application = create_app(
+        token_settings().model_copy(update={"coordination_backend": "postgres"})
+    )
+    coordinator = FakeCoordination()
+    application.state.coordination = coordinator
+
+    def request(token: str) -> Request:
+        return Request(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/api/v1/auth/session",
+                "headers": [(b"authorization", f"Bearer {token}".encode())],
+                "client": ("198.51.100.10", 50000),
+                "app": application,
+            }
+        )
+
+    with pytest.raises(AuthenticationRequiredError):
+        await auth_session(request("invalid"))
+    coordinator.locked = True
+    with pytest.raises(AuthenticationTemporarilyLockedError):
+        await auth_session(request(VALID_TOKEN))
+    coordinator.unavailable = True
+    with pytest.raises(CoordinationStorageError):
+        await auth_session(request(VALID_TOKEN))
+    assert coordinator.attempts == [False, True]

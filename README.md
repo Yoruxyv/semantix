@@ -388,8 +388,8 @@ boundaries.
   workload.
 - Hosted providers may receive prompts and can introduce cost, latency, and
   external data-handling requirements.
-- Runtime metrics, diagnostics, rate limiting, and request coalescing are
-  process-local.
+- Runtime metrics, diagnostics, and request coalescing are process-local;
+  production rate limiting uses shared PostgreSQL coordination.
 - The hardened stack is a single-instance baseline, not a complete multi-tenant
   or multi-replica platform.
 - Mock providers are for tests, demonstrations, and UI development.
