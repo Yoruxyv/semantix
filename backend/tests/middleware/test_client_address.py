@@ -57,6 +57,11 @@ def test_origin_is_resolved_through_trusted_proxy_hops() -> None:
     assert client_address(request) == "198.51.100.10"
 
 
+def test_gateway_observed_peer_is_authoritative() -> None:
+    request = request_for("172.28.0.2", "172.28.0.1", ["172.28.0.0/24"])
+    assert client_address(request) == "172.28.0.1"
+
+
 def test_malformed_forwarded_header_fails_closed_to_the_peer() -> None:
     request = request_for("172.28.0.5", "not-an-ip", ["172.28.0.0/24"])
     assert client_address(request) == "172.28.0.5"

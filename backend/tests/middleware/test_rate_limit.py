@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
@@ -75,6 +77,28 @@ def test_trusted_proxy_clients_receive_independent_limits() -> None:
 
     assert first.status_code == 200
     assert second.status_code == 200
+
+
+def test_production_gateway_uses_observed_peer_for_one_rate_limit_bucket() -> None:
+    nginx_config = (
+        Path(__file__).resolve().parents[3] / "frontend" / "nginx.conf"
+    ).read_text(encoding="utf-8")
+    assert nginx_config.count("proxy_set_header X-Forwarded-For $remote_addr;") == 3
+    assert "$proxy_add_x_forwarded_for" not in nginx_config
+
+    with TestClient(
+        create_app(settings("2/minute", trusted_proxy_cidrs=["172.28.0.0/24"])),
+        client=("172.28.0.2", 50_000),
+    ) as client:
+        statuses = [
+            client.get(
+                RATE_LIMITED_PATH,
+                headers={"X-Forwarded-For": "172.28.0.1"},
+            ).status_code
+            for _ in range(4)
+        ]
+
+    assert statuses == [200, 200, 429, 429]
 
 
 def test_limiter_state_and_settings_are_scoped_per_application() -> None:
