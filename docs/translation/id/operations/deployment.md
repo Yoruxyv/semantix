@@ -146,7 +146,7 @@ Ini adalah server-side authorization. Frontend control tidak dianggap sebagai se
 
 ## Proxy-aware client addresses
 
-Limiter hanya mempercayai forwarded address ketika direct peer termasuk dalam `TRUSTED_PROXY_CIDRS`. `X-Forwarded-For` yang di-spoof dari peer lain akan diabaikan.
+Frontend gateway mengganti `X-Forwarded-For` yang masuk dengan alamat peer yang dilihatnya. Limiter hanya mempercayai alamat dari gateway ketika direct peer backend termasuk dalam `TRUSTED_PROXY_CIDRS`. Pemanggil langsung di luar CIDR tersebut tidak dapat mengubah identitasnya melalui header.
 
 Production Compose network menggunakan `172.28.0.0/24`, sehingga default-nya adalah:
 
@@ -154,7 +154,7 @@ Production Compose network menggunakan `172.28.0.0/24`, sehingga default-nya ada
 TRUSTED_PROXY_CIDRS=["172.28.0.0/24"]
 ```
 
-Ketika TLS proxy tepercaya lainnya menambahkan forwarding header sebelum frontend gateway, tambahkan source CIDR proxy tersebut juga. Jangan menambahkan public range yang luas.
+Gateway default tidak mempercayai header yang dikirim ke gateway oleh TLS proxy pada host. Jika Docker menampilkan proxy host sebagai bridge gateway, para klien berbagi alamat dan kuota rate-limit gateway tersebut. Untuk mempertahankan alamat tiap klien, atur pemulihan IP klien tepercaya pada frontend gateway untuk sumber TLS proxy yang dapat dibedakan; menambahkan CIDR proxy ke pengaturan backend saja tidak memulihkan alamat asli. Jangan mempercayai public range yang luas.
 
 Backend yang disediakan menjalankan satu process. Rate-limit state tetap process-local. Multiple worker atau replica memerlukan shared limiter storage sebelum deployment.
 

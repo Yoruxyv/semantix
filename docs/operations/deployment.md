@@ -255,7 +255,7 @@ and the repository [threat model](../../SECURITY.md#semantic-cache-poisoning-thr
 
 ## Proxy-aware client addresses
 
-The limiter trusts forwarded addresses only when the direct peer belongs to `TRUSTED_PROXY_CIDRS`. Spoofed `X-Forwarded-For` from any other peer is ignored.
+The frontend gateway replaces incoming `X-Forwarded-For` with the peer address it observes. The limiter trusts that gateway-provided address only when the backend's direct peer belongs to `TRUSTED_PROXY_CIDRS`. Direct callers outside those CIDRs cannot override their identity with a header.
 
 The production Compose network uses `172.28.0.0/24`, so the default is:
 
@@ -263,7 +263,7 @@ The production Compose network uses `172.28.0.0/24`, so the default is:
 TRUSTED_PROXY_CIDRS=["172.28.0.0/24"]
 ```
 
-When another trusted TLS proxy adds forwarding headers before the frontend gateway, add that proxy's source CIDR as well. Do not add broad public ranges.
+The default gateway does not trust headers supplied to it by a host TLS proxy. If Docker presents the host proxy as its bridge gateway, those clients share that gateway address and rate-limit bucket. To retain individual client addresses, configure trusted client-IP restoration at the frontend gateway for a separately identifiable TLS proxy source; adding its CIDR to the backend setting alone does not restore the original address. Do not trust broad public ranges.
 
 The supplied backend runs one process. Rate-limit state remains process-local. Multiple workers or replicas require shared limiter storage before deployment.
 
