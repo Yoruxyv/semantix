@@ -63,27 +63,48 @@ def test_untrusted_forwarded_address_cannot_evade_the_limit() -> None:
 
 def test_trusted_proxy_clients_receive_independent_limits() -> None:
     with TestClient(
-        create_app(settings("1/minute", trusted_proxy_cidrs=["172.28.0.0/24"])),
+        create_app(settings("2/minute", trusted_proxy_cidrs=["172.28.0.0/24"])),
         client=("172.28.0.5", 50_000),
     ) as client:
-        first = client.get(
-            RATE_LIMITED_PATH,
-            headers={"X-Forwarded-For": "198.51.100.10"},
-        )
-        second = client.get(
-            RATE_LIMITED_PATH,
-            headers={"X-Forwarded-For": "198.51.100.11"},
-        )
+        statuses = [
+            client.get(
+                RATE_LIMITED_PATH, headers={"X-Forwarded-For": address}
+            ).status_code
+            for address in (
+                "198.51.100.10",
+                "198.51.100.10",
+                "198.51.100.10",
+                "198.51.100.11",
+                "198.51.100.11",
+            )
+        ]
 
-    assert first.status_code == 200
-    assert second.status_code == 200
+    assert statuses == [200, 200, 429, 200, 200]
 
 
-def test_production_gateway_uses_observed_peer_for_one_rate_limit_bucket() -> None:
-    nginx_config = (
-        Path(__file__).resolve().parents[3] / "frontend" / "nginx.conf"
-    ).read_text(encoding="utf-8")
-    assert nginx_config.count("proxy_set_header X-Forwarded-For $remote_addr;") == 3
+def test_production_gateway_requires_authenticated_host_proxy() -> None:
+    frontend = Path(__file__).resolve().parents[3] / "frontend"
+    nginx_config = (frontend / "nginx.conf").read_text(encoding="utf-8")
+    assert "map_hash_bucket_size 128;" in nginx_config
+    assert (
+        'map "$remote_addr|$http_x_semantix_host_proxy_token" $semantix_forwarded_for {'
+        in nginx_config
+    )
+    assert "default $remote_addr;" in nginx_config
+    assert "include /etc/nginx/host-proxy.conf;" in nginx_config
+    assert all(
+        not line.strip() or line.lstrip().startswith("#")
+        for line in (frontend / "host-proxy.disabled.conf")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
+    assert (
+        nginx_config.count("proxy_set_header X-Forwarded-For $semantix_forwarded_for;")
+        == 3
+    )
+    assert nginx_config.count('proxy_set_header X-Real-IP "";') == 3
+    assert nginx_config.count('proxy_set_header Forwarded "";') == 3
+    assert nginx_config.count('proxy_set_header X-Semantix-Host-Proxy-Token "";') == 3
     assert "$proxy_add_x_forwarded_for" not in nginx_config
 
     with TestClient(

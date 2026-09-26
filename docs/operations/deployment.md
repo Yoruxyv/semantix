@@ -263,7 +263,23 @@ The production Compose network uses `172.28.0.0/24`, so the default is:
 TRUSTED_PROXY_CIDRS=["172.28.0.0/24"]
 ```
 
-The default gateway does not trust headers supplied to it by a host TLS proxy. If Docker presents the host proxy as its bridge gateway, those clients share that gateway address and rate-limit bucket. To retain individual client addresses, configure trusted client-IP restoration at the frontend gateway for a separately identifiable TLS proxy source; adding its CIDR to the backend setting alone does not restore the original address. Do not trust broad public ranges.
+Docker Desktop can present both a host TLS proxy and another host process to the gateway as the same bridge peer (`172.28.0.1` in the verified production network). Source CIDR alone cannot authenticate the host proxy. By default, the gateway ignores incoming `X-Forwarded-For`, `X-Real-IP`, and `Forwarded` for identity and forwards its observed peer; users behind that host proxy then share a rate-limit bucket.
+
+To retain per-client identity, keep the published port bound to loopback and configure the host TLS proxy to **replace** incoming `X-Forwarded-For` with its actual client TCP peer address. It must also replace `X-Semantix-Host-Proxy-Token` with a private, randomly generated 64-character hexadecimal token; never pass either header through from the external caller. For a host Nginx proxy, the upstream location needs the equivalent of:
+
+```nginx
+proxy_pass http://127.0.0.1:8080;
+proxy_set_header X-Forwarded-For $remote_addr;
+proxy_set_header X-Semantix-Host-Proxy-Token "<private-64-hex-token>";
+```
+
+Generate the token with `python -c "import secrets; print(secrets.token_hex(32))"`. Put one map entry in a private file outside the repository, using the **exact gateway-observed source of the host proxy** and the same token:
+
+```nginx
+"172.28.0.1|<private-64-hex-token>" $http_x_forwarded_for;
+```
+
+Set `SEMANTIX_HOST_PROXY_RULE_FILE` to that file's absolute host path before starting production Compose. Compose mounts it read-only over the gateway's disabled rule file. Verify the observed source on the target Docker host; `172.28.0.1` is the tested Docker Desktop value, not a portable assumption. Keep the rule file private and untracked. The gateway accepts the proxy-supplied address only when **both** the source and token match. It strips the token, `X-Real-IP`, and `Forwarded` before the backend. Missing or mismatched trust falls back to the gateway-observed peer; malformed forwarded addresses fail closed in the backend. An untrusted intermediate proxy remains the host proxy's observed client unless separately authenticated there. Keep `TRUSTED_PROXY_CIDRS` limited to the backend's actual gateway network; do not add broad public ranges.
 
 The supplied backend runs one process. Rate-limit state remains process-local. Multiple workers or replicas require shared limiter storage before deployment.
 

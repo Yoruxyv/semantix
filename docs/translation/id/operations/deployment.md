@@ -154,7 +154,23 @@ Production Compose network menggunakan `172.28.0.0/24`, sehingga default-nya ada
 TRUSTED_PROXY_CIDRS=["172.28.0.0/24"]
 ```
 
-Gateway default tidak mempercayai header yang dikirim ke gateway oleh TLS proxy pada host. Jika Docker menampilkan proxy host sebagai bridge gateway, para klien berbagi alamat dan kuota rate-limit gateway tersebut. Untuk mempertahankan alamat tiap klien, atur pemulihan IP klien tepercaya pada frontend gateway untuk sumber TLS proxy yang dapat dibedakan; menambahkan CIDR proxy ke pengaturan backend saja tidak memulihkan alamat asli. Jangan mempercayai public range yang luas.
+Docker Desktop dapat menampilkan TLS proxy pada host dan proses host lain kepada gateway sebagai bridge peer yang sama (`172.28.0.1` pada network produksi yang diuji). CIDR sumber saja tidak dapat mengautentikasi proxy host. Secara default gateway mengabaikan `X-Forwarded-For`, `X-Real-IP`, dan `Forwarded` yang masuk sebagai identitas dan meneruskan peer yang dilihatnya; pengguna di belakang proxy host tersebut lalu berbagi kuota rate-limit.
+
+Untuk mempertahankan identitas tiap klien, biarkan port publikasi terikat ke loopback dan atur TLS proxy host agar **mengganti** `X-Forwarded-For` yang masuk dengan alamat TCP peer klien yang sebenarnya. Proxy juga harus mengganti `X-Semantix-Host-Proxy-Token` dengan token privat acak sepanjang 64 karakter heksadesimal; jangan meneruskan kedua header dari pemanggil eksternal. Untuk Nginx pada host, lokasi upstream memerlukan konfigurasi setara dengan:
+
+```nginx
+proxy_pass http://127.0.0.1:8080;
+proxy_set_header X-Forwarded-For $remote_addr;
+proxy_set_header X-Semantix-Host-Proxy-Token "<token-privat-64-hex>";
+```
+
+Buat token dengan `python -c "import secrets; print(secrets.token_hex(32))"`. Simpan satu entri map dalam file privat di luar repository, dengan **alamat sumber proxy host yang benar-benar dilihat gateway** dan token yang sama:
+
+```nginx
+"172.28.0.1|<token-privat-64-hex>" $http_x_forwarded_for;
+```
+
+Atur `SEMANTIX_HOST_PROXY_RULE_FILE` ke path absolut file tersebut pada host sebelum menjalankan production Compose. Compose memasangnya secara read-only menggantikan file aturan gateway yang nonaktif. Verifikasi alamat sumber pada host Docker tujuan; `172.28.0.1` adalah nilai Docker Desktop yang diuji, bukan asumsi untuk semua platform. Jaga file aturan tetap privat dan tidak dilacak Git. Gateway menerima alamat dari proxy hanya jika **sumber dan token** cocok. Token, `X-Real-IP`, dan `Forwarded` dihapus sebelum backend. Jika trust tidak cocok, gateway memakai peer yang dilihatnya; alamat forwarded yang rusak ditolak secara aman oleh backend. Proxy perantara yang tidak tepercaya tetap menjadi klien yang dilihat proxy host kecuali diautentikasi secara terpisah di sana. Batasi `TRUSTED_PROXY_CIDRS` pada network gateway backend yang nyata; jangan tambahkan rentang publik yang luas.
 
 Backend yang disediakan menjalankan satu process. Rate-limit state tetap process-local. Multiple worker atau replica memerlukan shared limiter storage sebelum deployment.
 
