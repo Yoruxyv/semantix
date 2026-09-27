@@ -1,10 +1,13 @@
+import asyncio
 import hashlib
+import logging
 import math
 import re
 from collections.abc import Sequence
 
 TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
 MOCK_GENERATION_PREFIX = "[mock provider]"
+logger = logging.getLogger(__name__)
 
 
 class MockEmbeddingProvider:
@@ -40,9 +43,21 @@ class MockEmbeddingProvider:
 class MockGenerationProvider:
     """Deterministic local generation provider for tests and demos."""
 
+    _generation_delay_seconds = 0.0
+
     async def generate(self, prompt: str) -> str:
+        if self._generation_delay_seconds:
+            logger.info("Mock generation started")
+            try:
+                await asyncio.sleep(self._generation_delay_seconds)
+            finally:
+                logger.info("Mock generation finished")
         return f"{MOCK_GENERATION_PREFIX} {prompt}"
 
 
 class MockProvider(MockEmbeddingProvider, MockGenerationProvider):
     """Dual-capability deterministic provider used by startup composition."""
+
+    def __init__(self, dimensions: int, *, delay_seconds: float = 0) -> None:
+        super().__init__(dimensions)
+        self._generation_delay_seconds = delay_seconds

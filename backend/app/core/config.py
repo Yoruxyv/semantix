@@ -114,6 +114,7 @@ class Settings(BaseSettings):
     ollama_embedding_dimensions: int | None = Field(default=None, gt=0)
 
     mock_embedding_dimensions: int = Field(default=384, gt=0)
+    mock_generation_delay_seconds: float = Field(default=0, ge=0, le=2)
 
     provider_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
     evaluation_timeout_seconds: float = Field(default=300.0, gt=0, le=3_600)

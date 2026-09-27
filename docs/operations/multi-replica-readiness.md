@@ -75,3 +75,13 @@ The overall rollout verdict remains **not ready**: this phase does not add a
 multi-replica router, provider capacity budget, or graceful drain contract.
 
 **MULTI-REPLICA READINESS AUDIT COMPLETE**
+
+## Phase 12C verification
+
+Production Compose now starts `backend-a` and `backend-b` behind an Nginx upstream. The isolated Docker Desktop smoke used deterministic mock providers and shared PostgreSQL/pgvector. It verified that both replica IPs served gateway traffic; A's cache write hit on B; namespace, TTL, deletion, and clear behavior crossed replicas; the global threshold, role/namespace rules, progressive session lockout, and route quota remained shared while requests alternated. The pgvector embedding-space integration test separately verifies isolation for incompatible model settings; both production replicas must use compatible embedding configuration.
+
+Stopping either replica while health traffic continued produced **zero transient gateway errors**. During planned drain, an already admitted query on A completed after A was removed from the upstream, six subsequent requests went only to B, and A exited cleanly. Its ASGI lifespan closes the database pool and provider client. The two idle backend pools held **2** PostgreSQL connections; a 12-request cold burst reached **10**, the configured combined maximum. That burst made **12** mock generation calls with peak concurrency **12**. A separate 12-request *same-prompt* cold burst made **2** calls, one per replica, confirming that process-local coalescing leaves a measured cross-replica duplicate without corrupting the shared cache.
+
+The mock provider has no external quota. Real-provider quota, latency, cost, and retry headroom must be assessed for the chosen provider and workload before deployment; the smoke does not establish those limits. The gateway and pool defaults are sized for two replicas, not arbitrary autoscaling. The [deployment runbook](deployment.md#two-replica-operation) gives the drain and connection budget procedure.
+
+**TWO-REPLICA LOAD BALANCING READY** for the deterministic mock topology.

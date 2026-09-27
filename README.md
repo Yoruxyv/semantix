@@ -217,7 +217,7 @@ notes.
 | Mode | Intended use | Main behavior |
 |---|---|---|
 | **Development** | One trusted local developer | Hot reload, loopback ports, disabled authentication, automatic migrations |
-| **Hardened** | Shared or public single-instance deployment | Token authentication, namespace roles, internal backend/database networks, external migrations, TLS proxy required |
+| **Hardened** | Shared or public two-replica deployment | Token authentication, namespace roles, internal backend/database networks, external migrations, TLS proxy required |
 
 Create `.env.production` from `.env.production.example` only when preparing a
 hardened deployment:
@@ -390,8 +390,8 @@ boundaries.
   external data-handling requirements.
 - Runtime metrics, diagnostics, and request coalescing are process-local;
   production rate limiting uses shared PostgreSQL coordination.
-- The hardened stack is a single-instance baseline, not a complete multi-tenant
-  or multi-replica platform.
+- The hardened stack balances two backend replicas; it is not a complete
+  multi-tenant platform or a general-purpose autoscaling system.
 - Mock providers are for tests, demonstrations, and UI development.
 - Evaluation sweeps reuse one measured run; alternate thresholds are
   projections, not ordered replays or automatic threshold recommendations.

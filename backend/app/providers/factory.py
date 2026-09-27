@@ -358,7 +358,10 @@ def _create_anthropic(
 
 
 def _create_mock(context: ProviderBuildContext, settings: Settings) -> MockProvider:
-    return MockProvider(settings.mock_embedding_dimensions)
+    return MockProvider(
+        settings.mock_embedding_dimensions,
+        delay_seconds=settings.mock_generation_delay_seconds,
+    )
 
 
 def _secrets(value: SecretStr | None) -> tuple[SecretStr, ...]:

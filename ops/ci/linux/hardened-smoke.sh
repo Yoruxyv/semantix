@@ -3,11 +3,16 @@ set -euo pipefail
 
 compose=(docker compose -f docker-compose.prod.yml)
 python_command="${PYTHON_COMMAND:-python3}"
+upstream_file="$(mktemp)"
 
 cleanup() {
   "${compose[@]}" down --volumes --remove-orphans
+  rm -f "$upstream_file"
 }
 trap cleanup EXIT
+
+cp frontend/upstream.prod.conf "$upstream_file"
+export SEMANTIX_UPSTREAM_FILE="$upstream_file"
 
 generate_secret() {
   "$python_command" -c 'import secrets; print(secrets.token_urlsafe(32))'
@@ -20,16 +25,17 @@ export POSTGRES_RUNTIME_USER="${POSTGRES_RUNTIME_USER:-semantix_runtime}"
 export POSTGRES_RUNTIME_PASSWORD="${POSTGRES_RUNTIME_PASSWORD:-$(generate_secret)}"
 
 smoke_token="${SMOKE_AUTH_TOKEN:-$(generate_secret)}"
+viewer_token="$(generate_secret)"
+operator_token="$(generate_secret)"
+scoped_admin_token="$(generate_secret)"
 export SEMANTIX_E2E_TOKEN="$smoke_token"
-token_sha256="$(
-  "$python_command" -c \
-    'import hashlib, sys; print(hashlib.sha256(sys.argv[1].encode()).hexdigest())' \
-    "$smoke_token"
-)"
+export SEMANTIX_E2E_VIEWER_TOKEN="$viewer_token"
+export SEMANTIX_E2E_OPERATOR_TOKEN="$operator_token"
+export SEMANTIX_E2E_SCOPED_ADMIN_TOKEN="$scoped_admin_token"
 export AUTH_PRINCIPALS="$(
   "$python_command" -c \
-    'import json, sys; print(json.dumps([{"name": "smoke-admin", "token_sha256": sys.argv[1], "role": "admin", "namespaces": ["*"]}]))' \
-    "$token_sha256"
+    'import hashlib, json, sys; print(json.dumps([{"name": name, "token_sha256": hashlib.sha256(token.encode()).hexdigest(), "role": role, "namespaces": namespaces} for name, token, role, namespaces in zip(("global-admin", "viewer", "operator", "scoped-admin"), sys.argv[1:], ("admin", "viewer", "operator", "admin"), (("*",), ("alpha",), ("alpha",), ("alpha",)))]))' \
+    "$smoke_token" "$viewer_token" "$operator_token" "$scoped_admin_token"
 )"
 
 "${compose[@]}" up --build --detach --wait --wait-timeout 180
