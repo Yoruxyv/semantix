@@ -61,12 +61,12 @@ def wait_routing(expected: set[str], *, excluded: frozenset[str] = frozenset()) 
         before = len(gateway_upstreams(path))
         request(path)
         served = gateway_upstreams(path)[before:]
-        assert len(served) == 1, served
-        if served[0] in excluded:
+        assert set(served) <= expected | excluded, served
+        if excluded.intersection(served):
             seen.clear()
             clean = 0
-        else:
-            seen.add(served[0])
+        elif served:
+            seen.update(served)
             clean += 1
         if clean >= 6 and expected.issubset(seen):
             return

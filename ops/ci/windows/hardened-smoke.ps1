@@ -42,15 +42,44 @@ else {
     New-SmokeSecret
 }
 $TokenHash = Get-Sha256 -Value $SmokeToken
+$ViewerToken = New-SmokeSecret
+$OperatorToken = New-SmokeSecret
+$ScopedAdminToken = New-SmokeSecret
 $env:SEMANTIX_E2E_TOKEN = $SmokeToken
-$env:AUTH_PRINCIPALS = @(
+$env:SEMANTIX_E2E_VIEWER_TOKEN = $ViewerToken
+$env:SEMANTIX_E2E_OPERATOR_TOKEN = $OperatorToken
+$env:SEMANTIX_E2E_SCOPED_ADMIN_TOKEN = $ScopedAdminToken
+$env:AUTH_PRINCIPALS = ConvertTo-Json -InputObject @(
     @{
         name = "smoke-admin"
         token_sha256 = $TokenHash
         role = "admin"
         namespaces = @("*")
     }
-) | ConvertTo-Json -Compress
+    @{
+        name = "smoke-viewer"
+        token_sha256 = Get-Sha256 -Value $ViewerToken
+        role = "viewer"
+        namespaces = @("alpha")
+    }
+    @{
+        name = "smoke-operator"
+        token_sha256 = Get-Sha256 -Value $OperatorToken
+        role = "operator"
+        namespaces = @("alpha")
+    }
+    @{
+        name = "smoke-scoped-admin"
+        token_sha256 = Get-Sha256 -Value $ScopedAdminToken
+        role = "admin"
+        namespaces = @("alpha")
+    }
+) -Compress
+$UpstreamFile = Join-Path (Get-Location).Path (
+    "semantix-smoke-upstream-" + [guid]::NewGuid().ToString("N") + ".conf"
+)
+Copy-Item -LiteralPath "frontend/upstream.prod.conf" -Destination $UpstreamFile
+$env:SEMANTIX_UPSTREAM_FILE = $UpstreamFile
 
 try {
     Invoke-Compose -Arguments @("up", "--build", "--detach", "--wait", "--wait-timeout", "180")
@@ -99,4 +128,5 @@ try {
 }
 finally {
     & docker @ComposeArguments down --volumes --remove-orphans
+    Remove-Item -LiteralPath $UpstreamFile -Force -ErrorAction SilentlyContinue
 }

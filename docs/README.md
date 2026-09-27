@@ -35,4 +35,5 @@ root [README](../README.md) remains the short project overview and quick start.
 | [Managed autoscaling readiness](operations/autoscaling-readiness.md) | Bounded replica policy, capacity budgets, readiness, draining, and scale-cycle evidence |
 | [Operations and recovery](operations/recovery.md) | Credential rotation, backup, restore, cache rebuild, rollback, and incidents |
 | [Load testing](operations/load-testing.md#capacity-baseline-on-the-local-docker-host) | Capacity baseline, safe k6 scenarios, and runtime observability |
+| [Production runtime audit](operations/production-runtime-audit.md) | Exact-topology safety, recovery, load evidence, and release verdict |
 | [Supply-chain security](operations/supply-chain.md) | Image pins, security scans, SBOM/provenance artifacts, and dependency updates |
