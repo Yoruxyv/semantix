@@ -26,6 +26,10 @@ Semantix is a full-stack semantic-cache laboratory for inspecting cache
 decisions, measuring provider savings, evaluating similarity thresholds, and
 comparing replaceable AI and storage providers.
 
+Self-host it for multiple applications and users: namespace-scoped access keeps
+their cache data separate, while PostgreSQL + pgvector persists entries across
+restarts. The hardened deployment routes traffic across two backend replicas.
+
 <sub>Monitor · Cache Inspector · Evaluations · Runtime Observability</sub>
 
 </div>
@@ -53,7 +57,7 @@ Core capabilities:
 - global-admin-only runtime diagnostics with safe provider categories,
   fingerprints, readiness, and evaluation limits;
 - token roles and namespace authorization for hardened deployments;
-- deterministic mock providers for safe local testing.
+- deterministic mock providers for safe local testing;
 - run-local evaluation caches, complete confusion-matrix accounting, and
   configurable bounded frozen-candidate threshold sweeps;
 - versioned session-local JSON evaluation datasets with provider-free preview,
@@ -83,6 +87,8 @@ Search the active namespace and embedding space
 Semantix returns a cached response only when the nearest compatible entry meets
 the active similarity threshold. See
 [Cache policies](docs/guides/cache-policies.md) for the complete rules.
+Reusing a suitable response avoids another generation call and can reduce
+latency and provider cost; evaluate false matches for your own workload.
 
 ## 🐍 Python SDK
 
@@ -230,21 +236,28 @@ Do not start it until every placeholder has been replaced. See
 [Hardened deployment](docs/operations/deployment.md) for token generation,
 trusted proxies, database roles, TLS, and validation.
 
-## 📈 Production scalability
+## 📈 Performance and scalability
 
 The hardened stack balances backend replicas over shared PostgreSQL + pgvector
 state. PostgreSQL also coordinates deployment-wide rate limits, session lockout,
 and cache threshold changes. Replica failover, draining, and controlled scaling
 have been exercised.
 
-Semantix has been exercised with up to **1,000 virtual users** in the documented
-capacity-test environment. k6 tests covered staged one- and two-replica loads,
-a ten-minute 1,000-VU soak, and Python SDK calls through the load-balanced
-gateway. These local mock-provider results are not a production capacity
-guarantee. See [Capacity testing](docs/operations/load-testing.md#phase-13-capacity-baseline-on-the-local-docker-host)
-for hardware, workloads, stabilized comparisons, results, and limitations.
+In a local Docker test on the documented hardware, the two-replica stack
+completed a **10-minute cache-heavy run with 1,000 virtual users**: 195,961
+requests (about 324 RPS), P95 latency 186 ms, and zero HTTP 4xx, HTTP 5xx,
+transport, or sampled readiness failures. The workload used deterministic mock
+providers and 2–4 seconds of think time per virtual user. These figures are
+specific to that machine and workload, not a production capacity guarantee.
 
-## 📊 Measured benchmark
+Controlled generation-heavy tests at 1,000 virtual users improved from about
+167 RPS and 4.86 s P95 with one replica to 270 RPS and 1.95 s P95 with two.
+PostgreSQL connection and lock pressure limits extrapolation to more replicas.
+See [Capacity testing](docs/operations/load-testing.md#capacity-baseline-on-the-local-docker-host)
+for hardware, methodology, all profiles, failures, and limitations. The Python
+SDK was also exercised through the load-balanced gateway.
+
+## 📊 Semantic cache benchmark
 
 A local run on July 19, 2026 used the eight-query **Quick semantic safety set**,
 Hugging Face providers, typo normalization, an empty isolated cache, and a
@@ -377,7 +390,8 @@ semantix/
 ├── backend/
 ├── frontend/
 ├── sdk/
-│   └── python/
+│   ├── src/
+│   └── tests/
 ├── ops/
 │   ├── ci/
 │   ├── load-testing/
@@ -421,7 +435,7 @@ The [documentation index](docs/README.md) groups the full guides by purpose.
 | [Python SDK](sdk/README.md) | Install and use the typed public HTTP client |
 | [Architecture](docs/reference/architecture.md) | Runtime flow, feature ownership, and package boundaries |
 | [Hardened deployment](docs/operations/deployment.md) | Authentication, TLS, database roles, and production validation |
-| [Capacity testing](docs/operations/load-testing.md#phase-13-capacity-baseline-on-the-local-docker-host) | Load profiles, hardware, one/two-replica results, and the 1,000-VU soak |
+| [Capacity testing](docs/operations/load-testing.md#capacity-baseline-on-the-local-docker-host) | Load profiles, hardware, one/two-replica results, and the 1,000-VU soak |
 
 ## 🤝 Contributors
 

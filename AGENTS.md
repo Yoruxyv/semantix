@@ -257,36 +257,24 @@ Implementation plans live under:
 docs/plans/
 ```
 
-When a task references a phase document:
+When a task references a planning document:
 
 - read the program `README.md`;
-- read the complete active phase document;
+- read the complete active planning document;
 - treat its objective, scope, exclusions, dependencies, acceptance criteria,
   validation, rollback, and definition of done as the implementation contract;
 - verify every current-state claim against the latest source;
-- implement only the requested phase;
-- do not silently begin later phases;
-- leave the repository valid and working at the end of the phase.
+- implement only the requested scope;
+- do not silently begin later planned work;
+- leave the repository valid and working at the end of the task.
 
-For the Evaluations program, use:
+Use planning documents that actually exist in the current checkout; do not
+assume older plan paths are still present.
 
-```text
-docs/plans/evaluations/README.md
-docs/plans/evaluations/phase-00-evaluations-navigation-foundation.md
-docs/plans/evaluations/phase-01-evaluation-contracts-metrics-and-sweeps.md
-docs/plans/evaluations/phase-02-error-analysis-and-case-details.md
-docs/plans/evaluations/phase-03-session-local-dataset-import.md
-docs/plans/evaluations/phase-04-persistent-dataset-catalog.md
-docs/plans/evaluations/phase-05-durable-run-history-and-comparison.md
-docs/plans/evaluations/phase-06-cache-entry-detail-integration.md
-docs/plans/evaluations/phase-07-monitor-policy-and-evidence-integration.md
-docs/plans/evaluations/phase-08-observability-diagnostics-integration.md
-```
-
-Do not combine multiple phases into one implementation pull request unless the
+Do not combine separate planned tasks into one implementation pull request unless the
 maintainer explicitly requests it.
 
-Optional phases must remain optional and must not be pulled into the MVP
+Optional work must remain optional and must not be pulled into the MVP
 silently.
 
 ## Scope discipline
@@ -305,7 +293,7 @@ Do not:
 - reformat unrelated files;
 - resolve unrelated TODOs;
 - combine optional follow-up work with required implementation;
-- implement later planning phases early;
+- implement later planned work early;
 - create a fifth top-level navigation item merely to fill visual space.
 
 When a separate issue is discovered:
@@ -470,7 +458,7 @@ Also verify:
 
 ## Accessibility
 
-Accessibility is part of implementation, not a final cleanup phase.
+Accessibility is part of implementation, not a final cleanup task.
 
 For affected functionality:
 
@@ -544,7 +532,7 @@ Evaluation work must preserve:
 - mandatory provider-call acknowledgement where required;
 - bounded cases, repetitions, thresholds, request size, and wall-clock time;
 - honest measured, estimated, and projected terminology;
-- frozen-candidate threshold projections unless a separate phase explicitly
+- frozen-candidate threshold projections unless a separate task explicitly
   introduces ordered replay;
 - complete confusion-matrix accounting;
 - explicit false-positive and false-negative semantics;
@@ -573,14 +561,14 @@ For imported evaluation datasets:
 - keep session-local data in component memory unless persistence is explicitly
   in scope;
 - do not use localStorage, sessionStorage, IndexedDB, or service-worker caching
-  unless an approved phase requires it;
+  unless an approved task requires it;
 - render imported text as escaped plain text;
 - neutralize spreadsheet formula prefixes in CSV exports;
 - keep JSON exports structurally faithful.
 
 ## Persistence and migrations
 
-Do not introduce persistence before the active phase requires it.
+Do not introduce persistence before the active task requires it.
 
 When persistence is in scope:
 
@@ -593,7 +581,7 @@ When persistence is in scope:
 - define retention, expiry, deletion, and cascade behavior;
 - keep retention objectively bounded;
 - avoid background workers unless separately approved;
-- use opportunistic bounded cleanup where the phase requires it;
+- use opportunistic bounded cleanup where the task requires it;
 - support intended memory-cache and pgvector-cache combinations;
 - avoid opening duplicate pools when one reviewed shared pool is appropriate;
 - never use display names as the sole authorization key;
@@ -716,7 +704,7 @@ uv run --locked ruff format --check .
 uv run --locked mypy app tests scripts
 ```
 
-When the current repository or active phase does not require coverage, use the
+When the current repository or active task does not require coverage, use the
 exact established pytest command from `CONTRIBUTING.md`,
 `.github/workflows/quality.yml`, or `backend/pyproject.toml`. Do not invent a
 different quality gate.
@@ -799,7 +787,7 @@ When a command cannot run:
 - include the exact attempted command;
 - include the relevant error;
 - distinguish environment limitations from implementation failures;
-- do not mark the phase complete when a mandatory gate remains unverified.
+- do not mark the task complete when a mandatory gate remains unverified.
 
 ## Git workflow
 
@@ -855,7 +843,7 @@ Examples:
 ```text
 feat(evaluations): add bounded threshold sweep controls
 fix(cache): preserve namespace isolation for entry detail
-docs(plans): add Evaluations expansion phases
+docs(plans): add evaluation planning documents
 ci(docs): validate documentation links
 refactor(frontend): consolidate evaluation result filters
 ```
@@ -952,7 +940,7 @@ git diff --cached --name-only
 At the end of an implementation task, report:
 
 - branch name;
-- task or phase implemented;
+- task implemented;
 - files changed;
 - concise implementation summary;
 - important repository or plan discrepancies;

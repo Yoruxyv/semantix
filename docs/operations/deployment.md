@@ -295,7 +295,7 @@ later Admin updates survive backend restarts and are read by every replica.
 Use the authorized threshold API to change a persisted value.
 `GET /ready` checks this authority and returns `503` if it is unavailable.
 
-See the [Phase 12A multi-replica readiness audit](multi-replica-readiness.md) for the full state inventory and rollout gates.
+See the [multi-replica readiness audit](multi-replica-readiness.md) for the initial state inventory and rollout gates, followed by the shared coordination and two-replica verification results.
 
 ## Two-replica operation
 

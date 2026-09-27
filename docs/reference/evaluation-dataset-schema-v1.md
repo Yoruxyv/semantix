@@ -106,7 +106,7 @@ Defaults are 65,536 request bytes, 49,152 decoded dataset bytes, 50 cases, and
 for the validation/run envelope beneath the existing 64 KiB request boundary.
 Threshold projections do not replay provider work.
 
-### Phase 04 entry-gate profile
+### Dataset sizing profile
 
 On August 1, 2026, a synthetic 50-case document with bounded 284-character
 prompts was validated 100 times at the maximum default workload

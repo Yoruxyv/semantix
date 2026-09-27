@@ -4,7 +4,7 @@ Workspace Benchmark mengukur kualitas cache, latency, dan penghematan provider c
 
 ## Measured reference run
 
-Hasil README berasal dari actual Phase 4 benchmark API run:
+Hasil README berasal dari pengujian benchmark API yang benar-benar dijalankan:
 
 | Properti run           | Nilai                                  |
 | ---------------------- | -------------------------------------- |

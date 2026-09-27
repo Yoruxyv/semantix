@@ -172,3 +172,11 @@ Saat teardown, k6 mencetak snapshot metrik backend dan menghapus namespace yang 
 * coalesced gauge kembali ke nol setelah traffic berhenti.
 
 Kecepatan provider, model warm-up, hardware, resource limit Docker, latency database, dan kondisi network semuanya memengaruhi latency absolut. Catat environment bersama setiap hasil performance daripada menganggap satu local run sebagai benchmark universal.
+
+## Baseline kapasitas pada host Docker lokal
+
+Baseline ini memakai stack hardened dengan PostgreSQL + pgvector dan koordinasi bersama, token authentication, provider mock deterministik, serta satu atau dua replika backend. k6 menjalankan profil cache-heavy, generation-heavy, mixed-policy, dan cold burst pada tangga 50, 100, 250, 500, dan 1.000 virtual user dengan jeda 2–4 detik. Hasil dan perintah reproduksi lengkap ada di [runbook berbahasa Inggris](../../../operations/load-testing.md#capacity-baseline-on-the-local-docker-host).
+
+Pada host Windows 11 dengan AMD Ryzen 9 5900HX dan Docker Desktop, dua replika menyelesaikan soak cache-heavy 10 menit dengan 1.000 virtual user: 195.961 request (sekitar 324 RPS), P95 186 ms, dan nol kegagalan HTTP 4xx/5xx, transport, serta readiness yang disampel. Pada pengukuran generation-heavy yang distabilkan, satu replika menghasilkan sekitar 167 RPS/P95 4,86 detik; dua replika sekitar 270 RPS/P95 1,95 detik. Koneksi dan lock PostgreSQL mencapai batas terukur, sehingga hasil ini tidak menjamin skala linear atau kapasitas produksi.
+
+Satu pengukuran mixed-policy dua replika pada 1.000 VU menghasilkan 1.585 respons 5xx; pengulangan terisolasi menghasilkan nol 5xx. Connection reset di gateway/upstream juga teramati pada pengukuran lain, tetapi akar penyebab lonjakan mixed-policy belum dikonfirmasi. Raw result lokal di `ops/load-testing/results/` diabaikan oleh Git; tabel, metodologi, dan batasan yang dapat ditinjau tersimpan dalam runbook berbahasa Inggris.

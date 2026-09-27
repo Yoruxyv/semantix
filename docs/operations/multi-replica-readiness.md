@@ -1,6 +1,6 @@
-# Phase 12A: multi-replica readiness audit
+# Multi-replica readiness audit
 
-**Phase 12A verdict: not ready for two backend replicas.** This is the source-based audit snapshot taken before Phase 12B. At that point production Compose started one backend process with `pgvector` cache, PostgreSQL, token authentication, and a five-connection maximum pool per process. A second replica would have shared PostgreSQL data but split rate-limit counters, progressive session-auth lockouts, and the mutable cache threshold. It would also have multiplied provider and database demand without a defined drain procedure. No load balancer or CQRS change was part of the audit.
+**Initial audit verdict: not ready for two backend replicas.** This is the source-based audit snapshot taken before shared PostgreSQL coordination was implemented. The later sections record the shared coordination and verified two-replica deployment. At the time of the initial audit, production Compose started one backend process with `pgvector` cache, PostgreSQL, token authentication, and a five-connection maximum pool per process. A second replica would have shared PostgreSQL data but split rate-limit counters, progressive session-auth lockouts, and the mutable cache threshold. It would also have multiplied provider and database demand without a defined drain procedure. No load balancer or CQRS change was part of the audit.
 
 The classifications below describe the **required ownership**, not a claim that current code already meets it. “Shared” means all replicas in one deployment see the same authoritative state. “Replica-local” means no cross-replica consistency is needed.
 
@@ -31,7 +31,7 @@ The classifications below describe the **required ownership**, not a claim that 
 
 ### Abuse controls
 
-Strict deployment-wide limiting and progressive session-auth lockout are required before routing clients across replicas. Process memory cannot provide either guarantee. A **single authoritative gateway** could own route limits, but it would need to reproduce the current per-route policies and remain the only ingress; multiple gateways would themselves need shared state. PostgreSQL is the minimal existing dependency for both rate buckets and lockouts at the current scale. Counters must update atomically with expiry and a database clock, and must use the Phase 11 trusted client-address result. If the shared authority fails, protected traffic must not silently become unlimited. Redis is a later option if PostgreSQL contention, latency, or an availability target demonstrates a need. The current tracker only protects `/auth/session`; extending lockout to other token-protected endpoints is a separate policy decision.
+Strict deployment-wide limiting and progressive session-auth lockout are required before routing clients across replicas. Process memory cannot provide either guarantee. A **single authoritative gateway** could own route limits, but it would need to reproduce the current per-route policies and remain the only ingress; multiple gateways would themselves need shared state. PostgreSQL is the minimal existing dependency for both rate buckets and lockouts at the current scale. Counters must update atomically with expiry and a database clock, and must use the verified trusted client-address handling. If the shared authority fails, protected traffic must not silently become unlimited. Redis is a later option if PostgreSQL contention, latency, or an availability target demonstrates a need. The current tracker only protects `/auth/session`; extending lockout to other token-protected endpoints is a separate policy decision.
 
 ### Database and provider budgets
 
@@ -62,21 +62,20 @@ Keep the one-replica production topology until all of these are demonstrated wit
 5. One replica can be removed, drained, and stopped during active query/evaluation work without orphaned provider calls or misleading retained history.
 6. Per-replica health/metrics and shared cache statistics are labeled and interpreted according to their actual scope.
 
-## Phase 12B status
+## Shared coordination implementation
 
 Production Compose now selects PostgreSQL coordination for atomic route rate
 buckets, progressive session-auth lockouts, and the global threshold. The
 migration job creates these tables and grants the runtime role access. Local
 development still defaults to process memory. Shared coordination fails closed
 when PostgreSQL is unavailable; optional cross-replica query coalescing remains
-deferred. The original matrix above records the Phase 12A baseline.
+deferred. The original matrix above records the initial audit baseline.
 
-The overall rollout verdict remains **not ready**: this phase does not add a
-multi-replica router, provider capacity budget, or graceful drain contract.
+At this intermediate point, the rollout verdict remained **not ready**:
+shared coordination did not add a multi-replica router, provider capacity
+budget, or graceful drain contract.
 
-**MULTI-REPLICA READINESS AUDIT COMPLETE**
-
-## Phase 12C verification
+## Two-replica verification
 
 Production Compose now starts `backend-a` and `backend-b` behind an Nginx upstream. The isolated Docker Desktop smoke used deterministic mock providers and shared PostgreSQL/pgvector. It verified that both replica IPs served gateway traffic; A's cache write hit on B; namespace, TTL, deletion, and clear behavior crossed replicas; the global threshold, role/namespace rules, progressive session lockout, and route quota remained shared while requests alternated. The pgvector embedding-space integration test separately verifies isolation for incompatible model settings; both production replicas must use compatible embedding configuration.
 
