@@ -467,11 +467,11 @@ jobs:
             sleep 5
           done
 
-      - name: Run hardened-stack API, browser, axe, and two-replica smoke
+      - name: Run hardened-stack API, browser, axe, and scaling smoke
         shell: bash
         run: |
           cd "$RUNNER_TEMP/semantix-autocrlf"
-          bash ops/ci/linux/hardened-smoke.sh bash -c 'npm --prefix frontend run test:e2e && python3 ops/ci/two_replica_smoke.py'
+          bash ops/ci/linux/hardened-smoke.sh bash -c 'npm --prefix frontend run test:e2e && python3 ops/ci/two_replica_smoke.py && python3 ops/ci/autoscaling_smoke.py'
 
   pgvector:
     name: Pgvector integration

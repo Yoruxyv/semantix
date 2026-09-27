@@ -319,6 +319,8 @@ Repeat for `backend-b` only after `backend-a` is serving traffic. The gateway re
 
 At the default pool maximum of five connections per replica, the two backends can use up to ten PostgreSQL connections, plus migration, maintenance, and monitoring connections. Reserve server headroom accordingly. Provider calls, retries, and evaluation runs can also occur on both replicas at once. Set provider quotas against the aggregate demand before using real providers; the mock-provider CI burst measures concurrency but does not establish a remote-provider quota.
 
+For a bounded two-to-three-replica managed rollout, use the [autoscaling readiness policy](autoscaling-readiness.md).
+
 ## URL configuration validation
 
 `ALLOWED_ORIGINS` entries must be bare HTTP or HTTPS origins: a host

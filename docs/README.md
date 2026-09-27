@@ -32,6 +32,7 @@ root [README](../README.md) remains the short project overview and quick start.
 | Runbook | Use it for |
 |---|---|
 | [Hardened deployment](operations/deployment.md) | Authentication, roles, proxies, TLS, request limits, and database permissions |
+| [Managed autoscaling readiness](operations/autoscaling-readiness.md) | Bounded replica policy, capacity budgets, readiness, draining, and scale-cycle evidence |
 | [Operations and recovery](operations/recovery.md) | Credential rotation, backup, restore, cache rebuild, rollback, and incidents |
 | [Load testing](operations/load-testing.md) | Safe k6 scenarios and runtime observability |
 | [Supply-chain security](operations/supply-chain.md) | Image pins, security scans, SBOM/provenance artifacts, and dependency updates |
