@@ -108,8 +108,8 @@ scoped; the deterministic oldest retained records are pruned by
 room for the incoming terminal record.
 
 Deleting a persisted source dataset cascades to retained runs. Threshold rows
-cascade with their parent run. Phase 05 uses exactly two aggregate history
-tables:
+cascade with their parent run. Retained evaluation history uses exactly two
+aggregate tables:
 
 - `semantix.evaluation_runs`
 - `semantix.evaluation_run_thresholds`

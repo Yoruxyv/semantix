@@ -28,5 +28,5 @@ Gunakan indeks ini untuk menemukan panduan terperinci untuk tugas yang sedang di
 | --------------------------------------------------- | ------------------------------------------------------------------------- |
 | [Hardened deployment](operations/deployment.md)     | Autentikasi, role, proxy, TLS, request limit, dan database permission     |
 | [Operations and recovery](operations/recovery.md)   | Rotasi credential, backup, restore, cache rebuild, rollback, dan incident |
-| [Load testing](operations/load-testing.md)          | Skenario k6 yang aman dan runtime observability                           |
+| [Load testing](operations/load-testing.md#baseline-kapasitas-pada-host-docker-lokal) | Baseline kapasitas, skenario k6 yang aman, dan runtime observability |
 | [Supply-chain security](operations/supply-chain.md) | Image pin, security scan, artifact SBOM/provenance, dan dependency update |

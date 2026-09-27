@@ -1,4 +1,4 @@
-# Phase 12D: managed autoscaling readiness
+# Managed autoscaling readiness
 
 **Scope:** a bounded two-to-three-replica pilot behind a managed load balancer, with shared PostgreSQL/pgvector and PostgreSQL coordination. The [two-replica deployment](deployment.md#two-replica-operation) remains the starting point. The chosen platform must implement the routing and scale policy below; this document is not a platform autoscaler configuration.
 

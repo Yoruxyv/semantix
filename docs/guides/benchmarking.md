@@ -10,7 +10,7 @@ Completed, failed, timed-out, and cancelled runs never seed a later run.
 
 ## Measured reference run
 
-The README result came from an actual Phase 4 benchmark API run:
+The README result came from an actual benchmark API run:
 
 | Run property | Value |
 |---|---|

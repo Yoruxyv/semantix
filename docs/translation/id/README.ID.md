@@ -24,6 +24,8 @@
 
 Semantix adalah laboratorium semantic-cache full-stack untuk memeriksa keputusan cache, mengukur penghematan provider, mengevaluasi similarity threshold, dan membandingkan provider AI serta storage yang dapat dipertukarkan.
 
+Semantix dapat di-host sendiri untuk beberapa aplikasi dan pengguna. Akses berbasis namespace memisahkan data cache mereka; PostgreSQL + pgvector mempertahankan entri saat layanan dimulai ulang. Deployment hardened merutekan traffic melalui dua replika backend.
+
 <sub>Monitor · Cache Inspector · Benchmark Lab · Runtime Observability</sub>
 
 </div>
@@ -69,6 +71,11 @@ Search the active namespace and embedding space
 ```
 
 Semantix hanya mengembalikan respons yang telah di-cache jika entri terdekat yang kompatibel memenuhi similarity threshold yang aktif. Lihat [Cache policies](guides/cache-policies.md) untuk aturan lengkapnya.
+Menggunakan kembali respons yang sesuai menghindari panggilan generation berikutnya dan dapat mengurangi latensi serta biaya provider; evaluasi false match untuk workload Anda sendiri.
+
+## 🐍 Python SDK
+
+Aplikasi Python dapat memakai distribusi `semantix-client` melalui HTTP API publik. Paket ini menyediakan `SemantixClient` dan `AsyncSemantixClient` tanpa memerlukan modul internal backend. Paket belum diterbitkan di PyPI; lihat [panduan Python SDK](../../../sdk/README.md) untuk instalasi dari repository atau wheel.
 
 ## 🚀 Mulai Cepat
 
@@ -182,13 +189,15 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up --build 
 
 Jangan menjalankannya sebelum setiap placeholder diganti. Lihat [Hardened deployment](operations/deployment.md) untuk pembuatan token, trusted proxy, peran database, TLS, dan validasi.
 
-## 📈 Skalabilitas Produksi
+## 📈 Performa dan skalabilitas
 
 Stack hardened menyeimbangkan replika backend di atas state PostgreSQL + pgvector bersama. PostgreSQL juga mengoordinasikan batas laju tingkat deployment, penguncian sesi, dan perubahan threshold cache. Failover, draining, serta perubahan jumlah replika yang terkendali telah diuji.
 
-Semantix telah diuji hingga **1.000 virtual user** dalam lingkungan uji kapasitas yang terdokumentasi. Pengujian k6 mencakup beban bertahap satu dan dua replika, soak 1.000 VU selama sepuluh menit, dan panggilan Python SDK melalui gateway dengan load balancer. Hasil lokal dengan provider mock ini bukan jaminan kapasitas produksi. Lihat [Pengujian kapasitas](../../operations/load-testing.md#phase-13-capacity-baseline-on-the-local-docker-host) untuk perangkat keras, workload, perbandingan setelah stabilisasi, hasil, dan batasannya.
+Dalam uji Docker lokal pada perangkat keras yang didokumentasikan, stack dua replika menyelesaikan **uji cache-heavy 10 menit dengan 1.000 virtual user**: 195.961 request (sekitar 324 RPS), latensi P95 186 ms, serta nol kegagalan HTTP 4xx, HTTP 5xx, transport, atau readiness yang disampel. Workload memakai provider mock deterministik dan jeda 2–4 detik per virtual user. Angka ini berlaku untuk mesin dan workload tersebut, bukan jaminan kapasitas produksi.
 
-## 📊 Benchmark Terukur
+Perbandingan generation-heavy terkontrol pada 1.000 virtual user menunjukkan sekitar 167 RPS dan P95 4,86 detik dengan satu replika, dibandingkan 270 RPS dan P95 1,95 detik dengan dua replika. Tekanan koneksi dan lock PostgreSQL membatasi ekstrapolasi ke lebih banyak replika. Lihat [Pengujian kapasitas](../../operations/load-testing.md#capacity-baseline-on-the-local-docker-host) untuk perangkat keras, metodologi, semua profil, kegagalan, dan batasannya. Python SDK juga diuji melalui gateway dengan load balancer.
+
+## 📊 Benchmark semantic cache
 
 Uji coba lokal pada 19 Juli 2026 menggunakan **Quick semantic safety set** yang berisi delapan kueri, provider Hugging Face, normalisasi typo, cache terisolasi yang kosong, dan threshold `0.92`:
 
@@ -306,6 +315,9 @@ Lihat [Development](guides/development.md) untuk toolchain lokal, aturan arsitek
 semantix/
 ├── backend/
 ├── frontend/
+├── sdk/
+│   ├── src/
+│   └── tests/
 ├── ops/
 │   ├── ci/
 │   ├── load-testing/
@@ -338,9 +350,10 @@ Backend dan frontend menggunakan kepemilikan feature-first. Lihat [Architecture]
 |---|---|
 | [Getting started](guides/getting-started.md) | Setup lokal, file environment, dan alur kerja Docker |
 | [Providers](guides/providers.md) | Konfigurasi provider hosted, lokal, dan mock |
+| [Python SDK](../../../sdk/README.md) | Instalasi dan penggunaan HTTP client sinkron dan asinkron |
 | [Architecture](reference/architecture.md) | Alur runtime, kepemilikan fitur, dan batas paket |
 | [Hardened deployment](operations/deployment.md) | Autentikasi, TLS, peran database, dan validasi produksi |
-| [Pengujian kapasitas](../../operations/load-testing.md#phase-13-capacity-baseline-on-the-local-docker-host) | Profil beban, perangkat keras, hasil satu/dua replika, dan soak 1.000 VU |
+| [Pengujian kapasitas](../../operations/load-testing.md#capacity-baseline-on-the-local-docker-host) | Profil beban, perangkat keras, hasil satu/dua replika, dan soak 1.000 VU |
 
 ## 🤝 Kontributor
 
