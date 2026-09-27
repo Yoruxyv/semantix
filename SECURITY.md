@@ -4,7 +4,7 @@
 
 # Security Policy
 
-Semantix is a local-first semantic-cache laboratory. The explicitly named development stack is intended for one trusted developer and must not be exposed to an untrusted network. A separate hardened single-instance deployment path is provided as a prerequisite for shared use.
+Semantix is a local-first semantic-cache laboratory. The explicitly named development stack is intended for one trusted developer and must not be exposed to an untrusted network. A separate hardened two-replica deployment path is provided as a prerequisite for shared use.
 
 ## Supported versions
 
@@ -50,13 +50,13 @@ The hardened stack requires:
 - token authentication and role/namespace authorization;
 - strong secret-managed tokens and database passwords;
 - explicit trusted-proxy CIDRs;
-- a single backend process unless shared rate-limit storage is added;
+- shared PostgreSQL rate-limit, session-lockout, and threshold state across both backend replicas;
 - separate migration and runtime database roles;
 - no direct public backend or database ports;
 - operator review of provider data handling, persistent dataset retention,
   deletion, backup retention, and recovery.
 
-The supplied hardened stack is not a complete multi-tenant service. It does not add distributed coordination, deployment-wide metrics, tenant billing, or a general identity provider.
+The supplied hardened stack is not a complete multi-tenant service. It does not add deployment-wide metrics, tenant billing, or a general identity provider.
 
 ## Semantic-cache poisoning threat model
 

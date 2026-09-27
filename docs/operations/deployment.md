@@ -1,10 +1,10 @@
 # Hardened deployment
 
-This deployment path is optional for local development and required before Semantix is shared with untrusted users. It is a single-instance baseline, not a multi-tenant platform or multi-replica architecture.
+This deployment path is optional for local development and required before Semantix is shared with untrusted users. The production Compose stack runs two backend replicas behind one frontend gateway; it is not a complete multi-tenant platform.
 
 ## Deployment boundary
 
-`docker-compose.prod.yml` publishes only the frontend gateway. The backend is reachable only on the internal `edge` network. PostgreSQL is reachable only on the internal `data` network. The frontend gateway proxies `/api`, `/health`, and `/ready` to the backend.
+`docker-compose.prod.yml` publishes only the frontend gateway. Both backends are reachable only on the internal `edge` network. PostgreSQL is reachable only on the internal `data` network. The frontend gateway balances `/api`, `/health`, and `/ready` across `backend-a` and `backend-b`.
 
 `docker-compose.prod.yml` uses the explicit Compose project name `semantix-prod`. Its PostgreSQL volume is therefore isolated from the local development volume and from volumes created by earlier versions of the default development stack.
 
@@ -103,7 +103,7 @@ Set up an operator token as follows:
 4. Give the original token to the authorized operator through a secure
    channel. Never store the plaintext token in `AUTH_PRINCIPALS`.
 5. Set `AUTH_MODE=token`.
-6. Recreate the backend container so it receives the changed environment.
+6. Recreate both backend containers so they receive the changed environment.
 7. Verify that `/api/v1/auth/config` reports authentication as required.
 8. Test one wrong token, then authenticate with the valid original token.
 
@@ -115,7 +115,7 @@ AUTH_PRINCIPALS=[{"name":"ops-admin","token_sha256":"<64-lowercase-hex>","role":
 ```
 
 Keep the original tokens in a secret manager. Rotating a token means generating
-a new token, replacing its digest, and recreating the backend container.
+a new token, replacing its digest, and recreating both backend containers.
 
 For local Docker development, `docker-compose.dev.yml` reads both values from
 `backend/.env`. After changing any value in that file, recreate the backend
@@ -296,6 +296,28 @@ Use the authorized threshold API to change a persisted value.
 `GET /ready` checks this authority and returns `503` if it is unavailable.
 
 See the [Phase 12A multi-replica readiness audit](multi-replica-readiness.md) for the full state inventory and rollout gates.
+
+## Two-replica operation
+
+The gateway uses [the upstream file](../../frontend/upstream.prod.conf) and Docker DNS to discover both backends. Keep both replicas on identical auth, provider, embedding, cache, and coordination settings. Production uses the shared pgvector cache and PostgreSQL coordination. A gateway `/ready` response describes the selected replica; inspect each one before and after a rollout:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -T frontend curl -f http://backend-a:8000/ready
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -T frontend curl -f http://backend-b:8000/ready
+```
+
+For a planned restart, copy `frontend/upstream.prod.conf` to a private host file and set `SEMANTIX_UPSTREAM_FILE` to its absolute path before starting Compose. Remove the target replica's `server` line from that mounted file, validate and reload Nginx, and wait for its admitted requests to finish. Then stop or recreate that replica. Reinsert its line only after its direct `/ready` check succeeds, and validate/reload again:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -T frontend nginx -t
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -T frontend nginx -s reload
+docker compose --env-file .env.production -f docker-compose.prod.yml stop backend-a
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d backend-a
+```
+
+Repeat for `backend-b` only after `backend-a` is serving traffic. The gateway retries connection errors and timeouts on the other replica. Its API read timeout is 330 seconds and the backend stop grace is 360 seconds, covering the default 300-second evaluation limit; size them together if that limit changes. The gateway access log records status, upstream address, URI path, and duration without query strings, prompts, tokens, or responses.
+
+At the default pool maximum of five connections per replica, the two backends can use up to ten PostgreSQL connections, plus migration, maintenance, and monitoring connections. Reserve server headroom accordingly. Provider calls, retries, and evaluation runs can also occur on both replicas at once. Set provider quotas against the aggregate demand before using real providers; the mock-provider CI burst measures concurrency but does not establish a remote-provider quota.
 
 ## URL configuration validation
 

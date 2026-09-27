@@ -46,7 +46,7 @@ services:
       - data
     restart: "no"
 
-  backend:
+  backend-a: &backend-service
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -54,6 +54,7 @@ services:
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-mock}
       GENERATION_PROVIDER: ${GENERATION_PROVIDER:-mock}
       MOCK_EMBEDDING_DIMENSIONS: ${MOCK_EMBEDDING_DIMENSIONS:-384}
+      MOCK_GENERATION_DELAY_SECONDS: ${MOCK_GENERATION_DELAY_SECONDS:-0}
       HF_API_KEY: ${HF_API_KEY:-}
       HF_INFERENCE_BASE_URL: ${HF_INFERENCE_BASE_URL:-https://router.huggingface.co/hf-inference/models}
       HF_CHAT_BASE_URL: ${HF_CHAT_BASE_URL:-https://router.huggingface.co/v1}
@@ -129,6 +130,9 @@ services:
       edge:
       data:
     restart: unless-stopped
+    stop_grace_period: 360s
+
+  backend-b: *backend-service
 
   frontend:
     build:
@@ -143,8 +147,14 @@ services:
         source: ${SEMANTIX_HOST_PROXY_RULE_FILE:-./frontend/host-proxy.disabled.conf}
         target: /etc/nginx/host-proxy.conf
         read_only: true
+      - type: bind
+        source: ${SEMANTIX_UPSTREAM_FILE:-./frontend/upstream.prod.conf}
+        target: /etc/nginx/semantix-upstream.conf
+        read_only: true
     depends_on:
-      backend:
+      backend-a:
+        condition: service_healthy
+      backend-b:
         condition: service_healthy
     networks:
       - edge

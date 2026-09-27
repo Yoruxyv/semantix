@@ -1,3 +1,4 @@
+import logging
 import math
 
 import pytest
@@ -8,6 +9,7 @@ from app.providers.adapters.mock import (
     MOCK_GENERATION_PREFIX,
     MockEmbeddingProvider,
     MockGenerationProvider,
+    MockProvider,
 )
 from app.query.application.service import QueryService
 from tests.support import TEST_EMBEDDING_DIMENSIONS, memory_backend
@@ -36,6 +38,20 @@ async def test_generation_is_deterministic_and_identifies_provider() -> None:
 
     assert first == second
     assert first == f"{MOCK_GENERATION_PREFIX} Explain caching"
+
+
+@pytest.mark.asyncio
+async def test_delayed_mock_generation_records_both_edges(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO)
+    provider = MockProvider(TEST_EMBEDDING_DIMENSIONS, delay_seconds=0.001)
+
+    assert await provider.generate("one") == f"{MOCK_GENERATION_PREFIX} one"
+    assert [record.message for record in caplog.records] == [
+        "Mock generation started",
+        "Mock generation finished",
+    ]
 
 
 @pytest.mark.asyncio

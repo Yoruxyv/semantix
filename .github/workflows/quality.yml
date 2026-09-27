@@ -417,6 +417,8 @@ jobs:
       POSTGRES_RUNTIME_USER: semantix_runtime
       SEMANTIX_BIND_ADDRESS: 127.0.0.1
       SEMANTIX_PORT: "18080"
+      MOCK_GENERATION_DELAY_SECONDS: "2"
+      RATE_LIMIT: "80/minute"
       TRUSTED_PROXY_CIDRS: '["172.28.0.0/24"]'
     steps:
       - name: Check out repository
@@ -465,11 +467,11 @@ jobs:
             sleep 5
           done
 
-      - name: Run hardened-stack API, browser, and axe smoke
+      - name: Run hardened-stack API, browser, axe, and two-replica smoke
         shell: bash
         run: |
           cd "$RUNNER_TEMP/semantix-autocrlf"
-          bash ops/ci/linux/hardened-smoke.sh npm --prefix frontend run test:e2e
+          bash ops/ci/linux/hardened-smoke.sh bash -c 'npm --prefix frontend run test:e2e && python3 ops/ci/two_replica_smoke.py'
 
   pgvector:
     name: Pgvector integration

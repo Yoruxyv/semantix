@@ -1,6 +1,6 @@
 # Operations and recovery
 
-This runbook covers the hardened single-instance Compose deployment. Test every
+This runbook covers the hardened two-replica Compose deployment. Test every
 procedure against an isolated project and disposable volume before using it for
 a shared environment.
 
@@ -93,7 +93,7 @@ $env:SEMANTIX_RUNTIME_PASSWORD = $env:NEW_POSTGRES_RUNTIME_PASSWORD
 Stop the gateway and backend, but leave PostgreSQL running:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml stop frontend backend
+docker compose --env-file .env.production -f docker-compose.prod.yml stop frontend backend-a backend-b
 ```
 
 Linux or macOS:
@@ -124,7 +124,7 @@ Update both password values in the deployment secret store or
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate postgres
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate migrate backend frontend
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate migrate backend-a backend-b frontend
 ```
 
 The migration job must exit successfully before the backend becomes healthy.

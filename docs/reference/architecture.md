@@ -197,7 +197,7 @@ semantix/
 
 ## Deployment boundary
 
-The supplied deployment is intentionally single-instance and local-first:
+The development deployment is local-first; production Compose runs two backends behind one gateway:
 
 - coalescing, runtime metrics, and runtime diagnostics are process-local;
   production rate limiting and session-auth lockouts use PostgreSQL;
@@ -206,6 +206,5 @@ The supplied deployment is intentionally single-instance and local-first:
 - CORS is configured for known local frontend origins;
 - no distributed lock, message bus, or external metrics platform is included.
 
-Production adaptation requires authentication, secret management, TLS,
-distributed coordination where multiple replicas share work, and an explicit
-data-retention model.
+Production exposure requires authentication, secret management, TLS, provider
+capacity planning, and an explicit data-retention model.
