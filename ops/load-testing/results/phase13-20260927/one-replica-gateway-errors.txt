@@ -1,0 +1,8 @@
+172.28.0.4 - - [27/Sep/2026:08:24:59 +0000] "POST /api/v1/query HTTP/1.1" 502 157 "-" "Grafana k6/2.1.0" "-"
+2026/09/27 08:24:59 [error] 23#23: *802 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 172.28.0.4, server: _, request: "POST /api/v1/query HTTP/1.1", upstream: "http://172.28.0.2:8000/api/v1/query", host: "frontend:8080"
+172.28.0.4 - - [27/Sep/2026:08:26:56 +0000] "POST /api/v1/query HTTP/1.1" 502 157 "-" "Grafana k6/2.1.0" "-"
+2026/09/27 08:26:56 [error] 21#21: *1716 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 172.28.0.4, server: _, request: "POST /api/v1/query HTTP/1.1", upstream: "http://172.28.0.2:8000/api/v1/query", host: "frontend:8080"
+172.28.0.4 - - [27/Sep/2026:08:27:59 +0000] "POST /api/v1/query HTTP/1.1" 502 157 "-" "Grafana k6/2.1.0" "-"
+172.28.0.4 - - [27/Sep/2026:08:27:59 +0000] "POST /api/v1/query HTTP/1.1" 502 157 "-" "Grafana k6/2.1.0" "-"
+2026/09/27 08:27:59 [error] 22#22: *4737 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 172.28.0.4, server: _, request: "POST /api/v1/query HTTP/1.1", upstream: "http://172.28.0.2:8000/api/v1/query", host: "frontend:8080"
+2026/09/27 08:27:59 [error] 35#35: *3885 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 172.28.0.4, server: _, request: "POST /api/v1/query HTTP/1.1", upstream: "http://172.28.0.2:8000/api/v1/query", host: "frontend:8080"

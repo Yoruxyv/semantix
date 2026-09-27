@@ -172,7 +172,7 @@ Hanya pengaturan yang diperlukan oleh kapabilitas yang dipilih yang akan divalid
 | Mode | Penggunaan yang dituju | Perilaku utama |
 |---|---|---|
 | **Development** | Satu developer lokal yang tepercaya | Hot reload, port loopback, autentikasi dinonaktifkan, migrasi otomatis |
-| **Hardened** | Deployment single-instance yang dibagikan atau publik | Autentikasi token, peran namespace, jaringan backend/database internal, migrasi eksternal, proxy TLS wajib |
+| **Hardened** | Deployment dua replika yang dibagikan atau publik | Autentikasi token, peran namespace, jaringan backend/database internal, migrasi eksternal, proxy TLS wajib |
 
 Buat `.env.production` dari `.env.production.example` hanya ketika Anda menyiapkan deployment yang diperkeras (hardened):
 
@@ -181,6 +181,12 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up --build 
 ```
 
 Jangan menjalankannya sebelum setiap placeholder diganti. Lihat [Hardened deployment](operations/deployment.md) untuk pembuatan token, trusted proxy, peran database, TLS, dan validasi.
+
+## 📈 Skalabilitas Produksi
+
+Stack hardened menyeimbangkan replika backend di atas state PostgreSQL + pgvector bersama. PostgreSQL juga mengoordinasikan batas laju tingkat deployment, penguncian sesi, dan perubahan threshold cache. Failover, draining, serta perubahan jumlah replika yang terkendali telah diuji.
+
+Semantix telah diuji hingga **1.000 virtual user** dalam lingkungan uji kapasitas yang terdokumentasi. Pengujian k6 mencakup beban bertahap satu dan dua replika, soak 1.000 VU selama sepuluh menit, dan panggilan Python SDK melalui gateway dengan load balancer. Hasil lokal dengan provider mock ini bukan jaminan kapasitas produksi. Lihat [Pengujian kapasitas](../../operations/load-testing.md#phase-13-capacity-baseline-on-the-local-docker-host) untuk perangkat keras, workload, perbandingan setelah stabilisasi, hasil, dan batasannya.
 
 ## 📊 Benchmark Terukur
 
@@ -321,7 +327,7 @@ Backend dan frontend menggunakan kepemilikan feature-first. Lihat [Architecture]
 - Similarity semantik bersifat probabilistik dan harus dievaluasi untuk setiap model dan beban kerja (workload).
 - Hosted provider dapat menerima prompt dan dapat menimbulkan biaya, latensi, serta kebutuhan penanganan data eksternal.
 - Metrik runtime dan request coalescing bersifat process-local; rate limiting produksi memakai koordinasi PostgreSQL bersama.
-- Stack hardened adalah baseline single-instance, bukan platform multi-tenant atau multi-replica yang lengkap.
+- Stack hardened menyeimbangkan dua replika backend; ini bukan platform multi-tenant atau sistem autoscaling umum yang lengkap.
 - Provider mock ditujukan untuk pengujian, demonstrasi, dan pengembangan UI.
 
 ## 📚 Dokumentasi
@@ -334,6 +340,7 @@ Backend dan frontend menggunakan kepemilikan feature-first. Lihat [Architecture]
 | [Providers](guides/providers.md) | Konfigurasi provider hosted, lokal, dan mock |
 | [Architecture](reference/architecture.md) | Alur runtime, kepemilikan fitur, dan batas paket |
 | [Hardened deployment](operations/deployment.md) | Autentikasi, TLS, peran database, dan validasi produksi |
+| [Pengujian kapasitas](../../operations/load-testing.md#phase-13-capacity-baseline-on-the-local-docker-host) | Profil beban, perangkat keras, hasil satu/dua replika, dan soak 1.000 VU |
 
 ## 🤝 Kontributor
 

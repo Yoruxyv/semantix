@@ -1,0 +1,56 @@
+{
+  "topology": 2,
+  "profile": "generation-heavy",
+  "vus": 1000,
+  "duration": "60s",
+  "exit_code": 0,
+  "requests": 17306,
+  "rps": 269.5746096923225,
+  "success": 17306,
+  "4xx": 0,
+  "429": 0,
+  "5xx": 0,
+  "502": 0,
+  "503": 0,
+  "504": 0,
+  "transport": 0,
+  "p50_ms": 367.466187,
+  "p95_ms": 1947.300123,
+  "p99_ms": 4117.287610300003,
+  "max_ms": 5039.248667,
+  "cache_hits": 6782,
+  "cache_misses": 10524,
+  "provider_responses": 10510,
+  "coalesced_responses": 14,
+  "backend_delta": {
+    "backend-a": {
+      "request_count": 8654,
+      "error_count": 0,
+      "cache_hits": 2782,
+      "cache_misses": 5256,
+      "provider_calls": 5256,
+      "evictions": 5255,
+      "expirations": 0
+    },
+    "backend-b": {
+      "request_count": 8652,
+      "error_count": 0,
+      "cache_hits": 2781,
+      "cache_misses": 5254,
+      "provider_calls": 5254,
+      "evictions": 5254,
+      "expirations": 0
+    }
+  },
+  "provider_logs": {
+    "generation_starts": 10510,
+    "generation_peak": 35,
+    "unfinished_at_end": 0
+  },
+  "db_peak": 10,
+  "db_active_peak": 7,
+  "db_lock_wait_peak": 6,
+  "probe_failures": 0,
+  "sample_count": 5,
+  "gateway_error_lines": 0
+}
