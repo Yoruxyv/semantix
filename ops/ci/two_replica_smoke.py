@@ -113,6 +113,18 @@ def gateway_upstreams(path: str) -> list[str]:
     return re.findall(rf"upstream=([0-9.]+):8000 path={re.escape(path)}(?:\s|$)", logs)
 
 
+def wait_gateway_upstream(ip: str) -> None:
+    path = "/api/v1/cache/threshold"
+    for _ in range(20):
+        before = len(gateway_upstreams(path))
+        for _ in range(3):
+            request(path)
+        if gateway_upstreams(path)[before:] == [ip] * 3:
+            return
+        time.sleep(0.1)
+    raise AssertionError(f"Gateway did not settle on upstream {ip}")
+
+
 def backend_logs(service: str, *, since: str | None = None) -> str:
     args = ["logs", "--no-color", "--timestamps"]
     if since:
@@ -322,8 +334,9 @@ def verify_failover() -> int:
     return len(failures)
 
 
-def verify_drain(ip_b: str) -> None:
+def verify_drain(ip_a: str, ip_b: str) -> None:
     set_upstream("backend-a")
+    wait_gateway_upstream(ip_a)
     started_before = backend_logs("backend-a").count("Mock generation started")
     with ThreadPoolExecutor(max_workers=1) as executor:
         active = executor.submit(
@@ -342,6 +355,7 @@ def verify_drain(ip_b: str) -> None:
         else:
             raise AssertionError("Active request did not reach backend A")
         set_upstream("backend-b")
+        wait_gateway_upstream(ip_b)
         before = len(gateway_upstreams("/api/v1/cache/threshold"))
         for _ in range(6):
             request("/api/v1/cache/threshold")
@@ -377,7 +391,7 @@ def main() -> None:
 
         verify_cache()
         transient_errors = verify_failover()
-        verify_drain(ip_b)
+        verify_drain(ip_a, ip_b)
 
         since = datetime.now(UTC).isoformat()
         with ThreadPoolExecutor(max_workers=12) as executor:
