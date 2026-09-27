@@ -53,10 +53,11 @@ def route_to(*ips: str) -> None:
 
 
 def wait_routing(expected: set[str], *, excluded: frozenset[str] = frozenset()) -> None:
-    path = "/api/v1/cache/threshold"
+    # Observe gateway routing without consuming the deployment-wide API rate limit.
+    path = "/health"
     seen: set[str] = set()
     clean = 0
-    for _ in range(30):
+    for _ in range(90):
         before = len(gateway_upstreams(path))
         request(path)
         served = gateway_upstreams(path)[before:]
