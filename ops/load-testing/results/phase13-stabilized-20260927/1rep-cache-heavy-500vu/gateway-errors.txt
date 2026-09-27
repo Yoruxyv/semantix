@@ -1,0 +1,2 @@
+frontend-1  | 2026-09-27T09:29:04.980181291Z 2026/09/27 09:29:04 [error] 32#32: *1881 upstream prematurely closed connection while reading response header from upstream, client: 172.28.0.4, server: _, request: "POST /api/v1/query HTTP/1.1", upstream: "http://172.28.0.2:8000/api/v1/query", host: "frontend:8080"
+frontend-1  | 2026-09-27T09:29:04.980228534Z 172.28.0.4 - - [27/Sep/2026:09:29:04 +0000] "POST /api/v1/query HTTP/1.1" 502 157 "-" "Grafana k6/2.1.0" "-"

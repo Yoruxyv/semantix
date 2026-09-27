@@ -1,0 +1,43 @@
+{
+  "topology": 1,
+  "profile": "mixed-policy",
+  "vus": 1000,
+  "duration": "60s",
+  "exit_code": 0,
+  "requests": 17236,
+  "rps": 268.8432229301708,
+  "success": 17236,
+  "4xx": 0,
+  "429": 0,
+  "5xx": 0,
+  "transport": 0,
+  "p50_ms": 311.954394,
+  "p95_ms": 2255.663447,
+  "p99_ms": 2774.312766550001,
+  "max_ms": 3420.199645,
+  "cache_hits": 9182,
+  "cache_misses": 8054,
+  "provider_responses": 8054,
+  "coalesced_responses": 0,
+  "backend_delta": {
+    "backend-a": {
+      "request_count": 17236,
+      "error_count": 0,
+      "cache_hits": 1671,
+      "cache_misses": 2946,
+      "provider_calls": 8054,
+      "evictions": 4125,
+      "expirations": 0
+    }
+  },
+  "provider_logs": {
+    "generation_starts": 8054,
+    "generation_peak": 34,
+    "unfinished_at_end": 0
+  },
+  "db_peak": 5,
+  "db_active_peak": 4,
+  "db_lock_wait_peak": 4,
+  "probe_failures": 0,
+  "sample_count": 7
+}

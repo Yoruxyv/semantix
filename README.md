@@ -230,6 +230,20 @@ Do not start it until every placeholder has been replaced. See
 [Hardened deployment](docs/operations/deployment.md) for token generation,
 trusted proxies, database roles, TLS, and validation.
 
+## 📈 Production scalability
+
+The hardened stack balances backend replicas over shared PostgreSQL + pgvector
+state. PostgreSQL also coordinates deployment-wide rate limits, session lockout,
+and cache threshold changes. Replica failover, draining, and controlled scaling
+have been exercised.
+
+Semantix has been exercised with up to **1,000 virtual users** in the documented
+capacity-test environment. k6 tests covered staged one- and two-replica loads,
+a ten-minute 1,000-VU soak, and Python SDK calls through the load-balanced
+gateway. These local mock-provider results are not a production capacity
+guarantee. See [Capacity testing](docs/operations/load-testing.md#phase-13-capacity-baseline-on-the-local-docker-host)
+for hardware, workloads, stabilized comparisons, results, and limitations.
+
 ## 📊 Measured benchmark
 
 A local run on July 19, 2026 used the eight-query **Quick semantic safety set**,
@@ -407,6 +421,7 @@ The [documentation index](docs/README.md) groups the full guides by purpose.
 | [Python SDK](sdk/README.md) | Install and use the typed public HTTP client |
 | [Architecture](docs/reference/architecture.md) | Runtime flow, feature ownership, and package boundaries |
 | [Hardened deployment](docs/operations/deployment.md) | Authentication, TLS, database roles, and production validation |
+| [Capacity testing](docs/operations/load-testing.md#phase-13-capacity-baseline-on-the-local-docker-host) | Load profiles, hardware, one/two-replica results, and the 1,000-VU soak |
 
 ## 🤝 Contributors
 

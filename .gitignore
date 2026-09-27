@@ -37,3 +37,8 @@ frontend/.vite-cache
 # Graphify local/generated state
 .codex/hooks.json
 graphify-out/
+
+# Disposable capacity-runner files; curated JSON/telemetry under results/ is tracked.
+/phase13-*/
+ops/load-testing/results/**/k6.log
+ops/load-testing/results/**/warmup.log
