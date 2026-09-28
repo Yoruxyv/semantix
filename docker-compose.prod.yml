@@ -114,6 +114,7 @@ services:
       MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-65536}
       RATE_LIMIT: ${RATE_LIMIT:-20/minute}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SEMANTIX_GATEWAY_TRACE: ${SEMANTIX_GATEWAY_TRACE:-0}
     healthcheck:
       test:
         - CMD

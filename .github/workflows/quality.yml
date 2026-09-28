@@ -473,6 +473,12 @@ jobs:
           cd "$RUNNER_TEMP/semantix-autocrlf"
           bash ops/ci/linux/hardened-smoke.sh bash -c 'npm --prefix frontend run test:e2e && python3 ops/ci/two_replica_smoke.py && python3 ops/ci/autoscaling_smoke.py'
 
+      - name: Verify gateway reset resilience
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/semantix-autocrlf"
+          python3 ops/ci/gateway_reset_smoke.py
+
   pgvector:
     name: Pgvector integration
     runs-on: ubuntu-latest

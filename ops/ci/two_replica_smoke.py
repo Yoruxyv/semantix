@@ -110,7 +110,9 @@ def edge_ip(service: str) -> str:
 
 def gateway_upstreams(path: str) -> list[str]:
     logs = compose("logs", "--no-color", "frontend")
-    return re.findall(rf"upstream=([0-9.]+):8000 path={re.escape(path)}(?:\s|$)", logs)
+    return re.findall(
+        rf"upstream=([0-9.]+):8000 .*?path={re.escape(path)}(?:\s|$)", logs
+    )
 
 
 def wait_gateway_upstream(ip: str) -> None:
@@ -140,7 +142,7 @@ def set_upstream(service: str | None) -> None:
             "resolver 127.0.0.11 valid=5s ipv6=off;\n"
             "upstream semantix_backend {\n"
             "    zone semantix_backend 64k;\n"
-            f"    server {service}:8000 resolve max_fails=1 fail_timeout=5s;\n"
+            f"    server {service}:8000 resolve max_fails=2 fail_timeout=5s;\n"
             "}\n",
             encoding="utf-8",
         )

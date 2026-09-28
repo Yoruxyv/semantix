@@ -1,3 +1,4 @@
+import os
 from collections.abc import Callable
 from uuid import uuid4
 
@@ -24,6 +25,7 @@ from app.middleware.body_limit import (
     RequestBodyTooLargeError,
     request_body_too_large_handler,
 )
+from app.middleware.gateway_trace import GatewayTraceMiddleware
 from app.middleware.rate_limit import limiter
 from app.providers.factory import create_default_provider_registry
 from app.providers.registry import ProviderRegistry
@@ -97,6 +99,8 @@ def _configure_middleware(application: FastAPI, settings: Settings) -> None:
         RequestBodyLimitMiddleware,
         max_body_bytes=settings.max_request_body_bytes,
     )
+    if os.environ.get("SEMANTIX_GATEWAY_TRACE") == "1":
+        application.add_middleware(GatewayTraceMiddleware)
 
 
 def _register_exception_handlers(application: FastAPI) -> None:

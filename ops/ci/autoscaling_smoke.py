@@ -44,7 +44,7 @@ def route_to(*ips: str) -> None:
         "resolver 127.0.0.11 valid=5s ipv6=off;\n"
         "upstream semantix_backend {\n"
         "    zone semantix_backend 64k;\n"
-        + "".join(f"    server {ip}:8000 max_fails=1 fail_timeout=5s;\n" for ip in ips)
+        + "".join(f"    server {ip}:8000 max_fails=2 fail_timeout=5s;\n" for ip in ips)
         + "}\n",
         encoding="utf-8",
     )

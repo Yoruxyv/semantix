@@ -355,7 +355,7 @@ def run_k6(
     gateway_errors = [
         line
         for line in gateway_log.splitlines()
-        if "[error]" in line or re.search(r'" 5\d\d ', line)
+        if "[error]" in line or re.search(r'" 5\d\d |status=5\d\d(?:\s|$)', line)
     ]
     (output / "gateway-errors.txt").write_text(
         "\n".join(
@@ -368,6 +368,26 @@ def run_k6(
         + "\n",
         encoding="utf-8",
     )
+    failed_ids = set(re.findall(r"rid=([0-9a-f]{32})", "\n".join(gateway_errors)))
+    if failed_ids:
+        backend_log = compose(
+            env, "logs", "--no-color", "--timestamps", "--since", started, *services
+        )
+        related = [
+            line
+            for line in backend_log.splitlines()
+            if (match := re.search(r"rid=([0-9a-f]{32})", line))
+            and match.group(1) in failed_ids
+        ]
+        (output / "backend-trace-errors.txt").write_text(
+            "\n".join(
+                related
+                if len(related) <= 200
+                else related[:100] + ["... omitted middle lines ..."] + related[-100:]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     row = {
         "topology": len(services),
         "profile": profile,
@@ -547,7 +567,7 @@ def main() -> None:
             upstream.write_text(
                 "resolver 127.0.0.11 valid=5s ipv6=off;\nupstream semantix_backend {\n    zone semantix_backend 64k;\n"
                 + "".join(
-                    f"    server backend-{letter}:8000 resolve max_fails=1 fail_timeout=5s;\n"
+                    f"    server backend-{letter}:8000 resolve max_fails=2 fail_timeout=5s;\n"
                     for letter in "ab"[:replicas]
                 )
                 + "}\n",
