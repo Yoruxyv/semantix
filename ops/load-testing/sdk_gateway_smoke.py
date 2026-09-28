@@ -30,6 +30,7 @@ def main() -> None:
         "async": False,
         "shared_cache": False,
         "shared_threshold": False,
+        "failover_recovery": False,
         "rate_limit_429": False,
         "server_5xx": False,
     }
@@ -134,6 +135,16 @@ def main() -> None:
                 payload={"threshold": threshold},
             )
             evidence["shared_threshold"] = True
+
+            compose(env, "stop", "backend-a")
+            time.sleep(6)
+            with SemantixClient(base_url=base, token=sdk_token) as client:
+                client.query(f"sdk failover {uuid4().hex}", namespace="normal")
+            compose(env, "up", "-d", "--wait", "--wait-timeout", "120", "backend-a")
+            assert direct(env, "backend-a", "/ready")[0] == 200
+            with SemantixClient(base_url=base, token=sdk_token) as client:
+                client.query(f"sdk recovery {uuid4().hex}", namespace="normal")
+            evidence["failover_recovery"] = True
 
             limited = env | {"RATE_LIMIT": "2/minute"}
             compose(

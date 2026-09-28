@@ -1,6 +1,8 @@
-# Production runtime audit — 2026-09-27
+# Production runtime audit and re-certification
 
-**Verdict: NOT PRODUCTION READY — the audited two-replica gateway returned 1,907 HTTP 502 responses during a 10-minute, 1,000-VU soak.** This is a local Docker Desktop verdict for the exact topology below. It is neither a managed-autoscaling certification nor a universal capacity limit.
+**Current verdict (2026-09-28): PRODUCTION READY for the audited two-replica Semantix runtime, with the residual reset and deployment boundaries disclosed below.** This does not certify external TLS termination, hosted-provider capacity, managed autoscaling, or other topologies. The current-main re-certification is recorded at the end of this document.
+
+**Historical verdict (2026-09-27): NOT PRODUCTION READY — the audited two-replica gateway returned 1,907 HTTP 502 responses during a 10-minute, 1,000-VU soak.** This is the preserved before-fix local Docker Desktop verdict for the exact topology below. It is neither a managed-autoscaling certification nor a universal capacity limit.
 
 ## Scope and environment
 
@@ -129,3 +131,42 @@ A focused disposable Nginx-to-Uvicorn probe shortened only Uvicorn's idle timeou
 The ladder and soak commands are shown above. For the focused runtime checks, use fresh `COMPOSE_PROJECT_NAME` values and run `powershell -NoProfile -ExecutionPolicy Bypass -File ops/ci/windows/hardened-smoke.ps1 python ops/ci/two_replica_smoke.py` or replace the follow-up with `python ops/ci/runtime_proxy_smoke.py`, after setting `SEMANTIX_PORT=18080` and isolated mock-provider environment values. The wrapper removes its named Compose project and volume. Run `python ops/load-testing/backup_restore_smoke.py` for the disposable dump/restore exercise and `sdk/.venv/Scripts/python.exe ops/load-testing/sdk_gateway_smoke.py --output <ignored-path>` for SDK compatibility. Both helpers clean their own disposable projects and volumes. Never point these commands at the normal development database.
 
 After the audit, `docker ps` showed only the original `semantix-frontend-1`, `semantix-backend-1`, and `semantix-postgres-1`; no audit container or PostgreSQL volume remained. Generated k6 results stayed in the ignored results directory for local investigation. No global Docker prune was used.
+
+## Production re-certification — 2026-09-28
+
+**Verdict: PRODUCTION READY for the supported two-replica Semantix runtime behind the documented external TLS/reverse-proxy boundary.** This verdict applies to merged `origin/main` at `f6e0ae9052487ce2bb1d3ca8d82e5becd25abe3c`, after the gateway resilience fix in PR #124. It supersedes the historical verdict above without altering that evidence. The checkout was clean before testing. No application, SDK, production Compose, gateway, cache, pool, or provider configuration was changed for re-certification.
+
+| Environment | Re-certified value |
+| --- | --- |
+| Topology | Production Compose Nginx gateway, `backend-a` and `backend-b`, shared PostgreSQL/pgvector, token authentication and namespaces, PostgreSQL-backed rate limit and lockout, shared threshold, pgvector cache, and process-local coalescing. The local gateway was bound to loopback HTTP; external TLS termination is a documented deployment boundary, not a tested component. |
+| Host | Windows 11 build 26200; AMD Ryzen 9 5900HX, 16 logical CPUs, 32,929,028 KiB visible RAM. Docker Desktop Engine 29.6.2 reported 16 CPUs and 16,451,792,896 bytes of VM memory. |
+| Runtime and tools | Backend Python 3.14.7; Nginx 1.31.3; PostgreSQL 17.10 in the pinned pgvector image; k6 2.1.0. The load run used deterministic mock providers, 384-dimensional embeddings, 50 ms generation delay, threshold 0.92, 3,600-second TTL, cache capacity 500, pool 1–5 per replica, and `RATE_LIMIT=100000/minute`. |
+| Pinned images | Backend base `python:3.14-slim@sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5ebe91c401c8e83`; gateway base `nginxinc/nginx-unprivileged:1.31.3-alpine@sha256:f972e5322b9797dc2a6b830030094426437b1ae7032e4644496395336ac6fdac`; database `pgvector/pgvector:pg17@sha256:d2ef61f42ef767baa5a1475393303cc235bcd92febd9d7014eddb48b41f3bad0`; k6 `grafana/k6@sha256:e7eeddf1ce2361df6920d925297f487c0ba549c44be242c6a9c22f28d9b08efa`. |
+| Built load-run images | Backend A `sha256:37e29ded142aec29446fa99802286dcd3f58f7f3151db6d428b713f0904b170f`, backend B `sha256:63543cc9a9270b7971795c12d6dab3e743602819671aa1dae14a3493be318a04`, gateway `sha256:f0bbd28063f31ca148bed4405cc04cb3cc26eb5fab9cc219b6e923c61dbbc925`. |
+
+The exact-main [Quality run](https://github.com/Yoruxyv/semantix/actions/runs/36394862157) and [Links run](https://github.com/Yoruxyv/semantix/actions/runs/36394861762) passed. Quality included 510 non-pgvector backend tests at 80.38% coverage, 44 pgvector integration tests, Ruff, format, mypy, frontend and SDK quality/compatibility, hardened smoke, production container validation, CodeQL, image and secret scans, SBOM/provenance, and the gateway reset regression. Dependency review was skipped on the main push; it passed on [PR #124's final head](https://github.com/Yoruxyv/semantix/actions/runs/36394036211), whose Git tree matches the merge commit. Local focused checks are summarized below.
+
+| Area | Re-certification result |
+| --- | --- |
+| Security and HTTP gateway | **PASS for the tested local boundary.** The disposable two-replica smoke passed token roles, namespace authorization, shared progressive lockout, and deployment-wide quota. The separate gateway probe returned 401 unauthenticated, 413 for declared and chunked oversized bodies, 400 for a large header and conflicting framing, all five expected security headers, and `401, 401, 429` despite three forged forwarding addresses. Exact-main backend tests and CI covered diagnostics authorization, secret redaction, provider URL suppression, and scans. External TLS and certificate rotation were not exercised. |
+| Provider safety | **PASS for tested contracts.** Exact-main backend tests cover deadlines, phase timeouts, retry/backoff budgets, cancellation, response bounds, encoded/compressed and malformed responses, safe errors, and log safety. Load used mocks; hosted-provider latency and quotas were not certified. |
+| Cache and database | **PASS.** Exact-main pgvector tests covered migrations, idempotency, checksums/schema state, concurrent applicator protection, runtime permissions, namespace and embedding-space isolation, persistence, and expiry. The two-replica smoke passed cross-replica cache behavior, TTL, policy modes, threshold coordination, and process-local coalescing: two leaders for one shared cold prompt remained within the documented design. The observed DB connection peak was 10, the configured two-pool maximum. |
+| Backup, outage, and recovery | **PASS for disposable recovery.** A custom-format 11,612-byte dump was restored into a fresh volume; both backends became ready and the previously cached prompt hit. Restarted backends and gateway retained cache behavior. PostgreSQL outage made `/ready` return 503, and restoration returned 200. No development database or volume was used. |
+| Failover, drain, and SDK | **PASS.** The controlled reset regression returned two deliberately induced 502s but kept gateway `/health` at 200, then passed real stopped-replica failover and recovery. The production two-replica smoke passed routing, active-provider drain, failover, and rejoin with zero transient errors. The SDK smoke passed sync/async clients, shared cache/threshold, 429 and 5xx decoding, plus a new SDK query while one replica was stopped and another after recovery. A deliberately blocked in-flight DB operation during shutdown was not exercised; that specific shutdown path remains a disclosed verification gap. |
+
+### Exact 10-minute blocker comparison
+
+The current-main run used the same specified two-replica, cache-heavy, 1,000-VU, 600-second workload with deterministic 2–4-second think time. PR #124 renamed the synthetic prompt labels, so prompt bytes and resulting similarity decisions need not match the old run exactly; workload selection, timing, and production settings stayed the same. The capacity runner used a fresh disposable Compose project and retained ignored local results under `ops/load-testing/results/recert-main-f6e0ae9-20260928/`.
+
+| Run | Requests | RPS | P50/P95/P99/max ms | HTTP 502 | Other 4xx/429/transport |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Original failed audit | 164,401 | 271.1 | 424/2,072/4,009/8,086 | 1,907 (1.16%) | 0 |
+| Re-certified merged main | 196,034 | 324.6 | 24/218/738/2,282 | 2 (0.0010%) | 0 |
+
+The new run returned 196,032 successes. Both peers served traffic (98,011 and 98,021 backend request increments), with zero backend application error increments and zero restarts. All 50 sampled health/readiness sets were 200 for both peers. Sampled ready latency peaked at 730/663 ms; backend CPU peaked at 118%/116% of one core and RSS at 93/103 MiB. Runtime-role DB connections/active sessions/lock waits peaked at 10/10/7. The mock provider recorded 34,768 generation starts (peak concurrency 33); k6 recorded 161,264 cache hits and 34,768 misses.
+
+The two retained 502s were isolated `recv() failed (104: Connection reset by peer) while reading response header from upstream` events, one on each peer about 74 seconds apart. The bounded gateway excerpt had **no `no live upstreams` line**. These remain real failed client requests; the exact initiating reset is still unconfirmed and is classified as a **RESIDUAL RUNTIME LIMITATION**. No backend application error-counter increment, restart, sampled readiness failure, or peer-exhaustion burst was observed. The controlled reset regression, rather than the load comparison alone, is the causal evidence that the confirmed gateway-wide amplification defect was fixed: fresh pre-change soaks had also sometimes completed cleanly.
+
+This verdict does not claim zero 502s, hosted-provider capacity, external TLS/certificate rotation, managed secret delivery, managed autoscaling, three replicas, HA PostgreSQL, or multi-region operation. Reclassify the residual reset if a comparable run shows materially higher errors, `no live upstreams`, failed readiness, impaired failover, or a representative trace establishes a specific defect. The blocked in-flight DB shutdown gap above should be tested before claiming complete shutdown-path coverage.
+
+All certification Compose projects, networks, and volumes were removed; the normal development stack was not modified. The k6 and SDK output remains Git-ignored for local inspection. No global Docker prune was run. **Final verdict: PRODUCTION READY for the exact audited two-replica topology, with the limitations above.**
