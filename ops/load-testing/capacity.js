@@ -4,7 +4,7 @@ import { Counter } from "k6/metrics";
 
 const base = __ENV.BASE_URL;
 const token = __ENV.SEMANTIX_TOKEN;
-const namespace = __ENV.SEMANTIX_NAMESPACE || "phase13";
+const namespace = __ENV.SEMANTIX_NAMESPACE || "capacity-test";
 const profile = __ENV.PROFILE || "cache-heavy";
 const runId = __ENV.RUN_ID || "manual";
 const vus = Number(__ENV.VUS || "50");
@@ -21,18 +21,18 @@ if (!Number.isInteger(vus) || vus < 1) {
   throw new Error("VUS must be a positive integer");
 }
 
-const status2xx = new Counter("phase13_status_2xx");
-const status4xx = new Counter("phase13_status_4xx");
-const status429 = new Counter("phase13_status_429");
-const status5xx = new Counter("phase13_status_5xx");
-const status502 = new Counter("phase13_status_502");
-const status503 = new Counter("phase13_status_503");
-const status504 = new Counter("phase13_status_504");
-const transportErrors = new Counter("phase13_transport_errors");
-const hits = new Counter("phase13_cache_hits");
-const misses = new Counter("phase13_cache_misses");
-const providerCalls = new Counter("phase13_provider_calls");
-const coalesced = new Counter("phase13_coalesced_responses");
+const status2xx = new Counter("capacity_status_2xx");
+const status4xx = new Counter("capacity_status_4xx");
+const status429 = new Counter("capacity_status_429");
+const status5xx = new Counter("capacity_status_5xx");
+const status502 = new Counter("capacity_status_502");
+const status503 = new Counter("capacity_status_503");
+const status504 = new Counter("capacity_status_504");
+const transportErrors = new Counter("capacity_transport_errors");
+const hits = new Counter("capacity_cache_hits");
+const misses = new Counter("capacity_cache_misses");
+const providerCalls = new Counter("capacity_provider_calls");
+const coalesced = new Counter("capacity_coalesced_responses");
 
 export const options = {
   scenarios: {
@@ -57,23 +57,23 @@ export default function () {
   let prompt;
   let policy = policies.normal;
   if (burst) {
-    prompt = `Phase 13 cold identical ${runId}`;
+    prompt = `Capacity cold identical ${runId}`;
   } else if (profile === "cache-heavy") {
     prompt = slot < 8
-      ? `Phase 13 repeated ${runId} ${slot % 8}`
-      : `Phase 13 unique ${runId} ${__VU} ${__ITER}`;
+      ? `Capacity repeated ${runId} ${slot % 8}`
+      : `Capacity unique ${runId} ${__VU} ${__ITER}`;
   } else if (profile === "generation-heavy") {
     prompt = slot === 0
-      ? `Phase 13 repeated ${runId} 0`
-      : `Phase 13 unique ${runId} ${__VU} ${__ITER}`;
+      ? `Capacity repeated ${runId} 0`
+      : `Capacity unique ${runId} ${__VU} ${__ITER}`;
   } else {
     policy = slot < 6 ? policies.normal
       : slot === 6 ? policies.read_only
       : slot === 7 ? policies.refresh
       : slot === 8 ? policies.bypass : policies.private;
     prompt = slot < 4 || slot === 6
-      ? `Phase 13 repeated ${runId} ${slot % 4}`
-      : `Phase 13 unique ${runId} ${__VU} ${__ITER}`;
+      ? `Capacity repeated ${runId} ${slot % 4}`
+      : `Capacity unique ${runId} ${__VU} ${__ITER}`;
   }
 
   const response = http.post(`${base}/api/v1/query`, JSON.stringify({

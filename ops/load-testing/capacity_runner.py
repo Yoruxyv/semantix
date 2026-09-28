@@ -12,6 +12,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -28,7 +29,7 @@ K6_IMAGE = (
 )
 
 
-def command(*args: str, env: dict[str, str]) -> str:
+def command(*args: str, env: Mapping[str, str] | None) -> str:
     result = subprocess.run(
         args, cwd=ROOT, env=env, capture_output=True, text=True, check=False
     )
@@ -97,7 +98,7 @@ def direct(
 
 
 def snapshot(env: dict[str, str], services: list[str], admin: str) -> dict:
-    sample = {"at": datetime.now(UTC).isoformat(), "replicas": {}}
+    sample: dict = {"at": datetime.now(UTC).isoformat(), "replicas": {}}
     for service in services:
         status, _, latency = direct(env, service, "/ready")
         health_status, _, health_latency = direct(env, service, "/health")
@@ -220,7 +221,7 @@ def run_k6(
     stabilize: str | None = None,
 ) -> dict:
     run_id = uuid4().hex
-    namespace = "phase13-burst" if burst else "phase13"
+    namespace = "capacity-test-burst" if burst else "capacity-test"
     status, _ = api(
         env, f"/api/v1/cache?namespace={namespace}", token=admin, method="DELETE"
     )
@@ -234,7 +235,7 @@ def run_k6(
                 token=operator,
                 method="POST",
                 payload={
-                    "prompt": f"Phase 13 repeated {run_id} {index}",
+                    "prompt": f"Capacity repeated {run_id} {index}",
                     "namespace": namespace,
                 },
             )
@@ -396,22 +397,22 @@ def run_k6(
         "exit_code": exit_code,
         "requests": value("http_reqs"),
         "rps": value("http_reqs", "rate"),
-        "success": value("phase13_status_2xx"),
-        "4xx": value("phase13_status_4xx"),
-        "429": value("phase13_status_429"),
-        "5xx": value("phase13_status_5xx"),
-        "502": value("phase13_status_502"),
-        "503": value("phase13_status_503"),
-        "504": value("phase13_status_504"),
-        "transport": value("phase13_transport_errors"),
+        "success": value("capacity_status_2xx"),
+        "4xx": value("capacity_status_4xx"),
+        "429": value("capacity_status_429"),
+        "5xx": value("capacity_status_5xx"),
+        "502": value("capacity_status_502"),
+        "503": value("capacity_status_503"),
+        "504": value("capacity_status_504"),
+        "transport": value("capacity_transport_errors"),
         "p50_ms": value("http_req_duration", "med"),
         "p95_ms": value("http_req_duration", "p(95)"),
         "p99_ms": value("http_req_duration", "p(99)"),
         "max_ms": value("http_req_duration", "max"),
-        "cache_hits": value("phase13_cache_hits"),
-        "cache_misses": value("phase13_cache_misses"),
-        "provider_responses": value("phase13_provider_calls"),
-        "coalesced_responses": value("phase13_coalesced_responses"),
+        "cache_hits": value("capacity_cache_hits"),
+        "cache_misses": value("capacity_cache_misses"),
+        "provider_responses": value("capacity_provider_calls"),
+        "coalesced_responses": value("capacity_coalesced_responses"),
         "backend_delta": metrics_delta(before, after, services),
         "provider_logs": provider_events(env, services, started),
         "db_peak": max(
@@ -457,16 +458,16 @@ def environment(
 ) -> dict[str, str]:
     principals = [
         {
-            "name": "phase13-admin",
+            "name": "capacity-admin",
             "token_sha256": hashlib.sha256(admin.encode()).hexdigest(),
             "role": "admin",
             "namespaces": ["*"],
         },
         {
-            "name": "phase13-operator",
+            "name": "capacity-operator",
             "token_sha256": hashlib.sha256(operator.encode()).hexdigest(),
             "role": "operator",
-            "namespaces": ["phase13", "phase13-burst"],
+            "namespaces": ["capacity-test", "capacity-test-burst"],
         },
     ]
     return os.environ | {
@@ -549,7 +550,7 @@ def main() -> None:
     )
     all_rows = []
     for replicas in args.topologies:
-        project = f"semantix-phase13-{replicas}-{uuid4().hex[:8]}"
+        project = f"semantix-capacity-{replicas}-{uuid4().hex[:8]}"
         existing = command(
             "docker",
             "ps",
@@ -562,7 +563,9 @@ def main() -> None:
         )
         if existing.strip():
             raise RuntimeError(f"Refusing to reuse existing project {project}")
-        with tempfile.TemporaryDirectory(prefix="phase13-", dir=ROOT) as temporary:
+        with tempfile.TemporaryDirectory(
+            prefix="capacity-runner-", dir=ROOT
+        ) as temporary:
             upstream = Path(temporary) / "upstream.conf"
             upstream.write_text(
                 "resolver 127.0.0.11 valid=5s ipv6=off;\nupstream semantix_backend {\n    zone semantix_backend 64k;\n"

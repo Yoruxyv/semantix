@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from uuid import uuid4
 
-from phase13 import PORT, ROOT, compose, direct, environment
+from capacity_runner import PORT, ROOT, compose, direct, environment
 from semantix_client import (
     SemantixClient,
     SemantixRateLimitError,
@@ -22,7 +22,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    project = f"semantix-phase13-sdk-{uuid4().hex[:8]}"
+    project = f"semantix-capacity-sdk-{uuid4().hex[:8]}"
     admin, operator, sdk_token = (secrets.token_urlsafe(32) for _ in range(3))
     base = f"http://127.0.0.1:{PORT}"
     evidence = {
@@ -33,7 +33,9 @@ def main() -> None:
         "rate_limit_429": False,
         "server_5xx": False,
     }
-    with tempfile.TemporaryDirectory(prefix="phase13-sdk-", dir=ROOT) as temporary:
+    with tempfile.TemporaryDirectory(
+        prefix="capacity-runner-sdk-", dir=ROOT
+    ) as temporary:
         upstream = Path(temporary) / "upstream.conf"
         upstream.write_text(
             (ROOT / "frontend/upstream.prod.conf").read_text(encoding="utf-8"),
@@ -43,7 +45,7 @@ def main() -> None:
         principals = json.loads(env["AUTH_PRINCIPALS"])
         principals.append(
             {
-                "name": "phase13-sdk",
+                "name": "capacity-sdk",
                 "token_sha256": hashlib.sha256(sdk_token.encode()).hexdigest(),
                 "role": "operator",
                 "namespaces": [
@@ -90,7 +92,7 @@ def main() -> None:
                 "/api/v1/query",
                 admin,
                 method="POST",
-                payload={"prompt": prompt, "namespace": "phase13"},
+                payload={"prompt": prompt, "namespace": "capacity-test"},
             )
             second = direct(
                 env,
@@ -98,7 +100,7 @@ def main() -> None:
                 "/api/v1/query",
                 admin,
                 method="POST",
-                payload={"prompt": prompt, "namespace": "phase13"},
+                payload={"prompt": prompt, "namespace": "capacity-test"},
             )
             assert first[0] == second[0] == 200 and second[1]["cache_hit"] is True
             evidence["shared_cache"] = True
@@ -148,9 +150,11 @@ def main() -> None:
             )
             with SemantixClient(base_url=base, token=operator) as client:
                 for index in range(2):
-                    client.query(f"sdk phase13 limit {index}", namespace="phase13")
+                    client.query(
+                        f"sdk capacity limit {index}", namespace="capacity-test"
+                    )
                 try:
-                    client.query("sdk phase13 limit 2", namespace="phase13")
+                    client.query("sdk capacity limit 2", namespace="capacity-test")
                 except SemantixRateLimitError as error:
                     assert error.status_code == 429
                     evidence["rate_limit_429"] = True
@@ -163,7 +167,9 @@ def main() -> None:
             time.sleep(1)
             with SemantixClient(base_url=base, token=operator) as client:
                 try:
-                    client.query("sdk phase13 database outage", namespace="phase13")
+                    client.query(
+                        "sdk capacity database outage", namespace="capacity-test"
+                    )
                 except SemantixServerError as error:
                     assert error.status_code >= 500
                     evidence["server_5xx"] = True
