@@ -42,6 +42,7 @@ def request(
     payload: dict[str, object] | None = None,
     backend: str | None = None,
     expected: int = 200,
+    timeout_seconds: int = 20,
 ) -> dict[str, object]:
     url = f"http://{backend}:8000{path}" if backend else f"{BASE}{path}"
     command = [
@@ -49,7 +50,7 @@ def request(
         "--silent",
         "--show-error",
         "--max-time",
-        "20",
+        str(timeout_seconds),
         "--write-out",
         "\n%{http_code}",
         "--request",
@@ -305,7 +306,7 @@ def verify_auth_and_limits() -> None:
 
 
 def verify_failover() -> int:
-    failures = []
+    failures: list[str] = []
 
     def traffic() -> None:
         while not stopped[0]:
@@ -377,6 +378,132 @@ def verify_drain(ip_a: str, ip_b: str) -> None:
     set_upstream(None)
 
 
+def verify_blocked_db_shutdown(ip_a: str, ip_b: str) -> float:
+    seed = f"blocked-db-seed-{uuid4().hex}"
+    assert query(seed, backend="backend-a", cache_read_enabled=False)["provider_called"]
+    set_upstream("backend-a")
+    wait_gateway_upstream(ip_a)
+    locker = subprocess.Popen(
+        [
+            *COMPOSE,
+            "exec",
+            "-T",
+            "-e",
+            "PGAPPNAME=semantix-blocked-db-smoke",
+            "postgres",
+            "psql",
+            "-X",
+            "-q",
+            "-U",
+            os.environ["POSTGRES_MIGRATION_USER"],
+            "-d",
+            os.environ["POSTGRES_DB"],
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    def count(sql: str) -> int:
+        return int(
+            compose(
+                "exec",
+                "-T",
+                "postgres",
+                "psql",
+                "-U",
+                os.environ["POSTGRES_MIGRATION_USER"],
+                "-d",
+                os.environ["POSTGRES_DB"],
+                "-Atc",
+                sql,
+            ).strip()
+        )
+
+    def wait_for(sql: str, description: str) -> None:
+        for _ in range(60):
+            if count(sql):
+                return
+            assert locker.poll() is None, f"Lock session exited before {description}"
+            time.sleep(0.1)
+        raise AssertionError(f"Timed out waiting for {description}")
+
+    try:
+        assert locker.stdin is not None
+        locker.stdin.write(
+            "SELECT pg_advisory_lock(hashtext((SELECT embedding_space "
+            "FROM semantix.cache_entries LIMIT 1)));\n"
+        )
+        locker.stdin.flush()
+        wait_for(
+            "SELECT count(*) FROM pg_stat_activity a JOIN pg_locks l USING (pid) "
+            "WHERE a.application_name = 'semantix-blocked-db-smoke' "
+            "AND l.locktype = 'advisory' AND l.granted",
+            "held advisory lock",
+        )
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            active = executor.submit(
+                request,
+                QUERY_PATH,
+                method="POST",
+                payload={
+                    "prompt": f"blocked-db-{uuid4().hex}",
+                    "namespace": "alpha",
+                    "cache_read_enabled": False,
+                },
+                timeout_seconds=60,
+            )
+            wait_for(
+                "SELECT count(*) FROM pg_stat_activity WHERE "
+                "usename = 'semantix_runtime' AND wait_event_type = 'Lock' "
+                "AND query LIKE 'SELECT pg_advisory_xact_lock%'",
+                "blocked backend database operation",
+            )
+            set_upstream("backend-b")
+            wait_gateway_upstream(ip_b)
+            stop_started = time.monotonic()
+            stopped = executor.submit(compose, "stop", "backend-a")
+            request("/ready")
+            query(f"surviving-peer-{uuid4().hex}", cache_enabled=False)
+            assert not active.done() and not stopped.done(), (
+                "The blocked request or replica stop finished before DB release"
+            )
+            locker.stdin.write("SELECT pg_advisory_unlock_all();\n\\q\n")
+            locker.stdin.flush()
+            assert locker.wait(timeout=10) == 0
+            assert active.result(timeout=45)["provider_called"] is True
+            stopped.result(timeout=45)
+            shutdown_seconds = time.monotonic() - stop_started
+
+        container = compose("ps", "-a", "-q", "backend-a").strip()
+        assert (
+            run(
+                "docker", "inspect", "--format", "{{.State.ExitCode}}", container
+            ).strip()
+            == "0"
+        )
+        assert "Application shutdown complete" in backend_logs("backend-a")
+        assert (
+            1 <= db_connections() <= int(os.environ.get("DATABASE_POOL_MAX_SIZE", "5"))
+        )
+        request("/ready")
+        assert query(seed, backend="backend-b")["cache_hit"] is True
+        compose("start", "backend-a")
+        wait_healthy("backend-a")
+        request("/ready", backend="backend-a")
+        return shutdown_seconds
+    finally:
+        if locker.poll() is None:
+            assert locker.stdin is not None
+            locker.stdin.write("SELECT pg_advisory_unlock_all();\n\\q\n")
+            locker.stdin.flush()
+            locker.wait(timeout=10)
+        compose("start", "backend-a")
+        wait_healthy("backend-a")
+        set_upstream(None)
+
+
 def main() -> None:
     ip_a, ip_b = edge_ip("backend-a"), edge_ip("backend-b")
     assert ip_a != ip_b
@@ -394,6 +521,7 @@ def main() -> None:
         verify_cache()
         transient_errors = verify_failover()
         verify_drain(ip_a, ip_b)
+        blocked_db_shutdown_seconds = verify_blocked_db_shutdown(ip_a, ip_b)
 
         since = datetime.now(UTC).isoformat()
         with ThreadPoolExecutor(max_workers=12) as executor:
@@ -418,13 +546,13 @@ def main() -> None:
         _, coalesced_calls = provider_peak(coalesce_since)
         assert 1 <= coalesced_calls <= 2, coalesced_calls
         assert (
-            sum(response["provider_called"] for response in coalesced_responses)
+            sum(bool(response["provider_called"]) for response in coalesced_responses)
             == coalesced_calls
         )
 
         verify_auth_and_limits()
         print(
-            f"two-replica verification: upstreams=2 idle_db={idle_connections} observed_db_peak={max(observed_connections)} mock_provider_peak={peak} cold_generation_calls={calls} same_prompt_generation_calls={coalesced_calls} transient_errors={transient_errors}"
+            f"two-replica verification: upstreams=2 idle_db={idle_connections} observed_db_peak={max(observed_connections)} mock_provider_peak={peak} cold_generation_calls={calls} same_prompt_generation_calls={coalesced_calls} transient_errors={transient_errors} blocked_db_shutdown_s={blocked_db_shutdown_seconds:.2f}"
         )
     finally:
         set_upstream(None)
