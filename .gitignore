@@ -39,5 +39,5 @@ frontend/.vite-cache
 graphify-out/
 
 # Disposable capacity-runner files and generated measurements.
-/phase13-*/
+/capacity-runner-*/
 ops/load-testing/results/

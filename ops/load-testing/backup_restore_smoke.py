@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from uuid import uuid4
 
-from phase13 import ROOT, api, command, compose, direct, environment
+from capacity_runner import ROOT, api, command, compose, direct, environment
 
 
 def wait_ready(env: dict[str, str]) -> None:
@@ -45,7 +45,9 @@ def main() -> None:
             env=os.environ,
         ).strip(), project
 
-    with tempfile.TemporaryDirectory(prefix="phase13-backup-", dir=ROOT) as temporary:
+    with tempfile.TemporaryDirectory(
+        prefix="capacity-runner-backup-", dir=ROOT
+    ) as temporary:
         folder = Path(temporary)
         upstream = folder / "upstream.conf"
         upstream.write_text(
@@ -62,7 +64,7 @@ def main() -> None:
                 source_env, "up", "--build", "-d", "--wait", "--wait-timeout", "240"
             )
             prompt = f"backup-restore-{uuid4().hex}"
-            payload = {"prompt": prompt, "namespace": "phase13"}
+            payload = {"prompt": prompt, "namespace": "capacity-test"}
             first_status, first = api(
                 source_env, "/api/v1/query", token=admin, method="POST", payload=payload
             )

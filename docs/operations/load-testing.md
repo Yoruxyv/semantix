@@ -207,7 +207,7 @@ The host was Windows 11 build 26200 on an AMD Ryzen 9 5900HX (16 logical CPUs), 
 
 Both topologies used the production Compose backend, gateway, shared PostgreSQL rate-limit/threshold/session coordination, pgvector cache, token authentication, and mock embedding/generation providers. The only topology difference was one versus two backend replicas in the gateway upstream. Settings were: 384-dimensional mock embeddings, threshold 0.92, cache TTL 3,600 seconds, pool min/max 1/5 **per replica**, `RATE_LIMIT=100000/minute`, and deterministic mock generation delay 50 ms. The elevated rate limit retained the PostgreSQL coordination path while keeping ordinary quota rejection out of the capacity measurement. No connection proxy or third replica was used.
 
-The capacity profile lives in [capacity.js](../../ops/load-testing/capacity.js), with the isolated runner in [phase13.py](../../ops/load-testing/phase13.py). Each VU waits 2, 3, or 4 seconds between requests (mean 3 seconds); 1,000 VUs do not mean 1,000 requests in one millisecond. Every 60-second stage clears the test namespace, prewarms eight repeated prompts, and records k6 JSON, probe/resource/DB telemetry, provider-log counts, and a compact result JSON. The k6 summary includes the short initial VU start and graceful completion period, so these ladder points are exploration measurements rather than pure steady-state SLO samples. The later soak and stabilized repeats provide longer windows. The profiles were:
+The capacity profile lives in [capacity.js](../../ops/load-testing/capacity.js), with the isolated runner in [capacity_runner.py](../../ops/load-testing/capacity_runner.py). Each VU waits 2, 3, or 4 seconds between requests (mean 3 seconds); 1,000 VUs do not mean 1,000 requests in one millisecond. Every 60-second stage clears the test namespace, prewarms eight repeated prompts, and records k6 JSON, probe/resource/DB telemetry, provider-log counts, and a compact result JSON. The k6 summary includes the short initial VU start and graceful completion period, so these ladder points are exploration measurements rather than pure steady-state SLO samples. The later soak and stabilized repeats provide longer windows. The profiles were:
 
 | Profile | Request construction |
 | --- | --- |
@@ -221,7 +221,7 @@ Mock embeddings can consider distinct synthetic prompts similar. The profile per
 Reproduce the original ladder from the repository root in Windows PowerShell, after ensuring Docker Desktop is running:
 
 ```powershell
-python ops/load-testing/phase13.py `
+python ops/load-testing/capacity_runner.py `
   --output ops/load-testing/results/phase13-20260927 `
   --topologies 1 2 `
   --profiles cache-heavy generation-heavy mixed-policy `
@@ -261,7 +261,7 @@ RPS is achieved HTTP requests per second. Latencies are k6 HTTP P50/P95/P99 in m
 **Unresolved 5xx anomaly.** The first two-replica mixed-policy 1,000-VU stage returned 1,585 5xx out of 19,041 requests (8.3%), while both backend query error counters stayed at zero and direct probes stayed ready. A fresh isolated repeat at the same VU count and profile returned 0/18,894 5xx at 295 RPS and P95 1.53 s. Earlier one-replica cache-heavy runs recorded isolated gateway 502s with Nginx `recv() failed (104: Connection reset by peer) while reading response header from upstream`; local `one-replica-gateway-errors.txt` excerpts support a gateway/upstream transport hypothesis, not a confirmed root cause for the mixed-stage spike. Keep the degraded first run in capacity decisions; do not infer a reliable 1,000-VU mixed-policy SLO from the clean repeat. The local `phase13-diagnostic-mixed-20260927/summary.json` repeat is separate evidence. A focused resilience investigation should reproduce and classify the 5xx before tuning production code. Its command was:
 
 ```powershell
-python ops/load-testing/phase13.py `
+python ops/load-testing/capacity_runner.py `
   --output ops/load-testing/results/phase13-diagnostic-mixed-20260927 `
   --topologies 2 --profiles mixed-policy --vus 1000 `
   --duration 60s --skip-burst
@@ -272,7 +272,7 @@ python ops/load-testing/phase13.py `
 The 500- and 1,000-VU cache-heavy and generation-heavy points were repeated on fresh stacks with an **unmeasured 20-second same-VU warm-up** immediately before each 60-second measurement. The warm-up metrics are retained as `warmup.json` but excluded from the table; they exercise the same prompt set and leave the cache warm. The original ladder had only the eight-prompt prewarm. These are separate measurement conditions, so compare topologies **within** each series.
 
 ```powershell
-python ops/load-testing/phase13.py `
+python ops/load-testing/capacity_runner.py `
   --output ops/load-testing/results/phase13-stabilized-20260927 `
   --topologies 1 2 --profiles cache-heavy generation-heavy `
   --vus 500 1000 --duration 60s --stabilize 20s --skip-burst
@@ -292,7 +292,7 @@ The local `phase13-stabilized-20260927/summary.json` and per-stage telemetry pre
 After the ladder, a fresh two-replica disposable stack ran the cache-heavy profile at 1,000 VUs for **600 seconds** with the same 2–4-second think time:
 
 ```powershell
-python ops/load-testing/phase13.py `
+python ops/load-testing/capacity_runner.py `
   --output ops/load-testing/results/phase13-soak-20260927 `
   --topologies 2 --profiles cache-heavy --vus 1000 `
   --duration 600s --skip-burst
@@ -313,6 +313,6 @@ The local `phase13-sdk-20260927.json` result passed all six checks, including re
 
 **Measurement integrity and limits.** A one-VU/5-second harness pilot was excluded because the first summary parser read the wrong k6 JSON shape; its disposable files were removed after the parser was fixed. The original ladder, degraded mixed-policy stage, clean diagnostic repeat, stabilized repeats, and ten-minute soak were retained locally after testing; generated output is ignored by Git and may not be present in another checkout. The normal development containers remained running and host interference was not independently quantified. PostgreSQL `pg_stat_activity` shows sampled sessions and lock waits, but the application does not expose pool wait time or embedding-call counts separately. In the measured stages, backend provider-call deltas matched mock generation-start counts, with no observed generation retry amplification; this says nothing about hosted-provider retries or quotas. No three-replica capacity run was made because the two-replica stages already reached the configured PostgreSQL runtime connection budget and showed lock waits. A separate investigation should classify the intermittent gateway 502s and the unreproduced mixed-policy 5xx spike before treating the latter as a reliable capacity limit. The baseline added load harness and SDK smoke assets without optimizing production or SDK source.
 
-The runner writes `environment.json`, `summary.json`, per-stage `result.json`, k6 metric JSON, sampled `telemetry.jsonl`, and gateway error excerpts under `ops/load-testing/results/`. These generated measurements stay local and are ignored by Git; the tables and observations above are the committed reviewable record. Back up local raw output separately if it must be retained beyond this checkout. Temporary root-level `phase13-*` runner directories are also ignored.
+The runner writes `environment.json`, `summary.json`, per-stage `result.json`, k6 metric JSON, sampled `telemetry.jsonl`, and gateway error excerpts under `ops/load-testing/results/`. These generated measurements stay local and are ignored by Git; the tables and observations above are the committed reviewable record. Back up local raw output separately if it must be retained beyond this checkout. Temporary root-level `capacity-runner-*` directories are also ignored. The `phase13-*` result paths above identify historical local runs; use a fresh output path for new runs.
 
 The runner and SDK smoke removed their uniquely named Compose containers, networks, volumes, and temporary credentials. A post-run Docker check found no `semantix-phase13` containers, networks, or volumes; the existing `semantix-frontend-1`, `semantix-backend-1`, and `semantix-postgres-1` remained running.
