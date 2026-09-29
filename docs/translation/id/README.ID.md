@@ -18,7 +18,7 @@ Semantix dapat di-host sendiri untuk beberapa aplikasi dan pengguna. Akses berba
 
 ![Monitor Semantix menampilkan cache hit, bukti similarity, dan panggilan provider yang dilewati](../../assets/screenshots/monitor-decision.png)
 
-*Tampilan Semantix asli dengan provider mock deterministik dan contoh prompt.*
+*Tampilan Semantix asli dengan provider Hugging Face dan contoh prompt.*
 
 ---
 
@@ -33,13 +33,13 @@ Semantix dapat di-host sendiri untuk beberapa aplikasi dan pengguna. Akses berba
 
 ## Tur produk
 
-Demo lokal dengan provider mock juga menampilkan workspace lainnya. Pilih pratinjau untuk melihat tangkapan layar berukuran penuh.
+Demo lokal dengan provider Hugging Face juga menampilkan workspace lainnya. Pilih pratinjau untuk melihat tangkapan layar berukuran penuh.
 
 | Workspace | Tampilan saat ini |
 |---|---|
 | **Cache Inspector** — Cari prompt tersimpan dan periksa usia, jumlah hit, serta masa berlaku entri tanpa menampilkan embedding. | <a href="../../assets/screenshots/cache-inspector.png"><img src="../../assets/screenshots/cache-inspector.png" alt="Cache Inspector menampilkan entri contoh dengan jumlah hit dan TTL" width="320"></a> |
 | **Evaluations** — Jalankan dataset terisolasi dan tinjau hit rate, panggilan provider, serta klasifikasi yang terukur. | <a href="../../assets/screenshots/evaluations-results.png"><img src="../../assets/screenshots/evaluations-results.png" alt="Evaluations menampilkan hasil quick semantic safety set bawaan" width="320"></a> |
-| **Observability** — Lihat metrik request, cache, provider, dan latensi pada proses backend ini. | <a href="../../assets/screenshots/observability-metrics.png"><img src="../../assets/screenshots/observability-metrics.png" alt="Observability menampilkan metrik traffic, cache, dan latensi provider mock" width="320"></a> |
+| **Observability** — Periksa diagnostik runtime yang aman, kategori provider, fingerprint pencocokan, dan kesiapan layanan. | <a href="../../assets/screenshots/observability-diagnostics.png"><img src="../../assets/screenshots/observability-diagnostics.png" alt="Diagnostik runtime Observability menampilkan provider Hugging Face dan kesiapan layanan" width="320"></a> |
 
 Kapabilitas inti:
 

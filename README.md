@@ -22,7 +22,7 @@ restarts. The hardened deployment routes traffic across two backend replicas.
 
 ![Semantix Monitor showing a cache hit, similarity evidence, and the skipped provider call](docs/assets/screenshots/monitor-decision.png)
 
-*Actual Semantix UI with deterministic mock providers and example prompts.*
+*Actual Semantix UI with Hugging Face providers and example prompts.*
 
 ---
 
@@ -37,13 +37,13 @@ restarts. The hardened deployment routes traffic across two backend replicas.
 
 ## Product tour
 
-The local mock-provider demo also shows the other workspaces. Select a preview to see the full-size screenshot.
+The local Hugging Face demo also shows the other workspaces. Select a preview to see the full-size screenshot.
 
 | Workspace | Current UI |
 |---|---|
 | **Cache Inspector** — Search stored prompts and inspect entry age, hits, and expiry without showing embeddings. | <a href="docs/assets/screenshots/cache-inspector.png"><img src="docs/assets/screenshots/cache-inspector.png" alt="Cache Inspector listing safe example entries with hit counts and TTL" width="320"></a> |
 | **Evaluations** — Run an isolated dataset and review measured hit rate, provider calls, and classification outcomes. | <a href="docs/assets/screenshots/evaluations-results.png"><img src="docs/assets/screenshots/evaluations-results.png" alt="Evaluations showing results for the built-in quick semantic safety set" width="320"></a> |
-| **Observability** — Read process-local request, cache, provider, and latency metrics. | <a href="docs/assets/screenshots/observability-metrics.png"><img src="docs/assets/screenshots/observability-metrics.png" alt="Observability showing mock-provider traffic, cache, and latency metrics" width="320"></a> |
+| **Observability** — Inspect safe runtime diagnostics, provider categories, matching fingerprints, and readiness. | <a href="docs/assets/screenshots/observability-diagnostics.png"><img src="docs/assets/screenshots/observability-diagnostics.png" alt="Observability runtime diagnostics showing Hugging Face providers and readiness" width="320"></a> |
 
 Core capabilities:
 
