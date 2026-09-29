@@ -19,6 +19,7 @@ Error aplikasi menggunakan objek stabil yang berisi `error` dan `detail`.
 | `POST` | `/api/v1/benchmarks/run` | Menjalankan benchmark yang terisolasi |
 | `GET` | `/api/v1/metrics` | Membaca metrik agregat process-local (hanya admin global) |
 | `GET` | `/health` | Membaca status kesehatan aplikasi dan tipe provider |
+| `GET` | `/ready` | Memeriksa kesiapan penyimpanan yang aktif |
 
 ## Request kueri
 
@@ -55,7 +56,7 @@ Lihat [Cache policies](../guides/cache-policies.md) untuk urutan prioritas dan a
 }
 ```
 
-Pada saat cache miss, field matched-entry bernilai `null`. Similarity terdekat mungkin tetap ada meski suatu entri ada namun tidak memenuhi threshold. Leader dari sebuah cache miss yang di-generate melaporkan `provider_called=true`; follower yang di-coalesce tetap berupa cache miss namun melaporkan `generation_skipped=true` dan `provider_called=false` karena ia menunggu (await) hasil dari leader.
+Kesebelas key respons selalu ada; field bukti yang nullable berisi `null` jika nilainya tidak tersedia. Pada saat cache miss, field matched-entry bernilai `null`. Similarity terdekat mungkin tetap ada meski suatu entri ada namun tidak memenuhi threshold. Leader dari sebuah cache miss yang di-generate melaporkan `provider_called=true`; follower yang di-coalesce tetap berupa cache miss namun melaporkan `generation_skipped=true` dan `provider_called=false` karena ia menunggu (await) hasil dari leader.
 
 Embedding dan respons inspector yang lengkap tidak pernah diekspos melalui kontrak query atau cache-management.
 

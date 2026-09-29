@@ -31,6 +31,7 @@ Application errors use a stable object containing `error` and `detail`.
 | `GET`    | `/api/v1/metrics`                                     | Read process-local aggregate metrics (global admin only)                  |
 | `GET`    | `/api/v1/diagnostics`                                 | Read allowlisted process diagnostics (global admin only)                  |
 | `GET`    | `/health`                                             | Read application and provider-type health                                 |
+| `GET`    | `/ready`                                              | Check active storage readiness                                            |
 
 The frontend exposes the evaluation laboratory at canonical route
 `/evaluations`; `/benchmarks` is a replace-redirect kept for compatibility.
@@ -92,9 +93,11 @@ rules.
 }
 ```
 
-On a miss, matched-entry fields are `null`. The nearest similarity may still
-be present when an entry existed but did not meet the threshold. The leader of
-a generated miss reports `provider_called=true`; a coalesced follower remains
+All eleven response keys are always present; nullable evidence fields carry
+explicit `null` values when unavailable. On a miss, matched-entry fields are
+`null`. The nearest similarity may still be present when an entry existed but
+did not meet the threshold. A generated miss's leader reports
+`provider_called=true`; a coalesced follower remains
 a miss but reports `generation_skipped=true` and `provider_called=false`
 because it awaited the leader.
 

@@ -6,16 +6,18 @@ import httpx
 import pytest
 
 from semantix_client import (
-    AsyncSemantixClient,
     CachePolicy,
     SemantixAPIError,
     SemantixAuthenticationError,
+    SemantixAuthorizationError,
+    SemantixRateLimitError,
     SemantixResponseError,
     SemantixServerError,
     SemantixTimeoutError,
+    SemantixValidationError,
 )
 
-from .conftest import TrackingByteStream, query_response
+from .conftest import TrackingByteStream, make_async_client, query_response
 
 
 @pytest.mark.asyncio
@@ -35,10 +37,10 @@ async def test_async_query_serialization_and_lifecycle() -> None:
         }
         return httpx.Response(200, json=query_response())
 
-    client = AsyncSemantixClient(
+    client = make_async_client(
         base_url="https://example.com",
         token="async-token",
-        _http_transport=httpx.MockTransport(handler),
+        transport=httpx.MockTransport(handler),
     )
     async with client:
         result = await client.query(
@@ -59,9 +61,9 @@ async def test_async_query_serializes_requested_cache_ttl() -> None:
         assert payload["cache_ttl_seconds"] == 900
         return httpx.Response(200, json=query_response())
 
-    async with AsyncSemantixClient(
+    async with make_async_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(handler),
+        transport=httpx.MockTransport(handler),
     ) as client:
         await client.query("question", cache_ttl_seconds=900)
 
@@ -87,9 +89,9 @@ async def test_async_health_and_readiness() -> None:
             },
         )
 
-    async with AsyncSemantixClient(
+    async with make_async_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(handler),
+        transport=httpx.MockTransport(handler),
     ) as client:
         assert (await client.health()).status == "ok"
         assert (await client.ready()).status == "ready"
@@ -104,10 +106,10 @@ async def test_async_timeout_is_safe_and_not_retried() -> None:
         calls += 1
         raise httpx.ReadTimeout("private timeout detail", request=request)
 
-    async with AsyncSemantixClient(
+    async with make_async_client(
         base_url="https://example.com",
         token="async-secret",
-        _http_transport=httpx.MockTransport(handler),
+        transport=httpx.MockTransport(handler),
     ) as client:
         with pytest.raises(SemantixTimeoutError) as caught:
             await client.query("question")
@@ -149,9 +151,9 @@ async def test_async_unexpected_success_body_is_safely_rejected(
     response: httpx.Response,
     message: str,
 ) -> None:
-    async with AsyncSemantixClient(
+    async with make_async_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(lambda request: response),
+        transport=httpx.MockTransport(lambda request: response),
     ) as client:
         with pytest.raises(SemantixResponseError, match=message):
             await client.query("question")
@@ -168,9 +170,9 @@ async def test_async_encoded_success_is_rejected_before_body_iteration() -> None
         },
         stream=stream,
     )
-    async with AsyncSemantixClient(
+    async with make_async_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(lambda request: response),
+        transport=httpx.MockTransport(lambda request: response),
     ) as client:
         with pytest.raises(SemantixResponseError, match="content encoding"):
             await client.query("question")
@@ -198,9 +200,9 @@ async def test_async_encoded_error_preserves_status_type_without_reading_body(
         },
         stream=stream,
     )
-    async with AsyncSemantixClient(
+    async with make_async_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(lambda request: response),
+        transport=httpx.MockTransport(lambda request: response),
     ) as client:
         with pytest.raises(exception_type) as caught:
             await client.query("question")
@@ -219,12 +221,44 @@ async def test_async_token_is_redacted_from_server_error() -> None:
             json={"error": "internal_error", "detail": f"Leaked {token}"},
         )
 
-    async with AsyncSemantixClient(
+    async with make_async_client(
         base_url="https://example.com",
         token=token,
-        _http_transport=httpx.MockTransport(handler),
+        transport=httpx.MockTransport(handler),
     ) as client:
         with pytest.raises(SemantixServerError) as caught:
             await client.query("question")
     assert token not in str(caught.value)
     assert caught.value.detail == "Leaked [redacted]"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status", "exception_type", "retry_after"),
+    [
+        (403, SemantixAuthorizationError, None),
+        (422, SemantixValidationError, None),
+        (429, SemantixRateLimitError, "5"),
+        (500, SemantixServerError, None),
+    ],
+)
+async def test_async_http_errors_are_typed(
+    status: int,
+    exception_type: type[SemantixAPIError],
+    retry_after: str | None,
+) -> None:
+    headers = {"Retry-After": retry_after} if retry_after is not None else {}
+    async with make_async_client(
+        base_url="https://example.com",
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(
+                status,
+                json={"error": "safe_code", "detail": "Safe detail."},
+                headers=headers,
+            )
+        ),
+    ) as client:
+        with pytest.raises(exception_type) as caught:
+            await client.query("question")
+    assert caught.value.status_code == status
+    assert caught.value.retry_after_seconds == (5 if retry_after else None)

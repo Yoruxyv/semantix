@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Hans Valerie
+# SPDX-License-Identifier: MIT
 """Private sync and async HTTP transport implementations."""
 
 import json

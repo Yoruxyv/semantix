@@ -1,4 +1,4 @@
-# Semantix Python client
+# semantix-client
 
 `semantix-client` is the typed Python client for the public Semantix HTTP API.
 The distribution is named `semantix-client`; Python code imports
@@ -22,10 +22,10 @@ backend internals.
 - A bearer token and authorized namespace when the server requires
   authentication.
 
-For a local server, follow [Getting started](../docs/guides/getting-started.md).
+For a local server, follow [Getting started](https://github.com/Yoruxyv/semantix/blob/main/docs/guides/getting-started.md).
 Use the network-free mock providers for a first request if you do not want to
 configure a hosted provider. Shared or public servers must follow the
-[hardened deployment guide](../docs/operations/deployment.md).
+[hardened deployment guide](https://github.com/Yoruxyv/semantix/blob/main/docs/operations/deployment.md).
 
 Verify the server before using the SDK:
 
@@ -39,8 +39,8 @@ check `/ready` as well.
 
 ### Installation
 
-The package is not currently published to PyPI. Do not assume that
-`pip install semantix-client` can resolve it from the public index.
+The package is prepared for PyPI publication but is not yet published.
+Install from a checkout or Git until publication.
 
 #### Build and install a wheel
 
@@ -152,18 +152,35 @@ asyncio.run(main())
 
 ## Client lifecycle
 
-Prefer context managers so the owned HTTP connection pool is always closed:
+Reuse a long-lived client instead of constructing one per request. One SDK
+instance owns one pooled HTTP client. Close it at application shutdown, or use
+a context manager:
 
 ```python
 with SemantixClient(base_url="http://localhost:8000") as client:
     result = client.query("Question")
+```
 
-async with AsyncSemantixClient(base_url="http://localhost:8000") as client:
-    result = await client.query("Question")
+```python
+import asyncio
+from semantix_client import AsyncSemantixClient
+
+
+async def main() -> None:
+    async with AsyncSemantixClient(base_url="http://localhost:8000") as client:
+        result = await client.query("Question")
+        print(result.response)
+
+
+asyncio.run(main())
 ```
 
 For a longer-lived client, call `client.close()` or `await client.aclose()`
 when the application shuts down. Closing either client more than once is safe.
+
+One asynchronous client can serve concurrent tasks. A deterministic SDK test
+exercises 64 concurrent requests and cancellation during response streaming;
+this verifies client transport and cleanup behavior, not server capacity.
 
 ## Query results
 
@@ -189,6 +206,8 @@ use the configured embedding provider. Raw embeddings are never returned.
 On every hit, `generation_skipped` is true, `provider_called` is false, and the
 matched-entry evidence is present. A miss either calls the generation provider
 or awaits identical in-flight work; it never contains matched-entry evidence.
+For a coalesced miss, `cache_hit=False`, `generation_skipped=True`, and
+`provider_called=False`: another request performed generation.
 
 ## HIT and MISS behavior
 
@@ -211,7 +230,7 @@ The repeat is not an unconditional promise of a hit. The entry must still
 exist, belong to the same namespace and embedding space, and meet the active
 similarity threshold. Expiry, eviction, restart of a memory-backed server,
 configuration changes, or a different prompt can produce another miss. See
-[Cache policies](../docs/guides/cache-policies.md) for the server rules.
+[Cache policies](https://github.com/Yoruxyv/semantix/blob/main/docs/guides/cache-policies.md) for the server rules.
 
 ## Cache policies
 
@@ -310,7 +329,8 @@ SemantixError
 
 `SemantixAPIError` represents other non-success HTTP statuses as well. It
 exposes `status_code`, `error_code`, bounded `detail`, and
-`retry_after_seconds` when the server supplies a positive `Retry-After` value.
+`retry_after_seconds` when the server supplies a positive integer `Retry-After`
+value; otherwise it is `None`. The SDK never retries automatically.
 
 Catch subclasses before their base classes:
 
@@ -354,8 +374,9 @@ details through these exceptions.
 
 ## Timeouts and retries
 
-The default timeout is 30 seconds. Configure another finite positive value on
-either client:
+The default is `httpx.Timeout(30.0)`: a 30-second limit for each connect,
+read, write, and connection-pool wait. It is not a strict 30-second deadline
+for the whole request. Configure another finite positive value on either client:
 
 ```python
 client = SemantixClient(
@@ -448,7 +469,7 @@ an authenticated server, set `SEMANTIX_TOKEN` to the original bearer token and
 ### Import resolution: editor analysis versus runtime
 
 When the repository root is open in VS Code, the committed
-[`pyrightconfig.json`](../pyrightconfig.json) adds `backend` and `sdk/src` as
+[`pyrightconfig.json`](https://github.com/Yoruxyv/semantix/blob/main/pyrightconfig.json) adds `backend` and `sdk/src` as
 analysis roots. Pylance can therefore resolve `semantix_client` into
 `sdk/src/semantix_client` for navigation without changing Python imports.
 
@@ -472,65 +493,7 @@ VS Code window.
 | `client.health()` works but `client.ready()` fails | The process is live but a required cache or evaluation-storage dependency is unavailable. Check server storage configuration and logs.            |
 | `ModuleNotFoundError: semantix_client`             | Install the `semantix-client` distribution into the active environment; the distribution uses a hyphen while the import uses an underscore.       |
 
-## Maintainer dogfooding checklist
-
-Perform this manually after the documentation PR is merged. The goal is to
-experience the SDK as an external developer, so after building the wheel do not
-inspect Semantix source to complete the exercise.
-
-Use a disposable namespace for each policy scenario. Inspect or clear only that
-namespace before and after the scenario:
-
-```powershell
-curl.exe "http://localhost:8000/api/v1/cache/entries?namespace=sdk-dogfood-read-only&offset=0&limit=100&sort=newest"
-curl.exe -X DELETE "http://localhost:8000/api/v1/cache?namespace=sdk-dogfood-read-only"
-```
-
-Prefer namespace-scoped deletion for dogfood isolation. Omitting `namespace`
-clears the entire active cache and should not be used casually. With
-authentication enabled, inspection requires Viewer access and deletion requires
-Admin access; see the [cache API reference](../docs/reference/api.md#cache-inspector-query).
-
-- [ ] Start a disposable, network-free Semantix server with mock embedding and
-      generation providers.
-- [ ] For authentication checks, enable token mode with one Operator token
-      scoped to a disposable namespace and keep a second namespace unauthorized.
-      Follow the [hardened authentication instructions](../docs/operations/deployment.md#access-tokens);
-      do not place plaintext tokens in repository files.
-- [ ] Build the wheel using only the installation instructions above.
-- [ ] Create a fresh project **outside** the Semantix repository, create and
-      activate a virtual environment, and install that wheel.
-- [ ] Confirm `import semantix_client` works and that no Semantix backend package
-      was installed into the project.
-- [ ] Follow only this README to configure `base_url`, token, namespace, and a
-      finite timeout.
-- [ ] Call `health()` and `ready()` and inspect their typed fields.
-- [ ] In a fresh namespace, send a unique `CachePolicy.NORMAL` query. Confirm a
-      miss with `provider_called=True`, then repeat it and record whether it becomes
-      a hit. If it does not, inspect documented threshold/cache conditions rather
-      than treating a hit as guaranteed.
-- [ ] Exercise every policy with unique prompts: Normal reads/writes, Read only
-      does not seed a miss, Refresh skips reads and writes the generated result,
-      Bypass neither reads nor writes, and Private neither caches nor enters the
-      normal server trace.
-- [ ] Use an invalid token once and confirm `SemantixAuthenticationError`.
-- [ ] Use the valid token with the unauthorized namespace and confirm
-      `SemantixAuthorizationError`.
-- [ ] Submit an empty prompt and confirm `SemantixValidationError`.
-- [ ] Stop the server and confirm a request raises `SemantixTransportError`.
-- [ ] Under a controlled local delay or test proxy, use a small positive timeout
-      and confirm `SemantixTimeoutError`. Do not induce this against production and
-      do not blindly retry the query.
-- [ ] Repeat a query through `AsyncSemantixClient` and verify `async with`
-      cleanup; also verify explicit `close()` and `aclose()` in a separate lifecycle
-      check.
-- [ ] Record every point where the README was insufficient or actual behavior
-      differed. That friction is the output of the maintainer-run dogfood pass.
-
-Do not treat the checklist as proof of universal cache-hit behavior or semantic
-cache safety. It is an onboarding and API-contract exercise.
-
-## SDK development checks
+## Development
 
 From `sdk`:
 
@@ -542,6 +505,7 @@ uv run --no-sync mypy src tests
 uv run --no-sync pytest -m "not integration" --cov=semantix_client
 uv run --no-sync python -m build
 uv run --no-sync python -m twine check dist/*
+uv run --no-sync python tests/check_artifacts.py
 ```
 
 Live integration tests require a real loopback Semantix server configured with
@@ -551,3 +515,7 @@ deterministic mock embedding and generation providers. Set
 ```bash
 uv run --no-sync pytest -m integration
 ```
+
+## License
+
+MIT. Copyright (c) 2026 Hans Valerie. See [LICENSE](https://github.com/Yoruxyv/semantix/blob/main/sdk/LICENSE).

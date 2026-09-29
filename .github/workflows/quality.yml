@@ -150,6 +150,10 @@ jobs:
       - name: Run SDK unit tests with coverage
         run: uv run --no-sync pytest -m "not integration" --cov=semantix_client
 
+      - name: Check backend OpenAPI contract for SDK routes
+        working-directory: backend
+        run: uv run --no-sync pytest tests/query/api/test_sdk_contract.py
+
       - name: Run SDK real-HTTP integration tests
         working-directory: .
         shell: bash
@@ -179,47 +183,8 @@ jobs:
       - name: Check package artifacts
         run: uv run --no-sync python -m twine check dist/*
 
-      - name: Inspect SDK package contents
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import tarfile
-          import zipfile
-
-          expected_license = Path("LICENSE").read_bytes()
-          wheel = next(Path("dist").glob("*.whl"))
-          sdist = next(Path("dist").glob("*.tar.gz"))
-
-          with zipfile.ZipFile(wheel) as archive:
-              names = archive.namelist()
-              assert any(name.startswith("semantix_client/") for name in names)
-              assert "semantix_client/py.typed" in names
-              assert not any(name.startswith("semantix/") for name in names)
-              licenses = [
-                  name
-                  for name in names
-                  if name.endswith(".dist-info/licenses/LICENSE")
-              ]
-              assert len(licenses) == 1
-              assert archive.read(licenses[0]) == expected_license
-
-          with tarfile.open(sdist) as archive:
-              names = archive.getnames()
-              assert any("/src/semantix_client/" in name for name in names)
-              assert not any("/src/semantix/" in name for name in names)
-              licenses = [
-                  name
-                  for name in names
-                  if name.count("/") == 1 and name.endswith("/LICENSE")
-              ]
-              assert len(licenses) == 1
-              license_file = archive.extractfile(licenses[0])
-              assert license_file is not None
-              assert license_file.read() == expected_license
-
-          print("SDK namespace and license artifacts verified")
-          PY
+      - name: Enforce SDK artifact and dependency allowlists
+        run: uv run --no-sync python tests/check_artifacts.py
 
       - name: Install built wheel in a clean environment
         shell: bash
@@ -229,7 +194,7 @@ jobs:
           "$RUNNER_TEMP/semantix-sdk-smoke/bin/python" -c \
             "from semantix_client import AsyncSemantixClient, CachePolicy, SemantixClient"
           "$RUNNER_TEMP/semantix-sdk-smoke/bin/python" -c \
-            "import importlib.util; assert importlib.util.find_spec('semantix') is None; assert importlib.util.find_spec('fastapi') is None; assert importlib.util.find_spec('asyncpg') is None; assert importlib.util.find_spec('numpy') is None"
+            "import importlib.util; assert all(importlib.util.find_spec(name) is None for name in ('semantix', 'app', 'backend', 'fastapi', 'asyncpg', 'numpy', 'pydantic', 'sqlalchemy', 'starlette', 'psycopg'))"
 
   sdk-compatibility:
     name: Python SDK compatibility (Python ${{ matrix.python-version }})
