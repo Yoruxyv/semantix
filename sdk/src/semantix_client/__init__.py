@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Hans Valerie
+# SPDX-License-Identifier: MIT
 """Typed clients for the public Semantix HTTP API."""
 
 from .async_client import AsyncSemantixClient

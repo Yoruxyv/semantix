@@ -64,14 +64,12 @@ class QueryRequest(StrictModel):
 class QueryResponse(StrictModel):
     response: str = Field(min_length=1, max_length=MAX_RESPONSE_LENGTH)
     cache_hit: bool
-    similarity_score: float | None = Field(default=None, ge=-1, le=1)
+    similarity_score: float | None = Field(ge=-1, le=1)
     similarity_threshold: float = Field(ge=0, le=1)
-    matched_prompt: str | None = Field(
-        default=None, min_length=1, max_length=MAX_PROMPT_LENGTH
-    )
-    matched_cache_key: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
-    cache_entry_created_at: datetime | None = None
-    cache_entry_age_seconds: float | None = Field(default=None, ge=0)
+    matched_prompt: str | None = Field(min_length=1, max_length=MAX_PROMPT_LENGTH)
+    matched_cache_key: str | None = Field(pattern=r"^[a-f0-9]{64}$")
+    cache_entry_created_at: datetime | None
+    cache_entry_age_seconds: float | None = Field(ge=0)
     generation_skipped: bool
     provider_called: bool
     latency_ms: float = Field(ge=0)

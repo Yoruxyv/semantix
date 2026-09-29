@@ -3,7 +3,35 @@ from collections.abc import AsyncIterator, Callable, Iterator
 import httpx
 import pytest
 
-from semantix_client import SemantixClient
+from semantix_client import AsyncSemantixClient, SemantixClient
+
+
+def make_client(
+    *,
+    base_url: str,
+    token: str | None = None,
+    timeout: float = 30.0,
+    transport: httpx.BaseTransport | None = None,
+) -> SemantixClient:
+    if transport is not None:
+        return SemantixClient._for_test(
+            base_url=base_url, token=token, timeout=timeout, transport=transport
+        )
+    return SemantixClient(base_url=base_url, token=token, timeout=timeout)
+
+
+def make_async_client(
+    *,
+    base_url: str,
+    token: str | None = None,
+    timeout: float = 30.0,
+    transport: httpx.AsyncBaseTransport | None = None,
+) -> AsyncSemantixClient:
+    if transport is not None:
+        return AsyncSemantixClient._for_test(
+            base_url=base_url, token=token, timeout=timeout, transport=transport
+        )
+    return AsyncSemantixClient(base_url=base_url, token=token, timeout=timeout)
 
 
 class TrackingByteStream(httpx.SyncByteStream, httpx.AsyncByteStream):
@@ -41,10 +69,10 @@ def query_response(**overrides: object) -> dict[str, object]:
 @pytest.fixture
 def client_for() -> Callable[[httpx.MockTransport], SemantixClient]:
     def factory(transport: httpx.MockTransport) -> SemantixClient:
-        return SemantixClient(
+        return SemantixClient._for_test(
             base_url="https://semantix.example",
             token="test-token",
-            _http_transport=transport,
+            transport=transport,
         )
 
     return factory

@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Hans Valerie
+# SPDX-License-Identifier: MIT
 """Immutable public response models and contract decoders."""
 
 import math
@@ -15,7 +17,24 @@ _MAX_RESPONSE_LENGTH = 100_000
 
 @dataclass(frozen=True, slots=True)
 class QueryResult:
-    """Evidence returned by a Semantix query."""
+    """Immutable evidence for one query.
+
+    Attributes:
+        response: Generated or cached answer text.
+        cache_hit: Whether an eligible cache entry supplied the answer.
+        similarity_score: Hit score or a below-threshold candidate score, if any.
+        similarity_threshold: Threshold used for the cache decision.
+        matched_prompt: Stored prompt on a hit; otherwise ``None``.
+        matched_cache_key: Opaque matched-entry key on a hit; otherwise ``None``.
+        cache_entry_created_at: Aware creation time on a hit; otherwise ``None``.
+        cache_entry_age_seconds: Entry age on a hit; otherwise ``None``.
+        generation_skipped: This request did not generate. Also true for a
+            coalesced miss that awaited another request's generation.
+        provider_called: This request led generation-provider work. A coalesced
+            miss has ``cache_hit=False``, ``generation_skipped=True``, and
+            ``provider_called=False``.
+        latency_ms: Server-reported processing time in milliseconds.
+    """
 
     response: str
     cache_hit: bool
@@ -32,7 +51,13 @@ class QueryResult:
 
 @dataclass(frozen=True, slots=True)
 class HealthStatus:
-    """Public liveness response from a Semantix server."""
+    """Process liveness and configured provider names.
+
+    Attributes:
+        status: Always ``"ok"`` for a successful health response.
+        embedding_provider: Configured embedding provider name.
+        generation_provider: Configured generation provider name.
+    """
 
     status: Literal["ok"]
     embedding_provider: str
@@ -41,11 +66,17 @@ class HealthStatus:
 
 @dataclass(frozen=True, slots=True)
 class ReadinessStatus:
-    """Public dependency-readiness response from a Semantix server."""
+    """Active storage readiness; failed readiness raises a server error.
+
+    Attributes:
+        status: Always ``"ready"`` on success.
+        cache_backend: Active cache storage, ``memory`` or ``pgvector``.
+        evaluation_dataset_storage: Dataset storage, ``session`` or ``postgres``.
+    """
 
     status: Literal["ready"]
-    cache_backend: str
-    evaluation_dataset_storage: str
+    cache_backend: Literal["memory", "pgvector"]
+    evaluation_dataset_storage: Literal["session", "postgres"]
 
 
 def _invalid(field: str) -> SemantixResponseError:
@@ -214,10 +245,17 @@ def _decode_health(value: object) -> HealthStatus:
     data = _object(value)
     if _required(data, "status") != "ok":
         raise _invalid("status")
+    embedding_provider = _string(data, "embedding_provider", max_length=50)
+    generation_provider = _string(data, "generation_provider", max_length=50)
+    if any(
+        re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,49}", provider) is None
+        for provider in (embedding_provider, generation_provider)
+    ):
+        raise _invalid("provider name")
     return HealthStatus(
         status="ok",
-        embedding_provider=_string(data, "embedding_provider", max_length=100),
-        generation_provider=_string(data, "generation_provider", max_length=100),
+        embedding_provider=embedding_provider,
+        generation_provider=generation_provider,
     )
 
 
@@ -225,12 +263,16 @@ def _decode_readiness(value: object) -> ReadinessStatus:
     data = _object(value)
     if _required(data, "status") != "ready":
         raise _invalid("status")
+    cache_backend = _string(data, "cache_backend", max_length=100)
+    dataset_storage = _string(data, "evaluation_dataset_storage", max_length=100)
+    if cache_backend not in {"memory", "pgvector"}:
+        raise _invalid("cache_backend")
+    if dataset_storage not in {"session", "postgres"}:
+        raise _invalid("evaluation_dataset_storage")
     return ReadinessStatus(
         status="ready",
-        cache_backend=_string(data, "cache_backend", max_length=100),
-        evaluation_dataset_storage=_string(
-            data,
-            "evaluation_dataset_storage",
-            max_length=100,
+        cache_backend=cast(Literal["memory", "pgvector"], cache_backend),
+        evaluation_dataset_storage=cast(
+            Literal["session", "postgres"], dataset_storage
         ),
     )

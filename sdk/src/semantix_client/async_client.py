@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Hans Valerie
+# SPDX-License-Identifier: MIT
 """Asynchronous Semantix client."""
 
 from types import TracebackType
@@ -19,10 +21,23 @@ from .policies import CachePolicy, _policy_fields
 class AsyncSemantixClient:
     """Asynchronous client for the public Semantix HTTP API.
 
+    Share one instance across concurrent tasks and close it during shutdown.
+    It owns one pooled asynchronous HTTP client.
+
     Args:
         base_url: HTTP or HTTPS URL for the Semantix server.
         token: Optional bearer token sent to the server.
-        timeout: Finite request timeout in seconds.
+        timeout: Positive connect, read, write, and pool timeout in seconds;
+            default ``30.0``. It is not a whole-request deadline.
+
+    Raises:
+        SemantixConfigurationError: URL, token, or timeout is invalid.
+
+    Example:
+        >>> async def main():
+        ...     async with AsyncSemantixClient(base_url="http://localhost:8000") as client:
+        ...         result = await client.query("Explain semantic caching")
+        ...         print(result.response)
     """
 
     def __init__(
@@ -31,14 +46,27 @@ class AsyncSemantixClient:
         base_url: str,
         token: str | None = None,
         timeout: float = 30.0,
-        _http_transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._transport = _AsyncTransport(
             base_url=base_url,
             token=token,
             timeout=timeout,
-            transport=_http_transport,
         )
+
+    @classmethod
+    def _for_test(
+        cls,
+        *,
+        base_url: str,
+        transport: httpx.AsyncBaseTransport,
+        token: str | None = None,
+        timeout: float = 30.0,
+    ) -> "AsyncSemantixClient":
+        client = cls.__new__(cls)
+        client._transport = _AsyncTransport(
+            base_url=base_url, token=token, timeout=timeout, transport=transport
+        )
+        return client
 
     async def query(
         self,
@@ -48,21 +76,30 @@ class AsyncSemantixClient:
         policy: CachePolicy = CachePolicy.NORMAL,
         cache_ttl_seconds: int | None = None,
     ) -> QueryResult:
-        """Submit a query to Semantix.
+        """Submit a query and decode its cache-decision evidence.
 
         Args:
-            prompt: User prompt sent through the public query API.
-            namespace: Concrete server-authorized cache namespace.
-            policy: Cache read/write behavior for this request.
-            cache_ttl_seconds: Optional requested cache lifetime in seconds.
+            prompt: Nonempty prompt, sanitized and bounded by the server.
+            namespace: Concrete authorized namespace; ``*`` is invalid. Defaults
+                to ``"default"``. The server enforces authorization.
+            policy: Cache behavior; defaults to :attr:`CachePolicy.NORMAL`.
+            cache_ttl_seconds: Optional lifetime in ``1..31_536_000``, valid
+                only with NORMAL or REFRESH. A finite server default caps it.
 
         Returns:
-            Immutable query evidence returned by Semantix.
+            Immutable query evidence. A coalesced miss may skip generation
+            while another request calls the provider.
 
         Raises:
             SemantixAPIError: The server rejects or fails the request.
+            SemantixAuthenticationError: The bearer token is missing or invalid.
+            SemantixAuthorizationError: The namespace or role is unauthorized.
+            SemantixValidationError: The server rejects prompt, namespace, or TTL.
+            SemantixRateLimitError: The server responds with HTTP 429.
+            SemantixServerError: The server responds with HTTP 5xx.
             SemantixResponseError: The response violates the public contract.
-            SemantixTransportError: The server cannot be reached or times out.
+            SemantixTransportError: The server cannot be reached.
+            SemantixTimeoutError: An HTTP timeout elapses.
         """
         payload: dict[str, object] = {
             "prompt": prompt,
@@ -82,8 +119,10 @@ class AsyncSemantixClient:
             Immutable provider-category health evidence.
 
         Raises:
+            SemantixAPIError: The server rejects the request.
             SemantixResponseError: The response violates the public contract.
-            SemantixTransportError: The server cannot be reached or times out.
+            SemantixTransportError: The server cannot be reached.
+            SemantixTimeoutError: An HTTP timeout elapses.
         """
         return _decode_health(await self._transport.request("GET", "health"))
 
@@ -94,9 +133,11 @@ class AsyncSemantixClient:
             Immutable active-storage readiness evidence.
 
         Raises:
-            SemantixAPIError: The server reports that it is not ready.
+            SemantixServerError: The server reports HTTP 503 when not ready.
+            SemantixAPIError: Another non-success HTTP response occurs.
             SemantixResponseError: The response violates the public contract.
-            SemantixTransportError: The server cannot be reached or times out.
+            SemantixTransportError: The server cannot be reached.
+            SemantixTimeoutError: An HTTP timeout elapses.
         """
         return _decode_readiness(await self._transport.request("GET", "ready"))
 
@@ -105,6 +146,7 @@ class AsyncSemantixClient:
         await self._transport.close()
 
     async def __aenter__(self) -> "AsyncSemantixClient":
+        """Return this client for a managed ``async with`` block."""
         return self
 
     async def __aexit__(
@@ -113,4 +155,5 @@ class AsyncSemantixClient:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
+        """Close the owned pool when leaving an ``async with`` block."""
         await self.aclose()

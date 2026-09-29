@@ -23,7 +23,7 @@ from semantix_client import (
     SemantixValidationError,
 )
 
-from .conftest import TrackingByteStream, query_response
+from .conftest import TrackingByteStream, make_client, query_response
 
 
 def request_json(request: httpx.Request) -> dict[str, object]:
@@ -61,10 +61,10 @@ def test_query_serializes_policy_and_authentication(
         ) == expected
         return httpx.Response(200, json=query_response(additive_field="ignored"))
 
-    with SemantixClient(
+    with make_client(
         base_url="https://semantix.example/prefix/",
         token="token-value",
-        _http_transport=httpx.MockTransport(handler),
+        transport=httpx.MockTransport(handler),
     ) as client:
         result = client.query(
             "Where can I reset my password?",
@@ -83,9 +83,9 @@ def test_query_serializes_requested_cache_ttl() -> None:
         assert request_json(request)["cache_ttl_seconds"] == 900
         return httpx.Response(200, json=query_response())
 
-    with SemantixClient(
+    with make_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(handler),
+        transport=httpx.MockTransport(handler),
     ) as client:
         client.query("question", cache_ttl_seconds=900)
 
@@ -101,9 +101,9 @@ def test_token_is_optional_and_default_namespace_is_serialized() -> None:
             headers={"Content-Encoding": "Identity"},
         )
 
-    client = SemantixClient(
+    client = make_client(
         base_url="http://localhost:8000/",
-        _http_transport=httpx.MockTransport(handler),
+        transport=httpx.MockTransport(handler),
     )
     client.query("question")
     client.close()
@@ -125,19 +125,19 @@ def test_token_is_optional_and_default_namespace_is_serialized() -> None:
 )
 def test_invalid_base_url_is_rejected(base_url: str) -> None:
     with pytest.raises(SemantixConfigurationError):
-        SemantixClient(base_url=base_url)
+        make_client(base_url=base_url)
 
 
 @pytest.mark.parametrize("timeout", [0, -1, float("inf"), float("nan")])
 def test_unbounded_or_nonpositive_timeout_is_rejected(timeout: float) -> None:
     with pytest.raises(SemantixConfigurationError):
-        SemantixClient(base_url="https://example.com", timeout=timeout)
+        make_client(base_url="https://example.com", timeout=timeout)
 
 
 def test_blank_or_header_unsafe_token_is_rejected_without_echoing_it() -> None:
     for token in ("", "   ", "secret\r\nheader"):
         with pytest.raises(SemantixConfigurationError) as caught:
-            SemantixClient(base_url="https://example.com", token=token)
+            make_client(base_url="https://example.com", token=token)
         if token:
             assert token not in str(caught.value)
 
@@ -164,9 +164,9 @@ def test_health_and_readiness_are_typed() -> None:
             },
         )
 
-    with SemantixClient(
+    with make_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(handler),
+        transport=httpx.MockTransport(handler),
     ) as client:
         assert client.health().embedding_provider == "mock"
         assert client.ready().cache_backend == "memory"
@@ -193,9 +193,9 @@ def test_cache_hit_and_current_miss_variants_decode() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=next(responses))
 
-    with SemantixClient(
+    with make_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(handler),
+        transport=httpx.MockTransport(handler),
     ) as client:
         hit = client.query("question")
         nearest_miss = client.query("other")
@@ -222,9 +222,9 @@ def test_cache_hit_and_current_miss_variants_decode() -> None:
 )
 def test_invalid_query_response_is_rejected(payload: dict[str, object]) -> None:
     transport = httpx.MockTransport(lambda request: httpx.Response(200, json=payload))
-    with SemantixClient(
+    with make_client(
         base_url="https://example.com",
-        _http_transport=transport,
+        transport=transport,
     ) as client:
         with pytest.raises(SemantixResponseError):
             client.query("question")
@@ -263,9 +263,9 @@ def test_unexpected_success_body_is_safely_rejected(
     response: httpx.Response,
     message: str,
 ) -> None:
-    with SemantixClient(
+    with make_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(lambda request: response),
+        transport=httpx.MockTransport(lambda request: response),
     ) as client:
         with pytest.raises(SemantixResponseError, match=message):
             client.query("question")
@@ -281,9 +281,9 @@ def test_encoded_success_is_rejected_before_body_iteration() -> None:
         },
         stream=stream,
     )
-    with SemantixClient(
+    with make_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(lambda request: response),
+        transport=httpx.MockTransport(lambda request: response),
     ) as client:
         with pytest.raises(SemantixResponseError, match="content encoding"):
             client.query("question")
@@ -314,9 +314,9 @@ def test_http_errors_are_typed(
             headers={"Retry-After": "12"},
         )
 
-    with SemantixClient(
+    with make_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(handler),
+        transport=httpx.MockTransport(handler),
     ) as client:
         with pytest.raises(exception_type) as caught:
             client.query("question")
@@ -325,6 +325,18 @@ def test_http_errors_are_typed(
     assert caught.value.error_code == "safe_code"
     assert caught.value.detail == "Safe detail."
     assert caught.value.retry_after_seconds == 12
+
+
+def test_rate_limit_without_retry_after_has_none() -> None:
+    with make_client(
+        base_url="https://example.com",
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(429, json={"error": "rate_limited"})
+        ),
+    ) as client:
+        with pytest.raises(SemantixRateLimitError) as caught:
+            client.query("question")
+    assert caught.value.retry_after_seconds is None
 
 
 @pytest.mark.parametrize(
@@ -351,9 +363,9 @@ def test_encoded_http_error_preserves_status_type_without_reading_body(
         },
         stream=stream,
     )
-    with SemantixClient(
+    with make_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(lambda request: response),
+        transport=httpx.MockTransport(lambda request: response),
     ) as client:
         with pytest.raises(exception_type) as caught:
             client.query("question")
@@ -364,9 +376,9 @@ def test_encoded_http_error_preserves_status_type_without_reading_body(
 
 def test_non_json_error_body_is_not_exposed() -> None:
     secret_body = "<html>private upstream details</html>"
-    with SemantixClient(
+    with make_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(
+        transport=httpx.MockTransport(
             lambda request: httpx.Response(
                 502,
                 text=secret_body,
@@ -380,9 +392,9 @@ def test_non_json_error_body_is_not_exposed() -> None:
 
 
 def test_malformed_json_error_body_preserves_status_category() -> None:
-    with SemantixClient(
+    with make_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(
+        transport=httpx.MockTransport(
             lambda request: httpx.Response(
                 503,
                 content=b"not-json",
@@ -398,10 +410,10 @@ def test_malformed_json_error_body_preserves_status_category() -> None:
 
 def test_token_is_redacted_from_server_error() -> None:
     token = "super-secret-token"
-    with SemantixClient(
+    with make_client(
         base_url="https://example.com",
         token=token,
-        _http_transport=httpx.MockTransport(
+        transport=httpx.MockTransport(
             lambda request: httpx.Response(
                 500,
                 json={"error": "internal_error", "detail": f"Leaked {token}"},
@@ -432,10 +444,10 @@ def test_transport_failures_are_safe_and_not_retried(
         calls += 1
         raise error
 
-    with SemantixClient(
+    with make_client(
         base_url="https://example.com",
         token="secret-token",
-        _http_transport=httpx.MockTransport(handler),
+        transport=httpx.MockTransport(handler),
     ) as client:
         with pytest.raises(exception_type) as caught:
             client.query("question")
@@ -453,9 +465,9 @@ def test_server_failure_is_not_retried() -> None:
             503, json={"error": "service_unavailable", "detail": None}
         )
 
-    with SemantixClient(
+    with make_client(
         base_url="https://example.com",
-        _http_transport=httpx.MockTransport(handler),
+        transport=httpx.MockTransport(handler),
     ) as client:
         with pytest.raises(SemantixServerError):
             client.query("question")
