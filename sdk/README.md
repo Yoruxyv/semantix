@@ -127,7 +127,7 @@ print(f"provider_called={result.provider_called}")
 Use an authorized namespace. A token-authenticated deployment usually needs an
 Operator or Admin token for provider-backed queries.
 
-## First asynchronous request
+### First asynchronous request
 
 ```python
 import asyncio
@@ -492,6 +492,17 @@ VS Code window.
 | `SemantixTimeoutError`                             | The finite timeout elapsed. Investigate server/provider latency before deciding whether a query retry is safe.                                    |
 | `client.health()` works but `client.ready()` fails | The process is live but a required cache or evaluation-storage dependency is unavailable. Check server storage configuration and logs.            |
 | `ModuleNotFoundError: semantix_client`             | Install the `semantix-client` distribution into the active environment; the distribution uses a hyphen while the import uses an underscore.       |
+
+## Compatibility and project links
+
+`semantix-client` 0.1.0 exposes only `query()`, `health()`, and `ready()`.
+It expects a compatible Semantix HTTP server and does not negotiate API
+versions. Check the [public API reference](https://github.com/Yoruxyv/semantix/blob/main/docs/reference/api.md)
+when upgrading either side.
+
+[Repository](https://github.com/Yoruxyv/semantix) ·
+[Documentation](https://github.com/Yoruxyv/semantix/blob/main/docs/README.md) ·
+[Issues](https://github.com/Yoruxyv/semantix/issues)
 
 ## Development
 

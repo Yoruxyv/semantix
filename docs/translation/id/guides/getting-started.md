@@ -34,6 +34,10 @@ CACHE_BACKEND=memory
 AUTH_MODE=disabled
 ```
 
+Untuk inference hosted atau lokal, pilih embedding dan generation provider dalam
+panduan [Providers](providers.md) sebelum menjalankan stack. Respons mock
+hanyalah keluaran contoh, bukan jawaban untuk production.
+
 Jalankan stack development yang disebutkan secara eksplisit:
 
 ```bash
@@ -55,6 +59,10 @@ Semua port development yang dipublikasikan secara default terikat ke `127.0.0.1`
 | Dokumentasi API | http://localhost:8000/docs   |
 | Liveness        | http://localhost:8000/health |
 | Readiness       | http://localhost:8000/ready  |
+
+Buka frontend lalu jalankan kueri di Monitor. [Tur produk](../README.ID.md#tur-produk)
+menampilkan Cache Inspector, Evaluations, dan Observability saat ini. Untuk
+request dari aplikasi Python, lanjutkan ke [Python SDK](../../../../sdk/README.md).
 
 Image frontend development menginstal dependency Node dan menjalankan development server Vite dengan HMR; image tersebut tidak melakukan kompilasi asset frontend production. `VITE_API_BASE_URL` diberikan ke development server tersebut saat runtime. Image frontend hardened melakukan production build yang dijelaskan nanti dalam panduan ini. Untuk memastikan pembaruan bind-mount tetap andal ketika native notifications tidak tersedia, stack development melakukan polling terhadap perubahan source frontend dan backend setiap satu detik. Vite mengabaikan output coverage yang dihasilkan, dan Uvicorn hanya melakukan reload untuk perubahan di bawah `backend/app`. Stack hardened tidak terpengaruh.
 
@@ -144,9 +152,10 @@ Lihat [Hardened deployment](../operations/deployment.md) untuk hashing token, ko
 
 `GET /health` adalah process liveness check yang ringan dan tidak dikenai rate limit.
 
-`GET /ready` memeriksa dependency cache yang aktif. Memory backend langsung mengembalikan hasil. Backend pgvector menjalankan query statistik cache dengan batas waktu dan mengembalikan `503` ketika database tidak tersedia.
-
-Readiness tidak memanggil hosted AI provider sehingga tidak menggunakan kuota provider.
+`GET /ready` memeriksa statistik cache aktif, katalog dataset evaluasi persisten
+yang dikonfigurasi, dan koordinasi threshold PostgreSQL bila diaktifkan. Endpoint
+ini mengembalikan `503` untuk kegagalan storage yang ditangani. Endpoint ini
+tidak memeriksa langsung repository riwayat run opsional atau hosted AI provider.
 
 ## Shutdown dan volume
 

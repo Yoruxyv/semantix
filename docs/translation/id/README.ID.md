@@ -2,20 +2,6 @@
   <sub><a href="README.ID.md">ID</a> · <a href="../../../README.md">EN</a></sub>
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/React-19.2.8-61DAFB?logo=react&logoColor=white" alt="React 19.2.8">
-  <img src="https://img.shields.io/badge/Vite-7.3.6-646CFF?logo=vite&logoColor=white" alt="Vite 7.3.6">
-  <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI">
-  <img src="https://img.shields.io/badge/Python-3.11%E2%80%933.14-3776AB?logo=python&logoColor=white" alt="Python 3.11 hingga 3.14">
-  <img src="https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL dengan pgvector">
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Auth-Scoped%20Tokens-D4A15A" alt="Autentikasi token bercakupan (scoped)">
-  <img src="https://img.shields.io/badge/Docker-Dev%20%2B%20Hardened-2496ED?logo=docker&logoColor=white" alt="Stack Docker development dan hardened">
-  <img src="https://img.shields.io/badge/License-MIT-22C55E?logo=opensourceinitiative&logoColor=white" alt="Lisensi MIT">
-</p>
-
 <div align="center">
 
 # 🧠 Semantix
@@ -26,9 +12,13 @@ Semantix adalah laboratorium semantic-cache full-stack untuk memeriksa keputusan
 
 Semantix dapat di-host sendiri untuk beberapa aplikasi dan pengguna. Akses berbasis namespace memisahkan data cache mereka; PostgreSQL + pgvector mempertahankan entri saat layanan dimulai ulang. Deployment hardened merutekan traffic melalui dua replika backend.
 
-<sub>Monitor · Cache Inspector · Benchmark Lab · Runtime Observability</sub>
+<sub>Monitor · Cache Inspector · Evaluations · Observability</sub>
 
 </div>
+
+![Monitor Semantix menampilkan cache hit, bukti similarity, dan panggilan provider yang dilewati](../../assets/screenshots/monitor-decision.png)
+
+*Tampilan Semantix asli dengan provider Hugging Face dan contoh prompt.*
 
 ---
 
@@ -36,20 +26,35 @@ Semantix dapat di-host sendiri untuk beberapa aplikasi dan pengguna. Akses berba
 
 | Workspace | Tujuan |
 |---|---|
-| **Monitor** | Mengirimkan prompt dan memeriksa cache hit, cache miss, latensi, prompt yang cocok (matched), dan bukti similarity |
+| **Monitor** | Mengirim probe kebijakan dalam namespace dan memeriksa hit, miss, latensi, prompt yang cocok, serta bukti similarity |
 | **Cache Inspector** | Mencari entri, memeriksa metadata, menghapus record, membersihkan namespace, dan mengelola threshold |
-| **Benchmark Lab** | Mengukur precision, recall, false hit, false miss, latensi, dan panggilan provider yang berhasil dihindari |
-| **Observability** | Melacak volume request, panggilan provider, aktivitas cache, coalescing, expiration, dan eviction |
+| **Evaluations** | Mengukur precision, recall, false hit, dan false miss; memeriksa bukti kasus terfilter serta mengekspor hasil run |
+| **Observability** | Melacak metrik proses dan memeriksa diagnostik runtime read-only yang aman |
+
+## Tur produk
+
+Demo lokal dengan provider Hugging Face juga menampilkan workspace lainnya. Pilih pratinjau untuk melihat tangkapan layar berukuran penuh.
+
+| Workspace | Tampilan saat ini |
+|---|---|
+| **Cache Inspector** — Cari prompt tersimpan dan periksa usia, jumlah hit, serta masa berlaku entri tanpa menampilkan embedding. | <a href="../../assets/screenshots/cache-inspector.png"><img src="../../assets/screenshots/cache-inspector.png" alt="Cache Inspector menampilkan entri contoh dengan jumlah hit dan TTL" width="320"></a> |
+| **Evaluations** — Jalankan dataset terisolasi dan tinjau hit rate, panggilan provider, serta klasifikasi yang terukur. | <a href="../../assets/screenshots/evaluations-results.png"><img src="../../assets/screenshots/evaluations-results.png" alt="Evaluations menampilkan hasil quick semantic safety set bawaan" width="320"></a> |
+| **Observability** — Periksa diagnostik runtime yang aman, kategori provider, fingerprint pencocokan, dan kesiapan layanan. | <a href="../../assets/screenshots/observability-diagnostics.png"><img src="../../assets/screenshots/observability-diagnostics.png" alt="Diagnostik runtime Observability menampilkan provider Hugging Face dan kesiapan layanan" width="320"></a> |
 
 Kapabilitas inti:
 
 - embedding dan generation provider yang independen;
 - penyimpanan memory atau PostgreSQL + pgvector yang persisten;
 - TTL, eviction LRU, namespace, request privat, dan kebijakan read/write;
+- kontrol Monitor sesuai peran, minimisasi trace privat, dan tautan hit ke detail Cache yang diotorisasi;
 - penggabungan request (request coalescing) untuk cache miss identik yang terjadi bersamaan;
 - normalisasi prompt yang menyadari typo (opsional);
+- threshold cache global yang dapat dilihat dan diagnostik runtime read-only khusus admin;
 - peran token dan otorisasi namespace untuk deployment yang diperkeras;
-- provider mock deterministik untuk pengujian lokal yang aman.
+- provider mock deterministik untuk pengujian lokal yang aman;
+- cache evaluasi terpisah per run, confusion matrix lengkap, dan proyeksi threshold dari kandidat yang sudah diukur;
+- dataset evaluasi JSON versi 1 yang tersimpan hanya selama sesi browser, dengan pratinjau tanpa panggilan provider;
+- katalog dataset evaluasi PostgreSQL opsional dengan penyimpanan eksplisit dan retensi terbatas.
 
 ## ⚙️ Cara Kerjanya
 
@@ -76,6 +81,15 @@ Menggunakan kembali respons yang sesuai menghindari panggilan generation berikut
 ## 🐍 Python SDK
 
 Aplikasi Python dapat memakai distribusi `semantix-client` melalui HTTP API publik. Paket ini menyediakan `SemantixClient` dan `AsyncSemantixClient` tanpa memerlukan modul internal backend. Paket belum diterbitkan di PyPI; lihat [panduan Python SDK](../../../sdk/README.md) untuk instalasi dari repository atau wheel.
+
+```python
+from semantix_client import SemantixClient
+
+with SemantixClient(base_url="http://localhost:8000") as client:
+    result = client.query("Explain semantic caching", namespace="default")
+
+print(result.response, result.cache_hit)
+```
 
 ## 🚀 Mulai Cepat
 
@@ -147,6 +161,7 @@ Perintah tunggal ini akan menjalankan:
 | Liveness | <http://localhost:8000/health> |
 | Readiness | <http://localhost:8000/ready> |
 | Metrik runtime | <http://localhost:8000/api/v1/metrics> |
+| Diagnostik runtime | <http://localhost:8000/api/v1/diagnostics> |
 | PostgreSQL dari host | `127.0.0.1:5433` |
 
 Perintah yang berguna:
@@ -338,9 +353,10 @@ Backend dan frontend menggunakan kepemilikan feature-first. Lihat [Architecture]
 
 - Similarity semantik bersifat probabilistik dan harus dievaluasi untuk setiap model dan beban kerja (workload).
 - Hosted provider dapat menerima prompt dan dapat menimbulkan biaya, latensi, serta kebutuhan penanganan data eksternal.
-- Metrik runtime dan request coalescing bersifat process-local; rate limiting produksi memakai koordinasi PostgreSQL bersama.
+- Metrik runtime, diagnostik, dan request coalescing bersifat process-local; rate limiting produksi memakai koordinasi PostgreSQL bersama.
 - Stack hardened menyeimbangkan dua replika backend; ini bukan platform multi-tenant atau sistem autoscaling umum yang lengkap.
 - Provider mock ditujukan untuk pengujian, demonstrasi, dan pengembangan UI.
+- Sweep evaluasi menggunakan proyeksi dari satu run terukur, bukan pemutaran ulang berurutan atau rekomendasi threshold otomatis.
 
 ## 📚 Dokumentasi
 
