@@ -34,6 +34,10 @@ CACHE_BACKEND=memory
 AUTH_MODE=disabled
 ```
 
+For hosted or local inference, choose the embedding and generation providers in
+[Providers](providers.md) before starting the stack. Mock responses are example
+output, not production answers.
+
 Start the explicitly named development stack:
 
 ```bash
@@ -55,6 +59,10 @@ All published development ports bind to `127.0.0.1` by default:
 | API documentation | <http://localhost:8000/docs> |
 | Liveness | <http://localhost:8000/health> |
 | Readiness | <http://localhost:8000/ready> |
+
+Open the frontend and run a Monitor query. The [product tour](../../README.md#product-tour)
+shows the current Cache Inspector, Evaluations, and Observability views. For
+requests from a Python application, continue with the [Python SDK](../../sdk/README.md).
 
 The development frontend image installs Node dependencies and runs the Vite
 development server with HMR; it does not compile production frontend assets.
@@ -158,9 +166,10 @@ validation.
 
 `GET /health` is a cheap process liveness check and is not rate-limited.
 
-`GET /ready` checks the active cache dependency. The memory backend returns immediately. The pgvector backend performs a bounded cache-statistics query and returns `503` when the database is unavailable.
-
-Readiness does not call hosted AI providers and therefore does not consume provider quota.
+`GET /ready` checks active cache statistics, the configured persistent
+evaluation dataset catalog, and PostgreSQL threshold coordination when enabled.
+It returns `503` for handled storage failures. It does not directly probe the
+optional run-history repository or hosted AI providers.
 
 ## Shutdown and volumes
 

@@ -177,6 +177,13 @@ python scripts/smoke_provider.py embedding "Explain semantic caching"
 
 Mock smoke test tidak memerlukan service eksternal. Ollama smoke test memerlukan Ollama yang sedang berjalan dengan model yang dikonfigurasi dan sudah tersedia.
 
+## Langkah berikutnya
+
+Kembali ke [Getting started](getting-started.md) untuk membuka workbench.
+[Tur produk](../README.ID.md#tur-produk) menampilkan workspace saat ini, dan
+[Python SDK](../../../../sdk/README.md) menghubungkan aplikasi ke HTTP API publik
+yang sama.
+
 ## Tradeoff dan keamanan
 
 * Hosted provider sederhana secara operasional tetapi memerlukan kredensial dan dapat menimbulkan latency, biaya penggunaan, serta pertimbangan pemrosesan data.

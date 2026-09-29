@@ -1,19 +1,5 @@
 <p align="center">
-  <sub><a href="/docs/translation/id/README.ID.md">ID</a> · <a href="README.md">EN</a></sub>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/React-19.2.8-61DAFB?logo=react&logoColor=white" alt="React 19.2.8">
-  <img src="https://img.shields.io/badge/Vite-7.3.6-646CFF?logo=vite&logoColor=white" alt="Vite 7.3.6">
-  <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI">
-  <img src="https://img.shields.io/badge/Python-3.11%E2%80%933.14-3776AB?logo=python&logoColor=white" alt="Python 3.11 through 3.14">
-  <img src="https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL with pgvector">
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Auth-Scoped%20Tokens-D4A15A" alt="Scoped token authentication">
-  <img src="https://img.shields.io/badge/Docker-Dev%20%2B%20Hardened-2496ED?logo=docker&logoColor=white" alt="Development and hardened Docker stacks">
-  <img src="https://img.shields.io/badge/License-MIT-22C55E?logo=opensourceinitiative&logoColor=white" alt="MIT License">
+  <sub><a href="docs/translation/id/README.ID.md">ID</a> · <a href="README.md">EN</a></sub>
 </p>
 
 <div align="center">
@@ -30,9 +16,13 @@ Self-host it for multiple applications and users: namespace-scoped access keeps
 their cache data separate, while PostgreSQL + pgvector persists entries across
 restarts. The hardened deployment routes traffic across two backend replicas.
 
-<sub>Monitor · Cache Inspector · Evaluations · Runtime Observability</sub>
+<sub>Monitor · Cache Inspector · Evaluations · Observability</sub>
 
 </div>
+
+![Semantix Monitor showing a cache hit, similarity evidence, and the skipped provider call](docs/assets/screenshots/monitor-decision.png)
+
+*Actual Semantix UI with deterministic mock providers and example prompts.*
 
 ---
 
@@ -44,6 +34,16 @@ restarts. The hardened deployment routes traffic across two backend replicas.
 | **Cache Inspector** | Search entries, inspect metadata, delete records, clear namespaces, and manage the threshold |
 | **Evaluations** | Measure precision, recall, false hits, false misses, inspect filtered case evidence, and export reproducible runs |
 | **Observability** | Track process metrics and inspect safe, read-only runtime diagnostics for evaluation reproducibility |
+
+## Product tour
+
+The local mock-provider demo also shows the other workspaces. Select a preview to see the full-size screenshot.
+
+| Workspace | Current UI |
+|---|---|
+| **Cache Inspector** — Search stored prompts and inspect entry age, hits, and expiry without showing embeddings. | <a href="docs/assets/screenshots/cache-inspector.png"><img src="docs/assets/screenshots/cache-inspector.png" alt="Cache Inspector listing safe example entries with hit counts and TTL" width="320"></a> |
+| **Evaluations** — Run an isolated dataset and review measured hit rate, provider calls, and classification outcomes. | <a href="docs/assets/screenshots/evaluations-results.png"><img src="docs/assets/screenshots/evaluations-results.png" alt="Evaluations showing results for the built-in quick semantic safety set" width="320"></a> |
+| **Observability** — Read process-local request, cache, provider, and latency metrics. | <a href="docs/assets/screenshots/observability-metrics.png"><img src="docs/assets/screenshots/observability-metrics.png" alt="Observability showing mock-provider traffic, cache, and latency metrics" width="320"></a> |
 
 Core capabilities:
 

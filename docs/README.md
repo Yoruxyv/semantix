@@ -7,6 +7,7 @@ root [README](../README.md) remains the short project overview and quick start.
 
 | Guide | Use it for |
 |---|---|
+| [Product tour](../README.md#product-tour) | Screenshots of the current Monitor, Cache Inspector, Evaluations, and Observability workspaces |
 | [Getting started](guides/getting-started.md) | Environment files, local toolchains, Docker workflows, and troubleshooting |
 | [Providers](guides/providers.md) | Hugging Face, OpenAI, Anthropic, Gemini, Ollama, and mock configuration |
 | [Custom provider adapters](guides/provider-extensions.md) | Explicit trusted server-side adapter registration and lifecycle contract |

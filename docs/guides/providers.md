@@ -219,6 +219,12 @@ python scripts/smoke_provider.py embedding "Explain semantic caching"
 Mock smoke tests require no external service. Ollama smoke tests require Ollama
 to be running with the configured models already available.
 
+## Next step
+
+Return to [Getting started](getting-started.md) to open the workbench. The
+[product tour](../../README.md#product-tour) shows its current views, and the
+[Python SDK](../../sdk/README.md) connects an application to the same public API.
+
 ## Tradeoffs and security
 
 - Hosted providers are operationally simple but require credentials and may
