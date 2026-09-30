@@ -1,0 +1,145 @@
+name: PR Labeler
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - edited
+      - synchronize
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: pr-labeler-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    name: Label pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      # SECURITY: pull_request_target has access to the base repository token.
+      # Do not check out or execute pull-request code in this workflow.
+      - name: Apply Conventional Commit type label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          managed_labels=(
+            enhancement
+            bug
+            documentation
+            style
+            refactor
+            performance
+            tests
+            maintenance
+            ci
+            build
+          )
+
+          if [[ "$PR_TITLE" =~ ^([A-Za-z]+)(\([^)]*\))?(!)?:[[:space:]]+ ]]; then
+            title_type="${BASH_REMATCH[1],,}"
+          else
+            echo "No Conventional Commit type found in PR title: $PR_TITLE"
+            exit 0
+          fi
+
+          case "$title_type" in
+            feat)
+              target_label="enhancement"
+              label_color="a2eeef"
+              label_description="New functionality or improvement"
+              ;;
+            fix)
+              target_label="bug"
+              label_color="d73a4a"
+              label_description="Something is not working correctly"
+              ;;
+            docs)
+              target_label="documentation"
+              label_color="0075ca"
+              label_description="Documentation changes"
+              ;;
+            style)
+              target_label="style"
+              label_color="ededed"
+              label_description="Formatting or style-only changes"
+              ;;
+            refactor)
+              target_label="refactor"
+              label_color="c5def5"
+              label_description="Internal restructuring without behavior changes"
+              ;;
+            perf)
+              target_label="performance"
+              label_color="5319e7"
+              label_description="Measured performance improvement"
+              ;;
+            test)
+              target_label="tests"
+              label_color="bfdadc"
+              label_description="Test coverage or test infrastructure"
+              ;;
+            chore)
+              target_label="maintenance"
+              label_color="fef2c0"
+              label_description="Repository maintenance"
+              ;;
+            ci)
+              target_label="ci"
+              label_color="1d76db"
+              label_description="Continuous integration changes"
+              ;;
+            build)
+              target_label="build"
+              label_color="d4c5f9"
+              label_description="Build system or dependency changes"
+              ;;
+            *)
+              echo "Unsupported Conventional Commit type: $title_type"
+              exit 0
+              ;;
+          esac
+
+          current_labels="$(
+            gh api \
+              "repos/$GH_REPO/issues/$PR_NUMBER/labels" \
+              --jq '.[].name'
+          )"
+
+          for label in "${managed_labels[@]}"; do
+            if [[ "$label" != "$target_label" ]] &&
+               grep -Fxq "$label" <<< "$current_labels"; then
+              gh api \
+                --method DELETE \
+                "repos/$GH_REPO/issues/$PR_NUMBER/labels/$label"
+            fi
+          done
+
+          gh label create "$target_label" \
+            --repo "$GH_REPO" \
+            --color "$label_color" \
+            --description "$label_description" \
+            2>/dev/null || true
+
+          if ! grep -Fxq "$target_label" <<< "$current_labels"; then
+            gh api \
+              --method POST \
+              "repos/$GH_REPO/issues/$PR_NUMBER/labels" \
+              -f "labels[]=$target_label"
+          fi
+
+          echo "PR title type: $title_type"
+          echo "Applied label: $target_label"
