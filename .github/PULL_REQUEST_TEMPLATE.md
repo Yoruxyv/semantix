@@ -6,8 +6,8 @@
 
 <!-- List the important implementation changes. -->
 
-- 
-- 
+-
+-
 
 ## Type of change
 
@@ -66,6 +66,37 @@ Remove this section when it does not apply.
 - [ ] Embedding-space compatibility was considered
 - [ ] Existing provider and cache defaults remain unchanged
 
+## AI assistance
+
+<!--
+Disclosure is required when an AI tool materially contributed to this pull
+request.
+
+Examples include:
+- generating or modifying source code;
+- generating tests;
+- translating or drafting documentation;
+- debugging or refactoring;
+- repository analysis;
+- generating implementation suggestions incorporated into the change.
+
+Do not include private prompts, conversation transcripts, credentials, API keys,
+or other sensitive information.
+
+Repository-maintained automation such as Dependabot is exempt.
+-->
+
+- [ ] No AI tool materially contributed to this change
+- [ ] AI tools materially assisted this change
+
+If AI-assisted, briefly describe the tool and how it was used:
+
+<!--
+Example:
+Claude Code was used for repository analysis and implementation drafting.
+I reviewed the resulting changes and ran the verification listed above.
+-->
+
 ## Checklist
 
 - [ ] My branch contains one focused concern
@@ -78,7 +109,7 @@ Remove this section when it does not apply.
 - [ ] I did not commit credentials, private prompts, responses, or personal data
 - [ ] Provider tests do not call real external services
 - [ ] Performance claims include reproducible evidence
-- [ ] AI-assisted changes were manually reviewed and verified
+- [ ] Any AI-assisted changes were manually reviewed, verified, and accurately disclosed
 
 ## Related issue
 
