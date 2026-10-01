@@ -85,7 +85,8 @@ def test_public_exports_models_and_signatures() -> None:
             for parameter in constructor.parameters.values()
         )
         assert constructor.parameters["token"].default is None
-        assert constructor.parameters["timeout"].default == 30.0
+        # Exact public API signature default, not a computed float comparison.
+        assert constructor.parameters["timeout"].default == 30.0  # noqa: RUF069
         query = inspect.signature(client_type.query)
         assert tuple(query.parameters) == (
             "self",

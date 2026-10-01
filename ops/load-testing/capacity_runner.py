@@ -335,7 +335,8 @@ def run_k6(
         else {}
     )
     metrics = summary.get("metrics", {})
-    value = lambda name, key="count": metrics.get(name, {}).get(key, 0)
+    def value(name: str, key: str = "count") -> int | float:
+        return metrics.get(name, {}).get(key, 0)
     probes = [
         json.loads(line)
         for line in (output / "telemetry.jsonl")

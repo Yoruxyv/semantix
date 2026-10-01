@@ -222,7 +222,9 @@ def test_threshold_change_is_compatible_and_deltas_are_candidate_minus_baseline(
     assert deltas.f1_score == pytest.approx(-1)
     assert deltas.average_cache_hit_latency_ms is None
     assert len(comparison.threshold_deltas) == 2
-    assert comparison.threshold_deltas[0].threshold == 0.80
+    assert comparison.threshold_deltas[0].threshold == pytest.approx(
+        0.80, rel=0.0, abs=1e-12
+    )
     assert comparison.threshold_deltas[0].baseline_result_kind == "projected"
     assert comparison.threshold_deltas[0].candidate_result_kind == "measured"
 

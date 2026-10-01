@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import Sequence
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.benchmark.application.service import BenchmarkService
@@ -478,7 +479,7 @@ def test_runs_default_benchmark_end_to_end(settings: Settings) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["dataset"]["dataset_id"] == "quick"
-    assert payload["threshold"] == 0.9
+    assert payload["threshold"] == pytest.approx(0.9, rel=0.0, abs=1e-12)
     assert payload["metrics"]["total_queries"] == 16
     assert len(payload["query_results"]) == 16
     assert payload["threshold_evaluation_mode"] == "frozen_candidate_projection"

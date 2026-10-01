@@ -23,6 +23,8 @@ from two_replica_smoke import (
     wait_gateway_upstream,
 )
 
+THRESHOLD_ABS_TOLERANCE = 1e-12
+
 
 def containers(service: str) -> set[str]:
     return set(compose("ps", "-a", "-q", service).splitlines())
@@ -150,16 +152,27 @@ def main() -> None:
             route_to(ip_a, ip_b, ip_new)
             wait_routing({ip_a, ip_b, ip_new})
 
-            changed_threshold = 0.81 if original_threshold != 0.81 else 0.82
+            changed_threshold = (
+                0.81
+                if not math.isclose(
+                    original_threshold,
+                    0.81,
+                    rel_tol=0.0,
+                    abs_tol=THRESHOLD_ABS_TOLERANCE,
+                )
+                else 0.82
+            )
             request(
                 "/api/v1/cache/threshold",
                 backend=ip_new,
                 method="PUT",
                 payload={"threshold": changed_threshold},
             )
-            assert (
-                request("/api/v1/cache/threshold", backend=ip_a)["threshold"]
-                == changed_threshold
+            assert math.isclose(
+                request("/api/v1/cache/threshold", backend=ip_a)["threshold"],
+                changed_threshold,
+                rel_tol=0.0,
+                abs_tol=THRESHOLD_ABS_TOLERANCE,
             )
 
             since = datetime.now(UTC).isoformat()
@@ -219,9 +232,11 @@ def main() -> None:
             )
             assert containers("backend-a") == original_a
             assert query(first_prompt, backend=ip_a)["cache_hit"] is True
-            assert (
-                request("/api/v1/cache/threshold", backend=ip_b)["threshold"]
-                == changed_threshold
+            assert math.isclose(
+                request("/api/v1/cache/threshold", backend=ip_b)["threshold"],
+                changed_threshold,
+                rel_tol=0.0,
+                abs_tol=THRESHOLD_ABS_TOLERANCE,
             )
             request("/ready", backend=ip_a)
             request("/ready", backend=ip_b)

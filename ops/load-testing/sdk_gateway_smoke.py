@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import math
 import secrets
 import subprocess
 import tempfile
@@ -16,6 +17,8 @@ from semantix_client import (
     SemantixRateLimitError,
     SemantixServerError,
 )
+
+THRESHOLD_ABS_TOLERANCE = 1e-12
 
 
 def main() -> None:
@@ -108,7 +111,16 @@ def main() -> None:
             threshold = direct(env, "backend-a", "/api/v1/cache/threshold", admin)[1][
                 "threshold"
             ]
-            updated = 0.81 if threshold != 0.81 else 0.82
+            updated = (
+                0.81
+                if not math.isclose(
+                    threshold,
+                    0.81,
+                    rel_tol=0.0,
+                    abs_tol=THRESHOLD_ABS_TOLERANCE,
+                )
+                else 0.82
+            )
             assert (
                 direct(
                     env,
@@ -120,11 +132,13 @@ def main() -> None:
                 )[0]
                 == 200
             )
-            assert (
+            assert math.isclose(
                 direct(env, "backend-b", "/api/v1/cache/threshold", admin)[1][
                     "threshold"
-                ]
-                == updated
+                ],
+                updated,
+                rel_tol=0.0,
+                abs_tol=THRESHOLD_ABS_TOLERANCE,
             )
             direct(
                 env,

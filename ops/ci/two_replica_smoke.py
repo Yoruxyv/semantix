@@ -1,6 +1,7 @@
 """Exercise the disposable production Compose stack through its real gateway."""
 
 import json
+import math
 import os
 import re
 import subprocess
@@ -21,6 +22,7 @@ TOKENS = {
 UPSTREAM_FILE = Path(os.environ["SEMANTIX_UPSTREAM_FILE"])
 UPSTREAM_ORIGINAL = UPSTREAM_FILE.read_text(encoding="utf-8")
 QUERY_PATH = "/api/v1/query"
+THRESHOLD_ABS_TOLERANCE = 1e-12
 
 
 def run(*command: str) -> str:
@@ -278,7 +280,12 @@ def verify_auth_and_limits() -> None:
         payload={"threshold": 0.8},
         backend="backend-b",
     )
-    assert request("/api/v1/cache/threshold", backend="backend-a")["threshold"] == 0.8
+    assert math.isclose(
+        request("/api/v1/cache/threshold", backend="backend-a")["threshold"],
+        0.8,
+        rel_tol=0.0,
+        abs_tol=THRESHOLD_ABS_TOLERANCE,
+    )
     request(
         "/api/v1/cache/threshold",
         method="PUT",

@@ -287,7 +287,10 @@ async def test_safe_reproducibility_metadata_uses_an_explicit_allowlist() -> Non
     assert all(
         "embedding" not in query for query in result.model_dump()["query_results"]
     )
-    assert payload["measured_threshold"] == result.threshold == 0.91
+    assert payload["measured_threshold"] == pytest.approx(
+        result.threshold, rel=0.0, abs=1e-12
+    )
+    assert result.threshold == pytest.approx(0.91, rel=0.0, abs=1e-12)
     assert payload["evaluation_thresholds"] == [0.80, 0.91, 0.95]
     assert payload["generation_configuration_fingerprint"] == "3" * 64
     assert payload["comparison_contract_version"] == 1
