@@ -47,10 +47,17 @@ jobs:
         run: uv sync --locked --extra dev
 
       - name: Run Ruff lint
-        run: uv run --no-sync ruff check --output-format=github .
+        run: uv run --no-sync ruff check --config ../ruff.toml --output-format=github .
+
+      - name: Run operational Ruff lint
+        run: >-
+          uv run --no-sync ruff check
+          --config ../ruff.toml
+          --output-format=github
+          ../ops
 
       - name: Check Ruff formatting
-        run: uv run --no-sync ruff format --check .
+        run: uv run --no-sync ruff format --config ../ruff.toml --check .
 
       - name: Run mypy
         run: uv run --no-sync mypy app tests scripts
@@ -139,10 +146,10 @@ jobs:
         run: uv sync --locked --extra dev
 
       - name: Run SDK Ruff lint
-        run: uv run --no-sync ruff check --output-format=github .
+        run: uv run --no-sync ruff check --config ../ruff.toml --output-format=github .
 
       - name: Check SDK Ruff formatting
-        run: uv run --no-sync ruff format --check .
+        run: uv run --no-sync ruff format --config ../ruff.toml --check .
 
       - name: Run SDK mypy
         run: uv run --no-sync mypy src tests
