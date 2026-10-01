@@ -143,7 +143,9 @@ async def test_updated_threshold_changes_lookup_rule() -> None:
     assert miss.matched_cache_key is None
     assert miss.cache_entry_created_at is None
 
-    assert cache.update_similarity_threshold(0.75) == 0.75
+    assert cache.update_similarity_threshold(0.75) == pytest.approx(
+        0.75, rel=0.0, abs=1e-12
+    )
     hit = await cache.lookup("near")
     assert hit.cache_hit
     assert hit.similarity_threshold == pytest.approx(0.75)

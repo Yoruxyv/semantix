@@ -188,9 +188,9 @@ async def test_threshold_is_shared_and_outage_fails_closed(
     second = PostgresCoordination(coordination_pool)
     await first.initialize_threshold(0.92)
     await second.initialize_threshold(0.75)
-    assert await second.read_threshold() == 0.92
-    assert await second.write_threshold(0.8) == 0.8
-    assert await first.read_threshold() == 0.8
+    assert await second.read_threshold() == pytest.approx(0.92, rel=0.0, abs=1e-12)
+    assert await second.write_threshold(0.8) == pytest.approx(0.8, rel=0.0, abs=1e-12)
+    assert await first.read_threshold() == pytest.approx(0.8, rel=0.0, abs=1e-12)
 
     await coordination_pool.close()
     with pytest.raises(CoordinationStorageError):
@@ -205,7 +205,9 @@ async def test_threshold_is_shared_and_outage_fails_closed(
     )
     try:
         recovered = PostgresCoordination(recovered_pool)
-        assert await recovered.read_threshold() == 0.8
+        assert await recovered.read_threshold() == pytest.approx(
+            0.8, rel=0.0, abs=1e-12
+        )
         assert await recovered.allow_request(
             "198.51.100.10", "/query", "1/minute", 1, 60
         )
@@ -273,7 +275,9 @@ async def test_two_apps_share_rate_lockout_and_threshold(
             json={"prompt": "threshold test", "cache_enabled": False},
         )
         assert bypassed.status_code == 200
-        assert bypassed.json()["similarity_threshold"] == 0.8
+        assert bypassed.json()["similarity_threshold"] == pytest.approx(
+            0.8, rel=0.0, abs=1e-12
+        )
 
         invalid = {"Authorization": "Bearer invalid-token"}
         assert (
@@ -310,7 +314,9 @@ async def test_runtime_role_can_use_coordination_tables(
         try:
             coordinator = PostgresCoordination(runtime_pool)
             await coordinator.initialize_threshold(0.92)
-            assert await coordinator.read_threshold() == 0.92
+            assert await coordinator.read_threshold() == pytest.approx(
+                0.92, rel=0.0, abs=1e-12
+            )
             assert await coordinator.allow_request(
                 "198.51.100.40", "/query", "1/minute", 1, 60
             )

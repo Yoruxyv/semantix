@@ -203,7 +203,7 @@ def test_cache_hit_and_current_miss_variants_decode() -> None:
 
     assert hit.cache_entry_created_at is not None
     assert hit.cache_entry_created_at.utcoffset() is not None
-    assert nearest_miss.similarity_score == 0.7
+    assert nearest_miss.similarity_score == pytest.approx(0.7, rel=0.0, abs=1e-12)
     assert coalesced_miss.generation_skipped
     assert not coalesced_miss.provider_called
 
