@@ -49,7 +49,9 @@ jobs:
             build
           )
 
-          if [[ "$PR_TITLE" =~ ^([A-Za-z]+)(\([^)]*\))?(!)?:[[:space:]]+ ]]; then
+          conventional_title_regex='^([A-Za-z]+)(\([^)]*\))?(!)?:[[:space:]]+'
+
+          if [[ "$PR_TITLE" =~ $conventional_title_regex ]]; then
             title_type="${BASH_REMATCH[1],,}"
           else
             echo "No Conventional Commit type found in PR title: $PR_TITLE"
