@@ -134,7 +134,7 @@ jobs:
             --repo "$GH_REPO" \
             --color "$label_color" \
             --description "$label_description" \
-            2>/dev/null || true
+            --force
 
           if ! grep -Fxq "$target_label" <<< "$current_labels"; then
             gh api \
@@ -182,7 +182,7 @@ jobs:
               --repo "$GH_REPO" \
               --color "$color" \
               --description "$description" \
-              2>/dev/null || true
+              --force
           }
 
           add_label() {
@@ -224,6 +224,7 @@ jobs:
             "area:ops"
             "area:ci"
             "area:docs"
+            "area:docker"
           )
 
           for label in "${managed_area_labels[@]}"; do
@@ -233,43 +234,50 @@ jobs:
           if grep -Eq '^backend/' <<< "$changed_files"; then
             add_label \
               "area:backend" \
-              "c2e0c6" \
+              "0E8A16" \
               "Changes affecting the backend"
           fi
 
           if grep -Eq '^sdk/' <<< "$changed_files"; then
             add_label \
               "area:sdk" \
-              "c2e0c6" \
+              "8250DF" \
               "Changes affecting the public SDK"
           fi
 
           if grep -Eq '^frontend/' <<< "$changed_files"; then
             add_label \
               "area:frontend" \
-              "c2e0c6" \
+              "E99695" \
               "Changes affecting the frontend"
           fi
 
           if grep -Eq '^ops/' <<< "$changed_files"; then
             add_label \
               "area:ops" \
-              "c2e0c6" \
+              "D93F0B" \
               "Changes affecting operational tooling"
           fi
 
           if grep -Eq '^\.github/' <<< "$changed_files"; then
             add_label \
               "area:ci" \
-              "c2e0c6" \
+              "FBCA04" \
               "Changes affecting GitHub or CI automation"
           fi
 
-          if grep -Eq '^docs/' <<< "$changed_files"; then
+          if grep -Eq '(^docs/|(^|/)README([^/]*)\.md$)' <<< "$changed_files"; then
             add_label \
               "area:docs" \
-              "c2e0c6" \
+              "0075CA" \
               "Changes affecting documentation"
+          fi
+
+          if grep -Eq '(^|/)(Dockerfile([^/]*)|(docker-)?compose[^/]*\.ya?ml)$' <<< "$changed_files"; then
+            add_label \
+              "area:docker" \
+              "2496ED" \
+              "Changes affecting Docker images or Compose configuration"
           fi
 
           # Dependabot already manages dependency/ecosystem labels.
