@@ -165,7 +165,8 @@ async def test_sync_async_wire_and_decode_parity(policy: sdk.CachePolicy) -> Non
     ) as async_:
         async_result = await async_.query("question", namespace="sample", policy=policy)
     assert sync_result == async_result
-    assert len(requests) == 2 and requests[0] == requests[1]
+    assert len(requests) == 2
+    assert requests[0] == requests[1]
 
 
 def test_nullable_query_keys_are_required_by_decoder() -> None:
@@ -202,7 +203,7 @@ def test_health_rejects_invalid_provider_names(provider: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "field,value",
+    ("field", "value"),
     [("cache_backend", "redis"), ("evaluation_dataset_storage", "sqlite")],
 )
 def test_readiness_rejects_unknown_storage(field: str, value: str) -> None:
@@ -244,10 +245,11 @@ def test_import_boundary_and_public_docs() -> None:
                 and isinstance(node.args[0], ast.Constant)
                 and isinstance(node.args[0].value, str)
                 and (
-                    isinstance(node.func, ast.Name)
-                    and node.func.id == "__import__"
-                    or isinstance(node.func, ast.Attribute)
-                    and node.func.attr == "import_module"
+                    (isinstance(node.func, ast.Name) and node.func.id == "__import__")
+                    or (
+                        isinstance(node.func, ast.Attribute)
+                        and node.func.attr == "import_module"
+                    )
                 )
             ):
                 names = [node.args[0].value]

@@ -38,8 +38,11 @@ def test_sync_client_crosses_real_http_query_boundary() -> None:
             cache_ttl_seconds=60,
         )
         hit = client.query("sdk normal prompt", namespace="normal")
-        assert not miss.cache_hit and miss.provider_called
-        assert hit.cache_hit and hit.generation_skipped and not hit.provider_called
+        assert not miss.cache_hit
+        assert miss.provider_called
+        assert hit.cache_hit
+        assert hit.generation_skipped
+        assert not hit.provider_called
         assert hit.matched_prompt == "sdk normal prompt"
         assert hit.matched_cache_key is not None
 
@@ -53,8 +56,10 @@ def test_sync_client_crosses_real_http_query_boundary() -> None:
             namespace="read-only",
             policy=CachePolicy.READ_ONLY,
         )
-        assert not read_only_first.cache_hit and read_only_first.provider_called
-        assert not read_only_second.cache_hit and read_only_second.provider_called
+        assert not read_only_first.cache_hit
+        assert read_only_first.provider_called
+        assert not read_only_second.cache_hit
+        assert read_only_second.provider_called
 
         client.query("sdk refresh prompt", namespace="refresh")
         refreshed = client.query(
@@ -63,7 +68,8 @@ def test_sync_client_crosses_real_http_query_boundary() -> None:
             policy=CachePolicy.REFRESH,
             cache_ttl_seconds=60,
         )
-        assert not refreshed.cache_hit and refreshed.provider_called
+        assert not refreshed.cache_hit
+        assert refreshed.provider_called
 
         client.query("sdk bypass prompt", namespace="bypass")
         bypassed = client.query(
@@ -71,7 +77,8 @@ def test_sync_client_crosses_real_http_query_boundary() -> None:
             namespace="bypass",
             policy=CachePolicy.BYPASS,
         )
-        assert not bypassed.cache_hit and bypassed.provider_called
+        assert not bypassed.cache_hit
+        assert bypassed.provider_called
 
         client.query("sdk private prompt", namespace="private")
         private = client.query(
@@ -79,7 +86,8 @@ def test_sync_client_crosses_real_http_query_boundary() -> None:
             namespace="private",
             policy=CachePolicy.PRIVATE,
         )
-        assert not private.cache_hit and private.provider_called
+        assert not private.cache_hit
+        assert private.provider_called
 
         with pytest.raises(SemantixAuthorizationError):
             client.query("unauthorized", namespace="other")
@@ -93,9 +101,11 @@ def test_sync_client_crosses_real_http_query_boundary() -> None:
         with pytest.raises(SemantixValidationError):
             client.query("wildcard", namespace="*")
 
-    with SemantixClient(base_url=base_url, token="invalid-token") as invalid:
-        with pytest.raises(SemantixAuthenticationError):
-            invalid.query("invalid token", namespace="normal")
+    with (
+        SemantixClient(base_url=base_url, token="invalid-token") as invalid,
+        pytest.raises(SemantixAuthenticationError),
+    ):
+        invalid.query("invalid token", namespace="normal")
 
 
 @pytest.mark.asyncio
@@ -109,12 +119,11 @@ async def test_async_client_crosses_real_http_query_boundary() -> None:
         )
         second = await client.query("sdk async normal", namespace="async")
         assert first.response == "[mock provider] sdk async normal"
-        assert not first.cache_hit and first.provider_called
-        assert (
-            second.cache_hit
-            and second.generation_skipped
-            and not second.provider_called
-        )
+        assert not first.cache_hit
+        assert first.provider_called
+        assert second.cache_hit
+        assert second.generation_skipped
+        assert not second.provider_called
         for policy in (
             CachePolicy.READ_ONLY,
             CachePolicy.REFRESH,
@@ -124,7 +133,8 @@ async def test_async_client_crosses_real_http_query_boundary() -> None:
             result = await client.query(
                 f"sdk async {policy.value}", namespace="async", policy=policy
             )
-            assert not result.cache_hit and result.provider_called
+            assert not result.cache_hit
+            assert result.provider_called
         with pytest.raises(SemantixAuthorizationError):
             await client.query("unauthorized", namespace="other")
         with pytest.raises(SemantixValidationError):
@@ -142,18 +152,21 @@ async def test_async_client_crosses_real_http_query_boundary() -> None:
 
 def test_real_http_rate_limit_without_retry_after() -> None:
     base_url, token = integration_settings()
+    caught_error: SemantixRateLimitError | None = None
+
     with SemantixClient(base_url=base_url, token=token) as client:
         for _ in range(120):
             try:
                 client.query("sdk rate probe", namespace="normal")
             except SemantixRateLimitError as error:
-                assert error.status_code == 429
-                assert error.retry_after_seconds is None
+                caught_error = error
                 break
-        else:
-            pytest.fail(
-                "The configured 100/minute query limit did not reject 120 calls"
-            )
+
+    if caught_error is None:
+        pytest.fail("The configured 100/minute query limit did not reject 120 calls")
+
+    assert caught_error.status_code == 429
+    assert caught_error.retry_after_seconds is None
 
 
 @pytest.mark.asyncio
@@ -168,7 +181,11 @@ async def test_real_http_error_headers_and_server_failure() -> None:
             self.end_headers()
             self.wfile.write(b'{"error":"test_error","detail":"Test failure."}')
 
-        def log_message(self, format: str, *args: object) -> None:
+        def log_message(
+            self,
+            format: str,  # noqa: A002 - matches BaseHTTPRequestHandler signature
+            *args: object,
+        ) -> None:
             pass
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), ErrorHandler)

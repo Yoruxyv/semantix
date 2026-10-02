@@ -98,7 +98,8 @@ def main() -> None:
         assert f"{root}/src/semantix_client/py.typed" in sdist_names
         assert f"{root}/tests/conftest.py" in sdist_names
         license_file = archive.extractfile(f"{root}/LICENSE")
-        assert license_file is not None and license_file.read() == license_bytes
+        assert license_file is not None
+        assert license_file.read() == license_bytes
     print("SDK wheel, sdist, license, and runtime dependency allowlists verified")
 
 
