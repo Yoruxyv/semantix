@@ -37,13 +37,30 @@ restarts. The hardened deployment routes traffic across two backend replicas.
 
 ## Product tour
 
-The local Hugging Face demo also shows the other workspaces. Select a preview to see the full-size screenshot.
+The local Hugging Face demo exposes the same workspaces used to inspect cache
+behavior, evaluate decisions, and diagnose the running system. The screenshots
+below show the current UI; select any image to open the original resolution.
 
-| Workspace | Current UI |
-|---|---|
-| **Cache Inspector** — Search stored prompts and inspect entry age, hits, and expiry without showing embeddings. | <a href="docs/assets/screenshots/cache-inspector.png"><img src="docs/assets/screenshots/cache-inspector.png" alt="Cache Inspector listing safe example entries with hit counts and TTL" width="320"></a> |
-| **Evaluations** — Run an isolated dataset and review measured hit rate, provider calls, and classification outcomes. | <a href="docs/assets/screenshots/evaluations-results.png"><img src="docs/assets/screenshots/evaluations-results.png" alt="Evaluations showing results for the built-in quick semantic safety set" width="320"></a> |
-| **Observability** — Inspect safe runtime diagnostics, provider categories, matching fingerprints, and readiness. | <a href="docs/assets/screenshots/observability-diagnostics.png"><img src="docs/assets/screenshots/observability-diagnostics.png" alt="Observability runtime diagnostics showing Hugging Face providers and readiness" width="320"></a> |
+### Cache Inspector
+
+Search stored prompts and inspect entry age, hit counts, expiry, and cache
+metadata without exposing raw embeddings.
+
+[![Cache Inspector showing safe example cache entries with hit counts and TTL](docs/assets/screenshots/cache-inspector.png)](docs/assets/screenshots/cache-inspector.png)
+
+### Evaluations
+
+Run an isolated dataset and inspect measured cache behavior, provider calls,
+latency, and classification outcomes.
+
+[![Evaluations showing results for the built-in semantic safety dataset](docs/assets/screenshots/evaluations-results.png)](docs/assets/screenshots/evaluations-results.png)
+
+### Observability
+
+Inspect safe runtime diagnostics, provider categories, matching fingerprints,
+storage readiness, and other reproducibility signals.
+
+[![Observability showing runtime diagnostics and provider readiness](docs/assets/screenshots/observability-diagnostics.png)](docs/assets/screenshots/observability-diagnostics.png)
 
 Core capabilities:
 
