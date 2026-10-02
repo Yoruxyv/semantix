@@ -4,8 +4,8 @@
     "linux/arm64"
   ],
   "images": {
-    "ghcr.io/astral-sh/uv:0.11.32": {
-      "digest": "sha256:df4cae8f3a96d175e2e5f992e597550000edbe78fdc2594d5cd8de1a217f504c",
+    "ghcr.io/astral-sh/uv:0.12.22": {
+      "digest": "sha256:f513a91fc62fe7c17567eee97230dd198e43edb8a9fbecca843714a4358fe1bc",
       "platforms": [
         "linux/amd64",
         "linux/arm64"
