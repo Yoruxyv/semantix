@@ -1,6 +1,6 @@
 import hashlib
 import json
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
 import httpx
@@ -47,7 +47,7 @@ def create_lifespan(
     @asynccontextmanager
     async def lifespan(
         application: FastAPI,
-    ) -> AsyncIterator[None]:
+    ) -> AsyncGenerator[None, None]:
         configure_logging(settings.log_level, logging_secrets)
         prompt_normalizer = create_prompt_normalizer(
             enabled=settings.prompt_typo_correction_enabled,

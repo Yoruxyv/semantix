@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from asyncpg.pool import Pool
@@ -18,7 +18,9 @@ from app.infrastructure.database import create_pool
 
 
 @asynccontextmanager
-async def database_pool_lifespan(settings: Settings) -> AsyncIterator[Pool | None]:
+async def database_pool_lifespan(
+    settings: Settings,
+) -> AsyncGenerator[Pool | None, None]:
     if not settings.database_required:
         yield None
         return

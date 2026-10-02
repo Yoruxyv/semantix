@@ -70,6 +70,10 @@ exists.
   cancellation unless the owning layer intentionally translates it.
 - Preserve meaningful failures and stable public errors; do not broadly swallow
   exceptions.
+- Keep exception handlers hierarchy-minimal. Do not list a subclass when a caught
+  superclass already covers it. Verify third-party exception inheritance before
+  simplifying handlers; static-analyzer silence is not proof that an exception tuple
+  is nonredundant.
 - Validate untrusted inputs at their boundary. Do not log or commit secrets, tokens,
   private endpoints, private prompts or responses, personal data, or production logs.
 - Treat generated output, local caches, credentials, and machine-specific hooks as local

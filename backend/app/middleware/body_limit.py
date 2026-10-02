@@ -61,7 +61,7 @@ class RequestBodyLimitMiddleware:
                 continue
             try:
                 return int(value.decode("ascii"))
-            except (UnicodeDecodeError, ValueError):
+            except ValueError:
                 return -1
         return None
 

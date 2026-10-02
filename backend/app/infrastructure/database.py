@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 MIGRATION_NAME = re.compile(r"^(?P<version>\d{4})_[a-z0-9_]+\.sql$")
 MIGRATION_LOCK_ID = 7_374_772_830_148_015_240
-ROLE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
+ROLE_NAME = re.compile(r"^[A-Za-z_]\w{0,62}$", re.ASCII)
 TABLE_NAME = re.compile(r"^semantix\.[a-z][a-z0-9_]*$")
 MIGRATION_BOOTSTRAP_SQL = """
 CREATE SCHEMA IF NOT EXISTS semantix;
@@ -97,7 +97,7 @@ async def create_pool(
             timeout=connect_timeout,
             command_timeout=command_timeout,
         )
-    except (OSError, TimeoutError, asyncpg.PostgresError) as error:
+    except (OSError, asyncpg.PostgresError) as error:
         raise error_type(error_detail) from error
 
 
@@ -197,7 +197,7 @@ async def apply_migrations(
                 )
     except AppError:
         raise
-    except (OSError, TimeoutError, asyncpg.PostgresError) as error:
+    except (OSError, asyncpg.PostgresError) as error:
         raise error_type(f"Could not initialize the {label.lower()} schema") from error
 
 
@@ -226,5 +226,5 @@ async def grant_runtime_privileges(
                 await connection.execute(statement)
     except AppError:
         raise
-    except (OSError, TimeoutError, asyncpg.PostgresError) as error:
+    except (OSError, asyncpg.PostgresError) as error:
         raise error_type("Could not grant runtime database privileges") from error
