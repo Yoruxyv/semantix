@@ -68,7 +68,7 @@ class QueryService:
                 raise ValueError(
                     "cache_ttl_seconds requires a cache policy that permits writes"
                 )
-            effective_policy = replace(
+            effective_policy: QueryCachePolicy = replace(
                 policy,
                 cache_ttl_seconds=(
                     self._cache.resolve_ttl(policy.cache_ttl_seconds)
