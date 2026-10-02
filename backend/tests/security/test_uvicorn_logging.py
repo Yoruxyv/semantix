@@ -26,7 +26,11 @@ class _ProviderServer(ThreadingHTTPServer):
 class _ProviderHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
-    def log_message(self, format: str, *args: object) -> None:
+    def log_message(
+        self,
+        format: str,  # noqa: A002 - stdlib override name
+        *args: object,
+    ) -> None:
         pass
 
     def do_POST(self) -> None:
@@ -213,7 +217,7 @@ def test_registered_secrets_are_redacted_from_real_uvicorn_output(
 
     log_path = tmp_path / "uvicorn.log"
     log_stream = log_path.open("w", encoding="utf-8")
-    process = subprocess.Popen(
+    process = subprocess.Popen(  # noqa: S603 - fixed local test command
         command,
         cwd=Path(__file__).parents[2],
         env=environment,
@@ -328,7 +332,7 @@ def test_provider_urls_are_suppressed_from_complete_real_uvicorn_output(
 
     log_path = tmp_path / "uvicorn-provider-url.log"
     log_stream = log_path.open("w", encoding="utf-8")
-    process = subprocess.Popen(
+    process = subprocess.Popen(  # noqa: S603 - fixed local test command
         command,
         cwd=Path(__file__).parents[2],
         env=environment,

@@ -39,7 +39,9 @@ ThreadingHTTPServer(("0.0.0.0", 8000), Handler).serve_forever()
 
 
 def run(*args: str) -> str:
-    result = subprocess.run(args, capture_output=True, text=True, check=False)
+    result = subprocess.run(  # noqa: S603 - internally constructed argv
+        args, capture_output=True, text=True, check=False
+    )
     if result.returncode:
         raise RuntimeError(f"{' '.join(args[:3])}: {result.stderr[-1000:]}")
     return result.stdout.strip()
@@ -52,7 +54,7 @@ def fetch(port: int, path: str, *, reset: bool = False) -> tuple[int, str]:
         method="POST" if reset else "GET",
     )
     try:
-        with urlopen(request, timeout=5) as response:
+        with urlopen(request, timeout=5) as response:  # noqa: S310 - fixed localhost HTTP endpoint
             return response.status, response.read().decode()
     except HTTPError as error:
         return error.code, error.read().decode()
@@ -158,8 +160,9 @@ def main() -> None:
             )
         finally:
             for container in (gateway, *peers.values()):
-                subprocess.run(
-                    ["docker", "stop", container], capture_output=True, check=False
+                subprocess.run(  # noqa: S603 - fixed Docker cleanup argv
+                    ["docker", "stop", container],  # noqa: S607 - controlled CI PATH
+                    check=False,
                 )
             run("docker", "network", "rm", network)
 

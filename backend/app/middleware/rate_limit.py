@@ -39,7 +39,7 @@ class CoordinationLimiter:
             async def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
                 request = kwargs.get("request")
                 if not isinstance(request, Request):
-                    raise RuntimeError("A rate-limited route requires Request")
+                    raise TypeError("A rate-limited route requires Request")
                 settings: Settings = request.app.state.settings
                 if settings.coordination_backend == "memory":
                     return await local(*args, **kwargs)

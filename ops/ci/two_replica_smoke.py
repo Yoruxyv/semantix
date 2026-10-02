@@ -25,15 +25,17 @@ QUERY_PATH = "/api/v1/query"
 THRESHOLD_ABS_TOLERANCE = 1e-12
 
 
-def run(*command: str) -> str:
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
+def run(*command: str, stdin_text: str | None = None) -> str:
+    result = subprocess.run(  # noqa: S603 - internally constructed argv
+        command, input=stdin_text, capture_output=True, text=True, check=False
+    )
     if result.returncode:
         raise AssertionError(f"Command failed: {result.stderr[-1200:]}")
     return result.stdout
 
 
-def compose(*arguments: str) -> str:
-    return run(*COMPOSE, *arguments)
+def compose(*arguments: str, stdin_text: str | None = None) -> str:
+    return run(*COMPOSE, *arguments, stdin_text=stdin_text)
 
 
 def request(
@@ -168,7 +170,10 @@ def wait_healthy(service: str) -> None:
 def db_connections() -> int:
     role = os.environ["POSTGRES_RUNTIME_USER"]
     database = os.environ["POSTGRES_DB"]
-    sql = f"SELECT count(*) FROM pg_stat_activity WHERE usename = '{role}' AND datname = '{database}'"
+    sql = (
+        "SELECT count(*) FROM pg_stat_activity "
+        "WHERE usename = :'runtime_user' AND datname = :'database';\n"
+    )
     return int(
         compose(
             "exec",
@@ -179,8 +184,16 @@ def db_connections() -> int:
             os.environ["POSTGRES_MIGRATION_USER"],
             "-d",
             database,
-            "-Atc",
-            sql,
+            "-v",
+            f"runtime_user={role}",
+            "-v",
+            f"database={database}",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-At",
+            "-f",
+            "-",
+            stdin_text=sql,
         ).strip()
     )
 
@@ -390,7 +403,7 @@ def verify_blocked_db_shutdown(ip_a: str, ip_b: str) -> float:
     assert query(seed, backend="backend-a", cache_read_enabled=False)["provider_called"]
     set_upstream("backend-a")
     wait_gateway_upstream(ip_a)
-    locker = subprocess.Popen(
+    locker = subprocess.Popen(  # noqa: S603 - fixed Compose/psql command
         [
             *COMPOSE,
             "exec",

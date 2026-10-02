@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import secrets
 import select
@@ -48,7 +49,7 @@ def real_server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[tuple[str,
     base_url = f"http://127.0.0.1:{port}"
     log_path = tmp_path_factory.mktemp("body-limit") / "uvicorn.log"
     with log_path.open("w", encoding="utf-8") as log_stream:
-        process = subprocess.Popen(
+        process = subprocess.Popen(  # noqa: S603 - fixed local test command
             [
                 sys.executable,
                 "-m",
@@ -135,10 +136,10 @@ def _raw_post(
                 if response or select.select([connection], [], [], 0.005)[0]:
                     break
             if not response:
-                try:
+                with contextlib.suppress(
+                    BrokenPipeError, ConnectionResetError, OSError
+                ):
                     connection.sendall(b"0\r\n\r\n")
-                except (BrokenPipeError, ConnectionResetError, OSError):
-                    pass
         else:
             try:
                 connection.sendall(body)

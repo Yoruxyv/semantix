@@ -357,7 +357,7 @@ def _create_anthropic(
     )
 
 
-def _create_mock(context: ProviderBuildContext, settings: Settings) -> MockProvider:
+def _create_mock(_context: ProviderBuildContext, settings: Settings) -> MockProvider:
     return MockProvider(
         settings.mock_embedding_dimensions,
         delay_seconds=settings.mock_generation_delay_seconds,

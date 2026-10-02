@@ -6,6 +6,7 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
+import app.benchmark.application.service as service_module
 from app.benchmark.api.schemas import (
     BenchmarkOutcome,
     BenchmarkQueryResult,
@@ -436,8 +437,6 @@ async def test_timeout_leaves_the_next_run_with_a_fresh_cache() -> None:
 async def test_run_identity_is_created_only_after_pre_execution_gates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import app.benchmark.application.service as service_module
-
     created_ids = 0
 
     def deterministic_uuid() -> UUID:

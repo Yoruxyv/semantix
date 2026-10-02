@@ -5,7 +5,7 @@
 from enum import Enum
 
 
-class CachePolicy(str, Enum):
+class CachePolicy(str, Enum):  # noqa: UP042 - preserve public SDK behavior
     """Cache modes; authorization and namespace rules remain server-owned.
 
     Attributes:

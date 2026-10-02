@@ -152,20 +152,11 @@ def test_metrics_report_missing_hit_average_as_null() -> None:
             (1, 0, 1, 0),
             (0.5, 1.0, 2 / 3),
         ),
-        (
-            [
-                BenchmarkObservation(True, False, 10, True, 0.20),
-                BenchmarkObservation(False, False, 20, True, None),
-            ],
-            (0, 1, 0, 1),
-            (0.0, 0.0, 0.0),
-        ),
     ],
     ids=[
         "zero-positive",
         "zero-predicted-positive",
         "all-hit",
-        "all-miss",
     ],
 )
 def test_quality_metrics_cover_zero_and_extreme_classifications(

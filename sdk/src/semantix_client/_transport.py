@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 """Private sync and async HTTP transport implementations."""
 
+import contextlib
 import json
 import math
 from collections.abc import Mapping
@@ -191,10 +192,8 @@ def _decode_response(
     if not response.is_success:
         payload = None
         if _is_json_response(response):
-            try:
+            with contextlib.suppress(SemantixResponseError):
                 payload = _json(content)
-            except SemantixResponseError:
-                pass
         _raise_api_error(response, payload, token=token)
     if not _is_json_response(response):
         raise SemantixResponseError(

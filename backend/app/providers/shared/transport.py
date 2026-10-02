@@ -33,7 +33,7 @@ class _ProviderResponseTooLargeError(InvalidProviderResponseError):
     """Non-retryable rejection of an oversized decoded provider response."""
 
 
-class _ProviderOperationDeadlineExceeded(Exception):
+class _ProviderOperationDeadlineExceededError(Exception):
     """Internal signal for synchronous work crossing the operation deadline."""
 
 
@@ -85,9 +85,9 @@ async def post_json(
                         max_response_bytes=max_response_bytes,
                     )
                     if deadline is not None and loop.time() >= deadline:
-                        raise _ProviderOperationDeadlineExceeded
+                        raise _ProviderOperationDeadlineExceededError
                     return result
-    except _ProviderOperationDeadlineExceeded as exc:
+    except _ProviderOperationDeadlineExceededError as exc:
         raise ProviderRetryableError("Network failure") from exc
     except TimeoutError as exc:
         if not operation_timeout.expired():

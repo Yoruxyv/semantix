@@ -16,7 +16,7 @@ def load_approved_images() -> tuple[set[str], dict[str, dict[str, object]]]:
     required_platforms = set(payload["required_platforms"])
     images = payload["images"]
     if not isinstance(images, dict):
-        raise ValueError("approved images must be an object")
+        raise TypeError("approved images must be an object")
     return required_platforms, images
 
 
@@ -28,7 +28,9 @@ def docker_references() -> list[tuple[Path, str]]:
     ]
     for path in dockerfiles:
         content = path.read_text(encoding="utf-8")
-        references.extend((path, match) for match in DOCKERFILE_PATTERN.findall(content))
+        references.extend(
+            (path, match) for match in DOCKERFILE_PATTERN.findall(content)
+        )
 
     for path in ROOT.glob("docker-compose*.yml"):
         content = path.read_text(encoding="utf-8")
@@ -37,7 +39,7 @@ def docker_references() -> list[tuple[Path, str]]:
     for path in (ROOT / ".github" / "workflows").glob("*.yml"):
         content = path.read_text(encoding="utf-8")
         for reference in IMAGE_PATTERN.findall(content):
-            if reference.startswith("${{") or reference.startswith("semantix-"):
+            if reference.startswith(("${{", "semantix-")):
                 continue
             references.append((path, reference))
     return references
@@ -49,7 +51,9 @@ def validate_reference(
     approved_images: dict[str, dict[str, object]],
 ) -> str:
     if reference.count("@") != 1:
-        raise ValueError(f"{path.relative_to(ROOT)}: mutable image reference {reference}")
+        raise ValueError(
+            f"{path.relative_to(ROOT)}: mutable image reference {reference}"
+        )
 
     tagged_image, digest = reference.split("@", maxsplit=1)
     if tagged_image not in approved_images:

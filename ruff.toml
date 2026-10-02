@@ -5,9 +5,103 @@ line-length = 88
 target-version = "py311"
 
 [lint]
-select = ["E4", "E7", "E9", "F", "I", "B", "RUF069"]
+select = [
+    "A",
+    "ARG",
+    "ASYNC",
+    "B",
+    "BLE",
+    "C4",
+    "C90",
+    "CPY001",
+    "DTZ",
+    "E",
+    "F",
+    "G",
+    "I",
+    "LOG",
+    "N",
+    "PERF",
+    "PGH",
+    "PIE",
+    "PLC",
+    "PLE",
+    "PLW",
+    "PTH",
+    "PT",
+    "RET",
+    "RSE",
+    "RUF",
+    "RUF069",
+    "S",
+    "SIM",
+    "T10",
+    "T20",
+    "TRY004",
+    "TRY201",
+    "TRY203",
+    "TRY400",
+    "TRY401",
+    "UP",
+    "W",
+]
+
+ignore = [
+    "E501",
+]
+
 preview = true
 explicit-preview-rules = true
+
+[lint.flake8-copyright]
+author = "Hans Valerie"
+
+[lint.mccabe]
+max-complexity = 15
+
+[lint.isort]
+known-first-party = ["app", "semantix_client", "tests"]
+
+[lint.per-file-ignores]
+# Copyright headers are part of the distributed SDK package contract only.
+"!**/src/semantix_client/**/*.py" = ["CPY001"]
+# Pytest intentionally uses plain assertions and often keeps callback,
+# fixture, and test-double parameters to preserve required signatures.
+"**/tests/**/*.py" = ["S101", "ARG001", "ARG002", "ARG005"]
+
+# FastAPI/SlowAPI route signatures intentionally retain request and
+# dependency-only authorization parameters required by the framework.
+"**/app/benchmark/api/router.py" = ["ARG001"]
+"**/app/cache/api/router.py" = ["ARG001"]
+"**/app/observability/router.py" = ["ARG001"]
+"**/app/query/api/router.py" = ["ARG001"]
+
+# Reviewed test-only credentials used to exercise authentication and redaction.
+"**/tests/benchmark/api/test_comparison_routes.py" = ["S105"]
+"**/tests/benchmark/api/test_history_security.py" = ["S105"]
+"**/tests/observability/test_routes.py" = ["S105"]
+"**/tests/providers/shared/test_transport.py" = ["S105"]
+"**/tests/security/test_auth.py" = ["S105"]
+"**/tests/security/test_auth_lockout.py" = ["S105", "S107"]
+"**/tests/conftest.py" = ["S106"]
+"**/tests/test_async_client.py" = ["S105", "S106"]
+"**/tests/test_client.py" = ["S105", "S106"]
+"**/tests/test_integration.py" = ["S106"]
+
+# Reviewed SQL builders assemble only module-owned identifiers;
+# runtime values remain PostgreSQL bind parameters.
+"**/app/benchmark/infrastructure/postgres_history_queries.py" = ["S608"]
+"**/app/cache/infrastructure/backends/pgvector_sql.py" = ["S608"]
+
+# Executable smoke checks are test harnesses: assertions are intentional
+# and stdout is their reporting interface.
+"**/*_smoke.py" = ["S101", "T201", "PT017", "PT018"]
+
+# Other executable verification scripts intentionally report to stdout.
+"smoke_provider.py" = ["T201"]
+"check_artifacts.py" = ["T201"]
+"capacity_runner.py" = ["T201"]
+"verify_image_pins.py" = ["T201"]
 
 [format]
 indent-style = "space"

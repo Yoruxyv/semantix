@@ -77,7 +77,7 @@ class ProviderRegistration:
             raise ValueError(f"Provider {self.name!r} does not support embedding")
         resolved = value() if callable(value) else value
         if not isinstance(resolved, EmbeddingMetadata):
-            raise ValueError("Embedding metadata resolver returned an invalid value")
+            raise TypeError("Embedding metadata resolver returned an invalid value")
         self._reject_secret_metadata((resolved.space,))
         return resolved
 

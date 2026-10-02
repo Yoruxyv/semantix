@@ -222,12 +222,14 @@ def test_cache_hit_and_current_miss_variants_decode() -> None:
 )
 def test_invalid_query_response_is_rejected(payload: dict[str, object]) -> None:
     transport = httpx.MockTransport(lambda request: httpx.Response(200, json=payload))
-    with make_client(
-        base_url="https://example.com",
-        transport=transport,
-    ) as client:
-        with pytest.raises(SemantixResponseError):
-            client.query("question")
+    with (
+        make_client(
+            base_url="https://example.com",
+            transport=transport,
+        ) as client,
+        pytest.raises(SemantixResponseError),
+    ):
+        client.query("question")
 
 
 @pytest.mark.parametrize(
@@ -263,12 +265,14 @@ def test_unexpected_success_body_is_safely_rejected(
     response: httpx.Response,
     message: str,
 ) -> None:
-    with make_client(
-        base_url="https://example.com",
-        transport=httpx.MockTransport(lambda request: response),
-    ) as client:
-        with pytest.raises(SemantixResponseError, match=message):
-            client.query("question")
+    with (
+        make_client(
+            base_url="https://example.com",
+            transport=httpx.MockTransport(lambda request: response),
+        ) as client,
+        pytest.raises(SemantixResponseError, match=message),
+    ):
+        client.query("question")
 
 
 def test_encoded_success_is_rejected_before_body_iteration() -> None:
@@ -281,12 +285,14 @@ def test_encoded_success_is_rejected_before_body_iteration() -> None:
         },
         stream=stream,
     )
-    with make_client(
-        base_url="https://example.com",
-        transport=httpx.MockTransport(lambda request: response),
-    ) as client:
-        with pytest.raises(SemantixResponseError, match="content encoding"):
-            client.query("question")
+    with (
+        make_client(
+            base_url="https://example.com",
+            transport=httpx.MockTransport(lambda request: response),
+        ) as client,
+        pytest.raises(SemantixResponseError, match="content encoding"),
+    ):
+        client.query("question")
     assert not stream.iterated
 
 
@@ -314,12 +320,14 @@ def test_http_errors_are_typed(
             headers={"Retry-After": "12"},
         )
 
-    with make_client(
-        base_url="https://example.com",
-        transport=httpx.MockTransport(handler),
-    ) as client:
-        with pytest.raises(exception_type) as caught:
-            client.query("question")
+    with (
+        make_client(
+            base_url="https://example.com",
+            transport=httpx.MockTransport(handler),
+        ) as client,
+        pytest.raises(exception_type) as caught,
+    ):
+        client.query("question")
 
     assert caught.value.status_code == status
     assert caught.value.error_code == "safe_code"
@@ -328,14 +336,16 @@ def test_http_errors_are_typed(
 
 
 def test_rate_limit_without_retry_after_has_none() -> None:
-    with make_client(
-        base_url="https://example.com",
-        transport=httpx.MockTransport(
-            lambda request: httpx.Response(429, json={"error": "rate_limited"})
-        ),
-    ) as client:
-        with pytest.raises(SemantixRateLimitError) as caught:
-            client.query("question")
+    with (
+        make_client(
+            base_url="https://example.com",
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(429, json={"error": "rate_limited"})
+            ),
+        ) as client,
+        pytest.raises(SemantixRateLimitError) as caught,
+    ):
+        client.query("question")
     assert caught.value.retry_after_seconds is None
 
 
@@ -363,12 +373,14 @@ def test_encoded_http_error_preserves_status_type_without_reading_body(
         },
         stream=stream,
     )
-    with make_client(
-        base_url="https://example.com",
-        transport=httpx.MockTransport(lambda request: response),
-    ) as client:
-        with pytest.raises(exception_type) as caught:
-            client.query("question")
+    with (
+        make_client(
+            base_url="https://example.com",
+            transport=httpx.MockTransport(lambda request: response),
+        ) as client,
+        pytest.raises(exception_type) as caught,
+    ):
+        client.query("question")
     assert caught.value.status_code == status
     assert caught.value.error_code == "http_error"
     assert not stream.iterated
@@ -376,52 +388,58 @@ def test_encoded_http_error_preserves_status_type_without_reading_body(
 
 def test_non_json_error_body_is_not_exposed() -> None:
     secret_body = "<html>private upstream details</html>"
-    with make_client(
-        base_url="https://example.com",
-        transport=httpx.MockTransport(
-            lambda request: httpx.Response(
-                502,
-                text=secret_body,
-                headers={"Content-Type": "text/html"},
-            )
-        ),
-    ) as client:
-        with pytest.raises(SemantixServerError) as caught:
-            client.query("question")
+    with (
+        make_client(
+            base_url="https://example.com",
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    502,
+                    text=secret_body,
+                    headers={"Content-Type": "text/html"},
+                )
+            ),
+        ) as client,
+        pytest.raises(SemantixServerError) as caught,
+    ):
+        client.query("question")
     assert secret_body not in str(caught.value)
 
 
 def test_malformed_json_error_body_preserves_status_category() -> None:
-    with make_client(
-        base_url="https://example.com",
-        transport=httpx.MockTransport(
-            lambda request: httpx.Response(
-                503,
-                content=b"not-json",
-                headers={"Content-Type": "application/json"},
-            )
-        ),
-    ) as client:
-        with pytest.raises(SemantixServerError) as caught:
-            client.query("question")
+    with (
+        make_client(
+            base_url="https://example.com",
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    503,
+                    content=b"not-json",
+                    headers={"Content-Type": "application/json"},
+                )
+            ),
+        ) as client,
+        pytest.raises(SemantixServerError) as caught,
+    ):
+        client.query("question")
     assert caught.value.status_code == 503
     assert caught.value.error_code == "http_error"
 
 
 def test_token_is_redacted_from_server_error() -> None:
     token = "super-secret-token"
-    with make_client(
-        base_url="https://example.com",
-        token=token,
-        transport=httpx.MockTransport(
-            lambda request: httpx.Response(
-                500,
-                json={"error": "internal_error", "detail": f"Leaked {token}"},
-            )
-        ),
-    ) as client:
-        with pytest.raises(SemantixServerError) as caught:
-            client.query("question")
+    with (
+        make_client(
+            base_url="https://example.com",
+            token=token,
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    500,
+                    json={"error": "internal_error", "detail": f"Leaked {token}"},
+                )
+            ),
+        ) as client,
+        pytest.raises(SemantixServerError) as caught,
+    ):
+        client.query("question")
     assert token not in str(caught.value)
     assert caught.value.detail == "Leaked [redacted]"
 
@@ -444,13 +462,15 @@ def test_transport_failures_are_safe_and_not_retried(
         calls += 1
         raise error
 
-    with make_client(
-        base_url="https://example.com",
-        token="secret-token",
-        transport=httpx.MockTransport(handler),
-    ) as client:
-        with pytest.raises(exception_type) as caught:
-            client.query("question")
+    with (
+        make_client(
+            base_url="https://example.com",
+            token="secret-token",
+            transport=httpx.MockTransport(handler),
+        ) as client,
+        pytest.raises(exception_type) as caught,
+    ):
+        client.query("question")
     assert calls == 1
     assert "secret" not in str(caught.value)
 
@@ -465,12 +485,14 @@ def test_server_failure_is_not_retried() -> None:
             503, json={"error": "service_unavailable", "detail": None}
         )
 
-    with make_client(
-        base_url="https://example.com",
-        transport=httpx.MockTransport(handler),
-    ) as client:
-        with pytest.raises(SemantixServerError):
-            client.query("question")
+    with (
+        make_client(
+            base_url="https://example.com",
+            transport=httpx.MockTransport(handler),
+        ) as client,
+        pytest.raises(SemantixServerError),
+    ):
+        client.query("question")
     assert calls == 1
 
 

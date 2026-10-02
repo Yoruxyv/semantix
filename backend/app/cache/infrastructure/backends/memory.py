@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import time
 from collections import OrderedDict
 from collections.abc import Sequence
@@ -116,10 +117,8 @@ class InMemoryCacheBackend:
                 candidate = await asyncio.shield(worker)
             except asyncio.CancelledError:
                 # Thread cancellation is not cooperative; retain the bounded slot.
-                try:
+                with contextlib.suppress(Exception):
                     await worker
-                except Exception:
-                    pass
                 raise
 
             async with self._lock:

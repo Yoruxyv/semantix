@@ -29,21 +29,39 @@ K6_IMAGE = (
 )
 
 
-def command(*args: str, env: Mapping[str, str] | None) -> str:
-    result = subprocess.run(
-        args, cwd=ROOT, env=env, capture_output=True, text=True, check=False
+def command(
+    *args: str,
+    env: Mapping[str, str] | None,
+    stdin_text: str | None = None,
+) -> str:
+    result = subprocess.run(  # noqa: S603 - internally constructed argv
+        args,
+        cwd=ROOT,
+        env=env,
+        input=stdin_text,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if result.returncode:
         raise RuntimeError(f"{' '.join(args[:4])}: {result.stderr[-1500:]}")
     return result.stdout
 
 
-def compose(env: dict[str, str], *args: str) -> str:
-    return command("docker", "compose", "-f", "docker-compose.prod.yml", *args, env=env)
+def compose(env: dict[str, str], *args: str, stdin_text: str | None = None) -> str:
+    return command(
+        "docker",
+        "compose",
+        "-f",
+        "docker-compose.prod.yml",
+        *args,
+        env=env,
+        stdin_text=stdin_text,
+    )
 
 
 def api(
-    env: dict[str, str],
+    _env: dict[str, str],
     path: str,
     *,
     token: str = "",
@@ -58,7 +76,7 @@ def api(
         f"http://127.0.0.1:{PORT}{path}", data=data, headers=headers, method=method
     )
     try:
-        with urllib.request.urlopen(request, timeout=5) as response:
+        with urllib.request.urlopen(request, timeout=5) as response:  # noqa: S310 - fixed localhost HTTP endpoint
             return response.status, json.load(response)
     except urllib.error.HTTPError as error:
         return error.code, json.load(error)
@@ -137,7 +155,8 @@ def snapshot(env: dict[str, str], services: list[str], admin: str) -> dict:
     sql = (
         "SELECT count(*),count(*) FILTER (WHERE state='active'),"
         "count(*) FILTER (WHERE wait_event_type='Lock') "
-        f"FROM pg_stat_activity WHERE usename='{role}' AND datname='{database}'"
+        "FROM pg_stat_activity "
+        "WHERE usename=:'runtime_user' AND datname=:'database';\n"
     )
     sample["db"] = compose(
         env,
@@ -149,8 +168,16 @@ def snapshot(env: dict[str, str], services: list[str], admin: str) -> dict:
         migrator,
         "-d",
         database,
-        "-Atc",
-        sql,
+        "-v",
+        f"runtime_user={role}",
+        "-v",
+        f"database={database}",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-At",
+        "-f",
+        "-",
+        stdin_text=sql,
     ).strip()
     return sample
 
@@ -291,7 +318,7 @@ def run_k6(
         warm_args = args.copy()
         warm_args[warm_args.index("--summary-export") + 1] = "/results/warmup.json"
         with (output / "warmup.log").open("w", encoding="utf-8") as warm_log:
-            warm_result = subprocess.run(
+            warm_result = subprocess.run(  # noqa: S603 - fixed k6 argv
                 warm_args,
                 cwd=ROOT,
                 env=k6_env | {"DURATION": stabilize},
@@ -307,7 +334,7 @@ def run_k6(
         (output / "k6.log").open("w", encoding="utf-8") as log,
         (output / "telemetry.jsonl").open("w", encoding="utf-8") as telemetry,
     ):
-        process = subprocess.Popen(
+        process = subprocess.Popen(  # noqa: S603 - fixed k6 argv
             args, cwd=ROOT, env=k6_env, stdout=log, stderr=subprocess.STDOUT
         )
         while process.poll() is None:
@@ -335,8 +362,10 @@ def run_k6(
         else {}
     )
     metrics = summary.get("metrics", {})
+
     def value(name: str, key: str = "count") -> int | float:
         return metrics.get(name, {}).get(key, 0)
+
     probes = [
         json.loads(line)
         for line in (output / "telemetry.jsonl")
@@ -363,9 +392,11 @@ def run_k6(
         "\n".join(
             gateway_errors
             if len(gateway_errors) <= 200
-            else gateway_errors[:100]
-            + ["... omitted middle lines ..."]
-            + gateway_errors[-100:]
+            else [
+                *gateway_errors[:100],
+                "... omitted middle lines ...",
+                *gateway_errors[-100:],
+            ]
         )
         + "\n",
         encoding="utf-8",
@@ -385,7 +416,7 @@ def run_k6(
             "\n".join(
                 related
                 if len(related) <= 200
-                else related[:100] + ["... omitted middle lines ..."] + related[-100:]
+                else [*related[:100], "... omitted middle lines ...", *related[-100:]]
             )
             + "\n",
             encoding="utf-8",

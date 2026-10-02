@@ -12,6 +12,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from capacity_runner import PORT, ROOT, compose, direct, environment
+
 from semantix_client import (
     SemantixClient,
     SemantixRateLimitError,
@@ -69,7 +70,7 @@ def main() -> None:
                 "SEMANTIX_INTEGRATION_URL": base,
                 "SEMANTIX_INTEGRATION_TOKEN": sdk_token,
             }
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603 - fixed SDK pytest command
                 [
                     str(ROOT / "sdk/.venv/Scripts/python.exe"),
                     "-m",

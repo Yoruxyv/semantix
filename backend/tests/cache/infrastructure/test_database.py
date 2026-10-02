@@ -40,7 +40,7 @@ def test_memory_cache_capacity_is_bounded_for_process_liveness() -> None:
     for unsafe_size in (MAX_MEMORY_CACHE_SIZE + 1, 50_000, 100_000):
         with pytest.raises(
             ValidationError,
-            match="MAX_CACHE_SIZE.*CACHE_BACKEND=memory.*pgvector",
+            match=r"MAX_CACHE_SIZE.*CACHE_BACKEND=memory.*pgvector",
         ):
             Settings(
                 cache_backend="memory",
@@ -259,7 +259,7 @@ async def test_database_pool_uses_independent_timeouts(
         dsn: str,
         min_size: int,
         max_size: int,
-        timeout: float,
+        timeout: float,  # noqa: ASYNC109 - mirrors asyncpg.create_pool
         command_timeout: float,
     ) -> Pool:
         configured.update(
