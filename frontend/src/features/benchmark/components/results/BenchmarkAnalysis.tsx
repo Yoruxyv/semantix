@@ -1,5 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
-import type { JSX } from 'react';
+import { useMemo, useRef, useState, type JSX } from 'react';
 
 import { Alert, Button } from '@/shared/components/ui';
 import type {

@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import type { ReactNode, JSX } from 'react';
+import { useState, type JSX, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router';
 
@@ -205,16 +204,15 @@ export function CacheEntryCard({
                   </Alert>
                 )}
 
-                {detailQuery.data !== undefined &&
-                  detailQuery.data.response === null && (
-                    <Alert
-                      className="border-l border-(--coral) pl-3 text-xs text-(--coral-text)"
-                      role="alert"
-                      tone="error"
-                    >
-                      The complete response is unavailable from this backend version.
-                    </Alert>
-                  )}
+                {detailQuery.data?.response === null && (
+                  <Alert
+                    className="border-l border-(--coral) pl-3 text-xs text-(--coral-text)"
+                    role="alert"
+                    tone="error"
+                  >
+                    The complete response is unavailable from this backend version.
+                  </Alert>
+                )}
 
                 {detailQuery.data?.response !== null &&
                   detailQuery.data?.response !== undefined && (

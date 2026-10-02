@@ -132,7 +132,7 @@ export function useCacheInspector({
 
   function refresh(): void {
     if (!entriesQuery.isFetching) {
-      entriesQuery.refetch({ cancelRefetch: false });
+      void entriesQuery.refetch({ cancelRefetch: false });
     }
   }
 

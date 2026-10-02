@@ -251,7 +251,7 @@ export function decodeBenchmarkReproducibilityValue(
     throw new Error('Invalid benchmark reproducibility metadata');
   }
 
-  const thresholds = value.evaluation_thresholds as number[];
+  const thresholds = value.evaluation_thresholds;
   if (
     (value.dataset_source === 'builtin' && value.dataset_schema_version !== null) ||
     ((value.dataset_source === 'inline' || value.dataset_source === 'persisted') &&

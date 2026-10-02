@@ -61,6 +61,11 @@ export default defineConfig([
 
     rules: {
       ...js.configs.recommended.rules,
+
+      'no-duplicate-imports': 'error',
+      'no-nested-ternary': 'error',
+      'no-void': 'error',
+      'prefer-object-has-own': 'error',
     },
   },
 
@@ -112,6 +117,15 @@ export default defineConfig([
       ...typescriptEslint.configs.recommended.rules,
       ...sonarjs.configs.recommended.rules,
 
+      'no-duplicate-imports': [
+        'error',
+        {
+          allowSeparateTypeImports: false,
+        },
+      ],
+      'no-nested-ternary': 'error',
+      'prefer-object-has-own': 'error',
+
       /*
        * Require the configured @/ alias when an import traverses two or more
        * parent directories.
@@ -146,6 +160,31 @@ export default defineConfig([
        * Prevent explicit any values from bypassing type safety.
        */
       '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'error',
+      '@typescript-eslint/prefer-optional-chain': 'error',
+
+      /*
+       * Require Promise results to be awaited, returned, or explicitly handled.
+       * `void promise` is intentionally not accepted as supervision.
+       */
+      '@typescript-eslint/no-floating-promises': [
+        'error',
+        {
+          ignoreVoid: true,
+          ignoreIIFE: false,
+        },
+      ],
+
+      /*
+       * Keep type-only imports explicit and consolidate them with value imports.
+       */
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        {
+          prefer: 'type-imports',
+          fixStyle: 'inline-type-imports',
+        },
+      ],
 
       /*
        * Report unused variables while permitting intentionally unused names
@@ -182,11 +221,6 @@ export default defineConfig([
       'sonarjs/no-identical-expressions': 'warn',
 
       /*
-       * Prefer readable control flow over nested ternary expressions.
-       */
-      'sonarjs/no-nested-conditional': 'warn',
-
-      /*
        * Prevent mutation of React component props.
        */
       'sonarjs/prefer-read-only-props': 'warn',
@@ -201,11 +235,6 @@ export default defineConfig([
        * Prefer RegExp.exec() when retrieving regular-expression matches.
        */
       'sonarjs/prefer-regexp-exec': 'warn',
-
-      /*
-       * Prevent the void operator from silently discarding expression values.
-       */
-      'sonarjs/void-use': 'error',
     },
   },
 
@@ -335,7 +364,7 @@ export default defineConfig([
        * becomes:
        *   text-(--text)
        */
-      'better-tailwindcss/enforce-canonical-classes': 'warn',
+      'better-tailwindcss/enforce-canonical-classes': 'error',
     },
   },
 

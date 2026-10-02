@@ -448,7 +448,13 @@ for (const filePath of files) {
   }
 }
 
-const mode = shouldWrite ? 'updated' : shouldCheck ? 'check' : 'preview';
+let mode = 'preview';
+
+if (shouldWrite) {
+  mode = 'updated';
+} else if (shouldCheck) {
+  mode = 'check';
+}
 
 console.log(`\nImport normalization ${mode} complete.`);
 console.log(`Files scanned   : ${files.length}`);

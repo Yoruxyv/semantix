@@ -1,5 +1,12 @@
-import type { MockedFunction } from 'vitest';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockedFunction,
+  vi,
+} from 'vitest';
 
 import { compareEvaluationRuns } from '@/features/benchmark/api/comparisonApi';
 import type { EvaluationRunHistoryDetail } from '@/features/benchmark/types';

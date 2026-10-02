@@ -396,12 +396,10 @@ describe('application routing', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Back to Cache' }));
 
     expect(await screen.findByDisplayValue('semantic')).toBeTruthy();
-    expect((screen.getByLabelText('Namespace') as HTMLInputElement).value).toBe(
-      'default',
+    expect(screen.getByLabelText<HTMLInputElement>('Namespace').value).toBe('default');
+    expect(screen.getByLabelText<HTMLSelectElement>('Sort cache entries').value).toBe(
+      'oldest',
     );
-    expect(
-      (screen.getByLabelText('Sort cache entries') as HTMLSelectElement).value,
-    ).toBe('oldest');
   });
 
   it('renders a useful not-found route', async () => {
@@ -585,7 +583,7 @@ describe('application routing', () => {
       </MemoryRouter>,
     );
 
-    expect((screen.getByLabelText('Query text') as HTMLTextAreaElement).value).toBe('');
+    expect(screen.getByLabelText<HTMLTextAreaElement>('Query text').value).toBe('');
     expect(screen.queryByText('First principal content')).toBeNull();
     expect(screen.getByText(/namespace tenant-two/i)).toBeTruthy();
   });
@@ -843,9 +841,9 @@ describe('application routing', () => {
 
     expect(await screen.findByText('01 records')).toBeTruthy();
     expect(screen.getAllByText(cacheEntry.prompt).length).toBeGreaterThan(0);
-    expect(
-      (screen.getByLabelText('Projection threshold') as HTMLInputElement).value,
-    ).toBe('0.8');
+    expect(screen.getByLabelText<HTMLInputElement>('Projection threshold').value).toBe(
+      '0.8',
+    );
     expect(screen.getByText('Backend applied 0.90')).toBeTruthy();
   });
 
@@ -871,7 +869,7 @@ describe('application routing', () => {
     );
     await waitFor(() =>
       expect(
-        (screen.getByLabelText('Projection threshold') as HTMLInputElement).value,
+        screen.getByLabelText<HTMLInputElement>('Projection threshold').value,
       ).toBe('0.9'),
     );
 
