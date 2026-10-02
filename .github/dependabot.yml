@@ -50,9 +50,9 @@ updates:
           - version-update:semver-patch
           - version-update:semver-minor
 
-  # Container dependencies referenced from repository-root Docker/Compose
+  # Container dependencies referenced from repository-root Docker Compose
   # configuration.
-  - package-ecosystem: docker
+  - package-ecosystem: docker-compose
     directory: /
     patterns:
       - "*"
