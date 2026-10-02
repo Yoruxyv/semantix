@@ -200,10 +200,10 @@ describe('AuthPanel', () => {
 
     render(<AuthPanel />);
 
-    const input = screen.getByLabelText('Access token') as HTMLInputElement;
-    const button = screen.getByRole('button', {
+    const input = screen.getByLabelText<HTMLInputElement>('Access token');
+    const button = screen.getByRole<HTMLButtonElement>('button', {
       name: 'Authenticate',
-    }) as HTMLButtonElement;
+    });
     expect(input.disabled).toBe(true);
     expect(button.disabled).toBe(true);
     expect(screen.getByText('Try again in 00:30.')).toBeTruthy();
@@ -240,19 +240,17 @@ describe('AuthPanel', () => {
     });
     render(<AuthPanel />);
 
-    const tokenInput = screen.getByLabelText('Access token');
-    expect((tokenInput as HTMLInputElement).type).toBe('password');
+    const tokenInput = screen.getByLabelText<HTMLInputElement>('Access token');
+    expect(tokenInput.type).toBe('password');
     fireEvent.change(tokenInput, {
       target: { value: 'test-token' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Authenticate' }));
 
     expect(
-      (
-        screen.getByRole('button', {
-          name: 'Verifying…',
-        }) as HTMLButtonElement
-      ).disabled,
+      screen.getByRole<HTMLButtonElement>('button', {
+        name: 'Verifying…',
+      }).disabled,
     ).toBe(true);
 
     await act(async () => {

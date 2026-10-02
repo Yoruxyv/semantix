@@ -1,8 +1,7 @@
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
-import type { Components } from 'react-markdown';
 import 'katex/dist/katex.min.css';
 
 import { prepareMarkdown } from '@/shared/lib/markdown';

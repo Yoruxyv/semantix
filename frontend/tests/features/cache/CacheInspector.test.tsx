@@ -268,9 +268,9 @@ describe('CacheInspector', () => {
         expect.any(AbortSignal),
       );
     });
-    expect(
-      (screen.getByLabelText('Search cached prompts') as HTMLInputElement).value,
-    ).toBe('semantic');
+    expect(screen.getByLabelText<HTMLInputElement>('Search cached prompts').value).toBe(
+      'semantic',
+    );
     expect(
       (await screen.findByRole('link', { name: 'View entry details' })).getAttribute(
         'href',

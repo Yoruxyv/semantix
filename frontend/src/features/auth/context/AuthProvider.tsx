@@ -1,14 +1,19 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
-import type { ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type JSX,
+  type ReactNode,
+} from 'react';
 
 import { clearAuthToken, getAuthToken, setAuthToken } from '@/shared/api/authToken';
 import { isProtectedQueryKey } from '@/shared/query/queryKeys';
 
 import { getAuthConfig, getAuthSession } from '../api/authApi';
 import type { AuthSession } from '../types';
-import { AuthContext } from './AuthContext';
-import type { AuthContextValue, AuthStatus } from './AuthContext';
+import { AuthContext, type AuthContextValue, type AuthStatus } from './AuthContext';
 
 const DEFAULT_LOCKOUT_SECONDS = 30;
 const LOCKOUT_ERROR = 'Too many failed authentication attempts.';

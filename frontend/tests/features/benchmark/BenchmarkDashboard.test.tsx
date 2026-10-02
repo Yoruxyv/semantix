@@ -598,9 +598,9 @@ describe('BenchmarkDashboard', () => {
       target: { value: 'tenant-b' },
     });
     expect(
-      (await screen.findByRole('button', {
+      await screen.findByRole<HTMLButtonElement>('button', {
         name: 'Save validated dataset',
-      })) as HTMLButtonElement,
+      }),
     ).toHaveProperty('disabled', false);
   });
 

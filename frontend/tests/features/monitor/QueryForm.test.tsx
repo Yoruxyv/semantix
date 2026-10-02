@@ -75,8 +75,7 @@ describe('QueryForm', () => {
 
     await waitFor(() =>
       expect(
-        (screen.getByRole('button', { name: 'Run query' }) as HTMLButtonElement)
-          .disabled,
+        screen.getByRole<HTMLButtonElement>('button', { name: 'Run query' }).disabled,
       ).toBe(true),
     );
     fireEvent.change(screen.getByLabelText('Authorized namespace'), {
@@ -105,7 +104,7 @@ describe('QueryForm', () => {
 
     fireEvent.change(namespace, { target: { value: 'not allowed' } });
     expect(
-      (screen.getByRole('button', { name: 'Run query' }) as HTMLButtonElement).disabled,
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Run query' }).disabled,
     ).toBe(true);
     expect(screen.getByText(/namespace not selected/i)).toBeTruthy();
   });

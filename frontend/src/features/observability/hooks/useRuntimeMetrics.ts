@@ -48,7 +48,7 @@ export function useRuntimeMetrics(): RuntimeMetricsController {
 
   const refresh = useCallback((): void => {
     if (!query.isFetching) {
-      query.refetch({ cancelRefetch: false });
+      void query.refetch({ cancelRefetch: false });
     }
   }, [query]);
 
