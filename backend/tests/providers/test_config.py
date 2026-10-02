@@ -235,7 +235,7 @@ def test_evaluation_import_limits_are_bounded_and_configurable() -> None:
 
 @pytest.mark.parametrize("port", ["not-a-port", "-1", "65536"])
 def test_database_url_rejects_invalid_ports(port: str) -> None:
-    with pytest.raises(ValidationError, match="DATABASE_URL.*port"):
+    with pytest.raises(ValidationError, match=r"DATABASE_URL.*port"):
         settings(
             cache_backend="pgvector",
             database_url=(f"postgresql://user:secret@database:{port}/semantix"),

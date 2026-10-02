@@ -48,7 +48,7 @@ class ProviderUrlTestProvider:
         )
         response = payload.get("response") if isinstance(payload, dict) else None
         if not isinstance(response, str):
-            raise ValueError("provider returned an invalid response")
+            raise TypeError("provider returned an invalid response")
         return response
 
 
