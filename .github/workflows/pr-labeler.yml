@@ -145,3 +145,149 @@ jobs:
 
           echo "PR title type: $title_type"
           echo "Applied label: $target_label"
+      - name: Apply area and security labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current_labels="$(
+            gh api \
+              "repos/$GH_REPO/issues/$PR_NUMBER/labels" \
+              --jq '.[].name'
+          )"
+
+          changed_files="$(
+            gh api \
+              --paginate \
+              "repos/$GH_REPO/pulls/$PR_NUMBER/files" \
+              --jq '.[].filename'
+          )"
+
+          has_label() {
+            grep -Fxq "$1" <<< "$current_labels"
+          }
+
+          ensure_label() {
+            local label="$1"
+            local color="$2"
+            local description="$3"
+
+            gh label create "$label" \
+              --repo "$GH_REPO" \
+              --color "$color" \
+              --description "$description" \
+              2>/dev/null || true
+          }
+
+          add_label() {
+            local label="$1"
+            local color="$2"
+            local description="$3"
+
+            ensure_label "$label" "$color" "$description"
+
+            if ! has_label "$label"; then
+              gh api \
+                --method POST \
+                "repos/$GH_REPO/issues/$PR_NUMBER/labels" \
+                -f "labels[]=$label"
+
+              current_labels+=$'\n'"$label"
+            fi
+          }
+
+          remove_label() {
+            local label="$1"
+
+            if has_label "$label"; then
+              gh api \
+                --method DELETE \
+                "repos/$GH_REPO/issues/$PR_NUMBER/labels/$label"
+
+              current_labels="$(
+                grep -Fxv "$label" <<< "$current_labels" || true
+              )"
+            fi
+          }
+
+          # Area labels are fully managed from the PR's current changed files.
+          managed_area_labels=(
+            "area:backend"
+            "area:sdk"
+            "area:frontend"
+            "area:ops"
+            "area:ci"
+            "area:docs"
+          )
+
+          for label in "${managed_area_labels[@]}"; do
+            remove_label "$label"
+          done
+
+          if grep -Eq '^backend/' <<< "$changed_files"; then
+            add_label \
+              "area:backend" \
+              "c2e0c6" \
+              "Changes affecting the backend"
+          fi
+
+          if grep -Eq '^sdk/' <<< "$changed_files"; then
+            add_label \
+              "area:sdk" \
+              "c2e0c6" \
+              "Changes affecting the public SDK"
+          fi
+
+          if grep -Eq '^frontend/' <<< "$changed_files"; then
+            add_label \
+              "area:frontend" \
+              "c2e0c6" \
+              "Changes affecting the frontend"
+          fi
+
+          if grep -Eq '^ops/' <<< "$changed_files"; then
+            add_label \
+              "area:ops" \
+              "c2e0c6" \
+              "Changes affecting operational tooling"
+          fi
+
+          if grep -Eq '^\.github/' <<< "$changed_files"; then
+            add_label \
+              "area:ci" \
+              "c2e0c6" \
+              "Changes affecting GitHub or CI automation"
+          fi
+
+          if grep -Eq '^docs/' <<< "$changed_files"; then
+            add_label \
+              "area:docs" \
+              "c2e0c6" \
+              "Changes affecting documentation"
+          fi
+
+          # Dependabot already manages dependency/ecosystem labels.
+          # Add "security" only when the PR contains a strong advisory signal.
+          if [[ "$PR_AUTHOR" == "dependabot[bot]" ]] &&
+             printf '%s\n' "$PR_BODY" |
+               grep -Eiq \
+                 'GHSA-[[:alnum:]-]+|CVE-[0-9]{4}-[0-9]{4,}|Fixed the following security issues'; then
+
+            add_label \
+              "security" \
+              "b60205" \
+              "Security-related fixes, hardening, or dependency updates"
+
+            echo "Detected security advisory content in Dependabot PR."
+          elif [[ "$PR_AUTHOR" == "dependabot[bot]" ]]; then
+            remove_label "security"
+          fi
+
+          echo "Changed files:"
+          printf '%s\n' "$changed_files"
