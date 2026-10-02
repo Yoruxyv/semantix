@@ -12,9 +12,11 @@ BASE = f"http://{HOST}:{PORT}"
 
 
 def get(path: str, *, headers: dict[str, str] | None = None) -> tuple[int, dict]:
-    request = urllib.request.Request(BASE + path, headers=headers or {})
+    request = urllib.request.Request(  # noqa: S310 - fixed localhost HTTP base
+        BASE + path, headers=headers or {}
+    )
     try:
-        with urllib.request.urlopen(request, timeout=10) as response:
+        with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310 - fixed localhost HTTP endpoint
             return response.status, dict(response.headers)
     except urllib.error.HTTPError as error:
         return error.code, dict(error.headers)

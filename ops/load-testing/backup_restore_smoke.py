@@ -10,6 +10,8 @@ from uuid import uuid4
 
 from capacity_runner import ROOT, api, command, compose, direct, environment
 
+CONTAINER_DUMP_PATH = "/tmp/semantix.dump"  # noqa: S108 - disposable container path
+
 
 def wait_ready(env: dict[str, str]) -> None:
     for _ in range(60):
@@ -122,12 +124,12 @@ def main() -> None:
                 "--no-owner",
                 "--no-acl",
                 "--file",
-                "/tmp/semantix.dump",
+                CONTAINER_DUMP_PATH,
             )
             command(
                 "docker",
                 "cp",
-                f"{source_container}:/tmp/semantix.dump",
+                f"{source_container}:{CONTAINER_DUMP_PATH}",
                 str(dump),
                 env=source_env,
             )
@@ -144,7 +146,7 @@ def main() -> None:
                 "docker",
                 "cp",
                 str(dump),
-                f"{target_container}:/tmp/semantix.dump",
+                f"{target_container}:{CONTAINER_DUMP_PATH}",
                 env=restored_env,
             )
             compose(
@@ -164,7 +166,7 @@ def main() -> None:
                 "--exit-on-error",
                 "--no-owner",
                 "--no-acl",
-                "/tmp/semantix.dump",
+                CONTAINER_DUMP_PATH,
             )
             compose(
                 restored_env, "up", "--build", "-d", "--wait", "--wait-timeout", "240"
