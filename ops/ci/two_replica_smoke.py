@@ -25,17 +25,17 @@ QUERY_PATH = "/api/v1/query"
 THRESHOLD_ABS_TOLERANCE = 1e-12
 
 
-def run(*command: str) -> str:
+def run(*command: str, stdin_text: str | None = None) -> str:
     result = subprocess.run(  # noqa: S603 - internally constructed argv
-        command, capture_output=True, text=True, check=False
+        command, input=stdin_text, capture_output=True, text=True, check=False
     )
     if result.returncode:
         raise AssertionError(f"Command failed: {result.stderr[-1200:]}")
     return result.stdout
 
 
-def compose(*arguments: str) -> str:
-    return run(*COMPOSE, *arguments)
+def compose(*arguments: str, stdin_text: str | None = None) -> str:
+    return run(*COMPOSE, *arguments, stdin_text=stdin_text)
 
 
 def request(
@@ -172,7 +172,7 @@ def db_connections() -> int:
     database = os.environ["POSTGRES_DB"]
     sql = (
         "SELECT count(*) FROM pg_stat_activity "
-        "WHERE usename = :'runtime_user' AND datname = :'database'"
+        "WHERE usename = :'runtime_user' AND datname = :'database';\n"
     )
     return int(
         compose(
@@ -188,8 +188,12 @@ def db_connections() -> int:
             f"runtime_user={role}",
             "-v",
             f"database={database}",
-            "-Atc",
-            sql,
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-At",
+            "-f",
+            "-",
+            stdin_text=sql,
         ).strip()
     )
 

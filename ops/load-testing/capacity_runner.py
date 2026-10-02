@@ -29,17 +29,35 @@ K6_IMAGE = (
 )
 
 
-def command(*args: str, env: Mapping[str, str] | None) -> str:
+def command(
+    *args: str,
+    env: Mapping[str, str] | None,
+    stdin_text: str | None = None,
+) -> str:
     result = subprocess.run(  # noqa: S603 - internally constructed argv
-        args, cwd=ROOT, env=env, capture_output=True, text=True, check=False
+        args,
+        cwd=ROOT,
+        env=env,
+        input=stdin_text,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if result.returncode:
         raise RuntimeError(f"{' '.join(args[:4])}: {result.stderr[-1500:]}")
     return result.stdout
 
 
-def compose(env: dict[str, str], *args: str) -> str:
-    return command("docker", "compose", "-f", "docker-compose.prod.yml", *args, env=env)
+def compose(env: dict[str, str], *args: str, stdin_text: str | None = None) -> str:
+    return command(
+        "docker",
+        "compose",
+        "-f",
+        "docker-compose.prod.yml",
+        *args,
+        env=env,
+        stdin_text=stdin_text,
+    )
 
 
 def api(
@@ -138,7 +156,7 @@ def snapshot(env: dict[str, str], services: list[str], admin: str) -> dict:
         "SELECT count(*),count(*) FILTER (WHERE state='active'),"
         "count(*) FILTER (WHERE wait_event_type='Lock') "
         "FROM pg_stat_activity "
-        "WHERE usename=:'runtime_user' AND datname=:'database'"
+        "WHERE usename=:'runtime_user' AND datname=:'database';\n"
     )
     sample["db"] = compose(
         env,
@@ -154,8 +172,12 @@ def snapshot(env: dict[str, str], services: list[str], admin: str) -> dict:
         f"runtime_user={role}",
         "-v",
         f"database={database}",
-        "-Atc",
-        sql,
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-At",
+        "-f",
+        "-",
+        stdin_text=sql,
     ).strip()
     return sample
 
