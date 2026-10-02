@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from asyncpg.pool import Pool
@@ -18,7 +18,7 @@ async def cache_backend_lifespan(
     embedding_space: str,
     events: CacheEventRecorder | None = None,
     pool: Pool | None = None,
-) -> AsyncIterator[CacheBackend]:
+) -> AsyncGenerator[CacheBackend, None]:
     if settings.cache_backend == "memory":
         yield InMemoryCacheBackend(
             settings.max_cache_size,

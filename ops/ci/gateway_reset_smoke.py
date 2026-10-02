@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
@@ -66,7 +66,7 @@ def wait_for(port: int, expected: set[str]) -> None:
             observed = {fetch(port, "/health")[1] for _ in range(12)}
             if observed == expected:
                 return
-        except (OSError, URLError):
+        except OSError:
             pass
         time.sleep(1)
     raise AssertionError(f"Gateway never routed to {expected}")

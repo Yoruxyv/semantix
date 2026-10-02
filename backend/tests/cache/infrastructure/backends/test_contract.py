@@ -1,7 +1,7 @@
 import asyncio
 import os
 import threading
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from uuid import uuid4
 
@@ -49,7 +49,7 @@ def backend_builder(
     async def build(
         max_size: int,
         ttl_seconds: float | None,
-    ) -> AsyncIterator[CacheBackend]:
+    ) -> AsyncGenerator[CacheBackend, None]:
         settings = Settings(
             cache_backend=backend_name,
             database_url=database_url,

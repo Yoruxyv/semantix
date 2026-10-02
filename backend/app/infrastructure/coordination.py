@@ -73,7 +73,7 @@ class PostgresCoordination:
                 )
                 """
                 )
-        except (OSError, TimeoutError, asyncpg.PostgresError, asyncpg.InterfaceError):
+        except (OSError, asyncpg.PostgresError, asyncpg.InterfaceError):
             logger.warning("Optional coordination expiry cleanup failed")
 
     async def allow_request(
@@ -91,7 +91,6 @@ class PostgresCoordination:
             return isinstance(hits, int) and hits <= amount
         except (
             OSError,
-            TimeoutError,
             asyncpg.PostgresError,
             asyncpg.InterfaceError,
         ) as error:
@@ -167,7 +166,6 @@ class PostgresCoordination:
             return retry_after
         except (
             OSError,
-            TimeoutError,
             asyncpg.PostgresError,
             asyncpg.InterfaceError,
         ) as error:
@@ -186,7 +184,6 @@ class PostgresCoordination:
                 )
         except (
             OSError,
-            TimeoutError,
             asyncpg.PostgresError,
             asyncpg.InterfaceError,
         ) as error:
@@ -203,7 +200,6 @@ class PostgresCoordination:
             return float(value)
         except (
             OSError,
-            TimeoutError,
             asyncpg.PostgresError,
             asyncpg.InterfaceError,
         ) as error:
@@ -224,7 +220,6 @@ class PostgresCoordination:
             return float(value)
         except (
             OSError,
-            TimeoutError,
             asyncpg.PostgresError,
             asyncpg.InterfaceError,
         ) as error:

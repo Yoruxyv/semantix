@@ -97,7 +97,7 @@ async def create_pool(
             timeout=connect_timeout,
             command_timeout=command_timeout,
         )
-    except (OSError, TimeoutError, asyncpg.PostgresError) as error:
+    except (OSError, asyncpg.PostgresError) as error:
         raise error_type(error_detail) from error
 
 
@@ -197,7 +197,7 @@ async def apply_migrations(
                 )
     except AppError:
         raise
-    except (OSError, TimeoutError, asyncpg.PostgresError) as error:
+    except (OSError, asyncpg.PostgresError) as error:
         raise error_type(f"Could not initialize the {label.lower()} schema") from error
 
 
@@ -226,5 +226,5 @@ async def grant_runtime_privileges(
                 await connection.execute(statement)
     except AppError:
         raise
-    except (OSError, TimeoutError, asyncpg.PostgresError) as error:
+    except (OSError, asyncpg.PostgresError) as error:
         raise error_type("Could not grant runtime database privileges") from error

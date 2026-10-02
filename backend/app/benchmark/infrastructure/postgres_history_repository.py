@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import cast
@@ -61,13 +61,13 @@ class PostgresEvaluationRunHistoryRepository:
         self._cleanup_batch_size = cleanup_batch_size
 
     @asynccontextmanager
-    async def _connection(self) -> AsyncIterator[Connection[Record]]:
+    async def _connection(self) -> AsyncGenerator[Connection[Record], None]:
         try:
             async with self._pool.acquire() as connection:
                 yield cast(Connection, connection)
         except AppError:
             raise
-        except (OSError, TimeoutError, asyncpg.PostgresError) as error:
+        except (OSError, asyncpg.PostgresError) as error:
             raise EvaluationRunHistoryStorageError(
                 "Persistent evaluation run history operation failed"
             ) from error

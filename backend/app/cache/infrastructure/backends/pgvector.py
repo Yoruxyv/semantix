@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import cast
@@ -82,13 +82,13 @@ class PgVectorCacheBackend:
         return self._ttl_seconds
 
     @asynccontextmanager
-    async def _connection(self) -> AsyncIterator[Connection]:
+    async def _connection(self) -> AsyncGenerator[Connection, None]:
         try:
             async with self._pool.acquire() as connection:
                 yield cast(Connection, connection)
         except CacheStorageError:
             raise
-        except (OSError, TimeoutError, asyncpg.PostgresError) as error:
+        except (OSError, asyncpg.PostgresError) as error:
             raise CacheStorageError("Persistent cache operation failed") from error
 
     async def _purge_expired(self, connection: Connection) -> None:
