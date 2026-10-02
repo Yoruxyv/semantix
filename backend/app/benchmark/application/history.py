@@ -76,7 +76,7 @@ class EvaluationRunHistoryRecorder:
                 threshold_evaluations=tuple(response.threshold_evaluations),
             )
             await self._persist(record)
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - retention must not fail the benchmark
             self._log_retention_failure(context, error)
             retention_state = "retention_failed"
         else:
@@ -118,5 +118,5 @@ class EvaluationRunHistoryRecorder:
                 safe_failure_detail=safe_failure_detail,
             )
             await self._persist(record)
-        except Exception as retention_error:
+        except Exception as retention_error:  # noqa: BLE001 - retention is best-effort
             self._log_retention_failure(context, retention_error)

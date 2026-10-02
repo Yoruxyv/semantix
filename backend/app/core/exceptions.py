@@ -95,7 +95,7 @@ class CoordinationStorageError(AppError):
     )
 
 
-class SharedRateLimitExceeded(AppError):
+class SharedRateLimitExceeded(AppError):  # noqa: N818 - established domain name
     status_code, error_code, public_detail = (
         429,
         "rate_limit_exceeded",
@@ -250,7 +250,7 @@ async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
-async def validation_error_handler(request: Request, exc: Exception) -> JSONResponse:
+async def validation_error_handler(_request: Request, exc: Exception) -> JSONResponse:
     error = cast(RequestValidationError, exc)
     locations = {".".join(str(part) for part in item["loc"]) for item in error.errors()}
     return _response(
@@ -258,14 +258,14 @@ async def validation_error_handler(request: Request, exc: Exception) -> JSONResp
     )
 
 
-async def rate_limit_error_handler(request: Request, exc: Exception) -> JSONResponse:
+async def rate_limit_error_handler(_request: Request, exc: Exception) -> JSONResponse:
     cast(RateLimitExceeded, exc)
     return _response(
         429, "rate_limit_exceeded", "Too many requests. Please try again later."
     )
 
 
-async def http_error_handler(request: Request, exc: Exception) -> JSONResponse:
+async def http_error_handler(_request: Request, exc: Exception) -> JSONResponse:
     error = cast(HTTPException, exc)
     return _response(
         error.status_code,
@@ -275,7 +275,10 @@ async def http_error_handler(request: Request, exc: Exception) -> JSONResponse:
 
 
 async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception(
-        "Unhandled error path=%s type=%s", request.url.path, type(exc).__name__
+    logger.error(
+        "Unhandled error path=%s type=%s",
+        request.url.path,
+        type(exc).__name__,
+        exc_info=(type(exc), exc, exc.__traceback__),
     )
     return _response(500, "internal_error", None)

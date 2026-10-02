@@ -119,20 +119,12 @@ EXTENDED_DATASET = _dataset(
     "extended",
     "Extended semantic safety set",
     "The quick set plus additional paraphrase, typo, negation, and different-intent checks.",
-    QUICK_DATASET.cases
-    + (
+    (
+        *QUICK_DATASET.cases,
         BenchmarkCase(
-            "music-paraphrase",
-            "paraphrase",
-            "Tell me about the band Yorushika.",
-            True,
+            "music-paraphrase", "paraphrase", "Tell me about the band Yorushika.", True
         ),
-        BenchmarkCase(
-            "music-typo",
-            "typo",
-            "Who are Yorushka?",
-            True,
-        ),
+        BenchmarkCase("music-typo", "typo", "Who are Yorushka?", True),
         BenchmarkCase(
             "music-negation",
             "negation",
