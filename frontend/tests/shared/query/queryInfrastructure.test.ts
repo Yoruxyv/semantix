@@ -76,7 +76,7 @@ describe('query infrastructure', () => {
     });
 
     await expect(
-      queryClient.fetchQuery({
+      queryClient.query({
         queryKey: ['deterministic-client-error'],
         queryFn: request,
       }),
