@@ -47,9 +47,11 @@ jobs:
           uv run --no-sync ruff check --config ../ruff.toml --output-format=github .
           uv run --no-sync ruff format --config ../ruff.toml --check .
       - name: Check typing
-        run: uv run --no-sync mypy src tests
+        run: uv run --no-sync mypy src tests examples
       - name: Test embedded behavior and coverage
         run: uv run --no-sync pytest --cov=semantix_cache
+      - name: Execute custom integration example
+        run: uv run --no-sync python examples/custom_integration.py
       - name: Build and inspect artifacts
         run: |
           uv run --no-sync python -m build
@@ -62,6 +64,11 @@ jobs:
           wheel_python="$RUNNER_TEMP/semantix-embedded-wheel/bin/python"
           "$wheel_python" -m pip install --disable-pip-version-check dist/*.whl
           "$wheel_python" tests/wheel_smoke.py
+          for extra in openai huggingface gemini ollama anthropic providers; do
+            "$wheel_python" -m pip install --disable-pip-version-check "dist/semantix_cache-0.1.0-py3-none-any.whl[$extra]"
+            "$wheel_python" -c "import sys; from semantix_cache import MemoryStore; import semantix_cache.adapters; assert 'httpx' not in sys.modules"
+            "$wheel_python" tests/providers_wheel_smoke.py
+          done
           "$wheel_python" -m pip install --disable-pip-version-check ../sdk
           "$wheel_python" -c "import sys; import semantix_client; assert 'semantix_cache' not in sys.modules; import semantix_cache; assert semantix_client.CachePolicy is not semantix_cache.CachePolicy"
 
