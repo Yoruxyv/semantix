@@ -53,7 +53,7 @@ def main() -> None:
         folder = Path(temporary)
         upstream = folder / "upstream.conf"
         upstream.write_text(
-            (ROOT / "frontend/upstream.prod.conf").read_text(encoding="utf-8"),
+            (ROOT / "apps/web/upstream.prod.conf").read_text(encoding="utf-8"),
             encoding="utf-8",
         )
         dump = folder / "semantix.dump"

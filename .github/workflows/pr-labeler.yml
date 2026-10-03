@@ -232,28 +232,28 @@ jobs:
             remove_label "$label"
           done
 
-          if grep -Eq '^backend/' <<< "$changed_files"; then
+          if grep -Eq '^apps/server/' <<< "$changed_files"; then
             add_label \
               "area:backend" \
               "0E8A16" \
               "Changes affecting the backend"
           fi
 
-          if grep -Eq '^sdk/' <<< "$changed_files"; then
+          if grep -Eq '^packages/client/' <<< "$changed_files"; then
             add_label \
               "area:sdk" \
               "8250DF" \
               "Changes affecting the public SDK"
           fi
 
-          if grep -Eq '^embedded/' <<< "$changed_files"; then
+          if grep -Eq '^packages/cache/' <<< "$changed_files"; then
             add_label \
               "area:embedded" \
               "008B8B" \
               "Changes affecting the embedded semantic cache"
           fi
 
-          if grep -Eq '^frontend/' <<< "$changed_files"; then
+          if grep -Eq '^apps/web/' <<< "$changed_files"; then
             add_label \
               "area:frontend" \
               "E99695" \

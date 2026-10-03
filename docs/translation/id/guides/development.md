@@ -9,7 +9,7 @@ Rentang interpreter yang didukung adalah Python 3.11 hingga 3.14. Backend image 
 Windows PowerShell:
 
 ```powershell
-cd backend
+cd apps/server
 uv sync --locked --extra dev
 .\.venv\Scripts\Activate.ps1
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -18,7 +18,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 macOS atau Linux:
 
 ```bash
-cd backend
+cd apps/server
 uv sync --locked --extra dev
 source .venv/bin/activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -26,19 +26,19 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Instal [uv](https://docs.astral.sh/uv/getting-started/installation/) sebelum menggunakan workflow backend lokal. `pyproject.toml` mendeklarasikan rentang versi yang didukung, sedangkan `uv.lock` mencatat resolusi lintas-platform yang tepat dan digunakan oleh CI serta backend image.
 
-Backend membaca `backend/.env`. Dengan `CACHE_BACKEND=pgvector`, database yang dapat dijangkau diperlukan sebelum startup aplikasi selesai. Memory dan mock provider merupakan konfigurasi development dengan dependency paling sedikit.
+Backend membaca `apps/server/.env`. Dengan `CACHE_BACKEND=pgvector`, database yang dapat dijangkau diperlukan sebelum startup aplikasi selesai. Memory dan mock provider merupakan konfigurasi development dengan dependency paling sedikit.
 
 ## Frontend
 
 Gunakan Node.js 24.0.0 atau yang lebih baru dalam release line Node 24. Ini sesuai dengan frontend image dan CI, serta memenuhi persyaratan runtime dari dependency frontend saat ini:
 
 ```bash
-cd frontend
+cd apps/web
 npm ci
 npm run dev
 ```
 
-Server Vite berjalan di http://localhost:5173. Konfigurasikan `VITE_API_BASE_URL=http://localhost:8000` di `frontend/.env`.
+Server Vite berjalan di http://localhost:5173. Konfigurasikan `VITE_API_BASE_URL=http://localhost:8000` di `apps/web/.env`.
 
 ## Laporan helper repository
 
@@ -81,7 +81,7 @@ Laporan dokumentasi secara sengaja mengecualikan test, package marker Python, pa
 Backend:
 
 ```bash
-cd backend
+cd apps/server
 uv run --locked pytest -m "not pgvector" --cov=app
 uv run --locked ruff check .
 uv run --locked ruff format --check .
@@ -91,7 +91,7 @@ uv run --locked mypy app tests scripts
 Frontend:
 
 ```bash
-cd frontend
+cd apps/web
 npm run lint
 npm run imports:check
 npm run test:coverage

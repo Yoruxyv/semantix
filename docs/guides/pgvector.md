@@ -8,7 +8,7 @@ intentionally limited to `5,000` entries to preserve server responsiveness.
 
 ## Configuration
 
-Set these values in `backend/.env`:
+Set these values in `apps/server/.env`:
 
 ```env
 CACHE_BACKEND=pgvector
@@ -174,7 +174,7 @@ variable at a disposable pgvector database:
 $env:PGVECTOR_TEST_DATABASE_URL = `
   "postgresql://semantix:semantix@localhost:5433/semantix"
 
-cd backend
+cd apps/server
 .\.venv\Scripts\python.exe -m pytest -m pgvector
 ```
 

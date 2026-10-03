@@ -7,7 +7,7 @@ unfamiliar names or domain-specific terms.
 
 ## Configuration
 
-Set these values in `backend/.env`:
+Set these values in `apps/server/.env`:
 
 ```env
 PROMPT_TYPO_CORRECTION_ENABLED=true

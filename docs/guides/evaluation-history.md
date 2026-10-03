@@ -208,7 +208,7 @@ with other PostgreSQL-backed Semantix data.
 Backend:
 
 ```powershell
-cd backend
+cd apps/server
 uv run --locked pytest
 uv run --locked ruff check .
 uv run --locked ruff format --check .
@@ -232,7 +232,7 @@ Never point destructive integration tests at development or production data.
 Frontend:
 
 ```powershell
-cd frontend
+cd apps/web
 npm run lint
 npm run imports:check
 npm test

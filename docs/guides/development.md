@@ -12,7 +12,7 @@ suite also runs on 3.11, 3.12, and 3.13 in CI.
 Windows PowerShell:
 
 ```powershell
-cd backend
+cd apps/server
 uv sync --locked --extra dev
 .\.venv\Scripts\Activate.ps1
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -21,7 +21,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 macOS or Linux:
 
 ```bash
-cd backend
+cd apps/server
 uv sync --locked --extra dev
 source .venv/bin/activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -32,7 +32,7 @@ using the local backend workflow. `pyproject.toml` declares supported version
 ranges while `uv.lock` records the exact cross-platform resolution used by CI
 and the backend images.
 
-The backend reads `backend/.env`. With `CACHE_BACKEND=pgvector`, a reachable
+The backend reads `apps/server/.env`. With `CACHE_BACKEND=pgvector`, a reachable
 database is required before application startup completes. Memory and mock
 providers are the lowest-dependency development configuration.
 
@@ -43,13 +43,13 @@ frontend images and CI, and satisfies the runtime requirements of the current
 frontend dependencies:
 
 ```bash
-cd frontend
+cd apps/web
 npm ci
 npm run dev
 ```
 
 The Vite server runs at <http://localhost:5173>. Configure
-`VITE_API_BASE_URL=http://localhost:8000` in `frontend/.env`.
+`VITE_API_BASE_URL=http://localhost:8000` in `apps/web/.env`.
 
 ## Repository helper reports
 
@@ -100,7 +100,7 @@ package even when its exact path is not mentioned.
 Backend:
 
 ```bash
-cd backend
+cd apps/server
 uv run --locked pytest -m "not pgvector" --cov=app
 uv run --locked ruff check .
 uv run --locked ruff format --check .
@@ -110,7 +110,7 @@ uv run --locked mypy app tests scripts
 Frontend:
 
 ```bash
-cd frontend
+cd apps/web
 npm run lint
 npm run imports:check
 npm run test:coverage

@@ -13,7 +13,7 @@ Gunakan indeks ini untuk menemukan panduan terperinci untuk tugas yang sedang di
 | [Cache policies](guides/cache-policies.md)                  | Threshold, TTL, LRU, namespace, privacy, dan request coalescing                  |
 | [Benchmarking](guides/benchmarking.md)                      | Dataset, metric, safeguard, projection, dan export                               |
 | [Prompt normalization](guides/prompt-typo-normalization.md) | Perilaku dan batasan typo-correction opsional                                    |
-| [Python SDK](../../../sdk/README.md)                          | Instalasi dan penggunaan client HTTP sinkron dan asinkron                       |
+| [Python SDK](../../../packages/client/README.md)                          | Instalasi dan penggunaan client HTTP sinkron dan asinkron                       |
 | [Development](guides/development.md)                        | Toolchain yang didukung, pemeriksaan kualitas, aturan arsitektur, dan kontribusi |
 
 ## Reference

@@ -66,7 +66,7 @@ updates:
 
   # Backend container images, including the Python and uv build images.
   - package-ecosystem: docker
-    directory: /backend
+    directory: /apps/server
     patterns:
       - "*"
     multi-ecosystem-group: semantix-routine
@@ -79,7 +79,7 @@ updates:
 
   # Frontend container images, including Node.js and Nginx.
   - package-ecosystem: docker
-    directory: /frontend
+    directory: /apps/web
     patterns:
       - "*"
     multi-ecosystem-group: semantix-routine
@@ -95,7 +95,7 @@ updates:
   # The backend is managed with pyproject.toml + uv.lock, so use Dependabot's
   # native uv ecosystem rather than treating the project as a pip-only project.
   - package-ecosystem: uv
-    directory: /backend
+    directory: /apps/server
     patterns:
       - "*"
     multi-ecosystem-group: semantix-routine
@@ -112,7 +112,7 @@ updates:
   # monitoring independent from the backend package contents while sharing the
   # same monthly routine-update PR.
   - package-ecosystem: uv
-    directory: /sdk
+    directory: /packages/client
     patterns:
       - "*"
     multi-ecosystem-group: semantix-routine
@@ -125,7 +125,7 @@ updates:
 
   # Embedded semantic-cache Python dependencies.
   - package-ecosystem: uv
-    directory: /embedded
+    directory: /packages/cache
     patterns:
       - "*"
     multi-ecosystem-group: semantix-routine
@@ -138,7 +138,7 @@ updates:
 
   # Frontend npm dependencies from package.json/package-lock.json.
   - package-ecosystem: npm
-    directory: /frontend
+    directory: /apps/web
     patterns:
       - "*"
     multi-ecosystem-group: semantix-routine

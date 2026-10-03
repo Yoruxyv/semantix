@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: embedded
+        working-directory: packages/cache
     strategy:
       fail-fast: false
       matrix:
@@ -44,8 +44,8 @@ jobs:
         run: uv sync --locked --extra dev --python "${{ matrix.python-version }}"
       - name: Lint and check formatting
         run: |
-          uv run --no-sync ruff check --config ../ruff.toml --output-format=github .
-          uv run --no-sync ruff format --config ../ruff.toml --check .
+          uv run --no-sync ruff check --config ../../ruff.toml --output-format=github .
+          uv run --no-sync ruff format --config ../../ruff.toml --check .
       - name: Check typing
         run: uv run --no-sync mypy src tests examples
       - name: Test embedded behavior and coverage
@@ -69,7 +69,7 @@ jobs:
             "$wheel_python" -c "import sys; from semantix_cache import MemoryStore; import semantix_cache.adapters; assert 'httpx' not in sys.modules"
             "$wheel_python" tests/providers_wheel_smoke.py
           done
-          "$wheel_python" -m pip install --disable-pip-version-check ../sdk
+          "$wheel_python" -m pip install --disable-pip-version-check ../client
           "$wheel_python" -c "import sys; import semantix_client; assert 'semantix_cache' not in sys.modules; import semantix_cache; assert semantix_client.CachePolicy is not semantix_cache.CachePolicy"
 
   backend:
@@ -78,7 +78,7 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: backend
+        working-directory: apps/server
     env:
       PYTHONPYCACHEPREFIX: /tmp/semantix-cache/python
       CACHE_BACKEND: memory
@@ -102,17 +102,17 @@ jobs:
         run: uv sync --locked --extra dev
 
       - name: Run Ruff lint
-        run: uv run --no-sync ruff check --config ../ruff.toml --output-format=github .
+        run: uv run --no-sync ruff check --config ../../ruff.toml --output-format=github .
 
       - name: Run operational Ruff lint
         run: >-
           uv run --no-sync ruff check
-          --config ../ruff.toml
+          --config ../../ruff.toml
           --output-format=github
-          ../ops
+          ../../ops
 
       - name: Check Ruff formatting
-        run: uv run --no-sync ruff format --config ../ruff.toml --check .
+        run: uv run --no-sync ruff format --config ../../ruff.toml --check .
 
       - name: Run mypy
         run: uv run --no-sync mypy app tests scripts
@@ -126,7 +126,7 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: backend
+        working-directory: apps/server
     env:
       AUTH_MODE: disabled
       CACHE_BACKEND: memory
@@ -165,7 +165,7 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: sdk
+        working-directory: packages/client
     env:
       ALLOWED_ORIGINS: '["http://127.0.0.1:4173"]'
       AUTH_MODE: token
@@ -197,14 +197,14 @@ jobs:
         run: uv sync --locked --extra dev
 
       - name: Sync locked backend dependencies
-        working-directory: backend
+        working-directory: apps/server
         run: uv sync --locked --extra dev
 
       - name: Run SDK Ruff lint
-        run: uv run --no-sync ruff check --config ../ruff.toml --output-format=github .
+        run: uv run --no-sync ruff check --config ../../ruff.toml --output-format=github .
 
       - name: Check SDK Ruff formatting
-        run: uv run --no-sync ruff format --config ../ruff.toml --check .
+        run: uv run --no-sync ruff format --config ../../ruff.toml --check .
 
       - name: Run SDK mypy
         run: uv run --no-sync mypy src tests
@@ -213,7 +213,7 @@ jobs:
         run: uv run --no-sync pytest -m "not integration" --cov=semantix_client
 
       - name: Check backend OpenAPI contract for SDK routes
-        working-directory: backend
+        working-directory: apps/server
         run: uv run --no-sync pytest tests/query/api/test_sdk_contract.py
 
       - name: Run SDK real-HTTP integration tests
@@ -221,7 +221,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cd backend
+          cd apps/server
           uv run --no-sync uvicorn app.main:app --host 127.0.0.1 --port 18081 > /tmp/semantix-sdk-backend.log 2>&1 &
           backend_pid=$!
           trap 'kill "$backend_pid" 2>/dev/null || true; wait "$backend_pid" 2>/dev/null || true' EXIT
@@ -234,7 +234,7 @@ jobs:
           done
           curl --fail --silent http://127.0.0.1:18081/health > /dev/null
 
-          cd ../sdk
+          cd ../../packages/client
           SEMANTIX_INTEGRATION_URL=http://127.0.0.1:18081 \
             SEMANTIX_INTEGRATION_TOKEN=sdk-operator-token \
             uv run --no-sync pytest -m integration
@@ -264,7 +264,7 @@ jobs:
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: sdk
+        working-directory: packages/client
     strategy:
       fail-fast: false
       matrix:
@@ -301,7 +301,7 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: frontend
+        working-directory: apps/web
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -311,7 +311,7 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
 
       - name: Install frontend dependencies
         run: npm ci
@@ -356,7 +356,7 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -371,14 +371,14 @@ jobs:
 
       - name: Install locked dependencies
         run: |
-          npm --prefix frontend ci
-          uv --directory backend sync --locked --extra dev
+          npm --prefix apps/web ci
+          uv --directory apps/server sync --locked --extra dev
 
       - name: Run production Lighthouse budget
         shell: bash
         run: |
           set -euo pipefail
-          cd backend
+          cd apps/server
           uv run --no-sync uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/semantix-lighthouse-backend.log 2>&1 &
           backend_pid=$!
           trap 'kill "$backend_pid" 2>/dev/null || true; wait "$backend_pid" 2>/dev/null || true' EXIT
@@ -391,7 +391,7 @@ jobs:
           done
           curl --fail --silent http://127.0.0.1:8000/health > /dev/null
 
-          cd ../frontend
+          cd ../web
           npm run lighthouse
 
       - name: Upload Lighthouse diagnostics
@@ -399,7 +399,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
-          path: frontend/lighthouse-reports/
+          path: apps/web/lighthouse-reports/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -413,7 +413,7 @@ jobs:
 
       - name: Prepare example environments
         run: |
-          cp backend/.env.example backend/.env
+          cp apps/server/.env.example apps/server/.env
           cp .env.production.example .env.production
 
       - name: Verify approved container image pins
@@ -474,7 +474,7 @@ jobs:
       - name: Install browser test dependencies
         shell: bash
         run: |
-          cd "$RUNNER_TEMP/semantix-autocrlf/frontend"
+          cd "$RUNNER_TEMP/semantix-autocrlf/apps/web"
           npm ci
 
           # Install OS dependencies once. Retrying --with-deps after a timeout
@@ -498,7 +498,7 @@ jobs:
         shell: bash
         run: |
           cd "$RUNNER_TEMP/semantix-autocrlf"
-          bash ops/ci/linux/hardened-smoke.sh bash -c 'npm --prefix frontend run test:e2e && python3 ops/ci/two_replica_smoke.py && python3 ops/ci/autoscaling_smoke.py'
+          bash ops/ci/linux/hardened-smoke.sh bash -c 'npm --prefix apps/web run test:e2e && python3 ops/ci/two_replica_smoke.py && python3 ops/ci/autoscaling_smoke.py'
 
       - name: Verify gateway reset resilience
         shell: bash
@@ -512,7 +512,7 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: backend
+        working-directory: apps/server
     env:
       PGVECTOR_TEST_DATABASE_URL: "postgresql://semantix:ci-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/semantix"
       PYTHONPYCACHEPREFIX: /tmp/semantix-cache/python
@@ -596,16 +596,16 @@ jobs:
         include:
           - name: backend-production
             context: .
-            dockerfile: backend/Dockerfile
+            dockerfile: apps/server/Dockerfile
           - name: backend-development
             context: .
-            dockerfile: backend/Dockerfile.dev
+            dockerfile: apps/server/Dockerfile.dev
           - name: frontend-production
-            context: frontend
-            dockerfile: frontend/Dockerfile
+            context: apps/web
+            dockerfile: apps/web/Dockerfile
           - name: frontend-development
-            context: frontend
-            dockerfile: frontend/Dockerfile.dev
+            context: apps/web
+            dockerfile: apps/web/Dockerfile.dev
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

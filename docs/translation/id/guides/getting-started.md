@@ -13,7 +13,7 @@ Clone repository dan buat file environment backend:
 ```bash
 git clone https://github.com/Yoruxyv/semantix.git
 cd semantix
-cp backend/.env.example backend/.env
+cp apps/server/.env.example apps/server/.env
 ```
 
 Windows PowerShell:
@@ -21,7 +21,7 @@ Windows PowerShell:
 ```powershell
 git clone https://github.com/Yoruxyv/semantix.git
 Set-Location semantix
-Copy-Item backend\.env.example backend\.env
+Copy-Item apps\server\.env.example apps\server\.env
 ```
 
 Untuk konfigurasi development tanpa akses jaringan, atur:
@@ -62,9 +62,9 @@ Semua port development yang dipublikasikan secara default terikat ke `127.0.0.1`
 
 Buka frontend lalu jalankan kueri di Monitor. [Tur produk](../README.ID.md#tur-produk)
 menampilkan Cache Inspector, Evaluations, dan Observability saat ini. Untuk
-request dari aplikasi Python, lanjutkan ke [Python SDK](../../../../sdk/README.md).
+request dari aplikasi Python, lanjutkan ke [Python SDK](../../../../packages/client/README.md).
 
-Image frontend development menginstal dependency Node dan menjalankan development server Vite dengan HMR; image tersebut tidak melakukan kompilasi asset frontend production. `VITE_API_BASE_URL` diberikan ke development server tersebut saat runtime. Image frontend hardened melakukan production build yang dijelaskan nanti dalam panduan ini. Untuk memastikan pembaruan bind-mount tetap andal ketika native notifications tidak tersedia, stack development melakukan polling terhadap perubahan source frontend dan backend setiap satu detik. Vite mengabaikan output coverage yang dihasilkan, dan Uvicorn hanya melakukan reload untuk perubahan di bawah `backend/app`. Stack hardened tidak terpengaruh.
+Image frontend development menginstal dependency Node dan menjalankan development server Vite dengan HMR; image tersebut tidak melakukan kompilasi asset frontend production. `VITE_API_BASE_URL` diberikan ke development server tersebut saat runtime. Image frontend hardened melakukan production build yang dijelaskan nanti dalam panduan ini. Untuk memastikan pembaruan bind-mount tetap andal ketika native notifications tidak tersedia, stack development melakukan polling terhadap perubahan source frontend dan backend setiap satu detik. Vite mengabaikan output coverage yang dihasilkan, dan Uvicorn hanya melakukan reload untuk perubahan di bawah `apps/server/app`. Stack hardened tidak terpengaruh.
 
 Perubahan biasanya terlihat dalam waktu sekitar satu detik. Jika tidak, pastikan Docker Desktop dapat membagikan drive repository, lalu buat ulang service yang terdampak. Periksa penggunaan saat idle dengan `docker stats --no-stream`. Jangan mengekspos stack development ke jaringan yang tidak tepercaya.
 
@@ -93,7 +93,7 @@ Perintah development mempertahankan nama Compose project `semantix` yang sudah a
 Backend:
 
 ```bash
-cd backend
+cd apps/server
 uv sync --locked --extra dev
 source .venv/bin/activate
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
@@ -110,12 +110,12 @@ Instal [uv](https://docs.astral.sh/uv/getting-started/installation/) sebelum men
 Frontend:
 
 ```bash
-cd frontend
+cd apps/web
 npm ci
 npm run dev
 ```
 
-Atur `VITE_API_BASE_URL=http://localhost:8000` di `frontend/.env` untuk development Vite lokal.
+Atur `VITE_API_BASE_URL=http://localhost:8000` di `apps/web/.env` untuk development Vite lokal.
 
 ## Deployment hardened
 
@@ -178,7 +178,7 @@ Named volume tetap dipertahankan. Menambahkan `--volumes` akan menghapus data Po
 Backend:
 
 ```bash
-cd backend
+cd apps/server
 uv run --locked pytest
 uv run --locked ruff check .
 uv run --locked ruff format --check .
@@ -188,7 +188,7 @@ uv run --locked mypy app tests scripts
 Frontend:
 
 ```bash
-cd frontend
+cd apps/web
 npm ci
 npm run lint
 npm run imports:check

@@ -5,7 +5,7 @@ small-text color tokens against the WCAG AA 4.5:1 contrast requirement.
 
 ## Contrast matrix
 
-The ratios below use the composited token colors from `frontend/src/index.css`.
+The ratios below use the composited token colors from `apps/web/src/index.css`.
 
 | Foreground | Background | Ratio | Normal text |
 | --- | --- | ---: | --- |
@@ -113,6 +113,6 @@ Persistent-catalog review additionally covers:
 Run the automated token check with:
 
 ```powershell
-cd frontend
+cd apps/web
 npm run test -- tests/shared/accessibility/contrast.test.ts
 ```

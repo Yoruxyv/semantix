@@ -4,7 +4,7 @@ Semantix menjaga data chart tetap tersedia sebagai tabel semantik dan memeriksa 
 
 ## Matriks kontras
 
-Rasio di bawah ini menggunakan warna token yang telah dikompositkan dari `frontend/src/index.css`.
+Rasio di bawah ini menggunakan warna token yang telah dikompositkan dari `apps/web/src/index.css`.
 
 | Foreground     | Background     |  Rasio | Teks normal |
 | -------------- | -------------- | -----: | ----------- |
@@ -31,6 +31,6 @@ Periksa hal-hal berikut pada lebar desktop dan mobile:
 Jalankan pemeriksaan token otomatis dengan:
 
 ```powershell
-cd frontend
+cd apps/web
 npm run test -- tests/shared/accessibility/contrast.test.ts
 ```

@@ -37,7 +37,7 @@ include = ["app*"]
 namespaces = true
 
 [tool.uv.sources]
-semantix-cache = { path = "../embedded", editable = true }
+semantix-cache = { path = "../../packages/cache", editable = true }
 
 [tool.setuptools.package-data]
 "app.cache.infrastructure.migrations" = ["*.sql"]

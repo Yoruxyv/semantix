@@ -118,7 +118,7 @@ Keep the original tokens in a secret manager. Rotating a token means generating
 a new token, replacing its digest, and recreating both backend containers.
 
 For local Docker development, `docker-compose.dev.yml` reads both values from
-`backend/.env`. After changing any value in that file, recreate the backend
+`apps/server/.env`. After changing any value in that file, recreate the backend
 container so Compose supplies the new environment. A plain container restart
 does not reload changed environment values. An image rebuild is not required
 for environment-only changes.
@@ -299,14 +299,14 @@ See the [multi-replica readiness audit](multi-replica-readiness.md) for the init
 
 ## Two-replica operation
 
-The gateway uses [the upstream file](../../frontend/upstream.prod.conf) and Docker DNS to discover both backends. Keep both replicas on identical auth, provider, embedding, cache, and coordination settings. Production uses the shared pgvector cache and PostgreSQL coordination. A gateway `/ready` response describes the selected replica; inspect each one before and after a rollout:
+The gateway uses [the upstream file](../../apps/web/upstream.prod.conf) and Docker DNS to discover both backends. Keep both replicas on identical auth, provider, embedding, cache, and coordination settings. Production uses the shared pgvector cache and PostgreSQL coordination. A gateway `/ready` response describes the selected replica; inspect each one before and after a rollout:
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.prod.yml exec -T frontend curl -f http://backend-a:8000/ready
 docker compose --env-file .env.production -f docker-compose.prod.yml exec -T frontend curl -f http://backend-b:8000/ready
 ```
 
-For a planned restart, copy `frontend/upstream.prod.conf` to a private host file and set `SEMANTIX_UPSTREAM_FILE` to its absolute path before starting Compose. Remove the target replica's `server` line from that mounted file, validate and reload Nginx, and wait for its admitted requests to finish. Then stop or recreate that replica. Reinsert its line only after its direct `/ready` check succeeds, and validate/reload again:
+For a planned restart, copy `apps/web/upstream.prod.conf` to a private host file and set `SEMANTIX_UPSTREAM_FILE` to its absolute path before starting Compose. Remove the target replica's `server` line from that mounted file, validate and reload Nginx, and wait for its admitted requests to finish. Then stop or recreate that replica. Reinsert its line only after its direct `/ready` check succeeds, and validate/reload again:
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.prod.yml exec -T frontend nginx -t

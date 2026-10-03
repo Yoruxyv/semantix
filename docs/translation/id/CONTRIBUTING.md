@@ -50,7 +50,7 @@ Gunakan issue form repository untuk bug, feature request, dan improvement dokume
 Buat file environment backend:
 
 ```powershell
-Copy-Item backend\.env.example backend\.env
+Copy-Item apps\server\.env.example apps\server\.env
 ```
 
 Untuk setup development tanpa credential:
@@ -84,14 +84,14 @@ Gunakan hardened stack hanya ketika memvalidasi konfigurasi yang berorientasi pr
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/), kemudian buat development environment yang terkunci:
 
 ```powershell
-cd backend
+cd apps/server
 uv sync --locked --extra dev
 .\.venv\Scripts\Activate.ps1
 . .\scripts\windows\enable_cache.ps1
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Script cache mengarahkan bytecode Python normal ke `backend/.cache/python` untuk sesi terminal saat ini. Ruff, mypy, dan pytest menggunakan direktori cache yang dikonfigurasi dalam `backend/pyproject.toml`.
+Script cache mengarahkan bytecode Python normal ke `apps/server/.cache/python` untuk sesi terminal saat ini. Ruff, mypy, dan pytest menggunakan direktori cache yang dikonfigurasi dalam `apps/server/pyproject.toml`.
 
 Pytest assertion rewriting tidak bergantung pada normal bytecode-cache path milik Python. Konfigurasi test menonaktifkan penulisan rewritten bytecode sehingga test run tidak membuat ulang direktori `__pycache__` yang tersebar.
 
@@ -104,7 +104,7 @@ Untuk menghapus backend cache dan editable-install metadata:
 ### Local frontend workflow
 
 ```powershell
-cd frontend
+cd apps/web
 npm ci
 npm run dev
 ```
@@ -206,7 +206,7 @@ Jalankan check yang terdampak oleh perubahan Anda sebelum melakukan push.
 ### Backend
 
 ```powershell
-cd backend
+cd apps/server
 .\.venv\Scripts\Activate.ps1
 . .\scripts\windows\enable_cache.ps1
 uv run --locked pytest -m "not pgvector" --cov=app
@@ -218,7 +218,7 @@ uv run --locked mypy app tests scripts
 ### Frontend
 
 ```powershell
-cd frontend
+cd apps/web
 npm ci
 npm run lint
 npm run imports:check
@@ -242,7 +242,7 @@ Pgvector integration test bersifat opt-in dan memerlukan disposable database:
 $env:PGVECTOR_TEST_DATABASE_URL = `
   "postgresql://semantix:semantix@localhost:5433/semantix"
 
-cd backend
+cd apps/server
 .\.venv\Scripts\python.exe -m pytest -m pgvector
 ```
 

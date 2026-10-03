@@ -18,7 +18,7 @@ RATE_LIMIT=100000/minute
 PROMPT_TYPO_CORRECTION_ENABLED=false
 ```
 
-Buat ulang backend setelah mengubah `backend/.env`:
+Buat ulang backend setelah mengubah `apps/server/.env`:
 
 ```powershell
 docker compose up --build --force-recreate -d backend frontend

@@ -1,7 +1,7 @@
 # Backend agent instructions
 
-Read [root instructions](../AGENTS.md), [current architecture](../ARCHITECTURE.md), and
-[product principles](../DESIGN.md) first. These rules cover backend/app, backend/tests,
+Read [root instructions](../../AGENTS.md), [current architecture](../../ARCHITECTURE.md), and
+[product principles](../../DESIGN.md) first. These rules cover apps/server/app, apps/server/tests,
 and backend scripts.
 
 ## Ownership and contracts
@@ -76,7 +76,7 @@ and backend scripts.
 - Exercise route/schema and application behavior at the layer being changed. Cover
   namespace and private-data boundaries when affected. PostgreSQL integration tests use
   only a disposable database.
-- From backend, run focused uv run --locked pytest paths first. Relevant main gates are
+- From apps/server, run focused uv run --locked pytest paths first. Relevant main gates are
   uv run --locked pytest -m "not pgvector" --cov=app, uv run --locked ruff check ., uv
   run --locked ruff format --check ., and uv run --locked mypy app tests scripts. Use
-  the current [quality workflow](../.github/workflows/quality.yml) for exact CI gates.
+  the current [quality workflow](../../.github/workflows/quality.yml) for exact CI gates.

@@ -57,7 +57,7 @@ improvements.
 Create the backend environment file:
 
 ```powershell
-Copy-Item backend\.env.example backend\.env
+Copy-Item apps\server\.env.example apps\server\.env
 ```
 
 For a credential-free development setup:
@@ -93,16 +93,16 @@ Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then
 create the locked development environment:
 
 ```powershell
-cd backend
+cd apps/server
 uv sync --locked --extra dev
 .\.venv\Scripts\Activate.ps1
 . .\scripts\windows\enable_cache.ps1
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The cache script redirects normal Python bytecode into `backend/.cache/python`
+The cache script redirects normal Python bytecode into `apps/server/.cache/python`
 for the current terminal session. Ruff, mypy, and pytest use the cache
-directories configured in `backend/pyproject.toml`.
+directories configured in `apps/server/pyproject.toml`.
 
 Pytest assertion rewriting does not rely on Python's normal bytecode-cache path.
 The test configuration disables writing rewritten bytecode so test runs do not
@@ -117,7 +117,7 @@ To remove backend caches and editable-install metadata:
 ### Local frontend workflow
 
 ```powershell
-cd frontend
+cd apps/web
 npm ci
 npm run dev
 ```
@@ -227,7 +227,7 @@ Run the checks affected by your change before pushing.
 ### Backend
 
 ```powershell
-cd backend
+cd apps/server
 .\.venv\Scripts\Activate.ps1
 . .\scripts\windows\enable_cache.ps1
 uv run --locked pytest -m "not pgvector" --cov=app
@@ -239,7 +239,7 @@ uv run --locked mypy app tests scripts
 ### Frontend
 
 ```powershell
-cd frontend
+cd apps/web
 npm ci
 npm run lint
 npm run imports:check
@@ -263,7 +263,7 @@ Pgvector integration tests are opt-in and require a disposable database:
 $env:PGVECTOR_TEST_DATABASE_URL = `
   "postgresql://semantix:semantix@localhost:5433/semantix"
 
-cd backend
+cd apps/server
 .\.venv\Scripts\python.exe -m pytest -m pgvector
 ```
 

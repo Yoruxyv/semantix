@@ -43,7 +43,7 @@ def main() -> None:
     ) as temporary:
         upstream = Path(temporary) / "upstream.conf"
         upstream.write_text(
-            (ROOT / "frontend/upstream.prod.conf").read_text(encoding="utf-8"),
+            (ROOT / "apps/web/upstream.prod.conf").read_text(encoding="utf-8"),
             encoding="utf-8",
         )
         env = environment(project, upstream, admin, operator)
@@ -72,10 +72,10 @@ def main() -> None:
             }
             result = subprocess.run(  # noqa: S603 - fixed SDK pytest command
                 [
-                    str(ROOT / "sdk/.venv/Scripts/python.exe"),
+                    str(ROOT / "packages/client/.venv/Scripts/python.exe"),
                     "-m",
                     "pytest",
-                    "sdk/tests/test_integration.py",
+                    "packages/client/tests/test_integration.py",
                     "-q",
                 ],
                 cwd=ROOT,

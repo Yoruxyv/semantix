@@ -1,7 +1,7 @@
 # Frontend agent instructions
 
-Read [root instructions](../AGENTS.md), [current architecture](../ARCHITECTURE.md), and
-[product principles](../DESIGN.md) first. These rules cover frontend/src, tests, and
+Read [root instructions](../../AGENTS.md), [current architecture](../../ARCHITECTURE.md), and
+[product principles](../../DESIGN.md) first. These rules cover apps/web/src, tests, and
 frontend build configuration.
 
 ## Feature ownership
@@ -37,7 +37,7 @@ frontend build configuration.
   content to hide overflow.
 - For navigation or layout changes, check 320, 744, 768, 820, 834, 1024, and 1280 px,
   representative landscape widths, 200% zoom, keyboard operation, and page-level
-  overflow. Update [accessibility reference](../docs/reference/accessibility.md) when
+  overflow. Update [accessibility reference](../../docs/reference/accessibility.md) when
   its contract changes. Preserve query, hash, filter, and route state in compatibility
   redirects.
 - Do not silently add another top-level workspace or turn Monitor into a generic
@@ -47,7 +47,7 @@ frontend build configuration.
 
 - Add focused Vitest tests for changed hooks, decoders, API adapters, or components. Use
   Playwright/axe for affected route, responsive, keyboard, or accessibility behavior.
-- From frontend, run the relevant focused npm run test -- <path>. Main gates from
+- From apps/web, run the relevant focused npm run test -- <path>. Main gates from
   [package.json](package.json) and CI are npm run lint, npm run format:check, npm run
   imports:check, npm run test:coverage, and npm run build. Run browser tests when their
   behavior is touched.

@@ -47,7 +47,7 @@ Install from a checkout or Git until publication.
 Build the current package from a Semantix checkout:
 
 ```bash
-cd sdk
+cd packages/client
 uv sync --locked --extra dev
 uv run --no-sync python -m build --wheel
 ```
@@ -59,13 +59,13 @@ Then install the wheel into the consuming project's virtual environment. Use
 the actual checkout path on your machine:
 
 ```bash
-python -m pip install /path/to/semantix/sdk/dist/semantix_client-0.1.0-py3-none-any.whl
+python -m pip install /path/to/semantix/packages/client/dist/semantix_client-0.1.0-py3-none-any.whl
 ```
 
 You can also install the package directly from the repository:
 
 ```bash
-python -m pip install "semantix-client @ git+https://github.com/Yoruxyv/semantix.git@main#subdirectory=sdk"
+python -m pip install "semantix-client @ git+https://github.com/Yoruxyv/semantix.git@main#subdirectory=packages/client"
 ```
 
 Confirm the distribution/import naming after installation:
@@ -469,14 +469,14 @@ an authenticated server, set `SEMANTIX_TOKEN` to the original bearer token and
 ### Import resolution: editor analysis versus runtime
 
 When the repository root is open in VS Code, the committed
-[`pyrightconfig.json`](https://github.com/Yoruxyv/semantix/blob/main/pyrightconfig.json) adds `backend` and `sdk/src` as
+[`pyrightconfig.json`](https://github.com/Yoruxyv/semantix/blob/main/pyrightconfig.json) adds `apps/server`, `packages/client/src` and `packages/cache/src` as
 analysis roots. Pylance can therefore resolve `semantix_client` into
-`sdk/src/semantix_client` for navigation without changing Python imports.
+`packages/client/src/semantix_client` for navigation without changing Python imports.
 
 That editor analysis does not install the SDK. For SDK development, run
-`uv sync --locked --extra dev` from `sdk` and select
-`sdk/.venv/Scripts/python.exe` on Windows (or `sdk/.venv/bin/python` on Linux
-and macOS) as the active interpreter. Select `backend/.venv` instead when
+`uv sync --locked --extra dev` from `packages/client` and select
+`packages/client/.venv/Scripts/python.exe` on Windows (or `packages/client/.venv/bin/python` on Linux
+and macOS) as the active interpreter. Select `apps/server/.venv` instead when
 working on the backend. If Pylance still shows a stale unresolved import after
 selecting the intended environment, restart its language server or reload the
 VS Code window.
@@ -506,7 +506,7 @@ when upgrading either side.
 
 ## Development
 
-From `sdk`:
+From `packages/client`:
 
 ```bash
 uv sync --locked --extra dev
@@ -529,4 +529,4 @@ uv run --no-sync pytest -m integration
 
 ## License
 
-MIT. Copyright (c) 2026 Hans Valerie. See [LICENSE](https://github.com/Yoruxyv/semantix/blob/main/sdk/LICENSE).
+MIT. Copyright (c) 2026 Hans Valerie. See [LICENSE](LICENSE).

@@ -14,9 +14,9 @@ Read this file first. Then read [ARCHITECTURE.md](ARCHITECTURE.md) when runtime
 structure or ownership matters, [DESIGN.md](DESIGN.md) when product decisions matter,
 and the nearest applicable subtree instructions:
 
-- [backend/AGENTS.md](backend/AGENTS.md) for the FastAPI service and tests.
-- [frontend/AGENTS.md](frontend/AGENTS.md) for the React workbench and tests.
-- [sdk/AGENTS.md](sdk/AGENTS.md) for the public Python client.
+- [apps/server/AGENTS.md](apps/server/AGENTS.md) for the FastAPI service and tests.
+- [apps/web/AGENTS.md](apps/web/AGENTS.md) for the React workbench and tests.
+- [packages/client/AGENTS.md](packages/client/AGENTS.md) for the public Python client.
 - [ops/AGENTS.md](ops/AGENTS.md) for deployment, CI, smoke, and load tooling.
 - [docs/AGENTS.md](docs/AGENTS.md) for documentation and translations.
 
