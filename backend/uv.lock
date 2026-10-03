@@ -915,6 +915,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
+    { name = "semantix-cache" },
     { name = "slowapi" },
     { name = "symspellpy" },
     { name = "tenacity" },
@@ -946,10 +947,34 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.1.0,<8" },
     { name = "python-dotenv", specifier = ">=1.2.3,<2" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.16.3,<0.17" },
+    { name = "semantix-cache", editable = "../embedded" },
     { name = "slowapi", specifier = ">=0.1.10,<1" },
     { name = "symspellpy", specifier = ">=6.10.0,<7" },
     { name = "tenacity", specifier = ">=9.1.4,<10" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.1,<1" },
+]
+provides-extras = ["dev"]
+
+[[package]]
+name = "semantix-cache"
+version = "0.1.0"
+source = { editable = "../embedded" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "build", marker = "extra == 'dev'", specifier = ">=1.4,<2" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=2.3.1,<3" },
+    { name = "numpy", specifier = ">=2.4.6,<2.5" },
+    { name = "pydantic", specifier = ">=2.13.4,<3" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.1.1,<10" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.4.0,<2" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.1.0,<8" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.16.3,<0.17" },
+    { name = "twine", marker = "extra == 'dev'", specifier = ">=6.2,<7" },
 ]
 provides-extras = ["dev"]
 

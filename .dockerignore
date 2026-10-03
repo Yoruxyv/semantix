@@ -1,0 +1,26 @@
+# Root backend context includes only the server and embedded package.
+**
+!backend/
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/app/
+!backend/app/**
+!backend/tests/
+!backend/tests/**
+!backend/scripts/
+!backend/scripts/**
+!backend/Dockerfile*
+!embedded/
+!embedded/pyproject.toml
+!embedded/README.md
+!embedded/LICENSE
+!embedded/src/
+!embedded/src/**
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+**/.env*
+**/.cache/
+**/.venv/
+**/build/
+**/dist/

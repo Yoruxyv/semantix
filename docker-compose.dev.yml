@@ -21,8 +21,8 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: backend/Dockerfile.dev
     env_file:
       - ./backend/.env
     environment:
@@ -34,6 +34,7 @@ services:
       - ./backend/app:/app/app
       - ./backend/tests:/app/tests
       - ./backend/scripts:/app/scripts
+      - ./embedded/src:/embedded/src
     command:
       - uvicorn
       - app.main:app

@@ -1,0 +1,57 @@
+"""Run in a clean environment containing only the built wheel and runtime deps."""
+
+import asyncio
+import importlib.util
+from collections.abc import Sequence
+from pathlib import Path
+
+import semantix_cache
+from semantix_cache import AsyncSemanticCache, EmbeddingSpace, MemoryStore
+
+
+class Adapter:
+    embedding_space = EmbeddingSpace(identity="wheel-smoke-v1", dimensions=2)
+
+    async def embed(self, text: str) -> Sequence[float]:
+        return (1.0, 0.0)
+
+
+async def main() -> None:
+    adapter = Adapter()
+
+    async def generate(prompt: str) -> str:
+        return "completed"
+
+    async with (
+        MemoryStore(embedding_space=adapter.embedding_space) as store,
+        AsyncSemanticCache(embedder=adapter, store=store) as cache,
+    ):
+        miss = await cache.resolve("first", generate=generate)
+        hit = await cache.resolve("similar", generate=generate)
+        assert miss.cache_written and miss.provider_called
+        assert hit.cache_hit and hit.generation_skipped
+        assert await cache.get("similar") is not None
+        assert await cache.clear() == 1
+    assert semantix_cache.__file__ is not None
+    location = Path(semantix_cache.__file__)
+    assert "site-packages" in location.parts
+    assert location.with_name("py.typed").is_file()
+    for name in (
+        "semantix",
+        "app",
+        "backend",
+        "fastapi",
+        "uvicorn",
+        "starlette",
+        "slowapi",
+        "asyncpg",
+        "httpx",
+        "pydantic_settings",
+        "dotenv",
+        "semantix_client",
+    ):
+        assert importlib.util.find_spec(name) is None, name
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -17,6 +17,54 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  embedded:
+    name: Embedded cache (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: embedded
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+          version: "0.11.32"
+      - name: Sync locked embedded dependencies
+        run: uv sync --locked --extra dev --python "${{ matrix.python-version }}"
+      - name: Lint and check formatting
+        run: |
+          uv run --no-sync ruff check --config ../ruff.toml --output-format=github .
+          uv run --no-sync ruff format --config ../ruff.toml --check .
+      - name: Check typing
+        run: uv run --no-sync mypy src tests
+      - name: Test embedded behavior and coverage
+        run: uv run --no-sync pytest --cov=semantix_cache
+      - name: Build and inspect artifacts
+        run: |
+          uv run --no-sync python -m build
+          uv run --no-sync python -m twine check dist/*
+          uv run --no-sync python tests/check_artifacts.py
+      - name: Verify isolated wheel and namespace coexistence
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/semantix-embedded-wheel"
+          wheel_python="$RUNNER_TEMP/semantix-embedded-wheel/bin/python"
+          "$wheel_python" -m pip install --disable-pip-version-check dist/*.whl
+          "$wheel_python" tests/wheel_smoke.py
+          "$wheel_python" -m pip install --disable-pip-version-check ../sdk
+          "$wheel_python" -c "import sys; import semantix_client; assert 'semantix_cache' not in sys.modules; import semantix_cache; assert semantix_client.CachePolicy is not semantix_cache.CachePolicy"
+
   backend:
     name: Backend quality
     runs-on: ubuntu-latest
@@ -540,10 +588,10 @@ jobs:
       matrix:
         include:
           - name: backend-production
-            context: backend
+            context: .
             dockerfile: backend/Dockerfile
           - name: backend-development
-            context: backend
+            context: .
             dockerfile: backend/Dockerfile.dev
           - name: frontend-production
             context: frontend
@@ -580,6 +628,7 @@ jobs:
     name: Quality gate
     if: ${{ always() }}
     needs:
+      - embedded
       - backend
       - backend-compatibility
       - sdk
@@ -602,6 +651,7 @@ jobs:
           CONTAINERS_RESULT: ${{ needs.containers.result }}
           CONTAINER_PLATFORMS_RESULT: ${{ needs.container-platforms.result }}
           DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
+          EMBEDDED_RESULT: ${{ needs.embedded.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           FRONTEND_LIGHTHOUSE_RESULT: ${{ needs.frontend-lighthouse.result }}
           HARDENED_WINDOWS_CHECKOUT_RESULT: ${{ needs.hardened-windows-checkout.result }}
@@ -610,6 +660,7 @@ jobs:
           SDK_COMPATIBILITY_RESULT: ${{ needs.sdk-compatibility.result }}
           SDK_RESULT: ${{ needs.sdk.result }}
         run: |
+          test "$EMBEDDED_RESULT" = "success"
           test "$BACKEND_RESULT" = "success"
           test "$BACKEND_COMPATIBILITY_RESULT" = "success"
           test "$SDK_RESULT" = "success"

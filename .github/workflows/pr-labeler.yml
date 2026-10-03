@@ -220,6 +220,7 @@ jobs:
           managed_area_labels=(
             "area:backend"
             "area:sdk"
+            "area:embedded"
             "area:frontend"
             "area:ops"
             "area:ci"
@@ -243,6 +244,13 @@ jobs:
               "area:sdk" \
               "8250DF" \
               "Changes affecting the public SDK"
+          fi
+
+          if grep -Eq '^embedded/' <<< "$changed_files"; then
+            add_label \
+              "area:embedded" \
+              "008B8B" \
+              "Changes affecting the embedded semantic cache"
           fi
 
           if grep -Eq '^frontend/' <<< "$changed_files"; then

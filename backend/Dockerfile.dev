@@ -12,10 +12,11 @@ ENV PATH="/app/.venv/bin:$PATH" \
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./
-COPY app ./app
-COPY tests ./tests
-COPY scripts ./scripts
+COPY backend/pyproject.toml backend/uv.lock ./
+COPY embedded /embedded
+COPY backend/app ./app
+COPY backend/tests ./tests
+COPY backend/scripts ./scripts
 
 RUN mkdir -p "$PYTHONPYCACHEPREFIX" \
     && uv sync --locked --extra dev

@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=83.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "semantix-cache"
+version = "0.1.0"
+description = "Async semantic caching in your Python process"
+readme = "README.md"
+requires-python = ">=3.11,<3.15"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["numpy>=2.4.6,<2.5", "pydantic>=2.13.4,<3"]
+
+[project.urls]
+Repository = "https://github.com/Yoruxyv/semantix"
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.4,<2",
+  "mypy>=2.3.1,<3",
+  "pytest>=9.1.1,<10",
+  "pytest-asyncio>=1.4.0,<2",
+  "pytest-cov>=7.1.0,<8",
+  "ruff>=0.16.3,<0.17",
+  "twine>=6.2,<7",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+semantix_cache = ["py.typed"]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+asyncio_mode = "auto"
+cache_dir = ".cache/pytest"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["semantix_cache"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["src", "tests"]
+cache_dir = ".cache/mypy"

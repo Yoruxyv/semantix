@@ -1,0 +1,33 @@
+import ast
+from pathlib import Path
+
+
+def test_no_server_or_provider_imports() -> None:
+    root = Path(__file__).parents[1] / "src" / "semantix_cache"
+    permitted = {
+        "asyncio",
+        "collections",
+        "contextlib",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "hashlib",
+        "inspect",
+        "math",
+        "numbers",
+        "re",
+        "time",
+        "types",
+        "typing",
+        "numpy",
+        "pydantic",
+    }
+    for source in root.rglob("*.py"):
+        for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                assert all(
+                    alias.name.split(".")[0] in permitted for alias in node.names
+                )
+            elif isinstance(node, ast.ImportFrom) and node.level == 0:
+                assert node.module is not None
+                assert node.module.split(".")[0] in permitted

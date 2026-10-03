@@ -24,8 +24,8 @@ services:
 
   migrate:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     command:
       - python
       - -m
@@ -48,8 +48,8 @@ services:
 
   backend-a: &backend-service
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-mock}
       GENERATION_PROVIDER: ${GENERATION_PROVIDER:-mock}

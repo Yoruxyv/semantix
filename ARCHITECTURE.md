@@ -14,6 +14,16 @@ Configured embedding and generation providers are external to the cache service;
 mock provider supports deterministic local use. The live cache is either process memory
 or PostgreSQL with pgvector, according to settings.
 
+An independently installable [semantix-cache](embedded/README.md) supplies the async
+embedded facade and bounded MemoryStore for applications that do not run this server.
+It accepts structural embedding adapters and application-owned async generation.
+Its private semantic core owns canonicalization, keys, namespace rules, vector
+normalization/scoring, TTL resolution, threshold eligibility and resolution ordering.
+The backend consumes the local embedded package through its locked path dependency,
+while preserving its HTTP schemas, authorization, metrics, global threshold and
+request coalescer. semantix-client remains a separate HTTP-only product.
+Maintained embedded provider adapters and PostgreSQL storage are not implemented.
+
 In the hardened Compose deployment, the browser and other HTTP clients reach the
 frontend Nginx gateway, which serves the browser assets and balances API requests across
 backend-a and backend-b. A development browser uses Vite and can reach the backend
