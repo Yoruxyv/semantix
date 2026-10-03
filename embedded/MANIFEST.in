@@ -1,3 +1,4 @@
 include LICENSE README.md
 recursive-include src/semantix_cache *.py py.typed
 recursive-include tests *.py
+recursive-include examples *.py
