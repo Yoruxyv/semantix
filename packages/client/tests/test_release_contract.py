@@ -263,12 +263,13 @@ def test_import_boundary_and_public_docs() -> None:
 def test_readme_python_examples_compile_and_relative_links_exist() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     for example in re.findall(r"```python\n(.*?)\n```", readme, flags=re.DOTALL):
-        compile(example, "sdk/README.md", "exec")
+        compile(example, "packages/client/README.md", "exec")
     for target in re.findall(r"\[[^]]+\]\(([^)]+)\)", readme):
         repository_prefix = "https://github.com/Yoruxyv/semantix/blob/main/"
         if target.startswith(repository_prefix):
             assert (
-                ROOT.parent / target.removeprefix(repository_prefix).split("#", 1)[0]
+                ROOT.parents[1]
+                / target.removeprefix(repository_prefix).split("#", 1)[0]
             ).exists(), target
         elif "://" not in target and not target.startswith("#"):
             assert (ROOT / target.split("#", 1)[0]).exists(), target

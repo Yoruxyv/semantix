@@ -2,7 +2,7 @@
 
 The in-process **semantix-cache** package imports as **semantix_cache**. It is
 independent of **semantix-client**, the HTTP client for a Semantix server. The
-[embedded core guide](../embedded/README.md) describes cache semantics and ownership.
+[embedded core guide](../packages/cache/README.md) describes cache semantics and ownership.
 
 ## Install and import
 
@@ -13,7 +13,7 @@ they do not install OpenAI, Anthropic, Google, Hugging Face or Ollama SDKs. Impo
 After publication, install an optional extra with
 `python -m pip install 'semantix-cache[openai]'`. The extras `huggingface`, `gemini`,
 `ollama`, `anthropic` and `providers` use the same bounded HTTP dependency.
-Publication is a separate release action. For a local build, from `embedded/`:
+Publication is a separate release action. For a local build, from `packages/cache/`:
 
 ~~~text
 uv sync --locked --extra dev
@@ -143,9 +143,9 @@ Any unsupported provider can be integrated structurally: supply the existing
 `embedding_space` property and `async embed(text) -> Sequence[float]`. No subclass,
 registration, extra dependency or request to add a built-in is required. A bare
 embedding callable has no space metadata and is insufficient. Wrap it explicitly;
-the complete [custom integration example](../embedded/examples/custom_integration.py)
+the complete [custom integration example](../packages/cache/examples/custom_integration.py)
 shows this and an object-based async generation flow. The demo is deterministic,
-not a production embedding model. From `embedded/`, execute and type-check it with:
+not a production embedding model. From `packages/cache/`, execute and type-check it with:
 
 ~~~text
 uv run --no-sync python examples/custom_integration.py

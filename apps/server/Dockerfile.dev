@@ -4,19 +4,19 @@ FROM python:3.14-slim@sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5e
 
 COPY --from=uv /uv /uvx /bin/
 
-ENV PATH="/app/.venv/bin:$PATH" \
+ENV PATH="/apps/server/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONPYCACHEPREFIX=/tmp/semantix-cache/python \
     UV_NO_CACHE=1 \
     UV_PYTHON_DOWNLOADS=never
 
-WORKDIR /app
+WORKDIR /apps/server
 
-COPY backend/pyproject.toml backend/uv.lock ./
-COPY embedded /embedded
-COPY backend/app ./app
-COPY backend/tests ./tests
-COPY backend/scripts ./scripts
+COPY apps/server/pyproject.toml apps/server/uv.lock ./
+COPY packages/cache /packages/cache
+COPY apps/server/app ./app
+COPY apps/server/tests ./tests
+COPY apps/server/scripts ./scripts
 
 RUN mkdir -p "$PYTHONPYCACHEPREFIX" \
     && uv sync --locked --extra dev

@@ -80,7 +80,7 @@ Menggunakan kembali respons yang sesuai menghindari panggilan generation berikut
 
 ## 🐍 Python SDK
 
-Aplikasi Python dapat memakai distribusi `semantix-client` melalui HTTP API publik. Paket ini menyediakan `SemantixClient` dan `AsyncSemantixClient` tanpa memerlukan modul internal backend. Paket belum diterbitkan di PyPI; lihat [panduan Python SDK](../../../sdk/README.md) untuk instalasi dari repository atau wheel.
+Aplikasi Python dapat memakai distribusi `semantix-client` melalui HTTP API publik. Paket ini menyediakan `SemantixClient` dan `AsyncSemantixClient` tanpa memerlukan modul internal backend. Paket belum diterbitkan di PyPI; lihat [panduan Python SDK](../../../packages/client/README.md) untuk instalasi dari repository atau wheel.
 
 ```python
 from semantix_client import SemantixClient
@@ -104,7 +104,7 @@ Linux atau macOS:
 ```bash
 git clone https://github.com/Yoruxyv/semantix.git
 cd semantix
-cp backend/.env.example backend/.env
+cp apps/server/.env.example apps/server/.env
 ```
 
 Windows PowerShell:
@@ -112,12 +112,12 @@ Windows PowerShell:
 ```powershell
 git clone https://github.com/Yoruxyv/semantix.git
 Set-Location semantix
-Copy-Item backend\.env.example backend\.env
+Copy-Item apps\server\.env.example apps\server\.env
 ```
 
 ### 2. Konfigurasi development lokal
 
-Untuk konfigurasi persisten tanpa kredensial (zero-key), gunakan nilai berikut di `backend/.env`:
+Untuk konfigurasi persisten tanpa kredensial (zero-key), gunakan nilai berikut di `apps/server/.env`:
 
 ```env
 EMBEDDING_PROVIDER=mock
@@ -136,7 +136,7 @@ MAX_REQUEST_BODY_BYTES=65536
 
 Nilai autentikasi dan proxy ini sengaja dikosongkan atau dinonaktifkan untuk development lokal yang tepercaya. Jangan gunakan konfigurasi development ini untuk deployment publik.
 
-Untuk menggunakan Hugging Face, OpenAI, Anthropic, Gemini, atau Ollama, lihat [Providers](guides/providers.md). Untuk setiap opsi environment, lihat [Getting started](guides/getting-started.md) dan `backend/.env.example`.
+Untuk menggunakan Hugging Face, OpenAI, Anthropic, Gemini, atau Ollama, lihat [Providers](guides/providers.md). Untuk setiap opsi environment, lihat [Getting started](guides/getting-started.md) dan `apps/server/.env.example`.
 
 ### 3. Jalankan stack development lengkap
 
@@ -226,23 +226,23 @@ Ini adalah satu pengukuran bertanggal, bukan jaminan performa. Lihat [Benchmarki
 
 ### Persiapan cache backend
 
-Cache tool backend dipusatkan di `backend/.cache/`. Aktifkan redirect cache bytecode Python sebelum menjalankan perintah backend.
+Cache tool backend dipusatkan di `apps/server/.cache/`. Aktifkan redirect cache bytecode Python sebelum menjalankan perintah backend.
 
 Dari root repository:
 
 Windows PowerShell:
 
 ```powershell
-. .\backend\scripts\windows\enable_cache.ps1
+. .\apps\server\scripts\windows\enable_cache.ps1
 ```
 
 Linux atau macOS:
 
 ```bash
-source backend/scripts/linux/enable_cache.sh
+source apps/server/scripts/linux/enable_cache.sh
 ```
 
-Ketika sudah berada di dalam `backend/`:
+Ketika sudah berada di dalam `apps/server/`:
 
 Windows PowerShell:
 
@@ -256,18 +256,18 @@ Linux atau macOS:
 source scripts/linux/enable_cache.sh
 ```
 
-Tanda titik di depan pada PowerShell dan `source` pada Bash diperlukan agar `PYTHONPYCACHEPREFIX` tetap aktif di terminal saat ini. Ruff, mypy, dan pytest menggunakan path cache-nya dari `backend/pyproject.toml`.
+Tanda titik di depan pada PowerShell dan `source` pada Bash diperlukan agar `PYTHONPYCACHEPREFIX` tetap aktif di terminal saat ini. Ruff, mypy, dan pytest menggunakan path cache-nya dari `apps/server/pyproject.toml`.
 
 Untuk menghapus cache yang dihasilkan dan metadata editable-install:
 
 ```powershell
-.\backend\scripts\windows\clean_artifacts.ps1
+.\apps\server\scripts\windows\clean_artifacts.ps1
 ```
 
 Untuk Linux atau macOS:
 
 ```bash
-bash backend/scripts/linux/clean_artifacts.sh
+bash apps/server/scripts/linux/clean_artifacts.sh
 ```
 
 Otomasi yang spesifik-platform berada di direktori `windows/` dan `linux/`. Overlay Compose bersama tetap berada di samping direktori tersebut di bawah `ops/ci/`. Sebagai contoh, smoke test kesehatan development memiliki entry point yang sepadan:
@@ -303,7 +303,7 @@ Skrip-skrip ini memeriksa file proyek yang dilacak Git dan tidak diabaikan (unig
 Backend:
 
 ```bash
-cd backend
+cd apps/server
 uv sync --locked --extra dev
 uv run --locked pytest
 uv run --locked ruff check .
@@ -314,7 +314,7 @@ uv run --locked mypy app tests scripts
 Frontend:
 
 ```bash
-cd frontend
+cd apps/web
 npm ci
 npm run lint
 npm run imports:check
@@ -328,11 +328,16 @@ Lihat [Development](guides/development.md) untuk toolchain lokal, aturan arsitek
 
 ```text
 semantix/
-├── backend/
-├── frontend/
-├── sdk/
-│   ├── src/
-│   └── tests/
+├── apps/
+│   ├── server/
+│   └── web/
+├── packages/
+│   ├── cache/
+│   │   ├── src/semantix_cache/
+│   │   └── tests/
+│   └── client/
+│       ├── src/semantix_client/
+│       └── tests/
 ├── ops/
 │   ├── ci/
 │   ├── load-testing/
@@ -342,10 +347,19 @@ semantix/
 │   ├── linux/
 │   └── windows/
 ├── docs/
+├── .github/
+├── docker-compose.yml
 ├── docker-compose.dev.yml
 ├── docker-compose.prod.yml
 └── README.md
 ```
+
+`apps/server` adalah aplikasi FastAPI resmi untuk self-hosting; `apps/web` adalah
+web/workbench resmi. `packages/cache` berisi library utama **semantix-cache**,
+distribusi PyPI publik pertama yang direncanakan. `packages/client` berisi HTTP
+client opsional/referensi **semantix-client** yang tetap dipelihara dan saat ini
+tidak diwajibkan untuk rilis publik pertama tersebut. `ops` berisi tooling
+operasional, sedangkan `scripts` berisi tooling repository/developer.
 
 Backend dan frontend menggunakan kepemilikan feature-first. Lihat [Architecture](reference/architecture.md) untuk alur runtime dan batas paket.
 
@@ -366,7 +380,7 @@ Backend dan frontend menggunakan kepemilikan feature-first. Lihat [Architecture]
 |---|---|
 | [Getting started](guides/getting-started.md) | Setup lokal, file environment, dan alur kerja Docker |
 | [Providers](guides/providers.md) | Konfigurasi provider hosted, lokal, dan mock |
-| [Python SDK](../../../sdk/README.md) | Instalasi dan penggunaan HTTP client sinkron dan asinkron |
+| [Python SDK](../../../packages/client/README.md) | Instalasi dan penggunaan HTTP client sinkron dan asinkron |
 | [Architecture](reference/architecture.md) | Alur runtime, kepemilikan fitur, dan batas paket |
 | [Hardened deployment](operations/deployment.md) | Autentikasi, TLS, peran database, dan validasi produksi |
 | [Pengujian kapasitas](../../operations/load-testing.md#capacity-baseline-on-the-local-docker-host) | Profil beban, perangkat keras, hasil satu/dua replika, dan soak 1.000 VU |

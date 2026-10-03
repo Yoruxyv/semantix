@@ -5,15 +5,16 @@ FROM python:3.14-slim@sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5e
 COPY --from=uv /uv /uvx /bin/
 
 ENV UV_NO_CACHE=1 \
-    UV_PYTHON_DOWNLOADS=never
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PROJECT_ENVIRONMENT=/app/.venv
 
-WORKDIR /app
+WORKDIR /apps/server
 
-COPY backend/pyproject.toml backend/uv.lock ./
-COPY embedded /embedded
+COPY apps/server/pyproject.toml apps/server/uv.lock ./
+COPY packages/cache /packages/cache
 RUN uv sync --locked --no-dev --no-install-project
 
-COPY backend/app ./app
+COPY apps/server/app ./app
 RUN uv sync --locked --no-dev --no-editable
 
 FROM python:3.14-slim@sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5ebe91c401c8e83 AS runtime

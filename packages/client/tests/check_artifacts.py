@@ -1,4 +1,4 @@
-"""Validate release archives from ``sdk/dist`` without importing the backend."""
+"""Validate release archives from ``packages/client/dist`` without importing the backend."""
 
 import re
 import tarfile

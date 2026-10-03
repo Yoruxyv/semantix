@@ -4,7 +4,7 @@ Semantix dapat mengoreksi kesalahan ejaan bahasa Inggris yang umum dan pemisahan
 
 ## Konfigurasi
 
-Atur nilai berikut di `backend/.env`:
+Atur nilai berikut di `apps/server/.env`:
 
 ```env
 PROMPT_TYPO_CORRECTION_ENABLED=true

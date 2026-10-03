@@ -32,7 +32,7 @@ Default 4 MiB diberlakukan secara terpusat pada hosted provider dan Ollama. Resp
 
 ## Hosted provider
 
-Base URL hosted provider harus berupa URL HTTPS absolut tanpa kredensial, query, atau fragment yang disematkan. Simpan API key hanya di `backend/.env` atau deployment secret store.
+Base URL hosted provider harus berupa URL HTTPS absolut tanpa kredensial, query, atau fragment yang disematkan. Simpan API key hanya di `apps/server/.env` atau deployment secret store.
 
 ### Hugging Face
 
@@ -137,7 +137,7 @@ Semantix memanggil native Ollama API:
 * `POST /api/embed` untuk embeddings;
 * `POST /api/generate` dengan streaming dinonaktifkan untuk generation.
 
-Model Ollama dapat menggunakan beberapa gigabyte. Untuk berhenti menggunakan Ollama, pulihkan provider selector di `backend/.env`, buat ulang backend, lalu hapus model melalui Ollama:
+Model Ollama dapat menggunakan beberapa gigabyte. Untuk berhenti menggunakan Ollama, pulihkan provider selector di `apps/server/.env`, buat ulang backend, lalu hapus model melalui Ollama:
 
 ```bash
 ollama rm embeddinggemma
@@ -166,10 +166,10 @@ Mengubah embedding provider, model, atau dimensions akan menghasilkan embedding 
 
 ## Smoke test
 
-Generic smoke script menjalankan provider apa pun yang dipilih di `backend/.env`:
+Generic smoke script menjalankan provider apa pun yang dipilih di `apps/server/.env`:
 
 ```powershell
-cd backend
+cd apps/server
 
 python scripts/smoke_provider.py generation "Explain semantic caching"
 python scripts/smoke_provider.py embedding "Explain semantic caching"
@@ -181,7 +181,7 @@ Mock smoke test tidak memerlukan service eksternal. Ollama smoke test memerlukan
 
 Kembali ke [Getting started](getting-started.md) untuk membuka workbench.
 [Tur produk](../README.ID.md#tur-produk) menampilkan workspace saat ini, dan
-[Python SDK](../../../../sdk/README.md) menghubungkan aplikasi ke HTTP API publik
+[Python SDK](../../../../packages/client/README.md) menghubungkan aplikasi ke HTTP API publik
 yang sama.
 
 ## Tradeoff dan keamanan

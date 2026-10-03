@@ -20,7 +20,7 @@ RATE_LIMIT=100000/minute
 PROMPT_TYPO_CORRECTION_ENABLED=false
 ```
 
-Recreate the backend after changing `backend/.env`:
+Recreate the backend after changing `apps/server/.env`:
 
 ```powershell
 docker compose up --build --force-recreate -d backend frontend
@@ -303,7 +303,7 @@ The local `phase13-soak-20260927/summary.json` recorded 195,961 requests (324.4 
 The existing Python SDK integration suite ran through the **two-replica gateway URL** on a separate disposable stack, plus direct cross-replica shared-cache and threshold checks. The smoke exercised `SemantixClient`, `AsyncSemantixClient`, normal queries, miss/hit, per-request TTL, authentication, namespaces, `/health`, `/ready`, SDK 429 decoding after setting a disposable low quota, and SDK 5xx decoding after stopping only its disposable database:
 
 ```powershell
-sdk/.venv/Scripts/python.exe ops/load-testing/sdk_gateway_smoke.py `
+packages/client/.venv/Scripts/python.exe ops/load-testing/sdk_gateway_smoke.py `
   --output ops/load-testing/results/phase13-sdk-20260927.json
 ```
 

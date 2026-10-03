@@ -1,6 +1,6 @@
 # Python SDK agent instructions
 
-Read [root instructions](../AGENTS.md) and the [architecture](../ARCHITECTURE.md).
+Read [root instructions](../../AGENTS.md) and the [architecture](../../ARCHITECTURE.md).
 semantix-client is an independently installable public
 HTTP client, even while its release remains unpublished.
 
@@ -43,7 +43,7 @@ HTTP client, even while its release remains unpublished.
 - Add focused unit checks with httpx.MockTransport and a real-HTTP integration check
   when a public boundary changes. Check sync/async parity, bounds, lifecycle, safe
   errors, and no unintended retry.
-- Run focused pytest from sdk, then the relevant Ruff, mypy, and unit gates in
-  [quality.yml](../.github/workflows/quality.yml). For package changes, build
+- Run focused pytest from packages/client, then the relevant Ruff, mypy, and unit gates in
+  [quality.yml](../../.github/workflows/quality.yml). For package changes, build
   wheel/sdist, run twine check, inspect contents, and verify clean installation without
   backend packages. Live integration tests require a disposable Semantix server.

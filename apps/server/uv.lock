@@ -947,7 +947,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.1.0,<8" },
     { name = "python-dotenv", specifier = ">=1.2.3,<2" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.16.3,<0.17" },
-    { name = "semantix-cache", editable = "../embedded" },
+    { name = "semantix-cache", editable = "../../packages/cache" },
     { name = "slowapi", specifier = ">=0.1.10,<1" },
     { name = "symspellpy", specifier = ">=6.10.0,<7" },
     { name = "tenacity", specifier = ">=9.1.4,<10" },
@@ -958,7 +958,7 @@ provides-extras = ["dev"]
 [[package]]
 name = "semantix-cache"
 version = "0.1.0"
-source = { editable = "../embedded" }
+source = { editable = "../../packages/cache" }
 dependencies = [
     { name = "numpy" },
     { name = "pydantic" },

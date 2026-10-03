@@ -78,7 +78,7 @@ $env:AUTH_PRINCIPALS = ConvertTo-Json -InputObject @(
 $UpstreamFile = Join-Path (Get-Location).Path (
     "semantix-smoke-upstream-" + [guid]::NewGuid().ToString("N") + ".conf"
 )
-Copy-Item -LiteralPath "frontend/upstream.prod.conf" -Destination $UpstreamFile
+Copy-Item -LiteralPath "apps/web/upstream.prod.conf" -Destination $UpstreamFile
 $env:SEMANTIX_UPSTREAM_FILE = $UpstreamFile
 
 try {

@@ -85,31 +85,43 @@ Monitor trace sengaja disimpan dalam memori browser. Memuat ulang (reload) akan 
 
 ```text
 semantix/
-├── backend/
-│   ├── app/
-│   │   ├── api/
-│   │   ├── benchmark/{api,application,domain}/
-│   │   ├── cache/{api,application,domain,infrastructure}/
-│   │   ├── embedding/
-│   │   ├── observability/
-│   │   ├── providers/{adapters,shared}/
-│   │   ├── query/{api,application,domain}/
-│   │   ├── core/
-│   │   ├── factory.py
-│   │   ├── lifecycle.py
-│   │   └── main.py
-│   └── tests/                    # Mencerminkan kepemilikan fitur
-├── frontend/
-│   ├── src/
+├── apps/
+│   ├── server/
 │   │   ├── app/
-│   │   ├── features/
-│   │   └── shared/
-│   └── tests/                    # Mencerminkan app dan features
+│   │   │   ├── api/
+│   │   │   ├── benchmark/{api,application,domain}/
+│   │   │   ├── cache/{api,application,domain,infrastructure}/
+│   │   │   ├── embedding/
+│   │   │   ├── observability/
+│   │   │   ├── providers/{adapters,shared}/
+│   │   │   ├── query/{api,application,domain}/
+│   │   │   ├── core/
+│   │   │   ├── factory.py
+│   │   │   ├── lifecycle.py
+│   │   │   └── main.py
+│   │   └── tests/                    # Mencerminkan kepemilikan fitur
+│   └── web/
+│       ├── src/
+│       │   ├── app/
+│       │   ├── features/
+│       │   └── shared/
+│       └── tests/                    # Mencerminkan app dan features
+├── packages/
+│   ├── cache/
+│   │   ├── src/semantix_cache/
+│   │   └── tests/
+│   └── client/
+│       ├── src/semantix_client/
+│       └── tests/
 ├── ops/
 │   ├── postgres/
 │   └── load-testing/
 ├── docs/
-└── docker-compose.yml
+├── scripts/
+├── .github/
+├── docker-compose.yml
+├── docker-compose.dev.yml
+└── docker-compose.prod.yml
 ```
 
 ## Batasan Deployment

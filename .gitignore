@@ -18,17 +18,17 @@ __pycache__/
 *.egg-info/
 
 node_modules/
-frontend/dist/
+apps/web/dist/
 coverage/
-frontend/playwright-report/
-frontend/test-results/
-frontend/lighthouse-reports/
-sdk/build/
-sdk/dist/
-embedded/build/
-embedded/dist/
+apps/web/playwright-report/
+apps/web/test-results/
+apps/web/lighthouse-reports/
+packages/client/build/
+packages/client/dist/
+packages/cache/build/
+packages/cache/dist/
 .vite_cache/
-frontend/.vite-cache
+apps/web/.vite-cache
 .lycheecache
 
 .vscode/settings.json

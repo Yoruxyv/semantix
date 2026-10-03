@@ -4,7 +4,7 @@ Semantix menggunakan cache in-memory secara default. Backend pgvector opsional m
 
 ## Konfigurasi
 
-Atur nilai berikut di `backend/.env`:
+Atur nilai berikut di `apps/server/.env`:
 
 ```env
 CACHE_BACKEND=pgvector
@@ -127,7 +127,7 @@ Integration test tidak pernah menggunakan `DATABASE_URL` secara implisit. Arahka
 $env:PGVECTOR_TEST_DATABASE_URL = `
   "postgresql://semantix:semantix@localhost:5433/semantix"
 
-cd backend
+cd apps/server
 .\.venv\Scripts\python.exe -m pytest -m pgvector
 ```
 

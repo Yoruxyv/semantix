@@ -66,11 +66,11 @@ jobs:
         include:
           - name: backend
             context: .
-            dockerfile: backend/Dockerfile
+            dockerfile: apps/server/Dockerfile
             image: semantix-ci-backend:scan
           - name: frontend
-            context: frontend
-            dockerfile: frontend/Dockerfile
+            context: apps/web
+            dockerfile: apps/web/Dockerfile
             image: semantix-ci-frontend:scan
     steps:
       - name: Check out repository
@@ -117,7 +117,7 @@ jobs:
       - name: Build backend with provenance metadata
         run: >-
           docker buildx build
-          --file backend/Dockerfile
+          --file apps/server/Dockerfile
           --load
           --metadata-file supply-chain/backend.provenance.json
           --tag semantix-sbom-backend:ci
@@ -126,11 +126,11 @@ jobs:
       - name: Build frontend with provenance metadata
         run: >-
           docker buildx build
-          --file frontend/Dockerfile
+          --file apps/web/Dockerfile
           --load
           --metadata-file supply-chain/frontend.provenance.json
           --tag semantix-sbom-frontend:ci
-          frontend
+          apps/web
 
       - name: Generate backend SPDX SBOM
         uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2

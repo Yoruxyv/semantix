@@ -88,7 +88,7 @@ def test_trusted_proxy_clients_receive_independent_limits() -> None:
 
 
 def test_production_gateway_requires_authenticated_host_proxy() -> None:
-    frontend = Path(__file__).resolve().parents[3] / "frontend"
+    frontend = Path(__file__).resolve().parents[3] / "web"
     nginx_config = (frontend / "nginx.conf").read_text(encoding="utf-8")
     assert "map_hash_bucket_size 128;" in nginx_config
     assert (

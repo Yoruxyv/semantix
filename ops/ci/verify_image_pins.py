@@ -23,8 +23,8 @@ def load_approved_images() -> tuple[set[str], dict[str, dict[str, object]]]:
 def docker_references() -> list[tuple[Path, str]]:
     references: list[tuple[Path, str]] = []
     dockerfiles = [
-        *ROOT.glob("backend/Dockerfile*"),
-        *ROOT.glob("frontend/Dockerfile*"),
+        *ROOT.glob("apps/server/Dockerfile*"),
+        *ROOT.glob("apps/web/Dockerfile*"),
     ]
     for path in dockerfiles:
         content = path.read_text(encoding="utf-8")

@@ -126,7 +126,7 @@ with SemantixClient(base_url="http://localhost:8000") as client:
 print(result.response, result.cache_hit)
 ```
 
-[Full Python SDK guide →](sdk/README.md)
+[Full Python SDK guide →](packages/client/README.md)
 
 ## 🚀 Quick start
 
@@ -141,7 +141,7 @@ Linux or macOS:
 ```bash
 git clone https://github.com/Yoruxyv/semantix.git
 cd semantix
-cp backend/.env.example backend/.env
+cp apps/server/.env.example apps/server/.env
 ```
 
 Windows PowerShell:
@@ -149,12 +149,12 @@ Windows PowerShell:
 ```powershell
 git clone https://github.com/Yoruxyv/semantix.git
 Set-Location semantix
-Copy-Item backend\.env.example backend\.env
+Copy-Item apps\server\.env.example apps\server\.env
 ```
 
 ### 2. Configure local development
 
-For a zero-key persistent setup, use these values in `backend/.env`:
+For a zero-key persistent setup, use these values in `apps/server/.env`:
 
 ```env
 EMBEDDING_PROVIDER=mock
@@ -179,7 +179,7 @@ public deployment.
 
 To use Hugging Face, OpenAI, Anthropic, Gemini, or Ollama, see
 [Providers](docs/guides/providers.md). For every environment option, see
-[Getting started](docs/guides/getting-started.md) and `backend/.env.example`.
+[Getting started](docs/guides/getting-started.md) and `apps/server/.env.example`.
 
 ### 3. Start the complete development stack
 
@@ -292,7 +292,7 @@ limitations.
 
 ### Backend cache setup
 
-Backend tool caches are centralized under `backend/.cache/`. Enable the Python
+Backend tool caches are centralized under `apps/server/.cache/`. Enable the Python
 bytecode cache redirect before running backend commands.
 
 From the repository root:
@@ -300,16 +300,16 @@ From the repository root:
 Windows PowerShell:
 
 ```powershell
-. .\backend\scripts\windows\enable_cache.ps1
+. .\apps\server\scripts\windows\enable_cache.ps1
 ```
 
 Linux or macOS:
 
 ```bash
-source backend/scripts/linux/enable_cache.sh
+source apps/server/scripts/linux/enable_cache.sh
 ```
 
-When already inside `backend/`:
+When already inside `apps/server/`:
 
 Windows PowerShell:
 
@@ -325,18 +325,18 @@ source scripts/linux/enable_cache.sh
 
 The leading dot in PowerShell and `source` in Bash are required so
 `PYTHONPYCACHEPREFIX` remains active in the current terminal. Ruff, mypy, and
-pytest use their cache paths from `backend/pyproject.toml`.
+pytest use their cache paths from `apps/server/pyproject.toml`.
 
 To remove generated caches and editable-install metadata:
 
 ```powershell
-.\backend\scripts\windows\clean_artifacts.ps1
+.\apps\server\scripts\windows\clean_artifacts.ps1
 ```
 
 For Linux or macOS:
 
 ```bash
-bash backend/scripts/linux/clean_artifacts.sh
+bash apps/server/scripts/linux/clean_artifacts.sh
 ```
 
 Platform-specific automation lives in `windows/` and `linux/` directories.
@@ -378,7 +378,7 @@ caches, virtual environments, and build output are excluded automatically.
 Backend:
 
 ```bash
-cd backend
+cd apps/server
 uv sync --locked --extra dev
 uv run --locked pytest
 uv run --locked ruff check .
@@ -389,7 +389,7 @@ uv run --locked mypy app tests scripts
 Frontend:
 
 ```bash
-cd frontend
+cd apps/web
 npm ci
 npm run lint
 npm run imports:check
@@ -404,11 +404,16 @@ rules, and contribution steps.
 
 ```text
 semantix/
-├── backend/
-├── frontend/
-├── sdk/
-│   ├── src/
-│   └── tests/
+├── apps/
+│   ├── server/
+│   └── web/
+├── packages/
+│   ├── cache/
+│   │   ├── src/semantix_cache/
+│   │   └── tests/
+│   └── client/
+│       ├── src/semantix_client/
+│       └── tests/
 ├── ops/
 │   ├── ci/
 │   ├── load-testing/
@@ -418,10 +423,19 @@ semantix/
 │   ├── linux/
 │   └── windows/
 ├── docs/
+├── .github/
+├── docker-compose.yml
 ├── docker-compose.dev.yml
 ├── docker-compose.prod.yml
 └── README.md
 ```
+
+`apps/server` is the official self-hosted FastAPI application; `apps/web` is
+the official web/workbench. `packages/cache` contains the primary reusable
+**semantix-cache** library, the intended first public PyPI distribution.
+`packages/client` contains the maintained optional/reference **semantix-client**
+HTTP client, which is not currently required for that first release. `ops` holds
+operational tooling and `scripts` holds repository/developer tooling.
 
 The backend and frontend use feature-first ownership. See
 [Architecture](docs/reference/architecture.md) for the runtime flow and package
@@ -449,7 +463,7 @@ The [documentation index](docs/README.md) groups the full guides by purpose.
 |---|---|
 | [Getting started](docs/guides/getting-started.md) | Local setup, environment files, and Docker workflows |
 | [Providers](docs/guides/providers.md) | Hosted, local, and mock provider configuration |
-| [Python SDK](sdk/README.md) | Install and use the typed public HTTP client |
+| [Python SDK](packages/client/README.md) | Install and use the typed public HTTP client |
 | [Architecture](docs/reference/architecture.md) | Runtime flow, feature ownership, and package boundaries |
 | [Hardened deployment](docs/operations/deployment.md) | Authentication, TLS, database roles, and production validation |
 | [Capacity testing](docs/operations/load-testing.md#capacity-baseline-on-the-local-docker-host) | Load profiles, hardware, one/two-replica results, and the 1,000-VU soak |

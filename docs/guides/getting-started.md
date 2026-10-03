@@ -13,7 +13,7 @@ Clone the repository and create the backend environment file:
 ```bash
 git clone https://github.com/Yoruxyv/semantix.git
 cd semantix
-cp backend/.env.example backend/.env
+cp apps/server/.env.example apps/server/.env
 ```
 
 Windows PowerShell:
@@ -21,7 +21,7 @@ Windows PowerShell:
 ```powershell
 git clone https://github.com/Yoruxyv/semantix.git
 Set-Location semantix
-Copy-Item backend\.env.example backend\.env
+Copy-Item apps\server\.env.example apps\server\.env
 ```
 
 For a network-free development configuration, set:
@@ -62,7 +62,7 @@ All published development ports bind to `127.0.0.1` by default:
 
 Open the frontend and run a Monitor query. The [product tour](../../README.md#product-tour)
 shows the current Cache Inspector, Evaluations, and Observability views. For
-requests from a Python application, continue with the [Python SDK](../../sdk/README.md).
+requests from a Python application, continue with the [Python SDK](../../packages/client/README.md).
 
 The development frontend image installs Node dependencies and runs the Vite
 development server with HMR; it does not compile production frontend assets.
@@ -71,7 +71,7 @@ hardened frontend image performs the production build described later in this
 guide. For reliable bind-mount updates when native notifications are
 unavailable, the development stack polls for frontend and backend source
 changes once per second. Vite ignores generated coverage output, and Uvicorn
-reloads only for changes under `backend/app`. The hardened stack is unaffected.
+reloads only for changes under `apps/server/app`. The hardened stack is unaffected.
 
 Changes normally appear within about one second. If they do not, confirm that
 Docker Desktop can share the repository drive, then recreate the affected
@@ -103,7 +103,7 @@ The development commands keep the repository's existing `semantix` Compose proje
 Backend:
 
 ```bash
-cd backend
+cd apps/server
 uv sync --locked --extra dev
 source .venv/bin/activate
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
@@ -122,12 +122,12 @@ container dependency resolution aligned.
 Frontend:
 
 ```bash
-cd frontend
+cd apps/web
 npm ci
 npm run dev
 ```
 
-Set `VITE_API_BASE_URL=http://localhost:8000` in `frontend/.env` for local Vite development.
+Set `VITE_API_BASE_URL=http://localhost:8000` in `apps/web/.env` for local Vite development.
 
 ## Hardened deployment
 
@@ -192,7 +192,7 @@ Named volumes are preserved. Adding `--volumes` permanently removes PostgreSQL d
 Backend:
 
 ```bash
-cd backend
+cd apps/server
 uv run --locked pytest
 uv run --locked ruff check .
 uv run --locked ruff format --check .
@@ -202,7 +202,7 @@ uv run --locked mypy app tests scripts
 Frontend:
 
 ```bash
-cd frontend
+cd apps/web
 npm ci
 npm run lint
 npm run imports:check

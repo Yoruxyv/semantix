@@ -48,7 +48,7 @@ cannot fit within the default.
 ## Hosted providers
 
 Hosted-provider base URLs must be absolute HTTPS URLs without embedded
-credentials, queries, or fragments. Store API keys only in `backend/.env` or a
+credentials, queries, or fragments. Store API keys only in `apps/server/.env` or a
 deployment secret store.
 
 ### Hugging Face
@@ -165,7 +165,7 @@ Semantix calls the native Ollama API:
 - `POST /api/generate` with streaming disabled for generation.
 
 Ollama models may consume several gigabytes. To stop using Ollama, restore the
-provider selectors in `backend/.env`, recreate the backend, then delete models
+provider selectors in `apps/server/.env`, recreate the backend, then delete models
 through Ollama:
 
 ```bash
@@ -207,10 +207,10 @@ restarts.
 ## Smoke tests
 
 The generic smoke script exercises whichever provider is selected in
-`backend/.env`:
+`apps/server/.env`:
 
 ```powershell
-cd backend
+cd apps/server
 
 python scripts/smoke_provider.py generation "Explain semantic caching"
 python scripts/smoke_provider.py embedding "Explain semantic caching"
@@ -223,7 +223,7 @@ to be running with the configured models already available.
 
 Return to [Getting started](getting-started.md) to open the workbench. The
 [product tour](../../README.md#product-tour) shows its current views, and the
-[Python SDK](../../sdk/README.md) connects an application to the same public API.
+[Python SDK](../../packages/client/README.md) connects an application to the same public API.
 
 ## Tradeoffs and security
 

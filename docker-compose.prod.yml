@@ -25,7 +25,7 @@ services:
   migrate:
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: apps/server/Dockerfile
     command:
       - python
       - -m
@@ -49,7 +49,7 @@ services:
   backend-a: &backend-service
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: apps/server/Dockerfile
     environment:
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-mock}
       GENERATION_PROVIDER: ${GENERATION_PROVIDER:-mock}
@@ -137,7 +137,7 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ./apps/web
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ""
@@ -145,11 +145,11 @@ services:
       - "${SEMANTIX_BIND_ADDRESS:-127.0.0.1}:${SEMANTIX_PORT:-8080}:8080"
     volumes:
       - type: bind
-        source: ${SEMANTIX_HOST_PROXY_RULE_FILE:-./frontend/host-proxy.disabled.conf}
+        source: ${SEMANTIX_HOST_PROXY_RULE_FILE:-./apps/web/host-proxy.disabled.conf}
         target: /etc/nginx/host-proxy.conf
         read_only: true
       - type: bind
-        source: ${SEMANTIX_UPSTREAM_FILE:-./frontend/upstream.prod.conf}
+        source: ${SEMANTIX_UPSTREAM_FILE:-./apps/web/upstream.prod.conf}
         target: /etc/nginx/semantix-upstream.conf
         read_only: true
     depends_on:

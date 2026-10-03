@@ -22,19 +22,19 @@ services:
   backend:
     build:
       context: .
-      dockerfile: backend/Dockerfile.dev
+      dockerfile: apps/server/Dockerfile.dev
     env_file:
-      - ./backend/.env
+      - ./apps/server/.env
     environment:
       DATABASE_MIGRATION_MODE: auto
       TRUSTED_PROXY_CIDRS: "[]"
       WATCHFILES_FORCE_POLLING: "true"
       WATCHFILES_POLL_DELAY_MS: "1000"
     volumes:
-      - ./backend/app:/app/app
-      - ./backend/tests:/app/tests
-      - ./backend/scripts:/app/scripts
-      - ./embedded/src:/embedded/src
+      - ./apps/server/app:/apps/server/app
+      - ./apps/server/tests:/apps/server/tests
+      - ./apps/server/scripts:/apps/server/scripts
+      - ./packages/cache/src:/packages/cache/src
     command:
       - uvicorn
       - app.main:app
@@ -44,7 +44,7 @@ services:
       - "8000"
       - --reload
       - --reload-dir
-      - /app/app
+      - /apps/server/app
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     healthcheck:
@@ -66,12 +66,12 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ./apps/web
       dockerfile: Dockerfile.dev
     environment:
       VITE_API_BASE_URL: http://localhost:8000
     volumes:
-      - ./frontend:/app
+      - ./apps/web:/app
       - /app/node_modules
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-4173}:4173"

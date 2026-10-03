@@ -78,8 +78,8 @@ function Test-DocumentationCandidate {
 
     if (
         $NormalizedPath -like "docs/*" -or
-        $NormalizedPath -like "backend/tests/*" -or
-        $NormalizedPath -like "frontend/tests/*" -or
+        $NormalizedPath -like "apps/server/tests/*" -or
+        $NormalizedPath -like "apps/web/tests/*" -or
         $NormalizedPath -like ".github/ISSUE_TEMPLATE/*" -or
         $Name -eq "__init__.py" -or
         $Name -in @("package.json", "package-lock.json", "uv.lock")

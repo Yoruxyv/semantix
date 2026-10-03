@@ -14,7 +14,7 @@ Configured embedding and generation providers are external to the cache service;
 mock provider supports deterministic local use. The live cache is either process memory
 or PostgreSQL with pgvector, according to settings.
 
-An independently installable [semantix-cache](embedded/README.md) supplies the async
+An independently installable [semantix-cache](packages/cache/README.md) supplies the async
 embedded facade and bounded MemoryStore for applications that do not run this server.
 It accepts structural embedding adapters and application-owned async generation.
 Its private semantic core owns canonicalization, keys, namespace rules, vector
@@ -43,13 +43,27 @@ are disabled, the generation provider receives the original prompt. Successful,
 nonempty, bounded output is stored only when the policy permits writes. Private and
 bypass policies neither read nor write the live cache. The response reports hit,
 similarity, match, provider-call, and latency evidence.
-[query schema](backend/app/query/api/schemas.py) and
-[cache policies](backend/app/query/domain/policies.py) define the exact fields and modes.
+[query schema](apps/server/app/query/api/schemas.py) and
+[cache policies](apps/server/app/query/domain/policies.py) define the exact fields and modes.
+
+## Repository layout
+
+| Path | Role |
+|---|---|
+| `apps/server/` | Official self-hosted FastAPI application |
+| `apps/web/` | Official web/workbench application |
+| `packages/cache/` | Primary reusable semantix-cache library |
+| `packages/client/` | Maintained optional/reference semantix-client HTTP client |
+| `ops/` | Operational and deployment tooling |
+| `scripts/` | Repository and developer tooling |
+
+Each Python project retains its own `pyproject.toml` and lockfile. The web app
+retains its independent Node project. Compose entry points remain at the root.
 
 ## Backend ownership
 
-- [app/api](backend/app/api/router.py) composes feature routes;
-  [factory](backend/app/factory.py) and [lifespan](backend/app/lifecycle.py) construct
+- [app/api](apps/server/app/api/router.py) composes feature routes;
+  [factory](apps/server/app/factory.py) and [lifespan](apps/server/app/lifecycle.py) construct
   shared dependencies.
 - app/query owns the query HTTP contract, policy and normalization rules, coalescing,
   and lookup/generation orchestration.
@@ -109,8 +123,8 @@ ordered packaged migrations within each owner, and SHA-256 checksums. Developmen
 apply enabled migrations automatically. Hardened Compose runs a one-shot migration
 service with a migration role before backends start; backend runtime uses a separately
 granted role and external migration mode. See
-[pool lifecycle](backend/app/infrastructure/lifecycle.py),
-[migrator](backend/app/infrastructure/migrate.py), and
+[pool lifecycle](apps/server/app/infrastructure/lifecycle.py),
+[migrator](apps/server/app/infrastructure/migrate.py), and
 [deployment](docs/operations/deployment.md).
 
 ## Production and failure boundaries

@@ -11,7 +11,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-cp frontend/upstream.prod.conf "$upstream_file"
+cp apps/web/upstream.prod.conf "$upstream_file"
 chmod 644 "$upstream_file"
 export SEMANTIX_UPSTREAM_FILE="$upstream_file"
 

@@ -41,7 +41,7 @@
 
 ```text
 # Example:
-# cd backend
+# cd apps/server
 # python -m pytest
 # python -m ruff check .
 ```

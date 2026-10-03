@@ -20,7 +20,7 @@ is_documentation_candidate() {
   esac
 
   case "$path" in
-    docs/*|backend/tests/*|frontend/tests/*|.github/ISSUE_TEMPLATE/*)
+    docs/*|apps/server/tests/*|apps/web/tests/*|.github/ISSUE_TEMPLATE/*)
       return 1
       ;;
   esac

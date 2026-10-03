@@ -149,7 +149,7 @@ application with appropriate care.
 **semantix-client**, imported as **semantix_client**, remains the independent HTTP
 client for a Semantix service. It has no embedded/local-mode switch.
 
-Optional [provider adapters and custom integrations](../docs/embedded-providers.md)
+Optional [provider adapters and custom integrations](../../docs/embedded-providers.md)
 use borrowed HTTP clients; install only the HTTP extra you need. The default core
 keeps its NumPy/Pydantic dependency boundary. PostgreSQL storage is not implemented.
 
@@ -157,8 +157,8 @@ From this directory, contributor checks are:
 
 ~~~text
 uv sync --locked --extra dev
-uv run --no-sync ruff check --config ../ruff.toml .
-uv run --no-sync ruff format --config ../ruff.toml --check .
+uv run --no-sync ruff check --config ../../ruff.toml .
+uv run --no-sync ruff format --config ../../ruff.toml --check .
 uv run --no-sync mypy src tests examples
 uv run --no-sync pytest --cov=semantix_cache
 uv run --no-sync python examples/custom_integration.py

@@ -121,11 +121,11 @@ def main() -> None:
                 "-p",
                 "127.0.0.1::8080",
                 "-v",
-                f"{ROOT / 'frontend' / 'nginx.conf'}:/etc/nginx/conf.d/default.conf:ro",
+                f"{ROOT / 'apps' / 'web' / 'nginx.conf'}:/etc/nginx/conf.d/default.conf:ro",
                 "-v",
-                f"{ROOT / 'frontend' / 'upstream.prod.conf'}:/etc/nginx/semantix-upstream.conf:ro",
+                f"{ROOT / 'apps' / 'web' / 'upstream.prod.conf'}:/etc/nginx/semantix-upstream.conf:ro",
                 "-v",
-                f"{ROOT / 'frontend' / 'host-proxy.disabled.conf'}:/etc/nginx/host-proxy.conf:ro",
+                f"{ROOT / 'apps' / 'web' / 'host-proxy.disabled.conf'}:/etc/nginx/host-proxy.conf:ro",
                 NGINX_IMAGE,
             )
             port = int(run("docker", "port", gateway, "8080/tcp").rsplit(":", 1)[1])

@@ -168,31 +168,43 @@ independent pools, ledgers, or startup lifecycles.
 
 ```text
 semantix/
-├── backend/
-│   ├── app/
-│   │   ├── api/
-│   │   ├── benchmark/{api,application,domain}/
-│   │   ├── cache/{api,application,domain,infrastructure}/
-│   │   ├── embedding/
-│   │   ├── observability/
-│   │   ├── providers/{adapters,shared}/
-│   │   ├── query/{api,application,domain}/
-│   │   ├── core/
-│   │   ├── factory.py
-│   │   ├── lifecycle.py
-│   │   └── main.py
-│   └── tests/                    # Mirrors feature ownership
-├── frontend/
-│   ├── src/
+├── apps/
+│   ├── server/
 │   │   ├── app/
-│   │   ├── features/
-│   │   └── shared/
-│   └── tests/                    # Mirrors app and features
+│   │   │   ├── api/
+│   │   │   ├── benchmark/{api,application,domain}/
+│   │   │   ├── cache/{api,application,domain,infrastructure}/
+│   │   │   ├── embedding/
+│   │   │   ├── observability/
+│   │   │   ├── providers/{adapters,shared}/
+│   │   │   ├── query/{api,application,domain}/
+│   │   │   ├── core/
+│   │   │   ├── factory.py
+│   │   │   ├── lifecycle.py
+│   │   │   └── main.py
+│   │   └── tests/                    # Mirrors feature ownership
+│   └── web/
+│       ├── src/
+│       │   ├── app/
+│       │   ├── features/
+│       │   └── shared/
+│       └── tests/                    # Mirrors app and features
+├── packages/
+│   ├── cache/
+│   │   ├── src/semantix_cache/
+│   │   └── tests/
+│   └── client/
+│       ├── src/semantix_client/
+│       └── tests/
 ├── ops/
 │   ├── postgres/
 │   └── load-testing/
 ├── docs/
-└── docker-compose.yml
+├── scripts/
+├── .github/
+├── docker-compose.yml
+├── docker-compose.dev.yml
+└── docker-compose.prod.yml
 ```
 
 ## Deployment boundary

@@ -73,7 +73,7 @@ AUTH_PRINCIPALS=[{"name":"ops-admin","token_sha256":"<64-lowercase-hex>","role":
 
 Simpan original token di secret manager. Rotasi token berarti membuat token baru, mengganti digest-nya, dan melakukan recreate backend container.
 
-Untuk local Docker development, `docker-compose.dev.yml` membaca kedua value dari `backend/.env`. Setelah mengubah value apa pun dalam file tersebut, recreate backend container agar Compose memberikan environment baru. Plain container restart tidak memuat ulang environment value yang telah berubah. Image rebuild tidak diperlukan untuk perubahan environment saja.
+Untuk local Docker development, `docker-compose.dev.yml` membaca kedua value dari `apps/server/.env`. Setelah mengubah value apa pun dalam file tersebut, recreate backend container agar Compose memberikan environment baru. Plain container restart tidak memuat ulang environment value yang telah berubah. Image rebuild tidak diperlukan untuk perubahan environment saja.
 
 Dari repository root di Windows PowerShell:
 
