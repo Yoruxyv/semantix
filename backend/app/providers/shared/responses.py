@@ -1,14 +1,11 @@
 from app.core.exceptions import InvalidProviderResponseError
-from app.core.limits import MAX_RESPONSE_LENGTH
+from semantix_cache._semantics import valid_response
 
 
 def validate_generation_response(value: object) -> str:
-    if (
-        not isinstance(value, str)
-        or not value.strip()
-        or len(value) > MAX_RESPONSE_LENGTH
-    ):
+    try:
+        return valid_response(value)
+    except ValueError:
         raise InvalidProviderResponseError(
             "Generation provider returned an invalid response"
-        )
-    return value
+        ) from None

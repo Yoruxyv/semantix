@@ -9,10 +9,11 @@ ENV UV_NO_CACHE=1 \
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./
+COPY backend/pyproject.toml backend/uv.lock ./
+COPY embedded /embedded
 RUN uv sync --locked --no-dev --no-install-project
 
-COPY app ./app
+COPY backend/app ./app
 RUN uv sync --locked --no-dev --no-editable
 
 FROM python:3.14-slim@sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5ebe91c401c8e83 AS runtime

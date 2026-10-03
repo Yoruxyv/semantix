@@ -15,8 +15,8 @@ from app.cache.domain.namespaces import (
 )
 from app.cache.domain.protocols import CacheBackend, CacheEventRecorder, ThresholdStore
 from app.core.exceptions import CacheEntryNotFoundError
-from app.core.limits import MAX_REQUEST_CACHE_TTL_SECONDS
 from app.providers.protocols import EmbeddingGenerator
+from semantix_cache._semantics import resolve_ttl, threshold_eligible
 
 
 def _preserve_prompt(prompt: str) -> str:
@@ -49,16 +49,12 @@ class SemanticCache:
         return self._similarity_threshold
 
     def resolve_ttl(self, requested_ttl_seconds: float | None) -> float | None:
-        default_ttl_seconds = self._backend.default_ttl_seconds
-        if requested_ttl_seconds is None:
-            return None if default_ttl_seconds is None else float(default_ttl_seconds)
-        if not 0 < requested_ttl_seconds <= MAX_REQUEST_CACHE_TTL_SECONDS:
-            raise ValueError("cache_ttl_seconds is outside the supported range")
-        return float(
-            requested_ttl_seconds
-            if default_ttl_seconds is None
-            else min(requested_ttl_seconds, default_ttl_seconds)
-        )
+        try:
+            return resolve_ttl(requested_ttl_seconds, self._backend.default_ttl_seconds)
+        except ValueError:
+            raise ValueError(
+                "cache_ttl_seconds is outside the supported range"
+            ) from None
 
     def update_similarity_threshold(self, threshold: float) -> float:
         if not 0 <= threshold <= 1:
@@ -98,7 +94,7 @@ class SemanticCache:
 
         if (
             candidate is not None
-            and candidate.similarity_score >= similarity_threshold
+            and threshold_eligible(candidate.similarity_score, similarity_threshold)
             and await self._backend.record_hit(
                 candidate.entry.cache_key,
                 expected_created_at=candidate.entry.created_at,

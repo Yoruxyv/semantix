@@ -14,6 +14,7 @@ from app.query.domain.policies import (
     DEFAULT_QUERY_CACHE_POLICY,
     QueryCachePolicy,
 )
+from semantix_cache._semantics import resolve_flow, validate_ttl_policy
 
 logger = logging.getLogger(__name__)
 
@@ -64,10 +65,9 @@ class QueryService:
         if self._metrics is not None:
             self._metrics.record_request_started()
         try:
-            if policy.cache_ttl_seconds is not None and not policy.write_enabled:
-                raise ValueError(
-                    "cache_ttl_seconds requires a cache policy that permits writes"
-                )
+            validate_ttl_policy(
+                policy.cache_ttl_seconds, write_enabled=policy.write_enabled
+            )
             effective_policy: QueryCachePolicy = replace(
                 policy,
                 cache_ttl_seconds=(
@@ -133,33 +133,44 @@ class QueryService:
         prompt: str,
         policy: QueryCachePolicy,
     ) -> _QueryResolution:
-        lookup = None
-        if policy.read_enabled:
-            lookup = await self._cache.lookup(
+        async def lookup() -> CacheLookupResult:
+            return await self._cache.lookup(
                 prompt,
                 namespace=policy.namespace,
             )
 
-        if lookup is not None and lookup.cache_hit:
-            if lookup.response is None:
-                raise RuntimeError("Validated cache hit had no response")
-            return _QueryResolution(lookup=lookup, response=lookup.response)
+        def hit_response(found: CacheLookupResult | None) -> str | None:
+            if found is not None and found.cache_hit:
+                if found.response is None:
+                    raise RuntimeError("Validated cache hit had no response")
+                return found.response
+            return None
 
-        if self._metrics is not None:
-            self._metrics.record_provider_call()
-        response = validate_generation_response(
-            await self._generation_provider.generate(prompt)
-        )
+        async def generate() -> str:
+            if self._metrics is not None:
+                self._metrics.record_provider_call()
+            return validate_generation_response(
+                await self._generation_provider.generate(prompt)
+            )
 
-        if policy.write_enabled:
+        async def write(response: str, found: CacheLookupResult | None) -> None:
             await self._cache.store(
                 prompt,
                 response,
-                None if lookup is None else lookup.embedding,
+                None if found is None else found.embedding,
                 namespace=policy.namespace,
                 ttl_seconds=policy.cache_ttl_seconds,
             )
-        return _QueryResolution(lookup=lookup, response=response)
+
+        found, response = await resolve_flow(
+            read_enabled=policy.read_enabled,
+            write_enabled=policy.write_enabled,
+            lookup=lookup,
+            hit_response=hit_response,
+            generate=generate,
+            write=write,
+        )
+        return _QueryResolution(lookup=found, response=response)
 
     @staticmethod
     def _entry_age_seconds(

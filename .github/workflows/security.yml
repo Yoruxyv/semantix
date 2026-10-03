@@ -65,7 +65,7 @@ jobs:
       matrix:
         include:
           - name: backend
-            context: backend
+            context: .
             dockerfile: backend/Dockerfile
             image: semantix-ci-backend:scan
           - name: frontend
@@ -121,7 +121,7 @@ jobs:
           --load
           --metadata-file supply-chain/backend.provenance.json
           --tag semantix-sbom-backend:ci
-          backend
+          .
 
       - name: Build frontend with provenance metadata
         run: >-

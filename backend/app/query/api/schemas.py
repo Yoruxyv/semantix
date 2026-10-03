@@ -1,4 +1,3 @@
-import re
 from datetime import datetime
 
 from pydantic import Field, field_validator, model_validator
@@ -11,9 +10,7 @@ from app.core.limits import (
     MAX_RESPONSE_LENGTH,
 )
 from app.query.domain.policies import QueryCachePolicy
-
-_CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
-_REPEATED_WHITESPACE = re.compile(r"[ \t]+")
+from semantix_cache._semantics import sanitize_prompt
 
 
 class QueryRequest(StrictModel):
@@ -35,9 +32,7 @@ class QueryRequest(StrictModel):
     def sanitize_prompt(cls, value: object) -> object:
         if not isinstance(value, str):
             return value
-        return _REPEATED_WHITESPACE.sub(
-            " ", _CONTROL_CHARACTERS.sub(" ", value)
-        ).strip()
+        return sanitize_prompt(value)
 
     @model_validator(mode="after")
     def validate_cache_ttl_policy(self) -> "QueryRequest":

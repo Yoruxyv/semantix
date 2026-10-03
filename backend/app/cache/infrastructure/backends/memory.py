@@ -25,23 +25,23 @@ from app.cache.infrastructure.backends.memory_records import (
     sort_entry_metadata,
 )
 from app.core.exceptions import CacheStorageError
+from semantix_cache._semantics import nearest_index
 
 
 def _find_nearest_in_snapshot(
     query: NDArray[np.float64],
     entries: tuple[CacheEntry, ...],
 ) -> CacheCandidate:
-    matrix: NDArray[np.float64] = np.asarray(
-        [entry.embedding for entry in entries], dtype=np.float64
+    entries = tuple(
+        sorted(entries, key=lambda entry: (entry.created_at, entry.cache_key))
     )
-    norms = np.linalg.norm(matrix, axis=1)
-    if np.any(norms <= np.finfo(np.float64).eps):
-        raise CacheStorageError("Zero magnitude embedding")
-    scores = (matrix @ query) / (norms * float(np.linalg.norm(query)))
-    index = int(np.argmax(scores))
+    try:
+        index, score = nearest_index(query, [entry.embedding for entry in entries])
+    except ValueError:
+        raise CacheStorageError("Zero magnitude embedding") from None
     return CacheCandidate(
         entry=entries[index].model_copy(deep=True),
-        similarity_score=max(-1.0, min(1.0, float(scores[index]))),
+        similarity_score=score,
     )
 
 

@@ -4,12 +4,19 @@ from typing import Annotated
 
 from pydantic import StringConstraints
 
-DEFAULT_CACHE_NAMESPACE = "default"
-MAX_CACHE_NAMESPACE_LENGTH = 64
-CACHE_NAMESPACE_PATTERN = (
-    rf"^[A-Za-z0-9][A-Za-z0-9._:-]"
-    rf"{{0,{MAX_CACHE_NAMESPACE_LENGTH - 1}}}$"
+from semantix_cache._semantics import (
+    CACHE_NAMESPACE_PATTERN,
+    DEFAULT_CACHE_NAMESPACE,
+    MAX_CACHE_NAMESPACE_LENGTH,
 )
+
+__all__ = [
+    "CACHE_NAMESPACE_PATTERN",
+    "DEFAULT_CACHE_NAMESPACE",
+    "MAX_CACHE_NAMESPACE_LENGTH",
+    "AuthorizedNamespaceScope",
+    "CacheNamespace",
+]
 
 CacheNamespace = Annotated[
     str,
