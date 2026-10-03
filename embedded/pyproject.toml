@@ -16,7 +16,14 @@ dependencies = ["numpy>=2.4.6,<2.5", "pydantic>=2.13.4,<3"]
 Repository = "https://github.com/Yoruxyv/semantix"
 
 [project.optional-dependencies]
+providers = ["httpx>=0.28.1,<0.29"]
+openai = ["httpx>=0.28.1,<0.29"]
+huggingface = ["httpx>=0.28.1,<0.29"]
+gemini = ["httpx>=0.28.1,<0.29"]
+ollama = ["httpx>=0.28.1,<0.29"]
+anthropic = ["httpx>=0.28.1,<0.29"]
 dev = [
+  "httpx>=0.28.1,<0.29",
   "build>=1.4,<2",
   "mypy>=2.3.1,<3",
   "pytest>=9.1.1,<10",

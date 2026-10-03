@@ -1,6 +1,7 @@
 """Run in a clean environment containing only the built wheel and runtime deps."""
 
 import asyncio
+import importlib
 import importlib.util
 from collections.abc import Sequence
 from pathlib import Path
@@ -51,6 +52,16 @@ async def main() -> None:
         "semantix_client",
     ):
         assert importlib.util.find_spec(name) is None, name
+
+    for provider in ("openai", "huggingface", "gemini", "ollama", "anthropic"):
+        try:
+            importlib.import_module("semantix_cache.adapters." + provider)
+        except ImportError as exc:
+            assert "semantix-cache[providers]" in str(exc)
+            assert "docs/embedded-providers.md" in str(exc)
+        else:
+            raise AssertionError("Optional adapter imported without HTTP dependencies")
+    print("Minimal wheel and actionable optional-dependency errors verified")
 
 
 if __name__ == "__main__":

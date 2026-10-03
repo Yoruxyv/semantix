@@ -967,6 +967,13 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.4,<2" },
+    { name = "httpx", marker = "extra == 'anthropic'", specifier = ">=0.28.1,<0.29" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28.1,<0.29" },
+    { name = "httpx", marker = "extra == 'gemini'", specifier = ">=0.28.1,<0.29" },
+    { name = "httpx", marker = "extra == 'huggingface'", specifier = ">=0.28.1,<0.29" },
+    { name = "httpx", marker = "extra == 'ollama'", specifier = ">=0.28.1,<0.29" },
+    { name = "httpx", marker = "extra == 'openai'", specifier = ">=0.28.1,<0.29" },
+    { name = "httpx", marker = "extra == 'providers'", specifier = ">=0.28.1,<0.29" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=2.3.1,<3" },
     { name = "numpy", specifier = ">=2.4.6,<2.5" },
     { name = "pydantic", specifier = ">=2.13.4,<3" },
@@ -976,7 +983,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.16.3,<0.17" },
     { name = "twine", marker = "extra == 'dev'", specifier = ">=6.2,<7" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["providers", "openai", "huggingface", "gemini", "ollama", "anthropic", "dev"]
 
 [[package]]
 name = "slowapi"

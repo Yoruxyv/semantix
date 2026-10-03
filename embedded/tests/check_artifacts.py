@@ -41,6 +41,25 @@ def main() -> None:
             "numpy",
             "pydantic",
         }
+        extras = {"providers", "openai", "huggingface", "gemini", "ollama", "anthropic"}
+        assert set(metadata.get_all("Provides-Extra", [])) == extras | {"dev"}
+        for extra in extras:
+            selected = [item for item in requirements if f'extra == "{extra}"' in item]
+            assert len(selected) == 1
+            assert selected[0].startswith("httpx")
+            assert ">=0.28.1" in selected[0]
+            assert "<0.29" in selected[0]
+        for module in (
+            "__init__",
+            "_http",
+            "_parsing",
+            "openai",
+            "huggingface",
+            "gemini",
+            "ollama",
+            "anthropic",
+        ):
+            assert f"semantix_cache/adapters/{module}.py" in names
     with tarfile.open(sdists[0]) as archive:
         root = "semantix_cache-0.1.0"
         top_files = {
@@ -51,7 +70,13 @@ def main() -> None:
             "setup.cfg",
             "MANIFEST.in",
         }
-        dirs = {"src", "src/semantix_cache", "src/semantix_cache.egg-info", "tests"}
+        dirs = {
+            "src",
+            "src/semantix_cache",
+            "src/semantix_cache.egg-info",
+            "tests",
+            "examples",
+        }
         for member in archive.getmembers():
             assert member.isfile() or member.isdir()
             assert ".." not in Path(member.name).parts
@@ -63,10 +88,16 @@ def main() -> None:
                 relative in top_files
                 or relative.rstrip("/") in dirs
                 or relative.startswith(
-                    ("src/semantix_cache/", "src/semantix_cache.egg-info/", "tests/")
+                    (
+                        "src/semantix_cache/",
+                        "src/semantix_cache.egg-info/",
+                        "tests/",
+                        "examples/",
+                    )
                 )
             ), relative
         assert f"{root}/src/semantix_cache/py.typed" in archive.getnames()
+        assert f"{root}/examples/custom_integration.py" in archive.getnames()
     print("Embedded archive, namespace, license and dependency allowlists verified")
 
 

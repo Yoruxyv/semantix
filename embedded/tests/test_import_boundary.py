@@ -2,7 +2,7 @@ import ast
 from pathlib import Path
 
 
-def test_no_server_or_provider_imports() -> None:
+def test_core_and_optional_provider_import_boundaries() -> None:
     root = Path(__file__).parents[1] / "src" / "semantix_cache"
     permitted = {
         "asyncio",
@@ -23,11 +23,14 @@ def test_no_server_or_provider_imports() -> None:
         "pydantic",
     }
     for source in root.rglob("*.py"):
+        allowed = permitted | (
+            {"httpx", "json", "urllib"}
+            if "adapters" in source.relative_to(root).parts
+            else set()
+        )
         for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
             if isinstance(node, ast.Import):
-                assert all(
-                    alias.name.split(".")[0] in permitted for alias in node.names
-                )
+                assert all(alias.name.split(".")[0] in allowed for alias in node.names)
             elif isinstance(node, ast.ImportFrom) and node.level == 0:
                 assert node.module is not None
-                assert node.module.split(".")[0] in permitted
+                assert node.module.split(".")[0] in allowed

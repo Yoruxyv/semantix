@@ -22,7 +22,11 @@ normalization/scoring, TTL resolution, threshold eligibility and resolution orde
 The backend consumes the local embedded package through its locked path dependency,
 while preserving its HTTP schemas, authorization, metrics, global threshold and
 request coalescer. semantix-client remains a separate HTTP-only product.
-Maintained embedded provider adapters and PostgreSQL storage are not implemented.
+Optional embedded adapters live in `semantix_cache.adapters`, with borrowed HTTPX
+clients and explicit model/space configuration. Root imports retain the minimal
+NumPy/Pydantic boundary. Backend/embedded parity tests protect common provider wire
+contracts; generation still enters the cache as an application-owned async callable.
+See the [provider guide](docs/embedded-providers.md). PostgreSQL storage is not implemented.
 
 In the hardened Compose deployment, the browser and other HTTP clients reach the
 frontend Nginx gateway, which serves the browser assets and balances API requests across
