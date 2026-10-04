@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+from array import array
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -8,6 +9,7 @@ from time import perf_counter
 from types import TracebackType
 from typing import Self
 
+from ._coalescing import Flights, Identity, Participation, validate_key
 from ._lifecycle import Lifecycle
 from ._semantics import (
     cache_key_value,
@@ -19,6 +21,7 @@ from ._semantics import (
     resolve_flow,
     resolve_ttl,
     threshold_eligible,
+    ttl_value,
     valid_response,
     validate_ttl_policy,
 )
@@ -72,6 +75,7 @@ class AsyncSemanticCache:
         self._normalizer = prompt_normalizer
         self._space = self._checked_space()
         self._state = Lifecycle()
+        self._flights = Flights()
 
     @property
     def similarity_threshold(self) -> float:
@@ -149,8 +153,11 @@ class AsyncSemanticCache:
         except ValueError:
             raise EmbeddingError("Embedding output is invalid") from None
 
-    async def _lookup(self, prompt: str, namespace: str) -> _Lookup:
-        embedding = await self._embed(prompt)
+    async def _lookup(
+        self, prompt: str, namespace: str, embedding: tuple[float, ...] | None = None
+    ) -> _Lookup:
+        if embedding is None:
+            embedding = await self._embed(prompt)
         match = await self._store.find_nearest(embedding, namespace=namespace)
         self._check_space()
         if match is None:
@@ -218,6 +225,37 @@ class AsyncSemanticCache:
         self._check_space()
         return key
 
+    def _coalescing_ttl(
+        self, requested: float | None
+    ) -> tuple[float | None, float | None]:
+        try:
+            validate_ttl_policy(requested, write_enabled=True)
+            default = ttl_value(self._store.default_ttl_seconds)
+            return resolve_ttl(requested, default), default
+        except ValueError:
+            raise CacheValidationError("Invalid TTL or cache policy") from None
+
+    async def _generate(self, generate: GenerationCallable, prompt: str) -> str:
+        output = await generate(prompt)
+        self._check_space()
+        try:
+            return valid_response(output)
+        except ValueError:
+            raise GenerationError("Generated response is invalid") from None
+
+    async def _flight_lookup(
+        self,
+        participation: Participation,
+        prompt: str,
+        namespace: str,
+        embedding: tuple[float, ...],
+    ) -> _Lookup:
+        if not participation.leader:
+            await asyncio.shield(participation.flight.gate)
+            if participation.flight.error is not None:
+                raise participation.flight.error
+        return await self._lookup(prompt, namespace, embedding)
+
     async def get(self, prompt: str, *, namespace: str = "default") -> CacheHit | None:
         async with self._operation():
             prompt, namespace = self._inputs(prompt, namespace)
@@ -248,74 +286,140 @@ class AsyncSemanticCache:
         namespace: str = "default",
         policy: CachePolicy = CachePolicy.NORMAL,
         cache_ttl_seconds: float | None = None,
+        coalescing_key: str | None = None,
     ) -> CacheResult:
+        """Resolve a semantic hit or invoke this caller's async generation function.
+
+        NORMAL misses may share generation only with an explicit coalescing_key
+        attesting to the same immutable application-input snapshot. Reuse the
+        exact callable object and rotate the key when context/model/tool inputs
+        change. The key is not a cache namespace or an authorization boundary.
+        Followers independently confirm persisted hits; expiry/churn can require
+        their own generation. Leader cancellation fails its entire flight;
+        follower cancellation affects only that follower. None preserves the
+        independent behavior of existing calls. Other policies never coalesce.
+        """
         started = perf_counter()
-        async with self._operation():
-            prompt, namespace = self._inputs(prompt, namespace)
-            if not isinstance(policy, CachePolicy):
-                raise CacheValidationError("Policy must be a CachePolicy")
-            ttl = self._ttl(cache_ttl_seconds, write_enabled=policy._write_enabled)
-            if not (
-                inspect.iscoroutinefunction(generate)
-                or (
-                    callable(generate)
-                    and inspect.iscoroutinefunction(type(generate).__call__)
+        participation: Participation | None = None
+        try:
+            async with self._operation():
+                prompt, namespace = self._inputs(prompt, namespace)
+                if not isinstance(policy, CachePolicy):
+                    raise CacheValidationError("Policy must be a CachePolicy")
+                eligible = coalescing_key is not None and policy is CachePolicy.NORMAL
+                if coalescing_key is not None:
+                    validate_key(coalescing_key)
+                default_ttl: float | None = None
+                if eligible:
+                    ttl, default_ttl = self._coalescing_ttl(cache_ttl_seconds)
+                else:
+                    ttl = self._ttl(
+                        cache_ttl_seconds, write_enabled=policy._write_enabled
+                    )
+                if not (
+                    inspect.iscoroutinefunction(generate)
+                    or (
+                        callable(generate)
+                        and inspect.iscoroutinefunction(type(generate).__call__)
+                    )
+                ):
+                    raise CacheValidationError("Generation must be an async callable")
+
+                async def lookup() -> _Lookup:
+                    nonlocal participation
+                    found = await self._lookup(prompt, namespace)
+                    if not eligible or found.hit is not None:
+                        return found
+                    # Native double bytes preserve exact normalized float64 values,
+                    # including signed zeros; no lossy dtype/hash equivalence.
+                    identity: Identity = (
+                        id(asyncio.get_running_loop()),
+                        prompt,
+                        str(namespace),
+                        str(self._space.identity),
+                        self._space.dimensions,
+                        array("d", found.embedding).tobytes(),
+                        self._threshold,
+                        self._timeout,
+                        id(self._normalizer),
+                        id(self._embedder),
+                        id(self._store),
+                        ttl_value(cache_ttl_seconds),
+                        default_ttl,
+                        ttl,
+                        id(generate),
+                        coalescing_key,
+                    )
+                    participation = self._flights.admit(identity, generate)
+                    # A join retains the existing record key only, not this
+                    # caller's temporary O(D) encoding across its wait.
+                    del identity
+                    if participation is None:
+                        return found
+                    # Reuse the query, but acquire this caller's own confirmed
+                    # candidate/revision. A real miss follows resolve_flow once.
+                    return await self._flight_lookup(
+                        participation, prompt, namespace, found.embedding
+                    )
+
+                def hit_response(found: _Lookup | None) -> str | None:
+                    return (
+                        None
+                        if found is None or found.hit is None
+                        else found.hit.response
+                    )
+
+                async def generation() -> str:
+                    return await self._generate(generate, prompt)
+
+                async def write(response: str, found: _Lookup | None) -> None:
+                    await self._write(
+                        prompt,
+                        response,
+                        namespace,
+                        ttl,
+                        None if found is None else found.embedding,
+                    )
+
+                found, response = await resolve_flow(
+                    read_enabled=policy._read_enabled,
+                    write_enabled=policy._write_enabled,
+                    lookup=lookup,
+                    hit_response=hit_response,
+                    generate=generation,
+                    write=write,
                 )
-            ):
-                raise CacheValidationError("Generation must be an async callable")
-
-            async def lookup() -> _Lookup:
-                return await self._lookup(prompt, namespace)
-
-            def hit_response(found: _Lookup | None) -> str | None:
-                return (
-                    None if found is None or found.hit is None else found.hit.response
+                hit = None if found is None else found.hit
+                result = CacheResult(
+                    response=response,
+                    cache_hit=hit is not None,
+                    similarity_score=None if found is None else found.score,
+                    similarity_threshold=self._threshold,
+                    matched_prompt=None if hit is None else hit.matched_prompt,
+                    matched_cache_key=None if hit is None else hit.matched_cache_key,
+                    cache_entry_created_at=None
+                    if hit is None
+                    else hit.cache_entry_created_at,
+                    cache_entry_age_seconds=None
+                    if hit is None
+                    else hit.cache_entry_age_seconds,
+                    generation_skipped=hit is not None,
+                    provider_called=hit is None,
+                    latency_ms=(perf_counter() - started) * 1_000,
+                    cache_written=hit is None and policy._write_enabled,
                 )
-
-            async def generation() -> str:
-                output = await generate(prompt)
-                self._check_space()
-                try:
-                    return valid_response(output)
-                except ValueError:
-                    raise GenerationError("Generated response is invalid") from None
-
-            async def write(response: str, found: _Lookup | None) -> None:
-                await self._write(
-                    prompt,
-                    response,
-                    namespace,
-                    ttl,
-                    None if found is None else found.embedding,
-                )
-
-            found, response = await resolve_flow(
-                read_enabled=policy._read_enabled,
-                write_enabled=policy._write_enabled,
-                lookup=lookup,
-                hit_response=hit_response,
-                generate=generation,
-                write=write,
-            )
-            hit = None if found is None else found.hit
-            return CacheResult(
-                response=response,
-                cache_hit=hit is not None,
-                similarity_score=None if found is None else found.score,
-                similarity_threshold=self._threshold,
-                matched_prompt=None if hit is None else hit.matched_prompt,
-                matched_cache_key=None if hit is None else hit.matched_cache_key,
-                cache_entry_created_at=None
-                if hit is None
-                else hit.cache_entry_created_at,
-                cache_entry_age_seconds=None
-                if hit is None
-                else hit.cache_entry_age_seconds,
-                generation_skipped=hit is not None,
-                provider_called=hit is None,
-                latency_ms=(perf_counter() - started) * 1_000,
-                cache_written=hit is None and policy._write_enabled,
-            )
+            if participation is not None and participation.leader:
+                self._flights.settle(participation.flight)
+            return result
+        except BaseException as error:
+            # Publish only after _operation translates an expired deadline. Explicit
+            # leader cancellation remains CancelledError, with no hidden retry.
+            if participation is not None and participation.leader:
+                self._flights.settle(participation.flight, error)
+            raise
+        finally:
+            if participation is not None:
+                self._flights.release(participation.flight)
 
     async def delete(self, cache_key: str, *, namespace: str = "default") -> bool:
         async with self._operation():
@@ -343,7 +447,7 @@ class AsyncSemanticCache:
             return result
 
     async def aclose(self) -> None:
-        self._state.close()
+        self._state.close(workers=bool(self._flights.counts()[1]))
 
     async def __aenter__(self) -> Self:
         self._state.check_open()

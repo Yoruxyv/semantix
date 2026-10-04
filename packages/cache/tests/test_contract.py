@@ -86,6 +86,7 @@ def test_public_exports_and_signatures() -> None:
             "namespace",
             "policy",
             "cache_ttl_seconds",
+            "coalescing_key",
         ],
         "delete": ["self", "cache_key", "namespace"],
         "clear": ["self", "namespace"],
@@ -98,6 +99,11 @@ def test_public_exports_and_signatures() -> None:
         assert list(signature.parameters) == parameters
         if "namespace" in signature.parameters:
             assert signature.parameters["namespace"].default == "default"
+    coalescing = inspect.signature(AsyncSemanticCache.resolve).parameters[
+        "coalescing_key"
+    ]
+    assert coalescing.default is None
+    assert coalescing.kind is inspect.Parameter.KEYWORD_ONLY
     assert set(CacheEntry.model_fields) == {
         "cache_key",
         "namespace",

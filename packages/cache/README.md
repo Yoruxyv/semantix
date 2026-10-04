@@ -58,6 +58,109 @@ asyncio.run(main())
 Create one store/cache and reuse them across requests. MemoryStore is bounded
 process memory; recreating it loses the cache. It is not persistent storage.
 
+## Optional cold-miss coalescing
+
+Opt-in cold-miss coalescing can substantially reduce duplicate generation during
+compatible concurrent misses while preserving the optimized cache-hit path.
+`resolve(..., coalescing_key=None)` is the default and keeps existing behavior.
+Only eligible NORMAL cold misses with an explicit key can share generation.
+Ordinary confirmed hits do not enter the coalescing registry. Other policies
+keep their existing behavior.
+
+Coalescing is in-process, within one cache instance and event loop. It does not
+coordinate separate cache instances or processes.
+
+~~~python
+# Reuse this exact callable object. The application freezes its relevant inputs
+# and rotates the key when model/context/document/permission state changes.
+question = "How do I reset my support account?"
+result = await cache.resolve(
+    prompt=question,
+    generate=generate,
+    namespace="support:tenant-123:v17",
+    coalescing_key="support-rag:tenant-123:v17",
+)
+~~~
+
+The key is your explicit declaration that concurrent requests have the same
+immutable generation-input context and that sharing one invocation is safe.
+Semantix cannot infer generation equivalence from the prompt or callable identity.
+Rotate or distinguish the key whenever tenant, permissions, conversation state,
+retrieved documents, model/tool configuration, ContextVars, closures, application
+epoch or any other generation-relevant input changes. Also maintain appropriate
+namespace/cache isolation for persisted reuse; changing the coalescing key alone
+does not invalidate cached answers. Use no key when callers need independent
+stochastic samples or generation side effects. Separately retrieved bound methods
+are distinct callable objects; bind once when sharing is intended.
+
+Keys are nonempty plain strings, at most 256 UTF-8 bytes, compared exactly. They
+are **not cache partitions or authorization boundaries**: persisted reuse still
+requires appropriate namespaces and embedding spaces. Sharing also requires the
+same canonical generation prompt, exact normalized float64 query, callable object,
+configuration and requested/default/effective TTL. Similar prompts alone never join.
+
+The leader generates and persists inside its request. Followers wait for the entire
+operation to succeed, then perform their own lookup and atomic revision/TTL
+confirmation using their already-prepared embeddings. Their CacheResult therefore
+contains fresh hit evidence. Expiry, replacement or failed confirmation can instead
+require the follower's own first generation/write; no leader result is copied.
+Generation and persistence failures propagate to waiting followers without retry.
+
+Follower cancellation/deadline affects only that follower. Leader cancellation
+fails the flight for waiting followers; leader deadlines propagate CacheTimeoutError.
+There is no detached generation task, promotion, global registry or distributed lock.
+`aclose()` remains busy while requests or retained participants exist; it neither
+cancels work nor closes borrowed dependencies.
+
+Internal admission is bounded to 128 retained records, 256 participants and 4 MiB
+of charged identity storage, including completed flights whose callers still drain.
+Overflow preserves independent generation. These bounds cover coalescer metadata,
+not caller-created tasks or arbitrary callable closures. Embedding calls are still
+per caller. Extra leader/follower lookups trade store work for reduced generation;
+zero-delay providers and TTL/churn can make sharing less useful.
+
+### Measured provider-work and latency tradeoff
+
+A local cold-burst experiment executed 256 requests with up to 128 concurrent
+resolves, two distinct compatible prompts and a 200 ms deterministic generation
+delay. Generation calls fell from 256 to 2 in each of three trials per mode for
+both stores; duplicate generation calls fell from 254 to 0. Embedding calls stayed
+at 256.
+
+The table reports median per-trial burst percentiles from **uninstrumented**
+runs with coalescing disabled and enabled. Treatment percentiles are dominated by
+followers; they are not isolated follower-only timings.
+
+| Store | Burst P50, disabled -> enabled (ms) | Burst P95, disabled -> enabled (ms) |
+|---|---:|---:|
+| MemoryStore | 294.095 -> 434.127 | 316.949 -> 458.839 |
+| PgVectorStore | 916.670 -> 941.012 | 1366.900 -> 1087.602 |
+
+These development measurements used this coalescing implementation on base revision
+`ee915140`, Python 3.14.6, NumPy 2.4.6 and Pydantic 2.13.5 on Windows 11 with a
+Ryzen 9 5900HX, 16 logical CPUs and about 32 GiB RAM. The workload used 384-dimensional
+vectors, 500 seeded candidates, capacity 5,000, threshold 0.92 and TTL 3,600 seconds.
+PostgreSQL 17.10/pgvector 0.8.5 ran locally in a four-CPU/2-GiB Docker container with
+an eight-connection pool. Each trial used a fresh Python process; setup, warmup and
+cleanup were excluded, and child BLAS threads were fixed at one. All measured requests
+completed without errors. See the [experiment methodology](benchmarks/COALESCING.md)
+for reproduction and source/environment recording.
+
+Followers wait for the leader's successful generation and persistence, then perform
+their **own authoritative lookup and atomic TTL/revision confirmation**. Diagnostic
+timing found store queueing, rather than identity/registry bookkeeping, dominated
+the added cost: MemoryStore's leader recheck and follower searches queued for the
+numerical worker; PostgreSQL searches and confirmations queued for pool connections.
+This work preserves truthful CacheResult evidence and expiry/revision semantics.
+Instrumented diagnosis timings are separate from the ordinary numbers above.
+
+These measurements show a provider-work/latency tradeoff, not a promise that every
+workload becomes faster or that coalescing always reduces latency. The 256-to-2
+reduction depends on compatible keys/inputs, admission, successful persistence and
+confirmation; it is not guaranteed for every application. Provider pricing, token
+counts and application behavior determine actual dollar savings, which this
+deterministic experiment did not measure.
+
 ## Contract
 
 The facade exposes async `resolve`, `get`, `set`, `delete`,
@@ -136,7 +239,8 @@ The facade's total operation deadline defaults to 30 seconds. Deadline expiry ra
 CacheTimeoutError; cancellation propagates. A cancelled numerical search retains its
 bounded worker slot until the thread completes, so aclose can remain busy meanwhile.
 Python cannot forcibly interrupt a numerical thread. Custom async integrations must
-not block the event loop. No automatic retry or miss coalescing is provided.
+not block the event loop. No automatic retry is provided; miss coalescing requires
+an explicit key as described above.
 
 Lookup and write failures raise; generation followed by write failure does not return
 a successful resolution. Expected integration failures use safe embedded errors;
