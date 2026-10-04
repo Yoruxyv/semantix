@@ -1,1 +1,45 @@
-"""Optional storage modules. Import each adapter explicitly with its extra."""
+"""Storage choices for the embedded semantic-cache engine.
+
+``AsyncSemanticCache`` depends on the structural ``CacheStore`` protocol, not a
+database driver. A store holds entries for its declared ``EmbeddingSpace``;
+search, hit confirmation, deletion and clearing are scoped to a namespace. The
+engine applies the similarity threshold, generation policy and response evidence.
+Store implementations enforce retention, capacity and safe concurrent mutations.
+
+Available implementations
+-------------------------
+``semantix_cache.MemoryStore``
+    Bounded process-local memory with exact cosine search and non-sliding TTL.
+    Import it from the package root; no database dependency is required.
+``semantix_cache.stores.pgvector.PgVectorStore``
+    Optional persistence in an application-owned PostgreSQL schema/table prefix.
+    Install ``semantix-cache[pgvector]`` and import the class explicitly::
+
+        from semantix_cache.stores.pgvector import PgVectorStore
+
+    Operators install the vector extension. Initialize the marked schema through
+    ``await store.initialize_schema(migration_pool=authorized_pool)`` and use
+    ``await store.validate_schema()`` to check it. Construction, ``connect()`` and
+    ordinary cache operations do not create database objects. Embedded tables and
+    migrations are independent of the server's storage schema.
+
+Ownership and custom stores
+---------------------------
+The cache borrows its store. Close the cache before the store after draining or
+cancelling work. ``PgVectorStore(pool=...)`` borrows the supplied asyncpg pool;
+``await PgVectorStore.connect(dsn=..., embedding_space=...)`` creates an owned pool.
+Its async context manager/``aclose()`` closes an owned pool, leaving borrowed pools
+for the application to close. MemoryStore and PgVectorStore both support async
+context management.
+
+A custom store implements ``CacheStore`` directly; no subclass or registration is
+needed. Preserve namespace/space isolation, TTL, detached candidates and atomic
+revision-aware hit confirmation. See ``CacheEntry``, ``CacheMatch`` and the
+repository's ``examples/custom_store.py`` and store conformance tests.
+
+Importing this namespace does not import adapters or asyncpg, select a store,
+connect to a database or initialize a schema. Pgvector uses float32 vectors, so
+scores near a threshold can differ slightly from MemoryStore's float64 scores.
+The storage guide describes setup, failure semantics and the complete contract:
+https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-storage.md.
+"""
