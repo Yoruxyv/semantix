@@ -16,6 +16,7 @@ dependencies = ["numpy>=2.4.6,<2.5", "pydantic>=2.13.4,<3"]
 Repository = "https://github.com/Yoruxyv/semantix"
 
 [project.optional-dependencies]
+pgvector = ["asyncpg>=0.31,<0.32"]
 providers = ["httpx>=0.28.1,<0.29"]
 openai = ["httpx>=0.28.1,<0.29"]
 huggingface = ["httpx>=0.28.1,<0.29"]
@@ -23,6 +24,8 @@ gemini = ["httpx>=0.28.1,<0.29"]
 ollama = ["httpx>=0.28.1,<0.29"]
 anthropic = ["httpx>=0.28.1,<0.29"]
 dev = [
+  "asyncpg>=0.31,<0.32",
+  "asyncpg-stubs>=0.31.3,<0.32",
   "httpx>=0.28.1,<0.29",
   "build>=1.4,<2",
   "mypy>=2.3.1,<3",
@@ -38,12 +41,15 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 semantix_cache = ["py.typed"]
+"semantix_cache.stores.migrations" = ["*.sql"]
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
+pythonpath = ["."]
 asyncio_mode = "auto"
 cache_dir = ".cache/pytest"
 testpaths = ["tests"]
+markers = ["pgvector: requires a disposable PostgreSQL database with vector installed"]
 
 [tool.coverage.run]
 branch = true
@@ -54,6 +60,7 @@ fail_under = 90
 show_missing = true
 
 [tool.mypy]
+enable_error_code = ["deprecated"]
 python_version = "3.11"
 strict = true
 plugins = ["pydantic.mypy"]

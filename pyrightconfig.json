@@ -1,3 +1,13 @@
 {
-  "extraPaths": ["apps/server", "packages/client/src", "packages/cache/src"]
+  "extraPaths": [
+    "apps/server",
+    "packages/client/src",
+    "packages/cache/src"
+  ],
+  "include": [
+    "apps/server",
+    "packages/cache",
+    "packages/client"
+  ],
+  "reportDeprecated": "error"
 }

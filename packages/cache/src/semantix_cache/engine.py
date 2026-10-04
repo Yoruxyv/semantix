@@ -1,6 +1,6 @@
 import asyncio
 import inspect
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -103,7 +103,7 @@ class AsyncSemanticCache:
             raise EmbeddingSpaceError("Embedding space changed after construction")
 
     @asynccontextmanager
-    async def _operation(self) -> AsyncIterator[None]:
+    async def _operation(self) -> AsyncGenerator[None, None]:
         with self._state.operation():
             self._check_space()
             deadline = asyncio.timeout(self._timeout)

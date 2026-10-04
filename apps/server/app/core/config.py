@@ -401,4 +401,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    # Required fields are supplied by BaseSettings environment sources.
+    return Settings()  # pyright: ignore[reportCallIssue]

@@ -93,6 +93,13 @@ known-first-party = ["app", "semantix_cache", "semantix_client", "tests"]
 "**/app/benchmark/infrastructure/postgres_history_queries.py" = ["S608"]
 "**/app/cache/infrastructure/backends/pgvector_sql.py" = ["S608"]
 
+# Cache SQL interpolates only ASCII-validated, quoted schema/prefix identifiers
+# or quoted extension catalog identifiers; all runtime values use bind parameters.
+"**/semantix_cache/stores/pgvector.py" = ["S608"]
+# Database tests interpolate only test-owned UUID schema/role names and fixed grants.
+"**/tests/test_pgvector.py" = ["S608"]
+"**/tests/test_store_conformance.py" = ["S608"]
+
 # Executable smoke checks are test harnesses: assertions are intentional
 # and stdout is their reporting interface.
 "**/*_smoke.py" = ["S101", "T201", "PT017", "PT018"]

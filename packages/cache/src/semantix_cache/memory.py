@@ -136,11 +136,11 @@ class MemoryStore:
                 worker = asyncio.create_task(asyncio.to_thread(_nearest, query, items))
                 self._workers.add(worker)
                 worker.add_done_callback(self._worker_done)
+                match = await asyncio.shield(worker)
             finally:
                 # A running numerical worker owns the slot, including cancellation.
                 if worker is None:
                     self._slot.release()
-            match = await asyncio.shield(worker)
             async with self._lock:
                 self._purge()
                 current = self._items.get(match.entry.cache_key)

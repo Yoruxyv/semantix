@@ -42,13 +42,25 @@ def main() -> None:
             "pydantic",
         }
         extras = {"providers", "openai", "huggingface", "gemini", "ollama", "anthropic"}
-        assert set(metadata.get_all("Provides-Extra", [])) == extras | {"dev"}
+        assert set(metadata.get_all("Provides-Extra", [])) == extras | {
+            "dev",
+            "pgvector",
+        }
         for extra in extras:
             selected = [item for item in requirements if f'extra == "{extra}"' in item]
             assert len(selected) == 1
             assert selected[0].startswith("httpx")
             assert ">=0.28.1" in selected[0]
             assert "<0.29" in selected[0]
+        postgres = [item for item in requirements if 'extra == "pgvector"' in item]
+        assert len(postgres) == 1
+        assert postgres[0].startswith("asyncpg")
+        assert ">=0.31" in postgres[0]
+        assert "<0.32" in postgres[0]
+        assert "semantix_cache/stores/pgvector.py" in names
+        migration = "semantix_cache/stores/migrations/0001_cache.sql"
+        assert [name for name in names if name.endswith(".sql")] == [migration]
+        assert archive.read(migration) == Path("src").joinpath(migration).read_bytes()
         for module in (
             "__init__",
             "_http",
@@ -69,6 +81,7 @@ def main() -> None:
             "PKG-INFO",
             "setup.cfg",
             "MANIFEST.in",
+            "src/README.md",
         }
         dirs = {
             "src",
@@ -98,6 +111,12 @@ def main() -> None:
             ), relative
         assert f"{root}/src/semantix_cache/py.typed" in archive.getnames()
         assert f"{root}/examples/custom_integration.py" in archive.getnames()
+        assert f"{root}/examples/custom_store.py" in archive.getnames()
+        assert f"{root}/examples/persistent_support.py" in archive.getnames()
+        assert (
+            f"{root}/src/semantix_cache/stores/migrations/0001_cache.sql"
+            in archive.getnames()
+        )
     print("Embedded archive, namespace, license and dependency allowlists verified")
 
 

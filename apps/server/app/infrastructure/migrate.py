@@ -54,7 +54,8 @@ class MigrationSettings(BaseSettings):
 
 
 async def run() -> None:
-    settings = MigrationSettings()
+    # Required fields are supplied by BaseSettings environment sources.
+    settings = MigrationSettings()  # pyright: ignore[reportCallIssue]
     pool = await create_pool(
         settings.migration_database_url.get_secret_value(),
         min_size=1,

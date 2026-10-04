@@ -180,6 +180,7 @@ async def test_success_request_and_borrowed_client(name: str, kind: str) -> None
         body = json.loads(request.content)
         if kind == "embed":
             adapter = embedder(name, client)
+            assert TEST_KEY not in repr(adapter)
             assert adapter.embedding_space == SPACE
             await adapter.aclose()
             await adapter.aclose()
@@ -187,6 +188,7 @@ async def test_success_request_and_borrowed_client(name: str, kind: str) -> None
                 await adapter.embed("test")
         else:
             gen = generator(name, client)
+            assert TEST_KEY not in repr(gen)
             await gen.aclose()
             with pytest.raises(CacheClosedError):
                 await gen.generate("test")
@@ -202,7 +204,6 @@ async def test_success_request_and_borrowed_client(name: str, kind: str) -> None
                     )
                 ]
             )
-        assert TEST_KEY not in repr(adapter if kind == "embed" else gen)
 
 
 @pytest.mark.parametrize(("name", "kind"), KINDS)
