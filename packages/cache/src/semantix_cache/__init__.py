@@ -1,63 +1,125 @@
-"""In-process semantic caching for asynchronous Python applications.
+"""Semantic caching inside an asynchronous Python application.
 
-The semantix-cache distribution imports as semantix_cache and runs inside your
-Python process; no Semantix FastAPI server is required. Version 0.1.0 is async-only.
-It is the primary intended first public PyPI package. The separate semantix_client
-package provides the optional/reference HTTP client for a running Semantix server.
+Semantix reuses a previously generated response when a new prompt's embedding is
+sufficiently similar to an unexpired entry in the same namespace and embedding
+space. A hit skips generation; the embedding and lookup still happen. Applications
+choose the similarity threshold and which responses are appropriate to reuse.
 
-Public surface
---------------
-AsyncSemanticCache is the high-level entry point: lookup() returns a CacheHit or
-None, and resolve() returns a CacheResult describing the response, cache decision
-and generation evidence. CachePolicy controls permitted reads and writes.
-MemoryStore is the supplied bounded, process-local CacheStore. Optional persistent
-PostgreSQL/pgvector storage lives in semantix_cache.stores.pgvector.PgVectorStore;
-install the pgvector extra and initialize its owned schema explicitly. Root imports
-do not load asyncpg. Supplied pools are borrowed; connect() creates an owned pool.
+The ``semantix-cache`` distribution imports as ``semantix_cache``. It runs in your
+process without a Semantix FastAPI server. Version 0.1.0 exposes an async-only
+engine and is the primary intended first public PyPI package. For an existing
+server's HTTP API, use the separate ``semantix_client`` package.
 
-EmbeddingAdapter describes a custom async embedder. Its immutable EmbeddingSpace
-identifies compatible vectors and their dimensions. GenerationCallable is an async
-prompt-to-text callable. CacheStore is the structural store protocol; CacheEntry
-and CacheMatch support store implementations. Custom EmbeddingAdapter,
-GenerationCallable and CacheStore implementations need no provider registry or
-inheritance from library classes.
+Public components
+-----------------
+AsyncSemanticCache
+    Reusable facade over an embedder and store. ``get()`` returns a ``CacheHit`` or
+    ``None``; ``set()`` stores approved response text; ``resolve()`` performs
+    lookup, generation on a miss, and a policy-permitted write.
+CachePolicy
+    ``NORMAL`` reads and writes; ``READ_ONLY`` reads and generates on a miss
+    without writing; ``REFRESH`` generates and writes without reading.
+    ``BYPASS`` and ``PRIVATE`` neither read nor write the cache.
+CacheHit, CacheResult
+    Immutable response and decision evidence. ``CacheResult`` includes hit status,
+    similarity/threshold, generation-call evidence, latency and write status.
+    ``CacheEntry`` and ``CacheMatch`` describe the lower-level store boundary.
+EmbeddingAdapter, EmbeddingSpace
+    A structural async ``embed(text)`` integration and its immutable vector-space
+    identity/dimensions. Identity must distinguish model/revision, preprocessing
+    and pooling; equal dimensions alone do not imply compatible embeddings.
+GenerationCallable
+    An async prompt-to-text function, or an object with async ``__call__``.
+    Supply it as ``generate=`` to ``resolve()``. A maintained generation adapter's
+    bound ``generate`` method is also suitable. The application owns generation
+    context, credentials and approval of the completed response.
+CacheStore, MemoryStore
+    The structural storage protocol and bounded in-memory implementation.
+    Custom stores need no inheritance, registry or database driver.
 
-SemantixCacheError is the typed error-family base. Configuration, validation and
-embedding-space errors distinguish invalid inputs; EmbeddingError,
-GenerationError and CacheStoreError describe integration failures. CacheClosedError,
-CacheBusyError and CacheTimeoutError describe lifecycle and deadline failures.
+Matching and retention
+----------------------
+Search is scoped to one concrete namespace and embedding space, uses cosine
+similarity, and accepts scores at or above the configured threshold. Namespaces
+isolate entries; they do not authenticate callers. Version a namespace when
+response context or generation configuration changes. A prompt normalizer affects
+embedding/matching text; it does not replace the prompt sent to generation.
 
-Quick start
------------
-Given your existing embedder and async generation callable::
+A missing ``cache_ttl_seconds`` uses the store default. A requested TTL may shorten
+but cannot extend a finite default; ``default_ttl_seconds=None`` permits entries
+without expiry. Hits do not extend TTL. TTL overrides require a write-enabled
+policy. Stores have bounded capacity, so an unexpired entry can still be evicted.
 
-    from semantix_cache import AsyncSemanticCache, MemoryStore
+Lifecycle and extensions
+------------------------
+Reuse the cache, embedder and store across requests. The cache borrows its
+embedder, store and generation callable and does not close them. Use async context
+managers or ``aclose()`` for resources you own; drain/cancel active work before
+closing. Built-in cache/store/adapter wrappers raise ``CacheBusyError`` when
+closed during active work; a closed cache cannot reopen. Operations have a finite
+configured deadline and cancellation propagates.
 
-    async def answer(my_embedder, my_generation_callable):
-        async with MemoryStore(
-            embedding_space=my_embedder.embedding_space
-        ) as store:
-            async with AsyncSemanticCache(
-                embedder=my_embedder,
-                store=store,
-            ) as cache:
-                result = await cache.resolve(
-                    prompt="How do I update my delivery address?",
-                    namespace="support",
-                    generate=my_generation_callable,
+``semantix_cache.adapters`` contains explicit provider modules; import the adapter
+from its module with the appropriate optional extra. HTTP clients remain
+application-owned. ``semantix_cache.stores.pgvector.PgVectorStore`` supplies optional
+PostgreSQL persistence with ``semantix-cache[pgvector]``. A supplied pool is borrowed;
+``await PgVectorStore.connect(...)`` owns its pool. Schema initialization is
+explicit, requires migration authority, and is separate from ordinary cache use.
+
+The root package needs NumPy and Pydantic, but does not load HTTPX, asyncpg,
+FastAPI or provider SDKs. Custom ``EmbeddingAdapter``, ``GenerationCallable`` and
+``CacheStore`` integrations remain available for unsupported providers or stores.
+
+Errors derive from ``SemantixCacheError``: configuration/validation/space errors
+identify invalid inputs; ``EmbeddingError``, ``GenerationError`` and
+``CacheStoreError`` identify integration failures; ``CacheClosedError``,
+``CacheBusyError`` and ``CacheTimeoutError`` identify lifecycle or deadline
+failures. Consult the specific error's API and your integration's contract when
+deciding how to handle it.
+
+Runnable example
+----------------
+This deterministic toy embedder returns one fixed vector to demonstrate lifecycle
+and repeated-prompt reuse without network access. Replace it with your semantic
+embedding integration for application use::
+
+    import asyncio
+    from semantix_cache import AsyncSemanticCache, EmbeddingSpace, MemoryStore
+
+    class DemoEmbedding:
+        embedding_space = EmbeddingSpace(identity="demo-fixed-v1", dimensions=2)
+
+        async def embed(self, text: str) -> tuple[float, float]:
+            return (1.0, 0.0)
+
+    async def generate(prompt: str) -> str:
+        return "Open account settings to update your delivery address."
+
+    async def main() -> None:
+        embedder = DemoEmbedding()
+        async with MemoryStore(embedding_space=embedder.embedding_space) as store:
+            async with AsyncSemanticCache(embedder=embedder, store=store) as cache:
+                first = await cache.resolve(
+                    "How do I update my delivery address?",
+                    namespace="support", generate=generate,
                 )
-                return result
+                second = await cache.resolve(
+                    "How do I update my delivery address?",
+                    namespace="support", generate=generate,
+                )
+                assert first.cache_written and second.cache_hit
+                assert first.response == second.response
 
-Use async context managers or await aclose() for resources you own. The cache
-borrows its embedder, store and generation callable and does not close them.
-Drain or cancel active work before closing; the nested example closes the cache
-before its application-owned store.
+    asyncio.run(main())
 
-Maintained provider adapters live under semantix_cache.adapters. Import their
-provider modules explicitly with the appropriate optional HTTP dependencies;
-provider modules and optional dependencies are not imported by this minimal root
-package. Provider HTTP clients remain application-owned. See the package README
-and provider guide for integration configuration and safety details.
+Finding more detail
+-------------------
+Use ``help(AsyncSemanticCache)`` or inspect ``engine``, ``models``, ``policies`` and
+``protocols`` for signatures and typed contracts. Repository guides:
+
+- https://github.com/Yoruxyv/semantix/blob/main/packages/cache/README.md
+- https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-providers.md
+- https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-storage.md
 """
 
 from .engine import AsyncSemanticCache
