@@ -28,6 +28,21 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
+    env:
+      PGVECTOR_TEST_DATABASE_URL: postgresql://postgres:ci-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/semantix_embedded_test
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17@sha256:d2ef61f42ef767baa5a1475393303cc235bcd92febd9d7014eddb48b41f3bad0
+        env:
+          POSTGRES_DB: semantix_embedded_test
+          POSTGRES_PASSWORD: "ci-${{ github.run_id }}-${{ github.run_attempt }}"
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d semantix_embedded_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -50,8 +65,17 @@ jobs:
         run: uv run --no-sync mypy src tests examples
       - name: Test embedded behavior and coverage
         run: uv run --no-sync pytest --cov=semantix_cache
-      - name: Execute custom integration example
-        run: uv run --no-sync python examples/custom_integration.py
+      - name: Execute custom integration examples
+        run: |
+          uv run --no-sync python examples/custom_integration.py
+          uv run --no-sync python -m examples.custom_store
+      - name: Execute persistent support example
+        env:
+          SEMANTIX_CACHE_DATABASE_URL: ${{ env.PGVECTOR_TEST_DATABASE_URL }}
+          SEMANTIX_CACHE_MIGRATION_DATABASE_URL: ${{ env.PGVECTOR_TEST_DATABASE_URL }}
+        run: |
+          uv run --no-sync python -m examples.persistent_support --initialize
+          uv run --no-sync python -m examples.persistent_support
       - name: Build and inspect artifacts
         run: |
           uv run --no-sync python -m build
@@ -69,6 +93,8 @@ jobs:
             "$wheel_python" -c "import sys; from semantix_cache import MemoryStore; import semantix_cache.adapters; assert 'httpx' not in sys.modules"
             "$wheel_python" tests/providers_wheel_smoke.py
           done
+          "$wheel_python" -m pip install --disable-pip-version-check "dist/semantix_cache-0.1.0-py3-none-any.whl[pgvector]"
+          "$wheel_python" tests/pgvector_wheel_smoke.py
           "$wheel_python" -m pip install --disable-pip-version-check ../client
           "$wheel_python" -c "import sys; import semantix_client; assert 'semantix_cache' not in sys.modules; import semantix_cache; assert semantix_client.CachePolicy is not semantix_cache.CachePolicy"
 

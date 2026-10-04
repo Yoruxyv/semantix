@@ -15,7 +15,8 @@ mock provider supports deterministic local use. The live cache is either process
 or PostgreSQL with pgvector, according to settings.
 
 An independently installable [semantix-cache](packages/cache/README.md) supplies the async
-embedded facade and bounded MemoryStore for applications that do not run this server.
+embedded facade, bounded MemoryStore and optional PostgreSQL/pgvector persistence
+for applications that do not run this server.
 It accepts structural embedding adapters and application-owned async generation.
 Its private semantic core owns canonicalization, keys, namespace rules, vector
 normalization/scoring, TTL resolution, threshold eligibility and resolution ordering.
@@ -26,7 +27,13 @@ Optional embedded adapters live in `semantix_cache.adapters`, with borrowed HTTP
 clients and explicit model/space configuration. Root imports retain the minimal
 NumPy/Pydantic boundary. Backend/embedded parity tests protect common provider wire
 contracts; generation still enters the cache as an application-owned async callable.
-See the [provider guide](docs/embedded-providers.md). PostgreSQL storage is not implemented.
+See the [provider guide](docs/embedded-providers.md) and
+[storage guide](docs/embedded-storage.md). The optional PgVectorStore lives under
+`semantix_cache.stores.pgvector` and uses an independently owned schema/prefix,
+explicit checksum-tracked migrations and application-owned or store-owned pools.
+Normal cache operations perform no DDL. Its SQL and ledger do not reuse the server's
+fixed `semantix` schema or HTTP administration contract. The engine's CacheStore
+port remains structural and independent of any database driver.
 
 In the hardened Compose deployment, the browser and other HTTP clients reach the
 frontend Nginx gateway, which serves the browser assets and balances API requests across

@@ -10,8 +10,10 @@ Public surface
 AsyncSemanticCache is the high-level entry point: lookup() returns a CacheHit or
 None, and resolve() returns a CacheResult describing the response, cache decision
 and generation evidence. CachePolicy controls permitted reads and writes.
-MemoryStore is the supplied bounded in-memory CacheStore; no built-in persistent
-PostgreSQL store is implemented.
+MemoryStore is the supplied bounded, process-local CacheStore. Optional persistent
+PostgreSQL/pgvector storage lives in semantix_cache.stores.pgvector.PgVectorStore;
+install the pgvector extra and initialize its owned schema explicitly. Root imports
+do not load asyncpg. Supplied pools are borrowed; connect() creates an owned pool.
 
 EmbeddingAdapter describes a custom async embedder. Its immutable EmbeddingSpace
 identifies compatible vectors and their dimensions. GenerationCallable is an async

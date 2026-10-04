@@ -151,9 +151,15 @@ client for a Semantix service. It has no embedded/local-mode switch.
 
 Optional [provider adapters and custom integrations](../../docs/embedded-providers.md)
 use borrowed HTTP clients; install only the HTTP extra you need. The default core
-keeps its NumPy/Pydantic dependency boundary. PostgreSQL storage is not implemented.
+keeps its NumPy/Pydantic dependency boundary. Optional
+[PostgreSQL/pgvector storage and custom databases](../../docs/embedded-storage.md)
+use `semantix_cache.stores.pgvector.PgVectorStore` with the `[pgvector]` extra.
+Schema initialization is explicit; normal cache use performs no DDL.
+See the [source layout](src/README.md) for package boundaries.
 
-From this directory, contributor checks are:
+From this directory, contributor checks are below. Supply
+`PGVECTOR_TEST_DATABASE_URL` for an explicitly disposable database to execute the
+PostgreSQL cases; without it those cases skip. mypy also checks deprecated APIs.
 
 ~~~text
 uv sync --locked --extra dev
@@ -162,6 +168,7 @@ uv run --no-sync ruff format --config ../../ruff.toml --check .
 uv run --no-sync mypy src tests examples
 uv run --no-sync pytest --cov=semantix_cache
 uv run --no-sync python examples/custom_integration.py
+uv run --no-sync python -m examples.custom_store
 uv run --no-sync python -m build
 uv run --no-sync python -m twine check dist/*
 uv run --no-sync python tests/check_artifacts.py

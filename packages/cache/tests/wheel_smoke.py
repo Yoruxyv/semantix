@@ -53,6 +53,15 @@ async def main() -> None:
     ):
         assert importlib.util.find_spec(name) is None, name
 
+    importlib.import_module("semantix_cache.stores")
+    try:
+        importlib.import_module("semantix_cache.stores.pgvector")
+    except ImportError as exc:
+        assert "semantix-cache[pgvector]" in str(exc)
+        assert "docs/embedded-storage.md" in str(exc)
+    else:
+        raise AssertionError("PostgreSQL store imported without its optional driver")
+
     for provider in ("openai", "huggingface", "gemini", "ollama", "anthropic"):
         try:
             importlib.import_module("semantix_cache.adapters." + provider)

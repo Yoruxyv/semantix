@@ -1,6 +1,8 @@
-from collections.abc import Sequence
+import os
+from collections.abc import AsyncIterator, Sequence
 from datetime import datetime
 
+import asyncpg
 import pytest
 
 from semantix_cache import (
@@ -76,3 +78,20 @@ def cache(adapter: Adapter, store: SpyStore) -> AsyncSemanticCache:
 
 async def generate(prompt: str) -> str:
     return "answer: " + prompt
+
+
+@pytest.fixture
+async def pg_pool() -> AsyncIterator[asyncpg.Pool | None]:
+    dsn = os.environ.get("PGVECTOR_TEST_DATABASE_URL")
+    if not dsn:
+        yield None
+        return
+    pool = await asyncpg.create_pool(dsn, min_size=1, max_size=4, command_timeout=10)
+    assert pool is not None
+    try:
+        # Operator setup for this disposable test database, not library migration.
+        async with pool.acquire() as connection:
+            await connection.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        yield pool
+    finally:
+        await pool.close()
