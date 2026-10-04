@@ -1,7 +1,7 @@
 import asyncio
 from collections import OrderedDict
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from time import monotonic
 from types import TracebackType
@@ -15,7 +15,6 @@ from ._semantics import (
     MAX_MEMORY_CACHE_SIZE,
     cache_key_value,
     namespace_value,
-    nearest_index,
     normalized_vector,
     resolve_ttl,
 )
@@ -30,16 +29,67 @@ class _Item:
     expires_at: datetime | None
 
 
-def _nearest(query: NDArray[np.float64], items: tuple[_Item, ...]) -> CacheMatch:
-    # Stable ordering gives exact score ties a deterministic revision/key tiebreak.
-    items = tuple(
-        sorted(items, key=lambda item: (item.entry.created_at, item.entry.cache_key))
-    )
-    index, score = nearest_index(query, [item.entry.embedding for item in items])
+@dataclass
+class _Snapshot:
+    """Detached candidates with a lazily built, owned float64 matrix.
+
+    Only the admitted numerical worker prepares this snapshot. Once prepared,
+    its (N, D) C-contiguous matrix is read-only and keeps the exact stored tuple
+    values and revision/key ordering. Reusing it avoids Python-float conversion
+    on repeated searches. The first search leaves the matrix worker-local; only
+    reuse retains 8*N*D bytes until a scoped mutation invalidates it, avoiding
+    retained buffers for write-heavy scopes. A running worker can retain an
+    invalidated snapshot until it drains.
+
+    Row norms use the original float64 reduction over stored values; normalized
+    tuples are not assumed to have an exactly unit norm. Read-only (N,) norms
+    retain another 8*N bytes and avoid repeating the (N, D) square temporary on
+    unchanged scopes. First-use allocation still includes matrix/norm creation.
+    """
+
+    items: tuple[_Item, ...] = field(repr=False)
+    matrix: NDArray[np.float64] | None = field(default=None, repr=False)
+    norms: NDArray[np.float64] | None = field(default=None, repr=False)
+    used: bool = False
+
+    def prepare(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        if self.matrix is None or self.norms is None:
+            items = tuple(
+                sorted(
+                    self.items,
+                    key=lambda item: (item.entry.created_at, item.entry.cache_key),
+                )
+            )
+            matrix = np.asarray(
+                [item.entry.embedding for item in items], dtype=np.float64
+            )
+            matrix.setflags(write=False)
+            norms = np.linalg.norm(matrix, axis=1)
+            norms.setflags(write=False)
+            self.items = items
+            if self.used:
+                self.matrix = matrix
+                self.norms = norms
+            self.used = True
+            return matrix, norms
+        return self.matrix, self.norms
+
+
+def _nearest(
+    query: NDArray[np.float64], items: tuple[_Item, ...] | _Snapshot
+) -> CacheMatch:
+    snapshot = _Snapshot(items) if isinstance(items, tuple) else items
+    matrix, norms = snapshot.prepare()
+    # Reuse candidate norms while preserving the original float64 arithmetic.
+    if np.any(norms <= np.finfo(np.float64).eps):
+        raise ValueError("Embedding has zero or invalid magnitude")
+    scores = (matrix @ query) / (norms * float(np.linalg.norm(query)))
+    index = int(np.argmax(scores))
+    score = max(-1.0, min(1.0, float(scores[index])))
     return CacheMatch(
-        entry=items[index].entry,
+        entry=snapshot.items[index].entry,
         similarity_score=score,
-        expires_at=items[index].expires_at,
+        expires_at=snapshot.items[index].expires_at,
     )
 
 
@@ -70,6 +120,7 @@ class MemoryStore:
             ) from None
         self._max_size = max_size
         self._items: OrderedDict[str, _Item] = OrderedDict()
+        self._snapshots: dict[str, _Snapshot] = {}
         self._last_revision: datetime | None = None
         self._lock = asyncio.Lock()
         self._slot = asyncio.Semaphore(1)
@@ -84,6 +135,10 @@ class MemoryStore:
     def default_ttl_seconds(self) -> float | None:
         return self._ttl
 
+    def _discard(self, key: str) -> None:
+        item = self._items.pop(key)
+        self._snapshots.pop(item.entry.namespace, None)
+
     def _purge(self) -> None:
         now = monotonic()
         for key in [
@@ -91,7 +146,7 @@ class MemoryStore:
             for key, item in self._items.items()
             if item.expires_monotonic is not None and now >= item.expires_monotonic
         ]:
-            del self._items[key]
+            self._discard(key)
 
     @staticmethod
     def _scope(cache_key: str, namespace: str) -> tuple[str, str]:
@@ -126,14 +181,20 @@ class MemoryStore:
             try:
                 async with self._lock:
                     self._purge()
-                    items = tuple(
-                        item
-                        for item in self._items.values()
-                        if item.entry.namespace == namespace
-                    )
-                if not items:
-                    return None
-                worker = asyncio.create_task(asyncio.to_thread(_nearest, query, items))
+                    snapshot = self._snapshots.get(namespace)
+                    if snapshot is None:
+                        items = tuple(
+                            item
+                            for item in self._items.values()
+                            if item.entry.namespace == namespace
+                        )
+                        if not items:
+                            return None
+                        snapshot = _Snapshot(items)
+                        self._snapshots[namespace] = snapshot
+                worker = asyncio.create_task(
+                    asyncio.to_thread(_nearest, query, snapshot)
+                )
                 self._workers.add(worker)
                 worker.add_done_callback(self._worker_done)
                 match = await asyncio.shield(worker)
@@ -202,6 +263,10 @@ class MemoryStore:
                     }
                 )
                 now = monotonic()
+                previous = self._items.get(entry.cache_key)
+                if previous is not None:
+                    self._snapshots.pop(previous.entry.namespace, None)
+                self._snapshots.pop(entry.namespace, None)
                 self._items[entry.cache_key] = _Item(
                     entry=entry,
                     expires_monotonic=None if ttl is None else now + ttl,
@@ -211,7 +276,7 @@ class MemoryStore:
                 )
                 self._items.move_to_end(entry.cache_key)
                 while len(self._items) > self._max_size:
-                    self._items.popitem(last=False)
+                    self._discard(next(iter(self._items)))
 
     async def delete_entry(self, cache_key: str, *, namespace: str) -> bool:
         with self._state.operation():
@@ -221,7 +286,7 @@ class MemoryStore:
                 item = self._items.get(key)
                 if item is None or item.entry.namespace != namespace:
                     return False
-                del self._items[key]
+                self._discard(key)
                 return True
 
     async def clear(self, *, namespace: str) -> int:
@@ -238,12 +303,13 @@ class MemoryStore:
                     if item.entry.namespace == namespace
                 ]
                 for key in keys:
-                    del self._items[key]
+                    self._discard(key)
                 return len(keys)
 
     async def aclose(self) -> None:
         self._state.close(workers=bool(self._workers))
         self._items.clear()
+        self._snapshots.clear()
 
     async def __aenter__(self) -> Self:
         self._state.check_open()
