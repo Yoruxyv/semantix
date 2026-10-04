@@ -1,0 +1,367 @@
+{
+  "defaults": {
+    "requests": 256,
+    "cache_size": 500,
+    "capacity": 5000,
+    "threshold": 0.92,
+    "ttl_seconds": 3600.0,
+    "seed": 2301
+  },
+  "groups": {
+    "matrix": {
+      "axes": {
+        "store": [
+          "memory",
+          "pgvector"
+        ],
+        "dimensions": [
+          384,
+          1536
+        ],
+        "concurrency": [
+          1,
+          8,
+          32,
+          64,
+          128
+        ],
+        "workload": [
+          "hits",
+          "mixed90",
+          "mixed50",
+          "cold",
+          "burst"
+        ]
+      },
+      "repeats": 3
+    },
+    "scale": {
+      "axes": {
+        "store": [
+          "memory"
+        ],
+        "dimensions": [
+          384,
+          1536,
+          3072
+        ],
+        "cache_size": [
+          32,
+          5000
+        ],
+        "concurrency": [
+          1,
+          32
+        ],
+        "workload": [
+          "hits"
+        ]
+      },
+      "case": {
+        "requests": 128
+      },
+      "repeats": 3
+    },
+    "components": {
+      "axes": {
+        "store": [
+          "memory",
+          "pgvector"
+        ],
+        "dimensions": [
+          384,
+          1536
+        ],
+        "concurrency": [
+          1
+        ],
+        "workload": [
+          "get",
+          "search",
+          "write",
+          "empty",
+          "embedding",
+          "generation",
+          "normal90"
+        ]
+      },
+      "repeats": 3
+    },
+    "fixture": {
+      "case": {
+        "store": "fixture",
+        "dimensions": 384,
+        "workload": "hits",
+        "concurrency": 1
+      },
+      "repeats": 3
+    },
+    "policies": {
+      "axes": {
+        "store": [
+          "memory",
+          "pgvector"
+        ],
+        "dimensions": [
+          384
+        ],
+        "concurrency": [
+          1,
+          32
+        ],
+        "workload": [
+          "read-only",
+          "refresh",
+          "bypass",
+          "private"
+        ]
+      },
+      "repeats": 3
+    },
+    "pool": {
+      "axes": {
+        "store": [
+          "pgvector"
+        ],
+        "dimensions": [
+          384
+        ],
+        "concurrency": [
+          32
+        ],
+        "pool_size": [
+          1,
+          8,
+          16
+        ],
+        "workload": [
+          "hits",
+          "normal90"
+        ]
+      },
+      "repeats": 3
+    },
+    "diagnostics": {
+      "axes": {
+        "store": [
+          "memory",
+          "pgvector"
+        ],
+        "dimensions": [
+          384,
+          1536
+        ],
+        "concurrency": [
+          1,
+          32
+        ],
+        "workload": [
+          "hits",
+          "search",
+          "write"
+        ]
+      },
+      "case": {
+        "requests": 64,
+        "diagnostics": true,
+        "allocations": true,
+        "profile": true
+      },
+      "repeats": 1
+    },
+    "cleanup": {
+      "axes": {
+        "store": [
+          "memory",
+          "pgvector"
+        ],
+        "dimensions": [
+          384
+        ],
+        "concurrency": [
+          8,
+          64
+        ],
+        "workload": [
+          "cancellation",
+          "search-cancellation"
+        ]
+      },
+      "case": {
+        "requests": 64,
+        "cache_size": 32
+      },
+      "repeats": 3
+    },
+    "saturation": {
+      "case": {
+        "store": "pgvector",
+        "dimensions": 384,
+        "workload": "saturation",
+        "pool_size": 4,
+        "cache_size": 32,
+        "requests": 16
+      },
+      "repeats": 3
+    },
+    "stability": {
+      "axes": {
+        "store": [
+          "memory",
+          "pgvector"
+        ]
+      },
+      "case": {
+        "dimensions": 384,
+        "workload": "stability",
+        "cache_size": 500,
+        "capacity": 500,
+        "requests": 128,
+        "concurrency": 8,
+        "ttl_seconds": 0.5,
+        "duration": 120.0
+      },
+      "repeats": 1
+    },
+    "numerics": {
+      "module": "numerics",
+      "axes": {
+        "dimensions": [
+          384,
+          1536,
+          3072
+        ],
+        "cache_size": [
+          32,
+          500,
+          5000
+        ]
+      },
+      "case": {
+        "requests": 1
+      },
+      "iterations": 30,
+      "repeats": 3
+    },
+    "blas-comparison": {
+      "module": "numerics",
+      "axes": {
+        "dimensions": [
+          384,
+          1536
+        ],
+        "cache_size": [
+          500,
+          5000
+        ]
+      },
+      "case": {
+        "requests": 1
+      },
+      "iterations": 20,
+      "repeats": 3
+    },
+    "failures": {
+      "module": "failures",
+      "case": {
+        "store": "pgvector",
+        "dimensions": 384,
+        "cache_size": 0,
+        "requests": 64
+      },
+      "repeats": 3
+    },
+    "worker-profiles": {
+      "axes": {
+        "store": [
+          "memory"
+        ],
+        "dimensions": [
+          384,
+          1536
+        ],
+        "concurrency": [
+          1
+        ],
+        "workload": [
+          "hits",
+          "search"
+        ]
+      },
+      "case": {
+        "requests": 32,
+        "diagnostics": true,
+        "worker_profile": true
+      },
+      "repeats": 1
+    },
+    "burst-latency": {
+      "axes": {
+        "store": [
+          "memory",
+          "pgvector"
+        ],
+        "dimensions": [
+          384
+        ],
+        "concurrency": [
+          8,
+          32,
+          128
+        ],
+        "generation_delay": [
+          0.0,
+          0.2
+        ],
+        "workload": [
+          "burst"
+        ]
+      },
+      "repeats": 3
+    },
+    "pool-diagnostics": {
+      "axes": {
+        "store": [
+          "pgvector"
+        ],
+        "dimensions": [
+          384
+        ],
+        "concurrency": [
+          32
+        ],
+        "pool_size": [
+          1,
+          8,
+          16
+        ],
+        "workload": [
+          "hits",
+          "normal90"
+        ]
+      },
+      "case": {
+        "requests": 128,
+        "diagnostics": true
+      },
+      "repeats": 1
+    },
+    "postgresql-components": {
+      "module": "postgresql",
+      "axes": {
+        "store": [
+          "pgvector"
+        ],
+        "dimensions": [
+          384,
+          1536
+        ]
+      },
+      "case": {
+        "requests": 1,
+        "diagnostics": true
+      },
+      "repeats": 3
+    }
+  }
+}
