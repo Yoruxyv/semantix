@@ -428,16 +428,24 @@ class PgVectorStore:
         literal = "[" + ",".join(str(float(v)) for v in vector) + "]"
         async with self._connection() as connection:
             layout = await self._layout(connection, require_schema=True)
+            # Keep eligibility materialized before variable-dimension distance,
+            # then fence the native-vector winner before text/payload projection.
+            # Only its embedding is serialized; validation below remains complete.
             row = await connection.fetchrow(
                 f"""
                 WITH eligible AS MATERIALIZED (
                     SELECT * FROM {layout["entries"]}
                     WHERE embedding_space=$1 AND embedding_dimensions=$2 AND namespace=$3
                       AND (expires_at IS NULL OR expires_at>clock_timestamp())
+                ), winner AS MATERIALIZED (
+                    SELECT cache_key, namespace, prompt, response, embedding,
+                           created_at, expires_at,
+                           embedding {layout["cosine"]} $4::{layout["vector"]} AS distance
+                    FROM eligible ORDER BY distance, created_at, cache_key LIMIT 1
                 )
                 SELECT cache_key, namespace, prompt, response, embedding::text AS embedding,
-                       created_at, expires_at, 1-(embedding {layout["cosine"]} $4::{layout["vector"]}) AS score
-                FROM eligible ORDER BY embedding {layout["cosine"]} $4::{layout["vector"]}, created_at, cache_key LIMIT 1
+                       created_at, expires_at, 1-distance AS score
+                FROM winner
             """,
                 *scope,
                 literal,
