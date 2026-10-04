@@ -6,6 +6,7 @@ def test_core_and_optional_provider_import_boundaries() -> None:
     root = Path(__file__).parents[1] / "src" / "semantix_cache"
     permitted = {
         "asyncio",
+        "array",
         "collections",
         "contextlib",
         "dataclasses",
@@ -16,6 +17,8 @@ def test_core_and_optional_provider_import_boundaries() -> None:
         "math",
         "numbers",
         "re",
+        "sys",
+        "threading",
         "time",
         "types",
         "typing",
