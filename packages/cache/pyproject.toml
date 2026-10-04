@@ -45,6 +45,7 @@ semantix_cache = ["py.typed"]
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
+pythonpath = ["."]
 asyncio_mode = "auto"
 cache_dir = ".cache/pytest"
 testpaths = ["tests"]
