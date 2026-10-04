@@ -55,6 +55,7 @@ fail_under = 90
 show_missing = true
 
 [tool.mypy]
+enable_error_code = ["deprecated"]
 python_version = "3.11"
 strict = true
 files = ["src", "tests"]

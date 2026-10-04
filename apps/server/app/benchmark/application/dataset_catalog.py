@@ -44,17 +44,19 @@ def _persisted_metadata(
     record: PersistedEvaluationDataset,
 ) -> PersistedEvaluationDatasetMetadata:
     metadata = record.metadata
-    return PersistedEvaluationDatasetMetadata(
-        dataset_id=metadata.dataset_id,
-        namespace=metadata.namespace,
-        name=metadata.name,
-        description=metadata.description,
-        schema_version=metadata.schema_version,
-        digest=metadata.digest,
-        case_count=metadata.case_count,
-        decoded_bytes=metadata.decoded_bytes,
-        created_at=metadata.created_at,
-        expires_at=metadata.expires_at,
+    return PersistedEvaluationDatasetMetadata.model_validate(
+        {
+            "dataset_id": metadata.dataset_id,
+            "namespace": metadata.namespace,
+            "name": metadata.name,
+            "description": metadata.description,
+            "schema_version": metadata.schema_version,
+            "digest": metadata.digest,
+            "case_count": metadata.case_count,
+            "decoded_bytes": metadata.decoded_bytes,
+            "created_at": metadata.created_at,
+            "expires_at": metadata.expires_at,
+        }
     )
 
 
@@ -209,17 +211,19 @@ class EvaluationDatasetCatalog:
             limit=limit,
         )
         items = [
-            PersistedEvaluationDatasetMetadata(
-                dataset_id=item.dataset_id,
-                namespace=item.namespace,
-                name=item.name,
-                description=item.description,
-                schema_version=item.schema_version,
-                digest=item.digest,
-                case_count=item.case_count,
-                decoded_bytes=item.decoded_bytes,
-                created_at=item.created_at,
-                expires_at=item.expires_at,
+            PersistedEvaluationDatasetMetadata.model_validate(
+                {
+                    "dataset_id": item.dataset_id,
+                    "namespace": item.namespace,
+                    "name": item.name,
+                    "description": item.description,
+                    "schema_version": item.schema_version,
+                    "digest": item.digest,
+                    "case_count": item.case_count,
+                    "decoded_bytes": item.decoded_bytes,
+                    "created_at": item.created_at,
+                    "expires_at": item.expires_at,
+                }
             )
             for item in page.items
         ]

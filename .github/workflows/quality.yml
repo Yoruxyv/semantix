@@ -63,6 +63,14 @@ jobs:
           uv run --no-sync ruff format --config ../../ruff.toml --check .
       - name: Check typing
         run: uv run --no-sync mypy src tests examples
+      - name: Set up Node for Pyright
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      - name: Run Pyright
+        run: >-
+          npx --yes pyright@1.1.414 --project ../../pyrightconfig.json
+          --pythonpath .venv/bin/python src examples
       - name: Test embedded behavior and coverage
         run: uv run --no-sync pytest --cov=semantix_cache
       - name: Execute custom integration examples
@@ -142,6 +150,14 @@ jobs:
 
       - name: Run mypy
         run: uv run --no-sync mypy app tests scripts
+      - name: Set up Node for Pyright
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      - name: Run Pyright
+        run: >-
+          npx --yes pyright@1.1.414 --project ../../pyrightconfig.json
+          --pythonpath .venv/bin/python app scripts
 
       - name: Run backend unit tests with coverage
         run: uv run --no-sync pytest -m "not pgvector" --cov=app
@@ -234,6 +250,14 @@ jobs:
 
       - name: Run SDK mypy
         run: uv run --no-sync mypy src tests
+      - name: Set up Node for Pyright
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      - name: Run Pyright
+        run: >-
+          npx --yes pyright@1.1.414 --project ../../pyrightconfig.json
+          --pythonpath .venv/bin/python src
 
       - name: Run SDK unit tests with coverage
         run: uv run --no-sync pytest -m "not integration" --cov=semantix_client

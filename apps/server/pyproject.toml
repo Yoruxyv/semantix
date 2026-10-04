@@ -62,6 +62,7 @@ fail_under = 80
 show_missing = true
 
 [tool.mypy]
+enable_error_code = ["deprecated"]
 python_version = "3.11"
 strict = true
 plugins = ["pydantic.mypy"]

@@ -1,6 +1,6 @@
 """Operation admission is synchronous so close cannot race an admitted operation."""
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 
 from .errors import CacheBusyError, CacheClosedError
@@ -16,7 +16,7 @@ class Lifecycle:
             raise CacheClosedError("Resource is closed")
 
     @contextmanager
-    def operation(self) -> Iterator[None]:
+    def operation(self) -> Generator[None, None, None]:
         self.check_open()
         self.active += 1
         try:

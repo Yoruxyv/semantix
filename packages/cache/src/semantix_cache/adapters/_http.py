@@ -114,7 +114,8 @@ class HTTPAdapter:
         self, path: str, body: dict[str, object], parse: Callable[[object], Parsed]
     ) -> Parsed:
         failure = ""
-        result: Parsed
+        # A parsed None is still a successful result.
+        result: tuple[Parsed] | None = None
         with self._lifecycle.operation():
             if self._client.is_closed:
                 raise self._error("Borrowed HTTP client is closed") from RuntimeError(
@@ -160,7 +161,7 @@ class HTTPAdapter:
                                 except (ValueError, RecursionError):
                                     failure = "Provider returned invalid JSON"
                                 else:
-                                    result = parse(payload)
+                                    result = (parse(payload),)
                 if asyncio.get_running_loop().time() >= deadline:
                     failure = "Provider request exceeded its deadline"
             except (TimeoutError, httpx.TimeoutException):
@@ -170,11 +171,12 @@ class HTTPAdapter:
             task = asyncio.current_task()
             if task is not None and task.cancelling():
                 raise asyncio.CancelledError
-            if failure:
+            if failure or result is None:
                 # Construct the cause outside the except block: raw HTTP/JSON exceptions
                 # can contain private URLs, credentials or response bodies.
-                raise self._error(failure) from RuntimeError(failure)
-        return result
+                message = failure or "Provider returned no parsed result"
+                raise self._error(message) from RuntimeError(message)
+        return result[0]
 
     async def aclose(self) -> None:
         self._lifecycle.close()
