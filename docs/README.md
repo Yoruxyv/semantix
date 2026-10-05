@@ -1,9 +1,26 @@
 # Semantix documentation
 
-Use this index to find the detailed guide for the task at hand. The repository
-root [README](../README.md) remains the short project overview and quick start.
+Start with **semantix-cache** for embedded/in-process Python caching. It requires
+no Semantix server. The root [README](../README.md) explains the unpublished
+0.1.0 install path and a credential-free MemoryStore example.
 
-## Guides
+The official server/workbench is optional. semantix-client is the maintained
+reference HTTP client for that server, not the first public PyPI target.
+
+## Embedded Python library
+
+| Guide | Use it for |
+| --- | --- |
+| [Cache package](../packages/cache/README.md) | First use, policies, results, lifecycle and canonical 0.1.x compatibility |
+| [Embedded providers](embedded-providers.md) | Maintained adapters, optional extras and custom embedding/generation |
+| [Embedded storage](embedded-storage.md) | Memory, PostgreSQL/pgvector and application-owned databases |
+| [Custom integration](../packages/cache/examples/custom_integration.py) | Existing async embedding and generation flow |
+| [Custom store](../packages/cache/examples/custom_store.py) | Structural CacheStore and shared conformance |
+| [Persistent support example](../packages/cache/examples/persistent_support.py) | Explicit initialization and durable customer-support caching |
+| [Runtime benchmarks](../packages/cache/benchmarks/README.md) | Reproducible workloads, profiling and measurement limits |
+| [Coalescing experiments](../packages/cache/benchmarks/COALESCING.md) | Provider-work reduction and cold-follower latency tradeoffs |
+
+## Optional server/workbench and HTTP client
 
 | Guide | Use it for |
 |---|---|
