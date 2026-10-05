@@ -11,6 +11,11 @@
     "packages/cache/examples",
     "packages/client/src"
   ],
+  "ignore": [
+    "apps/server/tests",
+    "packages/cache/tests",
+    "packages/client/tests"
+  ],
 
   "typeCheckingMode": "standard",
 
