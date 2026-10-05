@@ -168,7 +168,7 @@ def summary(samples_ns: Sequence[int], elapsed: float) -> dict[str, Any]:
 
 
 def rss_bytes() -> dict[str, int | None]:
-    if sys.platform == "win32":
+    if platform.system() == "Windows":
 
         class Counters(ctypes.Structure):
             _fields_ = [("cb", ctypes.c_ulong), ("faults", ctypes.c_ulong)] + [
@@ -205,7 +205,7 @@ def rss_bytes() -> dict[str, int | None]:
                 "private_bytes": counters.private,
             }
     elif Path("/proc/self/status").exists():
-        values = {}
+        values: dict[str, int] = {}
         for line in Path("/proc/self/status").read_text().splitlines():
             if line.startswith(("VmRSS:", "VmHWM:")):
                 key, value, *_ = line.split()
@@ -222,7 +222,7 @@ def environment(case: Case) -> dict[str, Any]:
     root = Path(__file__).resolve().parents[3]
     cpu = platform.processor()
     ram: int | None = None
-    if sys.platform == "win32":
+    if platform.system() == "Windows":
         import winreg  # noqa: PLC0415 -- Windows-only standard library
 
         with winreg.OpenKey(
