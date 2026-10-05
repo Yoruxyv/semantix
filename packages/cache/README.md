@@ -291,6 +291,20 @@ programming bugs propagate. Package error messages and model repr omit payloads.
 Explicit model serialization contains its documented data and must be handled by the
 application with appropriate care.
 
+## Provider verification
+
+The maintained OpenAI, Gemini, and Hugging Face adapters and independent custom
+integrations passed live MemoryStore miss → generate → write → confirmed-hit
+checks on **2026-10-05**. See the [provider guide](../../docs/embedded-providers.md#010-verification)
+for the tested models and scope. Ollama was previously exercised locally, but
+current release-verification evidence is incomplete.
+
+Anthropic generation is **contract verified; first-party live verification
+pending** for 0.1.0. Its deterministic contract/regression tests pass; it has no
+native embedding API, so pair it with any supported embedding adapter. First-party
+verification and evidence-backed fixes with regression coverage are welcome;
+never share credentials or raw provider responses.
+
 ## Separate products
 
 **semantix-client**, imported as **semantix_client**, remains the independent HTTP

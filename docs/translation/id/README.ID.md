@@ -18,7 +18,7 @@
 <p align="center">
   <a href="#instalasi-dan-contoh-awal">Mulai</a> ·
   <a href="#cara-kerja-embedded">Cara kerja</a> ·
-  <a href="#provider-embedded">Provider</a> ·
+  <a href="#provider-ai-terverifikasi">Provider</a> ·
   <a href="#storage-embedded">Storage</a> ·
   <a href="#performa-embedded">Benchmark</a>
 </p>
@@ -194,27 +194,50 @@ menyimpulkan kesetaraan ContextVars/closure atau berkoordinasi antarproses. Foll
 mengonfirmasi hit masing-masing. Mengubah key itu saja tidak membatalkan jawaban
 tersimpan. Baca [aturan keamanan coalescing](../../../packages/cache/README.md#optional-cold-miss-coalescing).
 
-[Kebijakan kompatibilitas 0.1.x](../../../packages/cache/README.md#01x-compatibility)
-lengkap tetap kanonis di panduan paket.
+Penggunaan `AsyncSemanticCache` yang terdokumentasi dicakup oleh
+[kebijakan kompatibilitas 0.1.x paket](../../../packages/cache/README.md#01x-compatibility).
 
-## Provider embedded
+## Provider AI terverifikasi
+
+Adapter OpenAI, Gemini, dan Hugging Face yang dipelihara diuji melalui API nyata
+pada **2026-10-05**,
+mencakup embedding, generation, serta alur `AsyncSemanticCache` + MemoryStore
+miss → generate → write → confirmed hit. Generation dilewati pada hit untuk
+prompt yang diulang; pemeriksaan ini mencakup model yang tercantum dalam
+[panduan provider](../../embedded-providers.md#010-verification).
+
+| Provider | Embeddings | Generation | Verifikasi |
+| --- | --- | --- | --- |
+| OpenAI | Ya | Ya | ✅ Terverifikasi melalui API nyata |
+| Gemini | Ya | Ya | ✅ Terverifikasi melalui API nyata |
+| Hugging Face | Ya | Ya | ✅ Terverifikasi melalui API nyata |
+| Ollama | Ya | Ya | Pernah diuji secara lokal; bukti verifikasi rilis saat ini belum lengkap |
+| Anthropic | Tidak menyediakan API embedding native | Ya | ⚠️ Teruji kontrak; verifikasi langsung API pihak pertama masih tertunda |
+
+**Jalur ekstensi publik terverifikasi.** Integrasi HTTPX untuk OpenAI, Gemini,
+dan Hugging Face yang ditulis secara independen hanya memakai antarmuka
+ekstensi publik `AsyncSemanticCache`, tanpa adapter provider bawaan atau helper
+privat. Masing-masing menyelesaikan alur nyata miss → generate → write →
+confirmed hit.
+
+> **Anthropic:** Adapter generation dicakup pengujian kontrak dan regresi
+> deterministik, tetapi belum diverifikasi langsung melalui API Anthropic pihak
+> pertama untuk 0.1.0. Anthropic tidak menyediakan API embedding native; pasangkan
+> generation dengan adapter embedding mana pun yang didukung. Kontribusi dari
+> pengguna dengan akses API Anthropic pihak pertama milik sendiri diterima untuk
+> verifikasi, laporan kompatibilitas yang dapat direproduksi, serta perbaikan
+> terfokus dengan pengujian regresi jika cacat telah direproduksi.
 
 Adapter bawaan berada di `semantix_cache.adapters`, di luar impor root minimal.
 Pilih model dan identitas embedding-space secara eksplisit, serta berikan HTTPX
-client yang dipinjam. Extra HTTP opsional tidak memasang SDK provider.
+client yang dipinjam. Extra HTTP opsional tidak memasang SDK provider. Lihat
+[provider embedded dan integrasi kustom](../../embedded-providers.md) untuk
+konfigurasi dan jalur provider kustom.
 
-| Provider | Embedding | Generation teks selesai |
-| --- | --- | --- |
-| OpenAI | Ya | Ya |
-| Hugging Face | Ya | Ya |
-| Gemini | Ya | Ya |
-| Ollama | Ya | Ya |
-| Anthropic | Memerlukan embedding kustom | Ya |
-
-Lihat [provider embedded dan integrasi kustom](../../embedded-providers.md) untuk
-extra, impor, kredensial, default, override endpoint yang kompatibel, dan batas respons.
-API eksternal dapat berubah secara independen; versi/provider yang belum didukung
-dapat memakai kontrak embedding dan generation kustom.
+API provider berkembang secara independen dari Semantix. Saya berniat menjaga
+integrasi yang dipelihara tetap sesuai; laporan kompatibilitas yang dapat
+direproduksi dan perbaikan terfokus sangat diterima. Jangan sertakan API key,
+kredensial, atau respons provider mentah dalam issue, commit, log, atau fixture.
 
 ## Storage embedded
 
@@ -394,7 +417,7 @@ Embedding provider dan generation provider dipilih secara independen.
 |---|:---:|:---:|:---:|
 | Hugging Face | Ya | Ya | Diperlukan |
 | OpenAI | Ya | Ya | Diperlukan |
-| Anthropic | Tidak | Ya | Diperlukan |
+| Anthropic | Tidak menyediakan API embedding native | Ya (teruji kontrak; verifikasi langsung tertunda) | Diperlukan |
 | Gemini | Ya | Ya | Diperlukan |
 | Ollama | Ya | Ya | Tidak diperlukan secara lokal |
 | Mock | Ya | Ya | Tidak diperlukan |

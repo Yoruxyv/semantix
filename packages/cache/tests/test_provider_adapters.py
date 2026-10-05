@@ -178,6 +178,12 @@ async def test_success_request_and_borrowed_client(name: str, kind: str) -> None
         assert request.method == "POST"
         assert request.headers["accept-encoding"] == "identity"
         body = json.loads(request.content)
+        if name == "gemini" and kind == "embed":
+            assert body == {
+                "model": "models/" + MODEL,
+                "content": {"parts": [{"text": "private prompt"}]},
+                "outputDimensionality": SPACE.dimensions,
+            }
         if kind == "embed":
             adapter = embedder(name, client)
             assert TEST_KEY not in repr(adapter)
@@ -204,6 +210,41 @@ async def test_success_request_and_borrowed_client(name: str, kind: str) -> None
                     )
                 ]
             )
+
+
+@pytest.mark.parametrize("returned_dimensions", [768, 3072])
+async def test_gemini_requested_dimensions_are_not_silently_changed(
+    returned_dimensions: int,
+) -> None:
+    space = EmbeddingSpace(identity="fixture:gemini-embedding-001:d768", dimensions=768)
+    values = [1.0] + [0.0] * (returned_dimensions - 1)
+    calls = 0
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        assert json.loads(request.content) == {
+            "model": "models/gemini-embedding-001",
+            "content": {"parts": [{"text": "test"}]},
+            "outputDimensionality": 768,
+        }
+        return httpx.Response(200, json={"embedding": {"values": values}})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        async with GeminiEmbeddingAdapter(
+            client=client,
+            api_key=TEST_KEY,
+            model="gemini-embedding-001",
+            embedding_space=space,
+        ) as adapter:
+            if returned_dimensions == 768:
+                assert tuple(await adapter.embed("test")) == tuple(values)
+            else:
+                with pytest.raises(EmbeddingError):
+                    await adapter.embed("test")
+            assert adapter.embedding_space == space
+            assert calls == 1
+        assert not client.is_closed
 
 
 @pytest.mark.parametrize(("name", "kind"), KINDS)

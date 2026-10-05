@@ -8,7 +8,7 @@ Semantix memilih embedding dan generation provider secara independen di balik po
 | ------------ | :--------: | :--------: | :----------------------: |
 | Hugging Face |     Ya     |     Ya     |            Ya            |
 | OpenAI       |     Ya     |     Ya     |            Ya            |
-| Anthropic    |    Tidak   |     Ya     |            Ya            |
+| Anthropic | Tidak menyediakan API embedding native | Ya (teruji kontrak; verifikasi langsung tertunda) | Ya |
 | Gemini       |     Ya     |     Ya     |            Ya            |
 | Ollama       |     Ya     |     Ya     | Tidak untuk server lokal |
 | Mock         |     Ya     |     Ya     |           Tidak          |
@@ -63,7 +63,14 @@ OPENAI_EMBEDDING_DIMENSIONS=
 
 ### Anthropic
 
-Anthropic hanya mendukung generation:
+Generation Anthropic telah diimplementasikan dan dicakup pengujian kontrak serta
+regresi deterministik, tetapi verifikasi langsung API pihak pertama masih tertunda
+untuk 0.1.0. Anthropic tidak menyediakan API embedding native; pilih provider
+embedding mana pun yang didukung secara terpisah. Lihat
+[cakupan verifikasi dan catatan kontribusi](../../../embedded-providers.md#010-verification).
+Claude melalui host lain tidak memverifikasi adapter Anthropic pihak pertama.
+
+Konfigurasikan generation dengan:
 
 ```env
 GENERATION_PROVIDER=anthropic
@@ -87,6 +94,10 @@ GEMINI_EMBEDDING_DIMENSIONS=
 ```
 
 ## Ollama
+
+Pernah diuji secara lokal; bukti verifikasi rilis saat ini belum lengkap. Contoh
+konfigurasi berikut bukan catatan model yang telah diverifikasi. Lihat
+[cakupan verifikasi provider](../../../embedded-providers.md#010-verification).
 
 Hugging Face merupakan default yang direkomendasikan untuk sebagian besar pengguna karena tidak memerlukan download model lokal dan hardware inference. Pilih Ollama ketika local inference memang diperlukan dan mesin memiliki kapasitas disk, memory, dan compute yang memadai.
 

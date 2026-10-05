@@ -1,6 +1,10 @@
-"""Anthropic generation; use a structural custom adapter for other embedding APIs.
+"""First-party Anthropic generation with a caller-owned HTTP client.
 
-See https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-providers.md#custom-integrations.
+Anthropic has no native embedding API; pair generation with any supported built-in
+or custom embedding adapter. The 0.1.0 adapter is covered by deterministic contract
+and regression tests; first-party live verification remains pending.
+
+See https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-providers.md#010-verification.
 """
 
 from ..errors import GenerationError

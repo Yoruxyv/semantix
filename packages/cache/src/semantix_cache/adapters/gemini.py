@@ -58,9 +58,9 @@ class GeminiEmbeddingAdapter(HTTPAdapter):
             {
                 "model": "models/" + self._model,
                 "content": {"parts": [{"text": text}]},
-                "embedContentConfig": {
-                    "outputDimensionality": self.embedding_space.dimensions
-                },
+                # gemini-embedding-001 honors the supported top-level field;
+                # the newer nested config can silently return the default size.
+                "outputDimensionality": self.embedding_space.dimensions,
             },
             lambda payload: vector(
                 mapping(mapping(payload).get("embedding")).get("values"),
