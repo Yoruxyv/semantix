@@ -637,27 +637,6 @@ Lihat [SECURITY](SECURITY.md) untuk pelaporan dan batas deployment server,
 serta panduan [provider embedded](../../embedded-providers.md) dan
 [storage](../../embedded-storage.md) untuk tanggung jawab resource dan database pemanggil.
 
-## 🤝 Kontributor
-
-Dibuat dengan ❤️ oleh:
-
-<table>
-  <tr>
-    <td align="center" width="180">
-      <a href="https://github.com/Yoruxyv">
-        <img src="https://github.com/Yoruxyv.png?size=96" width="96" alt="Avatar Hans"><br>
-        <b>Hans</b>
-      </a><br>
-    </td>
-    <td align="center" width="180">
-      <a href="https://github.com/Kasanee-Teto">
-        <img src="https://github.com/Kasanee-Teto.png?size=96" width="96" alt="Avatar Louis"><br>
-        <b>Louis</b>
-      </a><br>
-    </td>
-  </tr>
-</table>
-
 ## 📄 Lisensi
 
 Dilisensikan di bawah [MIT License](../../../LICENSE).

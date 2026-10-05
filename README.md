@@ -709,27 +709,6 @@ and provider data handling. Namespace separation is not authorization. See
 [embedded provider](docs/embedded-providers.md) and [storage](docs/embedded-storage.md)
 guides for caller-owned resource and database responsibilities.
 
-## 🤝 Contributors
-
-Made with ❤️ by:
-
-<table>
-  <tr>
-    <td align="center" width="180">
-      <a href="https://github.com/Yoruxyv">
-        <img src="https://github.com/Yoruxyv.png?size=96" width="96" alt="Hans avatar"><br>
-        <b>Hans</b>
-      </a><br>
-    </td>
-    <td align="center" width="180">
-      <a href="https://github.com/Kasanee-Teto">
-        <img src="https://github.com/Kasanee-Teto.png?size=96" width="96" alt="Louis avatar"><br>
-        <b>Louis</b>
-      </a><br>
-    </td>
-  </tr>
-</table>
-
 ## 📄 License
 
 Licensed under the [MIT License](LICENSE).
