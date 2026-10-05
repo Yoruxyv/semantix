@@ -168,7 +168,7 @@ def summary(samples_ns: Sequence[int], elapsed: float) -> dict[str, Any]:
 
 
 def rss_bytes() -> dict[str, int | None]:
-    if platform.system() == "Windows":
+    if sys.platform == "win32":
 
         class Counters(ctypes.Structure):
             _fields_ = [("cb", ctypes.c_ulong), ("faults", ctypes.c_ulong)] + [
@@ -204,7 +204,8 @@ def rss_bytes() -> dict[str, int | None]:
                 "peak_rss": counters.peak,
                 "private_bytes": counters.private,
             }
-    elif Path("/proc/self/status").exists():
+    # Separate feature probing keeps portable code visible to Windows editors.
+    if platform.system() != "Windows" and Path("/proc/self/status").exists():
         values: dict[str, int] = {}
         for line in Path("/proc/self/status").read_text().splitlines():
             if line.startswith(("VmRSS:", "VmHWM:")):
@@ -222,7 +223,7 @@ def environment(case: Case) -> dict[str, Any]:
     root = Path(__file__).resolve().parents[3]
     cpu = platform.processor()
     ram: int | None = None
-    if platform.system() == "Windows":
+    if sys.platform == "win32":
         import winreg  # noqa: PLC0415 -- Windows-only standard library
 
         with winreg.OpenKey(
@@ -248,7 +249,7 @@ def environment(case: Case) -> dict[str, Any]:
         memory.length = ctypes.sizeof(memory)
         if ctypes.WinDLL("kernel32").GlobalMemoryStatusEx(ctypes.byref(memory)):
             ram = memory.total
-    elif Path("/proc/meminfo").exists():
+    if platform.system() != "Windows" and Path("/proc/meminfo").exists():
         ram = int(Path("/proc/meminfo").read_text().splitlines()[0].split()[1]) * 1024
         if Path("/proc/cpuinfo").exists():
             cpu = next(
