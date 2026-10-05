@@ -2,12 +2,12 @@
 
 <h1>🧠 Semantix</h1>
 
-<p><strong>Semantic caching for your async Python app.</strong></p>
+<p><strong>Async semantic caching for Python.</strong></p>
 
-<p><code>semantix-cache</code> · <code>import semantix_cache</code></p>
+<p>Memory or PostgreSQL storage. Your generation flow stays yours.</p>
 
 <p>
-  <img src="https://img.shields.io/badge/Python-3.11%E2%80%933.14-3776AB?logo=python&amp;logoColor=white" alt="Python 3.11–3.14" />
+  <img src="https://img.shields.io/badge/Python-3.11%E2%80%933.14-555555?logo=python&amp;logoColor=FFD43B&amp;labelColor=3776AB" alt="Python 3.11–3.14" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-3DA639" alt="MIT license" /></a>
 </p>
 
@@ -15,14 +15,22 @@
 
 </div>
 
+<p align="center">
+  <a href="#install-and-run">Quick start</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#providers">Providers</a> ·
+  <a href="#storage">Storage</a> ·
+  <a href="#performance">Benchmarks</a>
+</p>
+
 **semantix-cache** is the intended first public PyPI product. Its 0.1.0 API
 is async-only and runs in your Python process. No Semantix server, web UI,
 Docker or PostgreSQL is required.
 
-
 ## Install and run
 
-**0.1.0 is not yet published.** After publication, the minimal install will be:
+> [!NOTE]
+> **0.1.0 is not yet published.** The public install command below applies after publication.
 
 ```bash
 python -m pip install semantix-cache
@@ -44,38 +52,27 @@ embedder and generation function with your application's existing async integrat
 
 ```python
 import asyncio
-from collections.abc import Sequence
-
 from semantix_cache import AsyncSemanticCache, EmbeddingSpace, MemoryStore
 
-
 class DemoEmbedder:
-    # Toy vectors for a runnable demo; replace with a real embedding adapter.
     embedding_space = EmbeddingSpace(identity="demo-v1", dimensions=2)
 
-    async def embed(self, text: str) -> Sequence[float]:
+    async def embed(self, text: str) -> tuple[float, float]:
         return (1.0, 0.0) if "weather" in text.lower() else (0.0, 1.0)
 
-
 async def generate(prompt: str) -> str:
-    # Replace with your existing async flow returning approved, completed text.
     return "Completed answer for: " + prompt
-
 
 async def main() -> None:
     embedder = DemoEmbedder()
     async with MemoryStore(embedding_space=embedder.embedding_space) as store:
         async with AsyncSemanticCache(embedder=embedder, store=store) as cache:
-            first = await cache.resolve(
-                "weather today", namespace="demo", generate=generate
-            )
-            second = await cache.resolve(
-                "weather today", namespace="demo", generate=generate
-            )
-            assert first.provider_called and first.cache_written
-            assert second.cache_hit and second.generation_skipped
-            print(second.response, "cache_hit=", second.cache_hit)
-
+            prompt = "weather today"
+            miss = await cache.resolve(prompt, namespace="demo", generate=generate)
+            hit = await cache.resolve(prompt, namespace="demo", generate=generate)
+            assert miss.provider_called and miss.cache_written
+            assert hit.cache_hit and hit.generation_skipped
+            print(hit.response, "cache_hit=", hit.cache_hit)
 
 asyncio.run(main())
 ```
@@ -84,6 +81,14 @@ The first resolve generates and writes; the second reports a confirmed cache hit
 and skips generation. Reuse the store/cache across requests: creating a new
 MemoryStore loses its process-local entries. Context managers close the facade
 and store; the application owns any other injected resources.
+
+## At a glance
+
+| Aspect | Summary |
+| --- | --- |
+| **Runtime** | Async, in-process Python |
+| **Storage** | MemoryStore or optional PostgreSQL/pgvector |
+| **Generation** | Your own async callable |
 
 ## Why Semantix?
 
@@ -107,7 +112,9 @@ flowchart LR
 ```
 
 Eligible candidates pass validation and atomic TTL/revision confirmation before
-a hit is returned. The application owns the embedder, generator and store lifetimes. A CacheStore can
+a hit is returned.
+
+The application owns the embedder, generator and store lifetimes. A CacheStore can
 be MemoryStore, optional PgVectorStore or your custom implementation. Other policies
 control reads/generation/writes; opt-in coalescing adds waiting and each follower's
 own confirmed lookup. See the [cache contract](packages/cache/README.md#contract).
@@ -128,11 +135,11 @@ TTL starts at the write and does not extend on hits. See
 
 ## Key capabilities
 
-- AsyncSemanticCache with explicit CachePolicy, CacheResult and CacheHit evidence.
-- Bounded MemoryStore with exact float64 cosine scoring, TTL and confirmed-hit LRU.
-- Optional PostgreSQL/pgvector persistence with explicit schema initialization.
-- Maintained embedding/generation adapters and structural custom integration ports.
-- Opt-in NORMAL cold-miss coalescing within one cache instance and event loop.
+- **Async API** — AsyncSemanticCache with explicit CachePolicy, CacheResult and CacheHit evidence.
+- **Memory** — Bounded MemoryStore with exact float64 cosine scoring, TTL and confirmed-hit LRU.
+- **Persistence** — Optional PostgreSQL/pgvector with explicit schema initialization.
+- **Extensions** — Maintained embedding/generation adapters and structural custom integration ports.
+- **Coalescing** — Opt-in NORMAL cold misses within one cache instance and event loop.
 
 ## Performance
 
@@ -148,20 +155,27 @@ embedding calls remained 256.
 | PgVectorStore | 916.670 → 941.012 ms | 1366.900 → 1087.602 ms |
 
 These are median per-trial burst percentiles, not isolated follower timings.
+
+Provider-work reduction can increase cold-follower latency, as the MemoryStore
+numbers show. Sharing requires equivalent attested inputs, bounded admission and
+successful persistence/confirmation. It is disabled by default and does not promise
+universal latency, duplicate elimination or dollar savings. See the
+[complete tradeoff](packages/cache/README.md#measured-provider-work-and-latency-tradeoff).
+Optional server measurements are retained below and describe a different workload.
+
+<details>
+<summary>Measurement environment and methodology</summary>
+
 Conditions: Windows 11, Ryzen 9 5900HX/16 logical CPUs/about 32 GiB RAM; Python
 3.14.6, NumPy 2.4.6, Pydantic 2.13.5; 384 dimensions, 500 seeded candidates,
 capacity 5,000, threshold 0.92, TTL 3,600 s; child BLAS threads=1. PostgreSQL
 17.10/pgvector 0.8.5 used a local four-CPU/2-GiB container, asyncpg 0.31.0 and
 pool eight. Setup/warmup/cleanup were excluded; measured requests had no errors.
 
-Provider-work reduction can increase cold-follower latency, as the MemoryStore
-numbers show. Sharing requires equivalent attested inputs, bounded admission and
-successful persistence/confirmation. It is disabled by default and does not promise
-universal latency, duplicate elimination or dollar savings. See the
-[complete tradeoff](packages/cache/README.md#measured-provider-work-and-latency-tradeoff),
-[coalescing experiments](packages/cache/benchmarks/COALESCING.md) and
-[runtime benchmark methodology](packages/cache/benchmarks/README.md).
-Optional server measurements are retained below and describe a different workload.
+Reproduce with the [coalescing experiments](packages/cache/benchmarks/COALESCING.md)
+and [runtime benchmark methodology](packages/cache/benchmarks/README.md).
+
+</details>
 
 ## Production behavior
 
@@ -194,7 +208,7 @@ client. The optional HTTP extras do not install provider SDKs.
 | Hugging Face | Yes | Yes |
 | Gemini | Yes | Yes |
 | Ollama | Yes | Yes |
-| Anthropic | Custom embedding required | Yes |
+| Anthropic | No native embedding API | Yes |
 
 See [embedded providers and custom integrations](docs/embedded-providers.md) for
 extras, imports, credentials, defaults, compatible endpoint overrides and response

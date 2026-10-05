@@ -2,12 +2,12 @@
 
 <h1>🧠 Semantix</h1>
 
-<p><strong>Semantic cache untuk aplikasi Python asinkron Anda.</strong></p>
+<p><strong>Semantic caching asinkron untuk Python.</strong></p>
 
-<p><code>semantix-cache</code> · <code>import semantix_cache</code></p>
+<p>Penyimpanan memory atau PostgreSQL. Alur generation tetap Anda kendalikan.</p>
 
 <p>
-  <img src="https://img.shields.io/badge/Python-3.11%E2%80%933.14-3776AB?logo=python&amp;logoColor=white" alt="Python 3.11–3.14" />
+  <img src="https://img.shields.io/badge/Python-3.11%E2%80%933.14-555555?logo=python&amp;logoColor=FFD43B&amp;labelColor=3776AB" alt="Python 3.11–3.14" />
   <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-3DA639" alt="MIT license" /></a>
 </p>
 
@@ -15,14 +15,22 @@
 
 </div>
 
+<p align="center">
+  <a href="#instalasi-dan-contoh-awal">Mulai</a> ·
+  <a href="#cara-kerja-embedded">Cara kerja</a> ·
+  <a href="#provider-embedded">Provider</a> ·
+  <a href="#storage-embedded">Storage</a> ·
+  <a href="#performa-embedded">Benchmark</a>
+</p>
+
 **semantix-cache** adalah produk PyPI publik pertama yang direncanakan.
 API 0.1.0 hanya asinkron dan berjalan di dalam proses Python Anda. Tidak
 memerlukan server Semantix, web UI, Docker, atau PostgreSQL.
 
-
 ## Instalasi dan contoh awal
 
-**0.1.0 belum diterbitkan.** Setelah publikasi, instalasi minimalnya adalah:
+> [!NOTE]
+> **0.1.0 belum diterbitkan.** Perintah instalasi publik berikut berlaku setelah publikasi.
 
 ```bash
 python -m pip install semantix-cache
@@ -44,38 +52,27 @@ semantik. Ganti embedder dan fungsi generation dengan integrasi asinkron aplikas
 
 ```python
 import asyncio
-from collections.abc import Sequence
-
 from semantix_cache import AsyncSemanticCache, EmbeddingSpace, MemoryStore
 
-
 class DemoEmbedder:
-    # Vektor demo; ganti dengan embedding adapter yang sebenarnya.
     embedding_space = EmbeddingSpace(identity="demo-v1", dimensions=2)
 
-    async def embed(self, text: str) -> Sequence[float]:
+    async def embed(self, text: str) -> tuple[float, float]:
         return (1.0, 0.0) if "weather" in text.lower() else (0.0, 1.0)
 
-
 async def generate(prompt: str) -> str:
-    # Ganti dengan alur asinkron Anda yang menghasilkan teks selesai dan disetujui.
     return "Completed answer for: " + prompt
-
 
 async def main() -> None:
     embedder = DemoEmbedder()
     async with MemoryStore(embedding_space=embedder.embedding_space) as store:
         async with AsyncSemanticCache(embedder=embedder, store=store) as cache:
-            first = await cache.resolve(
-                "weather today", namespace="demo", generate=generate
-            )
-            second = await cache.resolve(
-                "weather today", namespace="demo", generate=generate
-            )
-            assert first.provider_called and first.cache_written
-            assert second.cache_hit and second.generation_skipped
-            print(second.response, "cache_hit=", second.cache_hit)
-
+            prompt = "weather today"
+            miss = await cache.resolve(prompt, namespace="demo", generate=generate)
+            hit = await cache.resolve(prompt, namespace="demo", generate=generate)
+            assert miss.provider_called and miss.cache_written
+            assert hit.cache_hit and hit.generation_skipped
+            print(hit.response, "cache_hit=", hit.cache_hit)
 
 asyncio.run(main())
 ```
@@ -84,6 +81,14 @@ Resolve pertama menghasilkan dan menyimpan jawaban; resolve kedua melaporkan hit
 cache yang telah dikonfirmasi dan melewati generation. Gunakan ulang store/cache
 antar-request: membuat MemoryStore baru menghilangkan entri process-local sebelumnya.
 Context manager menutup facade dan store; resource lain yang diinjeksi tetap dimiliki aplikasi.
+
+## Sekilas
+
+| Aspek | Ringkasan |
+| --- | --- |
+| **Runtime** | Python asinkron, in-process |
+| **Storage** | MemoryStore atau PostgreSQL/pgvector opsional |
+| **Generation** | Callable asinkron milik Anda |
 
 ## Mengapa Semantix?
 
@@ -107,7 +112,9 @@ flowchart LR
 ```
 
 Kandidat yang memenuhi syarat harus lolos validasi dan konfirmasi TTL/revisi
-secara atomik sebelum hit dikembalikan. Aplikasi memiliki masa hidup embedder, generator, dan store. CacheStore dapat berupa
+secara atomik sebelum hit dikembalikan.
+
+Aplikasi memiliki masa hidup embedder, generator, dan store. CacheStore dapat berupa
 MemoryStore, PgVectorStore opsional, atau implementasi Anda. Kebijakan lain mengatur
 read/generation/write; coalescing opt-in menambahkan penantian dan lookup terkonfirmasi
 milik setiap follower. Lihat [kontrak cache](../../../packages/cache/README.md#contract).
@@ -127,11 +134,11 @@ TTL dimulai saat write dan tidak diperpanjang oleh hit. Lihat
 
 ## Kapabilitas utama
 
-- AsyncSemanticCache dengan CachePolicy, CacheResult, dan bukti CacheHit yang eksplisit.
-- MemoryStore terbatas dengan cosine float64 eksak, TTL, dan LRU berdasarkan hit terkonfirmasi.
-- Persistensi PostgreSQL/pgvector opsional dengan inisialisasi schema yang eksplisit.
-- Adapter embedding/generation yang dipelihara serta kontrak integrasi kustom struktural.
-- Coalescing cold miss NORMAL secara opt-in dalam satu instance cache dan event loop.
+- **API asinkron** — AsyncSemanticCache dengan CachePolicy, CacheResult, dan bukti CacheHit yang eksplisit.
+- **Memory** — MemoryStore terbatas dengan cosine float64 eksak, TTL, dan LRU berdasarkan hit terkonfirmasi.
+- **Persistensi** — PostgreSQL/pgvector opsional dengan inisialisasi schema yang eksplisit.
+- **Ekstensi** — Adapter embedding/generation yang dipelihara serta kontrak integrasi kustom struktural.
+- **Coalescing** — Cold miss NORMAL secara opt-in dalam satu instance cache dan event loop.
 
 ## Performa embedded
 
@@ -147,20 +154,28 @@ generation turun dari 256 menjadi 2; panggilan embedding tetap 256.
 | PgVectorStore | 916.670 → 941.012 ms | 1366.900 → 1087.602 ms |
 
 Angka ini adalah median persentil burst per trial, bukan timing follower secara
-terpisah. Kondisi: Windows 11, Ryzen 9 5900HX/16 CPU logis/sekitar 32 GiB RAM;
-Python 3.14.6, NumPy 2.4.6, Pydantic 2.13.5; 384 dimensi, 500 kandidat awal,
-kapasitas 5.000, threshold 0.92, TTL 3.600 s; thread BLAS proses anak=1. PostgreSQL
-17.10/pgvector 0.8.5 memakai container lokal empat CPU/2 GiB, asyncpg 0.31.0 dan
-pool delapan koneksi. Setup/warmup/cleanup tidak dihitung; request terukur selesai tanpa error.
+terpisah.
 
 Pengurangan kerja provider dapat meningkatkan latensi cold follower, seperti pada
 MemoryStore. Sharing mensyaratkan input setara yang ditegaskan pemanggil, admission
 terbatas, serta persistensi/konfirmasi yang berhasil. Fitur ini nonaktif secara
 bawaan dan tidak menjamin latensi, penghapusan duplikasi, atau penghematan biaya
-untuk semua aplikasi. Lihat [tradeoff lengkap](../../../packages/cache/README.md#measured-provider-work-and-latency-tradeoff),
-[eksperimen coalescing](../../../packages/cache/benchmarks/COALESCING.md), dan
-[metodologi benchmark runtime](../../../packages/cache/benchmarks/README.md).
+untuk semua aplikasi. Lihat [tradeoff lengkap](../../../packages/cache/README.md#measured-provider-work-and-latency-tradeoff).
 Pengukuran server opsional dipertahankan di bawah dan memakai workload yang berbeda.
+
+<details>
+<summary>Lingkungan pengukuran dan metodologi</summary>
+
+Kondisi: Windows 11, Ryzen 9 5900HX/16 CPU logis/sekitar 32 GiB RAM;
+Python 3.14.6, NumPy 2.4.6, Pydantic 2.13.5; 384 dimensi, 500 kandidat awal,
+kapasitas 5.000, threshold 0.92, TTL 3.600 s; thread BLAS proses anak=1. PostgreSQL
+17.10/pgvector 0.8.5 memakai container lokal empat CPU/2 GiB, asyncpg 0.31.0 dan
+pool delapan koneksi. Setup/warmup/cleanup tidak dihitung; request terukur selesai tanpa error.
+
+Lihat [eksperimen coalescing](../../../packages/cache/benchmarks/COALESCING.md)
+dan [metodologi benchmark runtime](../../../packages/cache/benchmarks/README.md) untuk reproduksi.
+
+</details>
 
 ## Perilaku operasional
 
