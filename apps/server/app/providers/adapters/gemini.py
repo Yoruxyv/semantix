@@ -73,9 +73,9 @@ class GeminiProvider:
                         },
                     ],
                 },
-                "embedContentConfig": {
-                    "outputDimensionality": self._embedding_dimensions,
-                },
+                # gemini-embedding-001 honors the supported top-level field;
+                # the newer nested config can silently return the default size.
+                "outputDimensionality": self._embedding_dimensions,
             },
             retry_factory=self._retry_factory,
             max_response_bytes=self._max_response_bytes,
