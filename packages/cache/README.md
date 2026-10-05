@@ -161,6 +161,41 @@ confirmation; it is not guaranteed for every application. Provider pricing, toke
 counts and application behavior determine actual dollar savings, which this
 deterministic experiment did not measure.
 
+## 0.1.x compatibility
+
+Throughout the 0.1.x release line, supported public import paths, classes and
+functions, existing call signatures and defaults, result fields, policy values,
+documented extension protocols, and documented lifecycle/resource-ownership
+behavior remain compatible for valid documented usage. Additive APIs must preserve
+existing calls and defaults.
+
+Bug and security corrections may reject behavior that was invalid, unsafe, or
+contrary to the documented contract, and must be described in release notes.
+A breaking change to valid supported usage requires an explicitly announced
+compatibility-policy amendment or version 0.2.0 or later with migration guidance.
+
+Undocumented behavior, private internals and underscore-prefixed modules are not
+compatibility surfaces. Maintained provider retirement follows the
+[provider deprecation process](../../docs/embedded-providers.md#deprecation-path).
+Arbitrary third-party providers, external provider availability and provider-side
+API behavior remain outside this compatibility promise. Custom integrations remain
+available when a provider's API changes.
+
+### PostgreSQL schema compatibility
+
+Semantix-owned cache schemas created or upgraded through supported Semantix
+migrations remain supported throughout 0.1.x. Applied migration SQL and checksums
+are immutable. Schema evolution requires a new explicit reviewed migration,
+separately privileged migration authority, and upgrade guidance.
+
+Runtime operations validate ownership markers, schema version and migration
+checksums and perform no DDL. Unsupported, tampered or foreign layouts are rejected
+by these checks rather than silently adopted or downgraded. Modified database
+layouts are outside the compatibility promise; administrators remain responsible
+for preventing out-of-band schema tampering, as described in the
+[storage guide](../../docs/embedded-storage.md#existing-application-database).
+Downgrades are unsupported unless explicitly documented.
+
 ## Contract
 
 The facade exposes async `resolve`, `get`, `set`, `delete`,
