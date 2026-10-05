@@ -1,20 +1,250 @@
-<p align="center">
-  <sub><a href="README.ID.md">ID</a> · <a href="../../../README.md">EN</a></sub>
-</p>
-
 <div align="center">
 
-# 🧠 Semantix
+<h1>🧠 Semantix</h1>
 
-### Amati, ukur, dan sesuaikan semantic caching Anda — bukan sekadar memperlakukannya sebagai kotak hitam
+<p><strong>Semantic cache untuk aplikasi Python asinkron Anda.</strong></p>
 
-Semantix adalah laboratorium semantic-cache full-stack untuk memeriksa keputusan cache, mengukur penghematan provider, mengevaluasi similarity threshold, dan membandingkan provider AI serta storage yang dapat dipertukarkan.
+<p><code>semantix-cache</code> · <code>import semantix_cache</code></p>
 
-Semantix dapat di-host sendiri untuk beberapa aplikasi dan pengguna. Akses berbasis namespace memisahkan data cache mereka; PostgreSQL + pgvector mempertahankan entri saat layanan dimulai ulang. Deployment hardened merutekan traffic melalui dua replika backend.
+<p>
+  <img src="https://img.shields.io/badge/Python-3.11%E2%80%933.14-3776AB?logo=python&amp;logoColor=white" alt="Python 3.11–3.14" />
+  <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-3DA639" alt="MIT license" /></a>
+</p>
 
-<sub>Monitor · Cache Inspector · Evaluations · Observability</sub>
+<p><sub><a href="../../../README.md">EN</a> · <a href="README.ID.md">ID</a></sub></p>
 
 </div>
+
+**semantix-cache** adalah produk PyPI publik pertama yang direncanakan.
+API 0.1.0 hanya asinkron dan berjalan di dalam proses Python Anda. Tidak
+memerlukan server Semantix, web UI, Docker, atau PostgreSQL.
+
+
+## Instalasi dan contoh awal
+
+**0.1.0 belum diterbitkan.** Setelah publikasi, instalasi minimalnya adalah:
+
+```bash
+python -m pip install semantix-cache
+```
+
+Sebelum publikasi, instal wheel kandidat yang sudah dibangun dari direktori yang memuatnya:
+
+```bash
+python -m pip install semantix_cache-0.1.0-py3-none-any.whl
+```
+
+Lihat [panduan paket](../../../packages/cache/README.md) untuk build lokal dan kontrak
+lengkap. Paket minimal bergantung pada NumPy dan Pydantic; dependensi jaringan
+provider serta driver PostgreSQL bersifat opsional.
+
+Contoh tanpa kredensial berikut dapat dijalankan sebagai skrip. Vektor sederhana
+hanya menunjukkan cara integrasi, bukan pemahaman bahasa atau kualitas pencocokan
+semantik. Ganti embedder dan fungsi generation dengan integrasi asinkron aplikasi Anda.
+
+```python
+import asyncio
+from collections.abc import Sequence
+
+from semantix_cache import AsyncSemanticCache, EmbeddingSpace, MemoryStore
+
+
+class DemoEmbedder:
+    # Vektor demo; ganti dengan embedding adapter yang sebenarnya.
+    embedding_space = EmbeddingSpace(identity="demo-v1", dimensions=2)
+
+    async def embed(self, text: str) -> Sequence[float]:
+        return (1.0, 0.0) if "weather" in text.lower() else (0.0, 1.0)
+
+
+async def generate(prompt: str) -> str:
+    # Ganti dengan alur asinkron Anda yang menghasilkan teks selesai dan disetujui.
+    return "Completed answer for: " + prompt
+
+
+async def main() -> None:
+    embedder = DemoEmbedder()
+    async with MemoryStore(embedding_space=embedder.embedding_space) as store:
+        async with AsyncSemanticCache(embedder=embedder, store=store) as cache:
+            first = await cache.resolve(
+                "weather today", namespace="demo", generate=generate
+            )
+            second = await cache.resolve(
+                "weather today", namespace="demo", generate=generate
+            )
+            assert first.provider_called and first.cache_written
+            assert second.cache_hit and second.generation_skipped
+            print(second.response, "cache_hit=", second.cache_hit)
+
+
+asyncio.run(main())
+```
+
+Resolve pertama menghasilkan dan menyimpan jawaban; resolve kedua melaporkan hit
+cache yang telah dikonfirmasi dan melewati generation. Gunakan ulang store/cache
+antar-request: membuat MemoryStore baru menghilangkan entri process-local sebelumnya.
+Context manager menutup facade dan store; resource lain yang diinjeksi tetap dimiliki aplikasi.
+
+## Mengapa Semantix?
+
+Gunakan ulang respons yang telah selesai dalam aplikasi asinkron Anda, sementara
+penyusunan prompt, pemilihan model, RAG, tools, dan persetujuan output tetap berada
+di kode aplikasi. Atur threshold similarity serta retensi secara eksplisit, periksa
+bukti hit/miss yang dikembalikan, dan tambahkan persistensi bila diperlukan.
+
+## Cara kerja embedded
+
+Untuk kebijakan NORMAL bawaan, alurnya adalah:
+
+```mermaid
+flowchart LR
+    A[Aplikasi Anda] --> B[AsyncSemanticCache]
+    B --> C[Embed]
+    C --> D{Hit cache terkonfirmasi?}
+    D -->|Ya| H[Kembalikan hit]
+    D -->|Tidak| G[Generation, validasi dan simpan]
+    G --> R[Kembalikan miss]
+```
+
+Kandidat yang memenuhi syarat harus lolos validasi dan konfirmasi TTL/revisi
+secara atomik sebelum hit dikembalikan. Aplikasi memiliki masa hidup embedder, generator, dan store. CacheStore dapat berupa
+MemoryStore, PgVectorStore opsional, atau implementasi Anda. Kebijakan lain mengatur
+read/generation/write; coalescing opt-in menambahkan penantian dan lookup terkonfirmasi
+milik setiap follower. Lihat [kontrak cache](../../../packages/cache/README.md#contract).
+
+## Perilaku semantic cache
+
+Pencocokan memakai embedding tervalidasi dan cosine similarity, bukan syarat string
+yang identik. Threshold inklusif bawaannya 0.92; evaluasi false match untuk model dan
+workload Anda. Prompt yang diulang pun tetap melalui embedding dan lookup. Namespace
+dan EmbeddingSpace mengisolasi data cache yang kompatibel, bukan menggantikan otorisasi aplikasi.
+
+Versikan namespace ketika konteks respons, model, izin, atau kebijakan persetujuan
+berubah. Pertahankan identitas embedding untuk kombinasi model/revisi/dimensi/
+preprocessing yang sama. Dimensi yang sama saja tidak membuktikan kompatibilitas.
+TTL dimulai saat write dan tidak diperpanjang oleh hit. Lihat
+[kebijakan, TTL, dan pencocokan](../../../packages/cache/README.md#contract).
+
+## Kapabilitas utama
+
+- AsyncSemanticCache dengan CachePolicy, CacheResult, dan bukti CacheHit yang eksplisit.
+- MemoryStore terbatas dengan cosine float64 eksak, TTL, dan LRU berdasarkan hit terkonfirmasi.
+- Persistensi PostgreSQL/pgvector opsional dengan inisialisasi schema yang eksplisit.
+- Adapter embedding/generation yang dipelihara serta kontrak integrasi kustom struktural.
+- Coalescing cold miss NORMAL secara opt-in dalam satu instance cache dan event loop.
+
+## Performa embedded
+
+Pengukuran development historis membandingkan base yang sudah dioptimasi `ee915140`
+dengan coalescing opt-in, melalui tiga pasangan control/treatment bergantian dengan
+proses baru untuk setiap store. Workload memakai 256 request, concurrency 128, dua
+prompt yang kompatibel, dan generation deterministik dengan jeda 200 ms. Panggilan
+generation turun dari 256 menjadi 2; panggilan embedding tetap 256.
+
+| Store | Burst P50, nonaktif → aktif | Burst P95, nonaktif → aktif |
+| --- | ---: | ---: |
+| MemoryStore | 294.095 → 434.127 ms | 316.949 → 458.839 ms |
+| PgVectorStore | 916.670 → 941.012 ms | 1366.900 → 1087.602 ms |
+
+Angka ini adalah median persentil burst per trial, bukan timing follower secara
+terpisah. Kondisi: Windows 11, Ryzen 9 5900HX/16 CPU logis/sekitar 32 GiB RAM;
+Python 3.14.6, NumPy 2.4.6, Pydantic 2.13.5; 384 dimensi, 500 kandidat awal,
+kapasitas 5.000, threshold 0.92, TTL 3.600 s; thread BLAS proses anak=1. PostgreSQL
+17.10/pgvector 0.8.5 memakai container lokal empat CPU/2 GiB, asyncpg 0.31.0 dan
+pool delapan koneksi. Setup/warmup/cleanup tidak dihitung; request terukur selesai tanpa error.
+
+Pengurangan kerja provider dapat meningkatkan latensi cold follower, seperti pada
+MemoryStore. Sharing mensyaratkan input setara yang ditegaskan pemanggil, admission
+terbatas, serta persistensi/konfirmasi yang berhasil. Fitur ini nonaktif secara
+bawaan dan tidak menjamin latensi, penghapusan duplikasi, atau penghematan biaya
+untuk semua aplikasi. Lihat [tradeoff lengkap](../../../packages/cache/README.md#measured-provider-work-and-latency-tradeoff),
+[eksperimen coalescing](../../../packages/cache/benchmarks/COALESCING.md), dan
+[metodologi benchmark runtime](../../../packages/cache/benchmarks/README.md).
+Pengukuran server opsional dipertahankan di bawah dan memakai workload yang berbeda.
+
+## Perilaku operasional
+
+Facade meminjam resource yang diinjeksi. Adapter meminjam HTTP client;
+PgVectorStore.connect memiliki pool-nya, sedangkan pool yang diinjeksi dipinjam.
+Tuntaskan atau batalkan pekerjaan aktif sebelum menutup resource: resource sibuk
+memunculkan CacheBusyError. Deadline total terbatas, cancellation diteruskan, dan
+tidak ada retry generation otomatis. Transport/callback yang dikonfigurasi pemanggil
+tetap menjadi tanggung jawab pemanggil.
+
+Kegagalan lookup/write diteruskan sebagai error; generation yang diikuti write gagal
+bukan resolve yang berhasil. Error bertipe dan bukti hasil yang terbatas dijelaskan
+di [panduan paket](../../../packages/cache/README.md#extension-and-ownership).
+Coalescing membutuhkan pernyataan eksplisit melalui `coalescing_key`; Semantix tidak
+menyimpulkan kesetaraan ContextVars/closure atau berkoordinasi antarproses. Follower
+mengonfirmasi hit masing-masing. Mengubah key itu saja tidak membatalkan jawaban
+tersimpan. Baca [aturan keamanan coalescing](../../../packages/cache/README.md#optional-cold-miss-coalescing).
+
+[Kebijakan kompatibilitas 0.1.x](../../../packages/cache/README.md#01x-compatibility)
+lengkap tetap kanonis di panduan paket.
+
+## Provider embedded
+
+Adapter bawaan berada di `semantix_cache.adapters`, di luar impor root minimal.
+Pilih model dan identitas embedding-space secara eksplisit, serta berikan HTTPX
+client yang dipinjam. Extra HTTP opsional tidak memasang SDK provider.
+
+| Provider | Embedding | Generation teks selesai |
+| --- | --- | --- |
+| OpenAI | Ya | Ya |
+| Hugging Face | Ya | Ya |
+| Gemini | Ya | Ya |
+| Ollama | Ya | Ya |
+| Anthropic | Memerlukan embedding kustom | Ya |
+
+Lihat [provider embedded dan integrasi kustom](../../embedded-providers.md) untuk
+extra, impor, kredensial, default, override endpoint yang kompatibel, dan batas respons.
+API eksternal dapat berubah secara independen; versi/provider yang belum didukung
+dapat memakai kontrak embedding dan generation kustom.
+
+## Storage embedded
+
+Mulai dengan MemoryStore untuk state process-local yang terbatas. Opsional
+`semantix_cache.stores.pgvector.PgVectorStore` mempertahankan data antarproses/restart
+melalui database PostgreSQL yang dikendalikan aplikasi. Siapkan extension vector dan
+inisialisasi schema cache terpisah yang bertanda secara eksplisit; operasi cache
+normal tidak menjalankan DDL. Runtime memeriksa penanda kepemilikan, versi, dan
+checksum migrasi, bukan fingerprint katalog lengkap. Lindungi perubahan schema di luar migrasi.
+
+Lihat [storage embedded dan database pengguna](../../embedded-storage.md) untuk akses
+runtime dengan izin minimum, kepemilikan pool, migrasi, dan store kustom. pgvector
+menyimpan vektor float32; skor dekat threshold dapat berbeda dari scoring float64 MemoryStore.
+
+## Titik ekstensi
+
+Berikan EmbeddingAdapter struktural (`embedding_space` dan `embed` asinkron),
+GenerationCallable asinkron yang mengembalikan teks selesai yang disetujui, atau
+CacheStore struktural. Tidak perlu subclass atau registry. Alur streaming/RAG/tools
+dapat memakai `get`/`set` di sekitar teks akhir yang disetujui; Semantix tidak
+menjalankan workflow aplikasi tersebut.
+
+## Contoh
+
+- [Embedding dan generation kustom](../../../packages/cache/examples/custom_integration.py).
+- [CacheStore kustom dan conformance](../../../packages/cache/examples/custom_store.py).
+- [Customer support persisten](../../../packages/cache/examples/persistent_support.py).
+- [API publik dan struktur source](../../../packages/cache/src/README.md).
+
+## Komponen repository
+
+| Path | Komponen |
+| --- | --- |
+| `packages/cache/` | Library embedded utama semantix-cache; produk PyPI pertama yang direncanakan |
+| `apps/server/` | Server FastAPI resmi yang opsional untuk self-hosting |
+| `apps/web/` | Web/workbench resmi yang opsional untuk memeriksa dan mengevaluasi keputusan cache server |
+| `packages/client/` | HTTP client opsional/referensi semantix-client yang dipelihara; bukan target PyPI rilis pertama |
+
+Server/workbench opsional merupakan laboratorium full-stack untuk memeriksa keputusan
+cache, mengevaluasi threshold, dan mengukur kerja provider. Otorisasi namespace dan
+deployment hardened dua replika adalah fitur server, bukan prasyarat embedded.
+Tooling operasional berada di `ops/`; tooling developer di `scripts/`.
+
+<details>
+<summary>Server/workbench opsional: tur, setup Docker, dan bukti deployment</summary>
 
 ![Monitor Semantix menampilkan cache hit, bukti similarity, dan panggilan provider yang dilewati](../../assets/screenshots/monitor-decision.png)
 
@@ -22,7 +252,7 @@ Semantix dapat di-host sendiri untuk beberapa aplikasi dan pengguna. Akses berba
 
 ---
 
-## ✨ Yang Ditawarkan Semantix
+### ✨ Yang Ditawarkan Semantix
 
 | Workspace | Tujuan |
 |---|---|
@@ -31,7 +261,7 @@ Semantix dapat di-host sendiri untuk beberapa aplikasi dan pengguna. Akses berba
 | **Evaluations** | Mengukur precision, recall, false hit, dan false miss; memeriksa bukti kasus terfilter serta mengekspor hasil run |
 | **Observability** | Melacak metrik proses dan memeriksa diagnostik runtime read-only yang aman |
 
-## Tur produk
+### Tur produk
 
 Demo lokal dengan provider Hugging Face juga menampilkan workspace lainnya. Pilih pratinjau untuk melihat tangkapan layar berukuran penuh.
 
@@ -56,48 +286,13 @@ Kapabilitas inti:
 - dataset evaluasi JSON versi 1 yang tersimpan hanya selama sesi browser, dengan pratinjau tanpa panggilan provider;
 - katalog dataset evaluasi PostgreSQL opsional dengan penyimpanan eksplisit dan retensi terbatas.
 
-## ⚙️ Cara Kerjanya
+### 🚀 Mulai Cepat
 
-```text
-Prompt
-  │
-  ▼
-Normalize matching text
-  │
-  ▼
-Create embedding
-  │
-  ▼
-Search the active namespace and embedding space
-  │
-  ├── score >= threshold ──► return cached response
-  │
-  └── score < threshold ───► call provider ─► store response
-```
-
-Semantix hanya mengembalikan respons yang telah di-cache jika entri terdekat yang kompatibel memenuhi similarity threshold yang aktif. Lihat [Cache policies](guides/cache-policies.md) untuk aturan lengkapnya.
-Menggunakan kembali respons yang sesuai menghindari panggilan generation berikutnya dan dapat mengurangi latensi serta biaya provider; evaluasi false match untuk workload Anda sendiri.
-
-## 🐍 Python SDK
-
-Aplikasi Python dapat memakai distribusi `semantix-client` melalui HTTP API publik. Paket ini menyediakan `SemantixClient` dan `AsyncSemantixClient` tanpa memerlukan modul internal backend. Paket belum diterbitkan di PyPI; lihat [panduan Python SDK](../../../packages/client/README.md) untuk instalasi dari repository atau wheel.
-
-```python
-from semantix_client import SemantixClient
-
-with SemantixClient(base_url="http://localhost:8000") as client:
-    result = client.query("Explain semantic caching", namespace="default")
-
-print(result.response, result.cache_hit)
-```
-
-## 🚀 Mulai Cepat
-
-### Prasyarat
+#### Prasyarat
 
 Instal Git dan Docker Desktop, atau Docker Engine beserta Compose.
 
-### 1. Clone repository
+#### 1. Clone repository
 
 Linux atau macOS:
 
@@ -115,7 +310,7 @@ Set-Location semantix
 Copy-Item apps\server\.env.example apps\server\.env
 ```
 
-### 2. Konfigurasi development lokal
+#### 2. Konfigurasi development lokal
 
 Untuk konfigurasi persisten tanpa kredensial (zero-key), gunakan nilai berikut di `apps/server/.env`:
 
@@ -127,6 +322,8 @@ MOCK_EMBEDDING_DIMENSIONS=384
 CACHE_BACKEND=pgvector
 DATABASE_URL=postgresql://semantix:semantix@postgres:5432/semantix
 DATABASE_MIGRATION_MODE=auto
+EVALUATION_DATASET_STORAGE=postgres
+EVALUATION_DATASET_DEFAULT_RETENTION_DAYS=30
 
 AUTH_MODE=disabled
 AUTH_PRINCIPALS=[]
@@ -138,7 +335,7 @@ Nilai autentikasi dan proxy ini sengaja dikosongkan atau dinonaktifkan untuk dev
 
 Untuk menggunakan Hugging Face, OpenAI, Anthropic, Gemini, atau Ollama, lihat [Providers](guides/providers.md). Untuk setiap opsi environment, lihat [Getting started](guides/getting-started.md) dan `apps/server/.env.example`.
 
-### 3. Jalankan stack development lengkap
+#### 3. Jalankan stack development lengkap
 
 ```bash
 docker compose -f docker-compose.dev.yml --profile pgvector up --build -d
@@ -151,7 +348,7 @@ Perintah tunggal ini akan menjalankan:
 - PostgreSQL dengan pgvector;
 - migrasi database development otomatis.
 
-### 4. Buka aplikasi
+#### 4. Buka aplikasi
 
 | Layanan | Alamat |
 |---|---|
@@ -174,7 +371,7 @@ docker compose -f docker-compose.dev.yml --profile pgvector down
 
 `down` tetap mempertahankan named volume. Menambahkan `--volumes` akan menghapus data PostgreSQL lokal.
 
-## 🔌 Provider
+### 🔌 Provider
 
 Embedding provider dan generation provider dipilih secara independen.
 
@@ -189,7 +386,7 @@ Embedding provider dan generation provider dipilih secara independen.
 
 Hanya pengaturan yang diperlukan oleh kapabilitas yang dipilih yang akan divalidasi. Lihat [Providers](guides/providers.md) untuk contoh konfigurasi dan catatan jaringan.
 
-## 🛡️ Deployment Development dan Hardened
+### 🛡️ Deployment Development dan Hardened
 
 | Mode | Penggunaan yang dituju | Perilaku utama |
 |---|---|---|
@@ -204,7 +401,7 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up --build 
 
 Jangan menjalankannya sebelum setiap placeholder diganti. Lihat [Hardened deployment](operations/deployment.md) untuk pembuatan token, trusted proxy, peran database, TLS, dan validasi.
 
-## 📈 Performa dan skalabilitas
+### 📈 Performa dan skalabilitas
 
 Stack hardened menyeimbangkan replika backend di atas state PostgreSQL + pgvector bersama. PostgreSQL juga mengoordinasikan batas laju tingkat deployment, penguncian sesi, dan perubahan threshold cache. Failover, draining, serta perubahan jumlah replika yang terkendali telah diuji.
 
@@ -212,7 +409,7 @@ Dalam uji Docker lokal pada perangkat keras yang didokumentasikan, stack dua rep
 
 Perbandingan generation-heavy terkontrol pada 1.000 virtual user menunjukkan sekitar 167 RPS dan P95 4,86 detik dengan satu replika, dibandingkan 270 RPS dan P95 1,95 detik dengan dua replika. Tekanan koneksi dan lock PostgreSQL membatasi ekstrapolasi ke lebih banyak replika. Lihat [Pengujian kapasitas](../../operations/load-testing.md#capacity-baseline-on-the-local-docker-host) untuk perangkat keras, metodologi, semua profil, kegagalan, dan batasannya. Python SDK juga diuji melalui gateway dengan load balancer.
 
-## 📊 Benchmark semantic cache
+### 📊 Benchmark semantic cache
 
 Uji coba lokal pada 19 Juli 2026 menggunakan **Quick semantic safety set** yang berisi delapan kueri, provider Hugging Face, normalisasi typo, cache terisolasi yang kosong, dan threshold `0.92`:
 
@@ -222,9 +419,100 @@ Uji coba lokal pada 19 Juli 2026 menggunakan **Quick semantic safety set** yang 
 
 Ini adalah satu pengukuran bertanggal, bukan jaminan performa. Lihat [Benchmarking](guides/benchmarking.md) untuk dataset, detail uji coba, dan batasannya.
 
-## ✅ Pemeriksaan Kualitas
+### ⚠️ Batasan Penting
 
-### Persiapan cache backend
+- Similarity semantik bersifat probabilistik dan harus dievaluasi untuk setiap model dan beban kerja (workload).
+- Hosted provider dapat menerima prompt dan dapat menimbulkan biaya, latensi, serta kebutuhan penanganan data eksternal.
+- Metrik runtime, diagnostik, dan request coalescing bersifat process-local; rate limiting produksi memakai koordinasi PostgreSQL bersama.
+- Stack hardened menyeimbangkan dua replika backend; ini bukan platform multi-tenant atau sistem autoscaling umum yang lengkap.
+- Provider mock ditujukan untuk pengujian, demonstrasi, dan pengembangan UI.
+- Sweep evaluasi menggunakan proyeksi dari satu run terukur, bukan pemutaran ulang berurutan atau rekomendasi threshold otomatis.
+
+</details>
+
+Gunakan semantix-client dengan server Semantix kompatibel yang sudah berjalan.
+Paket ini tetap dipelihara, bukan target PyPI rilis pertama, dan tidak menyediakan
+engine embedded.
+
+### HTTP client referensi
+
+Aplikasi Python dapat memakai distribusi `semantix-client` melalui HTTP API publik. Paket ini menyediakan `SemantixClient` dan `AsyncSemantixClient` tanpa memerlukan modul internal backend. Paket belum diterbitkan di PyPI; lihat [panduan Python SDK](../../../packages/client/README.md) untuk instalasi dari repository atau wheel.
+
+```python
+from semantix_client import SemantixClient
+
+with SemantixClient(base_url="http://localhost:8000") as client:
+    result = client.query("Explain semantic caching", namespace="default")
+
+print(result.response, result.cache_hit)
+```
+
+## Dokumentasi
+
+[Indeks dokumentasi](README.md) memisahkan panduan embedded dan server.
+
+| Mulai di sini | Gunakan untuk |
+| --- | --- |
+| [Panduan paket cache](../../../packages/cache/README.md) | Quick start embedded, kebijakan, kepemilikan, dan kompatibilitas kanonis |
+| [Provider embedded](../../embedded-providers.md) | Adapter yang dipelihara dan embedding/generation kustom |
+| [Storage embedded](../../embedded-storage.md) | Memory, PostgreSQL opsional, dan database aplikasi |
+| [Contoh](../../../packages/cache/examples/) | Generation dan store yang dikendalikan aplikasi |
+| [Metodologi benchmark](../../../packages/cache/benchmarks/README.md) | Workload runtime lokal yang reproducible beserta batasannya |
+| [Getting started server](guides/getting-started.md) | Environment dan workflow Docker untuk server opsional |
+| [Panduan HTTP client](../../../packages/client/README.md) | Client bertipe untuk server kompatibel yang sudah berjalan |
+| [Arsitektur server](reference/architecture.md) | Kepemilikan fitur dan alur request |
+| [Hardened deployment](operations/deployment.md) | Auth server, TLS, role database, dan validasi |
+
+## Berkontribusi
+
+Lihat [CONTRIBUTING](CONTRIBUTING.md), [pemeriksaan contributor cache](../../../packages/cache/README.md#separate-products),
+dan [development server/web](guides/development.md).
+
+<details>
+<summary>Struktur repository dan pemeriksaan development server/web</summary>
+
+### 🗂️ Struktur Proyek
+
+```text
+semantix/
+├── apps/
+│   ├── server/
+│   └── web/
+├── packages/
+│   ├── cache/
+│   │   ├── src/semantix_cache/
+│   │   └── tests/
+│   └── client/
+│       ├── src/semantix_client/
+│       └── tests/
+├── ops/
+│   ├── ci/
+│   ├── load-testing/
+│   ├── postgres/
+│   └── supply-chain/
+├── scripts/
+│   ├── linux/
+│   └── windows/
+├── docs/
+├── .github/
+├── docker-compose.yml
+├── docker-compose.dev.yml
+├── docker-compose.prod.yml
+└── README.md
+```
+
+`apps/server` adalah aplikasi FastAPI resmi untuk self-hosting; `apps/web` adalah
+web/workbench resmi. `packages/cache` berisi library utama **semantix-cache**,
+distribusi PyPI publik pertama yang direncanakan. `packages/client` berisi HTTP
+client opsional/referensi **semantix-client** yang tetap dipelihara dan saat ini
+tidak diwajibkan untuk rilis publik pertama tersebut. `ops` berisi tooling
+operasional, sedangkan `scripts` berisi tooling repository/developer.
+
+Backend dan frontend menggunakan kepemilikan feature-first. Lihat [Architecture](reference/architecture.md) untuk alur runtime dan batas paket.
+
+### ✅ Pemeriksaan Kualitas
+
+#### Persiapan cache backend
 
 Cache tool backend dipusatkan di `apps/server/.cache/`. Aktifkan redirect cache bytecode Python sebelum menjalankan perintah backend.
 
@@ -324,66 +612,15 @@ npm run build
 
 Lihat [Development](guides/development.md) untuk toolchain lokal, aturan arsitektur, dan langkah-langkah kontribusi.
 
-## 🗂️ Struktur Proyek
+</details>
 
-```text
-semantix/
-├── apps/
-│   ├── server/
-│   └── web/
-├── packages/
-│   ├── cache/
-│   │   ├── src/semantix_cache/
-│   │   └── tests/
-│   └── client/
-│       ├── src/semantix_client/
-│       └── tests/
-├── ops/
-│   ├── ci/
-│   ├── load-testing/
-│   ├── postgres/
-│   └── supply-chain/
-├── scripts/
-│   ├── linux/
-│   └── windows/
-├── docs/
-├── .github/
-├── docker-compose.yml
-├── docker-compose.dev.yml
-├── docker-compose.prod.yml
-└── README.md
-```
+## Keamanan
 
-`apps/server` adalah aplikasi FastAPI resmi untuk self-hosting; `apps/web` adalah
-web/workbench resmi. `packages/cache` berisi library utama **semantix-cache**,
-distribusi PyPI publik pertama yang direncanakan. `packages/client` berisi HTTP
-client opsional/referensi **semantix-client** yang tetap dipelihara dan saat ini
-tidak diwajibkan untuk rilis publik pertama tersebut. `ops` berisi tooling
-operasional, sedangkan `scripts` berisi tooling repository/developer.
-
-Backend dan frontend menggunakan kepemilikan feature-first. Lihat [Architecture](reference/architecture.md) untuk alur runtime dan batas paket.
-
-## ⚠️ Batasan Penting
-
-- Similarity semantik bersifat probabilistik dan harus dievaluasi untuk setiap model dan beban kerja (workload).
-- Hosted provider dapat menerima prompt dan dapat menimbulkan biaya, latensi, serta kebutuhan penanganan data eksternal.
-- Metrik runtime, diagnostik, dan request coalescing bersifat process-local; rate limiting produksi memakai koordinasi PostgreSQL bersama.
-- Stack hardened menyeimbangkan dua replika backend; ini bukan platform multi-tenant atau sistem autoscaling umum yang lengkap.
-- Provider mock ditujukan untuk pengujian, demonstrasi, dan pengembangan UI.
-- Sweep evaluasi menggunakan proyeksi dari satu run terukur, bukan pemutaran ulang berurutan atau rekomendasi threshold otomatis.
-
-## 📚 Dokumentasi
-
-[Indeks dokumentasi](README.md) mengelompokkan seluruh panduan berdasarkan tujuannya.
-
-| Mulai di sini | Gunakan untuk |
-|---|---|
-| [Getting started](guides/getting-started.md) | Setup lokal, file environment, dan alur kerja Docker |
-| [Providers](guides/providers.md) | Konfigurasi provider hosted, lokal, dan mock |
-| [Python SDK](../../../packages/client/README.md) | Instalasi dan penggunaan HTTP client sinkron dan asinkron |
-| [Architecture](reference/architecture.md) | Alur runtime, kepemilikan fitur, dan batas paket |
-| [Hardened deployment](operations/deployment.md) | Autentikasi, TLS, peran database, dan validasi produksi |
-| [Pengujian kapasitas](../../operations/load-testing.md#capacity-baseline-on-the-local-docker-host) | Profil beban, perangkat keras, hasil satu/dua replika, dan soak 1.000 VU |
+Aplikasi memiliki tanggung jawab atas otorisasi, konteks generation, kredensial,
+keamanan transport, dan penanganan data provider. Pemisahan namespace bukan otorisasi.
+Lihat [SECURITY](SECURITY.md) untuk pelaporan dan batas deployment server,
+serta panduan [provider embedded](../../embedded-providers.md) dan
+[storage](../../embedded-storage.md) untuk tanggung jawab resource dan database pemanggil.
 
 ## 🤝 Kontributor
 

@@ -3,8 +3,16 @@
 Async semantic caching in your Python process. No Semantix server is required.
 The runtime supports Python 3.11–3.14 and depends on NumPy and Pydantic.
 
-Install a built local wheel with `python -m pip install dist/semantix_cache-0.1.0-py3-none-any.whl`.
 The distribution name is **semantix-cache** and its import is **semantix_cache**.
+**0.1.0 is not yet published.** After publication, install the minimal package with:
+
+~~~bash
+python -m pip install semantix-cache
+~~~
+
+Before publication, install a built local wheel with
+`python -m pip install dist/semantix_cache-0.1.0-py3-none-any.whl`.
+See the contributor commands below to build it from this directory.
 Publication is a separate release action.
 
 ## Use your own embedding and generation
