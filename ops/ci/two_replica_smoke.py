@@ -25,17 +25,32 @@ QUERY_PATH = "/api/v1/query"
 THRESHOLD_ABS_TOLERANCE = 1e-12
 
 
-def run(*command: str, stdin_text: str | None = None) -> str:
-    result = subprocess.run(  # noqa: S603 - internally constructed argv
-        command, input=stdin_text, capture_output=True, text=True, check=False
-    )
+def run(
+    *command: str, stdin_text: str | None = None, timeout_seconds: float = 420
+) -> str:
+    try:
+        result = subprocess.run(  # noqa: S603 - internally constructed argv
+            command,
+            input=stdin_text,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        # TimeoutExpired's argv can contain bearer tokens. Never expose it.
+        raise TimeoutError("Smoke command exceeded its finite deadline") from None
     if result.returncode:
         raise AssertionError(f"Command failed: {result.stderr[-1200:]}")
     return result.stdout
 
 
-def compose(*arguments: str, stdin_text: str | None = None) -> str:
-    return run(*COMPOSE, *arguments, stdin_text=stdin_text)
+def compose(
+    *arguments: str, stdin_text: str | None = None, timeout_seconds: float = 420
+) -> str:
+    return run(
+        *COMPOSE, *arguments, stdin_text=stdin_text, timeout_seconds=timeout_seconds
+    )
 
 
 def request(
@@ -46,7 +61,7 @@ def request(
     payload: dict[str, object] | None = None,
     backend: str | None = None,
     expected: int = 200,
-    timeout_seconds: int = 20,
+    timeout_seconds: float = 20,
 ) -> dict[str, object]:
     url = f"http://{backend}:8000{path}" if backend else f"{BASE}{path}"
     command = [
@@ -72,7 +87,7 @@ def request(
     command.append(url)
     if backend:
         command = [*COMPOSE, "exec", "-T", "frontend", *command]
-    body, status_text = run(*command).rsplit("\n", 1)
+    body, status_text = run(*command, timeout_seconds=timeout_seconds).rsplit("\n", 1)
     status = int(status_text)
     if status != expected:
         raise AssertionError(
@@ -113,11 +128,13 @@ def edge_ip(service: str) -> str:
     )
 
 
-def gateway_upstreams(path: str) -> list[str]:
-    logs = compose("logs", "--no-color", "frontend")
-    return re.findall(
-        rf"upstream=([0-9.]+):8000 .*?path={re.escape(path)}(?:\s|$)", logs
+def gateway_upstreams(path: str, *, timeout_seconds: float = 20) -> list[str]:
+    logs = compose("logs", "--no-color", "frontend", timeout_seconds=timeout_seconds)
+    chains = re.findall(
+        rf"upstream=(.*?) upstream_status=.*?path={re.escape(path)}(?:\s|$)", logs
     )
+    # Include every attempted peer, including stale/unexpected failover targets.
+    return [ip for chain in chains for ip in re.findall(r"([0-9.]+):8000", chain)]
 
 
 def wait_gateway_upstream(ip: str) -> None:

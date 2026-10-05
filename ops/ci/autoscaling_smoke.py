@@ -2,6 +2,7 @@
 
 import json
 import math
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
@@ -10,6 +11,7 @@ from uuid import uuid4
 
 from two_replica_smoke import (
     UPSTREAM_FILE,
+    UPSTREAM_ORIGINAL,
     backend_logs,
     compose,
     db_connections,
@@ -54,28 +56,76 @@ def route_to(*ips: str) -> None:
     compose("exec", "-T", "frontend", "nginx", "-s", "reload")
 
 
-def wait_routing(expected: set[str], *, excluded: frozenset[str] = frozenset()) -> None:
-    # Observe gateway routing without consuming the deployment-wide API rate limit.
+class RoutingConvergenceError(AssertionError):
+    """Only healthy, correctly configured peers missing from observations may retry."""
+
+
+def wait_routing(
+    expected: set[str],
+    *,
+    excluded: frozenset[str] = frozenset(),
+    timeout_seconds: float = 60,
+) -> None:
+    # Health probes avoid the shared API quota. Keep a single cursor: a log line
+    # arriving after one read must remain observable in the following read.
     path = "/health"
+    started = time.monotonic()
+    deadline = started + timeout_seconds
+    cursor = len(gateway_upstreams(path, timeout_seconds=timeout_seconds))
     seen: set[str] = set()
-    clean = 0
-    for _ in range(90):
-        before = len(gateway_upstreams(path))
-        request(path)
-        served = gateway_upstreams(path)[before:]
-        assert set(served) <= expected | excluded, served
+    clean = probes = stale = 0
+    served: list[str] = []
+    while time.monotonic() < deadline:
+        # One regularly spaced probe can alias with the background /ready traffic
+        # and round-robin routing. A burst samples peers without a fixed cadence.
+        try:
+            for _ in range(2 * len(expected)):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                request(path, timeout_seconds=min(20, remaining))
+                probes += 1
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            observed = gateway_upstreams(path, timeout_seconds=min(20, remaining))
+        except TimeoutError:
+            if time.monotonic() < deadline:
+                raise
+            break
+        assert len(observed) >= cursor, "Gateway routing log was truncated/reset"
+        served = observed[cursor:]
+        cursor = len(observed)
+        assert set(served) <= expected | excluded, f"Unexpected upstreams: {served}"
         if excluded.intersection(served):
+            stale += 1
             seen.clear()
             clean = 0
         elif served:
             seen.update(served)
             clean += 1
-        if clean >= 6 and expected.issubset(seen):
+        if time.monotonic() <= deadline and clean >= 6 and expected.issubset(seen):
+            print(
+                f"routing converged: peers={len(expected)} probes={probes} "
+                f"elapsed_s={time.monotonic() - started:.2f} stale_batches={stale}"
+            )
             return
-        time.sleep(0.1)
-    raise AssertionError(
-        f"Gateway observed {seen}, expected {expected}, excluding {excluded}"
+        time.sleep(min(0.1, max(0, deadline - time.monotonic())))
+    details = (
+        f"Gateway convergence deadline={timeout_seconds}s "
+        f"elapsed_s={time.monotonic() - started:.2f} probes={probes} "
+        f"seen={sorted(seen)} expected={sorted(expected)} "
+        f"missing={sorted(expected - seen)} excluded={sorted(excluded)} "
+        f"clean_batches={clean} stale_batches={stale} last={served[-12:]}"
     )
+    # A removed peer that keeps serving is a drain/configuration failure, not a
+    # transient missing observation. Likewise never retry wrong config/readiness.
+    assert clean >= 6 or stale == 0, f"Stale upstream did not drain: {details}"
+    configured = set(re.findall(r"server ([0-9.]+):8000", UPSTREAM_FILE.read_text()))
+    assert configured == expected, f"Unexpected upstream configuration: {details}"
+    for ip in sorted(expected):
+        request("/ready", backend=ip, timeout_seconds=5)
+    raise RoutingConvergenceError(details)
 
 
 def wait_new_replica(container: str, *, started: float) -> tuple[float, float, int]:
@@ -93,9 +143,54 @@ def wait_new_replica(container: str, *, started: float) -> tuple[float, float, i
     return db_connected, ready, observed_connections
 
 
+def remove_added_replicas(original: set[str]) -> None:
+    current = containers("backend-a")
+    assert original <= current, "An original backend-a replica disappeared"
+    project = inspect(
+        next(iter(original)), '{{index .Config.Labels "com.docker.compose.project"}}'
+    )
+    for container in sorted(current - original):
+        assert (
+            inspect(container, '{{index .Config.Labels "com.docker.compose.project"}}')
+            == project
+        )
+        assert (
+            inspect(container, '{{index .Config.Labels "com.docker.compose.service"}}')
+            == "backend-a"
+        )
+        run("docker", "stop", "--time", "360", container)
+        run("docker", "rm", container)
+    assert containers("backend-a") == original
+
+
+def restore_threshold(value: float, *, ip_a: str, ip_b: str) -> None:
+    request(
+        "/api/v1/cache/threshold",
+        backend=ip_b,
+        method="PUT",
+        payload={"threshold": value},
+    )
+    for ip in (ip_a, ip_b):
+        actual = request("/api/v1/cache/threshold", backend=ip)["threshold"]
+        assert math.isclose(actual, value, rel_tol=0, abs_tol=THRESHOLD_ABS_TOLERANCE)
+
+
+def verify_restored(
+    original_a: set[str], original_b: set[str], ip_a: str, ip_b: str
+) -> None:
+    assert containers("backend-a") == original_a
+    assert containers("backend-b") == original_b
+    assert UPSTREAM_FILE.read_text(encoding="utf-8") == UPSTREAM_ORIGINAL
+    for ip in (ip_a, ip_b):
+        request("/ready", backend=ip)
+    # Verify the restored live gateway as well as the file written before reload.
+    wait_routing({ip_a, ip_b})
+
+
 def main() -> None:
     original_a = containers("backend-a")
-    assert len(original_a) == 1
+    original_b = containers("backend-b")
+    assert len(original_a) == len(original_b) == 1
     ip_a, ip_b = edge_ip("backend-a"), edge_ip("backend-b")
     baseline_connections = db_connections()
     assert 2 <= baseline_connections <= 10
@@ -253,15 +348,45 @@ def main() -> None:
             )
         finally:
             stop_traffic.set()
-            worker.result(timeout=10)
-            request(
-                "/api/v1/cache/threshold",
-                backend=ip_b,
-                method="PUT",
-                payload={"threshold": original_threshold},
+            errors: list[Exception] = []
+            actions = (
+                lambda: worker.result(timeout=25),
+                # Keep only original peers routable while the added replica drains.
+                # Restore DNS after removal so it cannot learn the disappearing IP.
+                lambda: route_to(ip_a, ip_b),
+                lambda: remove_added_replicas(original_a),
+                lambda: set_upstream(None),
+                lambda: restore_threshold(original_threshold, ip_a=ip_a, ip_b=ip_b),
+                lambda: verify_restored(original_a, original_b, ip_a, ip_b),
             )
-            set_upstream(None)
+            for action in actions:
+                try:
+                    action()
+                except Exception as error:  # noqa: BLE001 -- collect, then raise every cleanup failure
+                    errors.append(error)
+            if errors:
+                # Preserve every cleanup error and the triggering exception's
+                # traceback. A dirty topology must never enter the retry loop.
+                raise ExceptionGroup("Autoscaling cleanup/verification failed", errors)
+            assert worker.done() and not traffic_errors, traffic_errors
+            print(
+                "autoscaling cleanup verified: replicas=2 threshold/upstreams restored traffic=stopped"
+            )
+
+
+def run_with_retry() -> None:
+    for attempt in range(1, 3):
+        print(f"autoscaling attempt={attempt}/2")
+        try:
+            main()
+        except RoutingConvergenceError as error:
+            print(f"autoscaling observation timeout: {error}")
+            if attempt == 2:
+                raise
+            print("retrying autoscaling only after verified cleanup")
+        else:
+            return
 
 
 if __name__ == "__main__":
-    main()
+    run_with_retry()
