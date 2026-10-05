@@ -9,5 +9,20 @@
     "packages/cache",
     "packages/client"
   ],
-  "reportDeprecated": "error"
+
+  "typeCheckingMode": "standard",
+
+  "reportDeprecated": "error",
+  "reportUnreachable": "error",
+
+  "reportMissingTypeArgument": "error",
+  "reportMissingParameterType": "error",
+
+  "reportUnknownParameterType": "error",
+  "reportUnknownArgumentType": "error",
+  "reportUnknownMemberType": "error",
+  "reportUnknownVariableType": "error",
+
+  "reportImplicitOverride": "error",
+  "reportUnnecessaryTypeIgnoreComment": "error"
 }

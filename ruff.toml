@@ -60,7 +60,7 @@ author = "Hans Valerie"
 max-complexity = 15
 
 [lint.isort]
-known-first-party = ["app", "semantix_cache", "semantix_client", "tests"]
+known-first-party = ["app", "benchmarks", "examples", "semantix_cache", "semantix_client", "tests"]
 
 [lint.per-file-ignores]
 # Copyright headers are part of the distributed SDK package contract only.

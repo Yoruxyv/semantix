@@ -1,7 +1,8 @@
 """Immutable validated models. Payload fields are deliberately absent from repr."""
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Annotated, Self
+from typing import Annotated, Self, cast
 
 from pydantic import (
     AfterValidator,
@@ -46,8 +47,9 @@ def _embedding(value: object) -> tuple[float, ...]:
     if not isinstance(value, (list, tuple)):
         raise SemanticValidationError("Embedding must be a tuple or list")
     # Validation checks magnitude but preserves values; normalization belongs to use.
-    normalized_vector(value, dimensions=len(value))
-    return tuple(float(component) for component in value)
+    components = cast("Sequence[float]", value)
+    normalized_vector(components, dimensions=len(components))
+    return tuple(float(component) for component in components)
 
 
 Prompt = Annotated[str, BeforeValidator(canonical_prompt)]

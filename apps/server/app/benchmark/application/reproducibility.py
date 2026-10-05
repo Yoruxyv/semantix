@@ -16,7 +16,7 @@ def build_reproducibility_metadata(
 ) -> BenchmarkReproducibilityMetadata:
     """Build the safe, deterministic metadata describing an evaluation run."""
 
-    safe_configuration = {
+    safe_configuration: dict[str, object] = {
         "application_version": runtime.application_version,
         "dataset_id": dataset.dataset_id,
         "dataset_source": dataset.dataset_source,
@@ -46,7 +46,11 @@ def build_reproducibility_metadata(
         separators=(",", ":"),
         sort_keys=True,
     )
-    return BenchmarkReproducibilityMetadata(
-        **safe_configuration,
-        configuration_fingerprint=hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+    return BenchmarkReproducibilityMetadata.model_validate(
+        {
+            **safe_configuration,
+            "configuration_fingerprint": hashlib.sha256(
+                canonical.encode("utf-8")
+            ).hexdigest(),
+        }
     )

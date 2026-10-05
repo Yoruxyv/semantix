@@ -16,7 +16,7 @@ from datetime import datetime
 from hashlib import sha256
 from importlib.resources import files
 from types import TracebackType
-from typing import Self
+from typing import Self, cast
 
 try:
     import asyncpg
@@ -164,7 +164,7 @@ class PgVectorStore:
             operation_timeout_seconds,
             close_timeout_seconds,
         )
-        if not isinstance(pool, Pool):
+        if not isinstance(cast(object, pool), Pool):
             raise CacheConfigurationError("Expected an asyncpg pool, not a connection")
         self._pool = pool
         self._owned = False
@@ -348,7 +348,7 @@ class PgVectorStore:
 
     async def initialize_schema(self, *, migration_pool: Pool) -> None:
         self._state.check_open()
-        if not isinstance(migration_pool, Pool):
+        if not isinstance(cast(object, migration_pool), Pool):
             raise CacheConfigurationError(
                 "Expected a separately authorized migration pool"
             )
@@ -517,7 +517,7 @@ class PgVectorStore:
     async def put(self, entry: CacheEntry, *, ttl_seconds: float | None = None) -> None:
         self._state.check_open()
         try:
-            if not isinstance(entry, CacheEntry):
+            if not isinstance(cast(object, entry), CacheEntry):
                 raise CacheStoreError("Invalid stored entry")
             entry = CacheEntry.model_validate(entry.model_dump())
             if "\0" in entry.response:

@@ -1,3 +1,5 @@
+from typing import cast
+
 import httpx
 
 from app.core.exceptions import InvalidProviderResponseError
@@ -65,17 +67,20 @@ class AnthropicProvider:
                 "Invalid message response",
             )
 
-        content = payload.get("content")
+        content = cast("dict[str, object]", payload).get("content")
         if not isinstance(content, list) or not content:
             raise InvalidProviderResponseError(
                 "Message response contained no content",
             )
 
         text_blocks: list[str] = []
-        for block in content:
-            if not isinstance(block, dict) or block.get("type") != "text":
+        for block in cast("list[object]", content):
+            if (
+                not isinstance(block, dict)
+                or cast("dict[str, object]", block).get("type") != "text"
+            ):
                 continue
-            text = block.get("text")
+            text = cast("dict[str, object]", block).get("text")
             if isinstance(text, str) and text.strip():
                 text_blocks.append(text.strip())
 

@@ -3,6 +3,8 @@ import logging
 from datetime import UTC, datetime
 from typing import Final
 
+from typing_extensions import override
+
 _UVICORN_LOGGER_NAMES: Final = ("uvicorn", "uvicorn.error", "uvicorn.access")
 
 
@@ -18,6 +20,7 @@ class RedactingJsonFormatter(logging.Formatter):
             value = value.replace(secret, "[REDACTED]")
         return value
 
+    @override
     def format(self, record: logging.LogRecord) -> str:
         payload = {
             "timestamp": datetime.now(UTC).isoformat(),

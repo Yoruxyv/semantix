@@ -11,17 +11,15 @@ from ..errors import EmbeddingError, GenerationError
 
 
 def components(value: object, dimensions: int) -> tuple[float, ...]:
-    if (
-        not isinstance(value, list)
-        or len(value) != dimensions
-        or any(
-            isinstance(item, bool) or not isinstance(item, (int, float))
-            for item in value
-        )
+    if not isinstance(value, list):
+        raise EmbeddingError("Provider returned an invalid embedding vector")
+    items = cast("list[object]", value)
+    if len(items) != dimensions or any(
+        isinstance(item, bool) or not isinstance(item, (int, float)) for item in items
     ):
         raise EmbeddingError("Provider returned an invalid embedding vector")
     try:
-        result = tuple(float(item) for item in value)
+        result = tuple(float(cast("int | float", item)) for item in items)
     except OverflowError:
         raise EmbeddingError("Provider returned an invalid embedding vector") from None
     if not all(math.isfinite(item) for item in result):
@@ -39,13 +37,18 @@ def vector(value: object, dimensions: int) -> Sequence[float]:
 
 
 def pooled_vector(value: object, dimensions: int) -> Sequence[float]:
-    while isinstance(value, list) and len(value) == 1 and isinstance(value[0], list):
-        value = value[0]
+    while (
+        isinstance(value, list)
+        and len(items := cast("list[object]", value)) == 1
+        and isinstance(items[0], list)
+    ):
+        value = cast("list[object]", items[0])
     if not isinstance(value, list) or not value:
         raise EmbeddingError("Provider returned an invalid embedding shape")
-    if not isinstance(value[0], list):
-        return vector(value, dimensions)
-    rows = [components(row, dimensions) for row in value]
+    items = cast("list[object]", value)
+    if not isinstance(items[0], list):
+        return vector(items, dimensions)
+    rows = [components(row, dimensions) for row in items]
     with np.errstate(over="ignore", invalid="ignore"):
         pooled = np.mean(np.asarray(rows, dtype=np.float64), axis=0)
     return vector(pooled.tolist(), dimensions)
@@ -65,7 +68,11 @@ def mapping(value: object) -> dict[str, object]:
 
 
 def first(value: object) -> dict[str, object]:
-    return mapping(value[0]) if isinstance(value, list) and value else {}
+    return (
+        mapping(cast("list[object]", value)[0])
+        if isinstance(value, list) and value
+        else {}
+    )
 
 
 def chat_text(payload: object) -> str:
@@ -82,13 +89,12 @@ def parts_text(parts: object, *, typed: bool = False) -> str:
     if not isinstance(parts, list):
         raise GenerationError("Provider returned invalid completed text")
     pieces = [
-        part["text"].strip()
-        for part in parts
-        if isinstance(part, dict)
-        and (not typed or part.get("type") == "text")
+        piece.strip()
+        for part in map(mapping, cast("list[object]", parts))
+        if (not typed or part.get("type") == "text")
         and part.get("thought") is not True
-        and isinstance(part.get("text"), str)
-        and part["text"].strip()
+        and isinstance(piece := part.get("text"), str)
+        and piece.strip()
     ]
     return text("\n".join(pieces))
 
@@ -98,10 +104,10 @@ def gemini_text(payload: object) -> str:
     if candidate.get("finishReason") != "STOP":
         raise GenerationError("Provider generation did not finish with completed text")
     parts = mapping(candidate.get("content")).get("parts")
-    if isinstance(parts, list) and any(
-        isinstance(part, dict) and "functionCall" in part for part in parts
-    ):
-        raise GenerationError("Provider generation requires application handling")
+    if isinstance(parts, list):
+        parts = cast("list[object]", parts)
+        if any("functionCall" in mapping(part) for part in parts):
+            raise GenerationError("Provider generation requires application handling")
     return parts_text(parts)
 
 
@@ -110,10 +116,10 @@ def anthropic_text(payload: object) -> str:
     if message.get("stop_reason") not in ("end_turn", "stop_sequence"):
         raise GenerationError("Provider generation did not finish with completed text")
     content = message.get("content")
-    if isinstance(content, list) and any(
-        isinstance(block, dict) and block.get("type") == "tool_use" for block in content
-    ):
-        raise GenerationError("Provider generation requires application handling")
+    if isinstance(content, list):
+        content = cast("list[object]", content)
+        if any(mapping(block).get("type") == "tool_use" for block in content):
+            raise GenerationError("Provider generation requires application handling")
     return parts_text(content, typed=True)
 
 
@@ -129,13 +135,13 @@ def ollama_text(payload: object) -> str:
 
 def ollama_vector(payload: object, dimensions: int) -> Sequence[float]:
     embeddings = mapping(payload).get("embeddings")
-    if not isinstance(embeddings, list) or len(embeddings) != 1:
+    if not isinstance(embeddings, list) or len(cast("list[object]", embeddings)) != 1:
         raise EmbeddingError("Provider returned an invalid embedding batch")
-    return vector(embeddings[0], dimensions)
+    return vector(cast("list[object]", embeddings)[0], dimensions)
 
 
 def openai_vector(payload: object, dimensions: int) -> Sequence[float]:
     data = mapping(payload).get("data")
-    if not isinstance(data, list) or len(data) != 1:
+    if not isinstance(data, list) or len(cast("list[object]", data)) != 1:
         raise EmbeddingError("Provider returned an invalid embedding batch")
-    return vector(mapping(data[0]).get("embedding"), dimensions)
+    return vector(mapping(cast("list[object]", data)[0]).get("embedding"), dimensions)
