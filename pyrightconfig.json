@@ -5,9 +5,11 @@
     "packages/cache/src"
   ],
   "include": [
-    "apps/server",
-    "packages/cache",
-    "packages/client"
+    "apps/server/app",
+    "apps/server/scripts",
+    "packages/cache/src",
+    "packages/cache/examples",
+    "packages/client/src"
   ],
 
   "typeCheckingMode": "standard",
