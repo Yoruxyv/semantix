@@ -48,6 +48,24 @@ browser and SDK decoders aligned with backend responses. The independently insta
 SDK reflects selected public HTTP capabilities; new backend behavior is not
 automatically an SDK feature.
 
+## Preserve the embedded public boundary
+
+`AsyncSemanticCache` is a core, long-lived public API for semantic-cache
+orchestration. Keep embedding replaceable through `EmbeddingAdapter`, generation
+caller-owned through the async `GenerationCallable` contract, and storage
+structural through `CacheStore`. Your generation flow stays yours.
+
+Future provider, storage and observability integrations should use the existing
+extension boundaries where possible. Keep provider management, database
+administration, gateway/agent workflows, retries and configuration with their
+owning integrations rather than expanding the facade into those roles.
+Public API changes remain governed by the
+[package compatibility policy](packages/cache/README.md#01x-compatibility).
+
+If a synchronous facade is introduced, add it under a separate public name
+without renaming or breaking `AsyncSemanticCache`. No synchronous facade is
+currently provided; this design principle does not commit to adding one.
+
 ## Scope operational claims to evidence
 
 Report workload, provider, cache state, topology, host, duration, and failures for

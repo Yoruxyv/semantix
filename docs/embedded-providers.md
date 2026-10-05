@@ -34,7 +34,43 @@ Import classes from their provider modules, not the package root:
 | `huggingface` | `HuggingFaceEmbeddingAdapter` | `HuggingFaceGenerationAdapter` |
 | `gemini` | `GeminiEmbeddingAdapter` | `GeminiGenerationAdapter` |
 | `ollama` | `OllamaEmbeddingAdapter` | `OllamaGenerationAdapter` |
-| `anthropic` | Use a custom embedding integration | `AnthropicGenerationAdapter` |
+| `anthropic` | No native API; pair another embedding adapter | `AnthropicGenerationAdapter` |
+
+## 0.1.0 verification
+
+On **2026-10-05**, the maintained adapters passed bounded live embedding and
+generation checks with the following configurations. Each MemoryStore flow
+generated and wrote on the first miss, then confirmed the repeated-prompt hit
+without another generation call. These checks do not cover every model or endpoint.
+
+| Provider | Embedding model (dimensions) | Generation model | Verification |
+| --- | --- | --- | --- |
+| OpenAI | `text-embedding-3-small` (256) | `gpt-4.1-nano-2025-04-14` | Live verified |
+| Gemini | `gemini-embedding-001` (768) | `gemini-3.5-flash-lite` | Live verified |
+| Hugging Face | `sentence-transformers/all-MiniLM-L6-v2` (384) | `Qwen/Qwen3-4B-Instruct-2507:nscale` | Live verified |
+
+Independent custom embedding adapters and generation callables for those three
+providers also passed the same flow using only public extension interfaces, with
+no built-in provider inheritance or private parsing/transport helpers.
+
+**Ollama — prior local test; current evidence incomplete.** The maintainer
+previously exercised Ollama locally, but no receipt records the models and exact
+cache assertions. No suitable local runtime was available for a fresh check on
+2026-10-05. Ollama is not marked live verified for this release; no models were
+installed or downloaded to change that status.
+
+**Anthropic — contract verified; first-party live verification pending.**
+Generation support is implemented and covered by deterministic contract and
+regression tests, but was not live-verified against the first-party Anthropic API
+for 0.1.0. Anthropic has no native embedding API; pair generation with any supported
+built-in or custom embedding adapter. Claude through Bedrock, Vertex AI, Replicate,
+OpenRouter, or another host does not verify the first-party adapter.
+
+First-party Anthropic verification using your own API access is welcome, as are
+reproducible compatibility reports and focused fixes with regression coverage
+after a defect is reproduced. Never share credentials or commit raw provider
+responses. Provider APIs can evolve independently; custom integrations remain the
+escape hatch for unsupported versions.
 
 ## Configuration and ownership
 
@@ -72,6 +108,13 @@ provider, model and revision, dimensions, pooling and preprocessing. Never put k
 private endpoints or user data in it. Matching dimensions alone do not identify the
 same space. If a model alias changes behavior, bump the identity and use a matching
 store. No automatic fallback switches providers or models.
+
+For `gemini-embedding-001`, the adapter sends the supported top-level
+`outputDimensionality` field. The live 768-dimensional check showed that the nested
+`embedContentConfig` form returned the default 3072 dimensions instead. Google's
+discovery schema marks the top-level field deprecated, although this model still
+honors it. Dimension mismatches remain errors; Semantix never truncates or pads a
+response to hide a changed provider contract.
 
 The adapters reject boolean, non-finite, wrong-dimension, empty and zero-magnitude
 vectors. Hugging Face accepts vectors and singleton batch wrappers; token matrices
@@ -160,7 +203,8 @@ callback exceptions propagate unchanged. Never silently switch spaces or models.
 
 There is no provider-string registry, so there is no unsupported-provider lookup
 error to work around. Use the capability table and structural example when a class
-is absent, including Anthropic embeddings. A missing HTTP extra reports the exact
+is absent. Anthropic generation can use an existing supported embedding adapter;
+a custom embedding integration is optional. A missing HTTP extra reports the exact
 installation command and this custom integration path.
 
 ## Deprecation path

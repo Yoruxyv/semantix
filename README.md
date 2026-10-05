@@ -18,7 +18,7 @@
 <p align="center">
   <a href="#install-and-run">Quick start</a> ·
   <a href="#how-it-works">How it works</a> ·
-  <a href="#providers">Providers</a> ·
+  <a href="#verified-ai-providers">Providers</a> ·
   <a href="#storage">Storage</a> ·
   <a href="#performance">Benchmarks</a>
 </p>
@@ -193,27 +193,47 @@ ContextVars/closures or coordinate across processes. Followers confirm their own
 hits. Changing that key alone does not invalidate stored answers. Read the
 [coalescing safety rules](packages/cache/README.md#optional-cold-miss-coalescing).
 
-The full [0.1.x compatibility policy](packages/cache/README.md#01x-compatibility)
-is canonical in the package guide.
+Documented `AsyncSemanticCache` usage is covered by the package's
+[0.1.x compatibility policy](packages/cache/README.md#01x-compatibility).
 
-## Providers
+## Verified AI Providers
+
+The maintained OpenAI, Gemini, and Hugging Face adapters were exercised against
+real provider APIs on **2026-10-05**, including embedding, generation, and an
+`AsyncSemanticCache` + MemoryStore miss → generate → write → confirmed-hit flow.
+Generation was skipped on the repeated-prompt hit; the checks cover the models
+listed in the [provider guide](docs/embedded-providers.md#010-verification).
+
+| Provider | Embeddings | Generation | Verification |
+| --- | --- | --- | --- |
+| OpenAI | Yes | Yes | ✅ Live verified |
+| Gemini | Yes | Yes | ✅ Live verified |
+| Hugging Face | Yes | Yes | ✅ Live verified |
+| Ollama | Yes | Yes | Previously exercised locally; current release evidence incomplete |
+| Anthropic | No native embedding API | Yes | ⚠️ Contract-tested; first-party live verification pending |
+
+**Public extension path verified.** Independent HTTPX integrations for OpenAI,
+Gemini, and Hugging Face used only Semantix's public `AsyncSemanticCache`
+extension interfaces, without built-in provider adapters or private helpers.
+Each completed a live miss → generate → write → confirmed-hit flow.
+
+> **Anthropic:** The generation adapter is covered by deterministic contract and
+> regression tests, but was not live-verified against the first-party Anthropic API
+> for 0.1.0. It has no native embedding API; pair generation with any supported
+> embedding adapter. Contributions using your own first-party Anthropic API access
+> are welcome for verification, reproducible compatibility reports, and focused
+> fixes with regression coverage when a defect is reproduced.
 
 Built-in adapters live in `semantix_cache.adapters`, outside minimal root imports.
 Choose models and embedding-space identity explicitly and supply a borrowed HTTPX
-client. The optional HTTP extras do not install provider SDKs.
+client. The optional HTTP extras do not install provider SDKs. See
+[embedded providers and custom integrations](docs/embedded-providers.md) for
+configuration and the custom-provider path.
 
-| Provider | Embedding | Completed-text generation |
-| --- | --- | --- |
-| OpenAI | Yes | Yes |
-| Hugging Face | Yes | Yes |
-| Gemini | Yes | Yes |
-| Ollama | Yes | Yes |
-| Anthropic | No native embedding API | Yes |
-
-See [embedded providers and custom integrations](docs/embedded-providers.md) for
-extras, imports, credentials, defaults, compatible endpoint overrides and response
-limits. External APIs can change independently; unsupported versions/providers can
-use the custom embedding and generation contracts.
+Provider APIs evolve independently of Semantix. I intend to keep the maintained
+integrations current; reproducible compatibility reports and focused fixes are
+welcome. Never include API keys, credentials, or raw provider responses in issues,
+commits, logs, or fixtures.
 
 ## Storage
 
@@ -419,7 +439,7 @@ Embedding and generation providers are selected independently.
 |---|:---:|:---:|:---:|
 | Hugging Face | Yes | Yes | Required |
 | OpenAI | Yes | Yes | Required |
-| Anthropic | No | Yes | Required |
+| Anthropic | No native embedding API | Yes (contract-tested; live pending) | Required |
 | Gemini | Yes | Yes | Required |
 | Ollama | Yes | Yes | Not required locally |
 | Mock | Yes | Yes | Not required |

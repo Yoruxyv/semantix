@@ -16,7 +16,9 @@ Navigating the maintained modules
 ``ollama``
     ``OllamaEmbeddingAdapter`` and ``OllamaGenerationAdapter``.
 ``anthropic``
-    ``AnthropicGenerationAdapter``; use a custom integration for embeddings.
+    ``AnthropicGenerationAdapter``; no native embedding API. Pair it with any
+    supported embedding adapter. Contract/regression-tested for 0.1.0;
+    first-party live verification remains pending.
 
 Import classes explicitly from their provider module, for example::
 
