@@ -179,7 +179,9 @@ class Settings(BaseSettings):
     coordination_backend: CoordinationBackendName = "memory"
 
     auth_mode: AuthMode = "disabled"
-    auth_principals: list[AuthPrincipalSettings] = Field(default_factory=list)
+    auth_principals: list[AuthPrincipalSettings] = Field(
+        default_factory=list[AuthPrincipalSettings]
+    )
     trusted_proxy_cidrs: list[str] = Field(default_factory=list)
     max_request_body_bytes: int = Field(default=65_536, ge=1_024, le=10_485_760)
 

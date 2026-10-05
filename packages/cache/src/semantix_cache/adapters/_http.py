@@ -4,7 +4,7 @@ import asyncio
 import json
 from collections.abc import Callable
 from types import TracebackType
-from typing import Self, TypeVar
+from typing import Self, TypeVar, cast
 from urllib.parse import urlsplit
 
 try:
@@ -91,7 +91,7 @@ class HTTPAdapter:
         error: type[EmbeddingError] | type[GenerationError],
         local: bool = False,
     ) -> None:
-        if not isinstance(client, httpx.AsyncClient):
+        if not isinstance(cast(object, client), httpx.AsyncClient):
             raise CacheConfigurationError("Expected a borrowed httpx.AsyncClient")
         try:
             timeout = finite_number(timeout_seconds, minimum=0, maximum=float("inf"))
@@ -194,7 +194,7 @@ class HTTPAdapter:
         await self.aclose()
 
 
-def checked_space(value: EmbeddingSpace) -> EmbeddingSpace:
+def checked_space(value: object) -> EmbeddingSpace:
     if not isinstance(value, EmbeddingSpace):
         raise CacheConfigurationError("Expected explicit EmbeddingSpace metadata")
     try:

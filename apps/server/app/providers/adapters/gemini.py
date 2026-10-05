@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import cast
 from urllib.parse import quote
 
 import httpx
@@ -84,14 +85,14 @@ class GeminiProvider:
                 "Invalid embedding response",
             )
 
-        embedding = payload.get("embedding")
+        embedding = cast("dict[str, object]", payload).get("embedding")
         if not isinstance(embedding, dict):
             raise InvalidProviderResponseError(
                 "Embedding response contained no embedding",
             )
 
         vector = parse_vector(
-            embedding.get("values"),
+            cast("dict[str, object]", embedding).get("values"),
             dimensions=self._embedding_dimensions,
         )
         if vector is None:
@@ -134,33 +135,33 @@ class GeminiProvider:
                 "Invalid generation response",
             )
 
-        candidates = payload.get("candidates")
+        candidates = cast("dict[str, object]", payload).get("candidates")
         if not isinstance(candidates, list) or not candidates:
             raise InvalidProviderResponseError(
                 "Generation response contained no candidates",
             )
 
-        first = candidates[0]
+        first = cast("list[object]", candidates)[0]
         if not isinstance(first, dict):
             raise InvalidProviderResponseError(
                 "Invalid generation candidate",
             )
-        content = first.get("content")
+        content = cast("dict[str, object]", first).get("content")
         if not isinstance(content, dict):
             raise InvalidProviderResponseError(
                 "Generation response contained no content",
             )
-        parts = content.get("parts")
+        parts = cast("dict[str, object]", content).get("parts")
         if not isinstance(parts, list):
             raise InvalidProviderResponseError(
                 "Generation response contained no parts",
             )
 
         text_parts: list[str] = []
-        for part in parts:
+        for part in cast("list[object]", parts):
             if not isinstance(part, dict):
                 continue
-            text = part.get("text")
+            text = cast("dict[str, object]", part).get("text")
             if isinstance(text, str) and text.strip():
                 text_parts.append(text.strip())
 

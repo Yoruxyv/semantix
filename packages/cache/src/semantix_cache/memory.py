@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from time import monotonic
 from types import TracebackType
-from typing import Self
+from typing import Self, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -104,7 +104,7 @@ class MemoryStore:
         default_ttl_seconds: float | None = 3600.0,
     ) -> None:
         try:
-            if not isinstance(embedding_space, EmbeddingSpace):
+            if not isinstance(cast(object, embedding_space), EmbeddingSpace):
                 raise CacheConfigurationError("Invalid memory store configuration")
             self._space = EmbeddingSpace.model_validate(embedding_space.model_dump())
             if (
@@ -241,7 +241,7 @@ class MemoryStore:
     async def put(self, entry: CacheEntry, *, ttl_seconds: float | None = None) -> None:
         with self._state.operation():
             try:
-                if not isinstance(entry, CacheEntry):
+                if not isinstance(cast(object, entry), CacheEntry):
                     raise CacheStoreError("Invalid stored entry")
                 entry = CacheEntry.model_validate(entry.model_dump())
                 embedding = normalized_vector(

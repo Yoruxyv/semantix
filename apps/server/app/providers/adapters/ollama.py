@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import cast
 
 import httpx
 
@@ -68,14 +69,17 @@ class OllamaProvider:
                 "Invalid Ollama embedding response",
             )
 
-        embeddings = payload.get("embeddings")
-        if not isinstance(embeddings, list) or len(embeddings) != 1:
+        embeddings = cast("dict[str, object]", payload).get("embeddings")
+        if (
+            not isinstance(embeddings, list)
+            or len(cast("list[object]", embeddings)) != 1
+        ):
             raise InvalidProviderResponseError(
                 "Ollama embedding response contained no single vector",
             )
 
         vector = parse_vector(
-            embeddings[0],
+            cast("list[object]", embeddings)[0],
             dimensions=self._embedding_dimensions,
         )
         if vector is None:
@@ -108,7 +112,7 @@ class OllamaProvider:
                 "Invalid Ollama generation response",
             )
 
-        response = payload.get("response")
+        response = cast("dict[str, object]", payload).get("response")
         if not isinstance(response, str) or not response.strip():
             raise InvalidProviderResponseError(
                 "Ollama generation response contained no text",

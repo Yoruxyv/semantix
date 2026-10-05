@@ -5,9 +5,31 @@
     "packages/cache/src"
   ],
   "include": [
-    "apps/server",
-    "packages/cache",
-    "packages/client"
+    "apps/server/app",
+    "apps/server/scripts",
+    "packages/cache/src",
+    "packages/cache/examples",
+    "packages/client/src"
   ],
-  "reportDeprecated": "error"
+  "ignore": [
+    "apps/server/tests",
+    "packages/cache/tests",
+    "packages/client/tests"
+  ],
+
+  "typeCheckingMode": "standard",
+
+  "reportDeprecated": "error",
+  "reportUnreachable": "error",
+
+  "reportMissingTypeArgument": "error",
+  "reportMissingParameterType": "error",
+
+  "reportUnknownParameterType": "error",
+  "reportUnknownArgumentType": "error",
+  "reportUnknownMemberType": "error",
+  "reportUnknownVariableType": "error",
+
+  "reportImplicitOverride": "error",
+  "reportUnnecessaryTypeIgnoreComment": "error"
 }

@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import cast
 
 import httpx
 
@@ -68,20 +69,20 @@ class OpenAIProvider:
                 "Invalid embedding response",
             )
 
-        data = payload.get("data")
+        data = cast("dict[str, object]", payload).get("data")
         if not isinstance(data, list) or not data:
             raise InvalidProviderResponseError(
                 "Embedding response contained no data",
             )
 
-        first = data[0]
+        first = cast("list[object]", data)[0]
         if not isinstance(first, dict):
             raise InvalidProviderResponseError(
                 "Invalid embedding item",
             )
 
         vector = parse_vector(
-            first.get("embedding"),
+            cast("dict[str, object]", first).get("embedding"),
             dimensions=self._embedding_dimensions,
         )
         if vector is None:
@@ -116,23 +117,23 @@ class OpenAIProvider:
                 "Invalid chat-completion response",
             )
 
-        choices = payload.get("choices")
+        choices = cast("dict[str, object]", payload).get("choices")
         if not isinstance(choices, list) or not choices:
             raise InvalidProviderResponseError(
                 "Chat response contained no choices",
             )
 
-        first = choices[0]
+        first = cast("list[object]", choices)[0]
         if not isinstance(first, dict):
             raise InvalidProviderResponseError(
                 "Invalid chat choice",
             )
-        message = first.get("message")
+        message = cast("dict[str, object]", first).get("message")
         if not isinstance(message, dict):
             raise InvalidProviderResponseError(
                 "Chat response contained no message",
             )
-        content = message.get("content")
+        content = cast("dict[str, object]", message).get("content")
         if not isinstance(content, str) or not content.strip():
             raise InvalidProviderResponseError(
                 "Chat response contained no text",

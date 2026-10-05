@@ -61,13 +61,13 @@ def _safe_case_context(
     case_index = location[1]
     if not isinstance(raw, dict):
         return None, case_index
-    cases = raw.get("cases")
-    if not isinstance(cases, list) or case_index >= len(cases):
+    cases = cast("dict[object, object]", raw).get("cases")
+    if not isinstance(cases, list) or case_index >= len(cast("list[object]", cases)):
         return None, case_index
-    case = cases[case_index]
+    case = cast("list[object]", cases)[case_index]
     if not isinstance(case, dict):
         return None, case_index
-    case_id = case.get("case_id")
+    case_id = cast("dict[object, object]", case).get("case_id")
     if (
         isinstance(case_id, str)
         and 0 < len(case_id) <= 100
@@ -83,7 +83,11 @@ def _pydantic_issue(
 ) -> EvaluationDatasetValidationIssue:
     raw_location = error.get("loc")
     location = (
-        tuple(part for part in raw_location if isinstance(part, (int, str)))
+        tuple(
+            part
+            for part in cast("tuple[object, ...]", raw_location)
+            if isinstance(part, (int, str))
+        )
         if isinstance(raw_location, tuple)
         else ()
     )
@@ -244,8 +248,8 @@ def validate_imported_dataset(
             ]
         )
 
-    raw_cases = raw.get("cases")
-    if isinstance(raw_cases, list) and len(raw_cases) > max_cases:
+    raw_cases = cast("dict[object, object]", raw).get("cases")
+    if isinstance(raw_cases, list) and len(cast("list[object]", raw_cases)) > max_cases:
         raise EvaluationDatasetValidationError(
             [
                 EvaluationDatasetValidationIssue(
@@ -260,7 +264,7 @@ def validate_imported_dataset(
         definition = ImportedEvaluationDatasetDefinition.model_validate(raw)
     except ValidationError as exc:
         issues = [
-            _pydantic_issue(raw, cast(dict[str, object], error))
+            _pydantic_issue(cast(object, raw), cast(dict[str, object], error))
             for error in exc.errors(include_url=False)
         ]
         raise EvaluationDatasetValidationError(issues) from exc
@@ -325,7 +329,7 @@ def validate_imported_dataset(
             )
         )
 
-    summary = {
+    summary: dict[str, object] = {
         "dataset_id": dataset_id,
         "dataset_source": "inline",
         "schema_version": definition.schema_version,

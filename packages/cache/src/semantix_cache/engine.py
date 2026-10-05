@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from time import perf_counter
 from types import TracebackType
-from typing import Self
+from typing import Self, cast
 
 from ._coalescing import Flights, Identity, Participation, validate_key
 from ._lifecycle import Lifecycle
@@ -65,7 +65,9 @@ class AsyncSemanticCache:
             )
             if self._timeout == 0:
                 raise ValueError("Operation timeout must be positive")
-            if prompt_normalizer is not None and not callable(prompt_normalizer):
+            if prompt_normalizer is not None and not callable(
+                cast(object, prompt_normalizer)
+            ):
                 raise ValueError("Prompt normalizer must be callable")
             resolve_ttl(None, store.default_ttl_seconds)
         except ValueError:
@@ -304,7 +306,7 @@ class AsyncSemanticCache:
         try:
             async with self._operation():
                 prompt, namespace = self._inputs(prompt, namespace)
-                if not isinstance(policy, CachePolicy):
+                if not isinstance(cast(object, policy), CachePolicy):
                     raise CacheValidationError("Policy must be a CachePolicy")
                 eligible = coalescing_key is not None and policy is CachePolicy.NORMAL
                 if coalescing_key is not None:
@@ -409,17 +411,20 @@ class AsyncSemanticCache:
                     cache_written=hit is None and policy._write_enabled,
                 )
             if participation is not None and participation.leader:
-                self._flights.settle(participation.flight)
+                # lookup() updates this nonlocal during resolve_flow.
+                self._flights.settle(participation.flight)  # pyright: ignore[reportUnreachable]
             return result
         except BaseException as error:
             # Publish only after _operation translates an expired deadline. Explicit
             # leader cancellation remains CancelledError, with no hidden retry.
             if participation is not None and participation.leader:
-                self._flights.settle(participation.flight, error)
+                # lookup() updates this nonlocal during resolve_flow.
+                self._flights.settle(participation.flight, error)  # pyright: ignore[reportUnreachable]
             raise
         finally:
             if participation is not None:
-                self._flights.release(participation.flight)
+                # lookup() updates this nonlocal during resolve_flow.
+                self._flights.release(participation.flight)  # pyright: ignore[reportUnreachable]
 
     async def delete(self, cache_key: str, *, namespace: str = "default") -> bool:
         async with self._operation():

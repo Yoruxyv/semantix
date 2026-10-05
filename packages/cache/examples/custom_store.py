@@ -11,6 +11,7 @@ import re
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from time import monotonic
+from typing import cast
 
 from examples.custom_integration import CustomEmbedding, demo_model
 from semantix_cache import (
@@ -144,7 +145,7 @@ class CompanyCacheStore:
     async def put(self, entry: CacheEntry, *, ttl_seconds: float | None = None) -> None:
         if self.closed:
             raise CacheClosedError("Example store is closed")
-        if not isinstance(entry, CacheEntry):
+        if not isinstance(cast(object, entry), CacheEntry):
             raise CacheStoreError("Invalid stored entry")
         self._scope(entry.namespace)
         try:

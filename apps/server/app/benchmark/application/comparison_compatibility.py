@@ -1,3 +1,5 @@
+from typing import cast
+
 from app.benchmark.api.comparison_schemas import (
     EvaluationComparisonBlocker,
     EvaluationComparisonWarning,
@@ -116,7 +118,11 @@ def comparison_blockers(
                 detail="Comparison contract versions differ.",
             )
         )
-    if baseline.threshold_evaluation_mode != candidate.threshold_evaluation_mode:
+    # Historical comparisons also defend against model_copy/model_construct values.
+    if (
+        cast(str, baseline.threshold_evaluation_mode)
+        != candidate.threshold_evaluation_mode
+    ):
         blockers.append(
             EvaluationComparisonBlocker(
                 code="threshold_evaluation_mode_mismatch",

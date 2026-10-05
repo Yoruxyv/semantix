@@ -84,7 +84,9 @@ def _invalid(field: str) -> SemantixResponseError:
 
 
 def _object(value: object) -> dict[str, object]:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+    if not isinstance(value, dict) or not all(
+        isinstance(key, str) for key in cast("dict[object, object]", value)
+    ):
         raise SemantixResponseError("The Semantix response must be a JSON object.")
     return cast(dict[str, object], value)
 

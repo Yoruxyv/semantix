@@ -204,8 +204,9 @@ def rss_bytes() -> dict[str, int | None]:
                 "peak_rss": counters.peak,
                 "private_bytes": counters.private,
             }
-    elif Path("/proc/self/status").exists():
-        values = {}
+    # Separate feature probing keeps portable code visible to Windows editors.
+    if platform.system() != "Windows" and Path("/proc/self/status").exists():
+        values: dict[str, int] = {}
         for line in Path("/proc/self/status").read_text().splitlines():
             if line.startswith(("VmRSS:", "VmHWM:")):
                 key, value, *_ = line.split()
@@ -248,7 +249,7 @@ def environment(case: Case) -> dict[str, Any]:
         memory.length = ctypes.sizeof(memory)
         if ctypes.WinDLL("kernel32").GlobalMemoryStatusEx(ctypes.byref(memory)):
             ram = memory.total
-    elif Path("/proc/meminfo").exists():
+    if platform.system() != "Windows" and Path("/proc/meminfo").exists():
         ram = int(Path("/proc/meminfo").read_text().splitlines()[0].split()[1]) * 1024
         if Path("/proc/cpuinfo").exists():
             cpu = next(

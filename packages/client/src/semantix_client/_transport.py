@@ -151,7 +151,7 @@ def _raise_api_error(
     *,
     token: str | None,
 ) -> None:
-    data = payload if isinstance(payload, dict) else {}
+    data = cast("dict[object, object]", payload) if isinstance(payload, dict) else {}
     error_code = (
         _safe_text(
             data.get("error"),

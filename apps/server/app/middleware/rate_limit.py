@@ -33,13 +33,15 @@ class CoordinationLimiter:
         self, limit_value: Callable[[str], str]
     ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
         def decorate(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
-            local = cast(Callable[P, Awaitable[R]], self.local.limit(limit_value)(func))
+            # SlowAPI returns a bare Callable; pin its signature at this boundary.
+            local = cast(Callable[P, Awaitable[R]], self.local.limit(limit_value)(func))  # pyright: ignore[reportUnknownMemberType]
 
             @wraps(func)
             async def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
                 request = kwargs.get("request")
                 if not isinstance(request, Request):
                     raise TypeError("A rate-limited route requires Request")
+                request = cast(Request, request)
                 settings: Settings = request.app.state.settings
                 if settings.coordination_backend == "memory":
                     return await local(*args, **kwargs)

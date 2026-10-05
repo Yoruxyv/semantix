@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import cast
 from urllib.parse import quote
 
 import httpx
@@ -35,16 +36,17 @@ def _rows(
     if not isinstance(value, list) or not value:
         return None
 
-    if len(value) == 1:
+    items = cast("list[object]", value)
+    if len(items) == 1:
         nested = _rows(
-            value[0],
+            items[0],
             dimensions=dimensions,
         )
         if nested is not None:
             return nested
 
     result: list[list[float]] = []
-    for item in value:
+    for item in items:
         row = parse_vector(
             item,
             dimensions=dimensions,
@@ -161,25 +163,25 @@ class HuggingFaceProvider:
                 "Invalid chat-completion response",
             )
 
-        choices = payload.get("choices")
+        choices = cast("dict[str, object]", payload).get("choices")
         if not isinstance(choices, list) or not choices:
             raise InvalidProviderResponseError(
                 "Chat response contained no choices",
             )
 
-        first_choice = choices[0]
+        first_choice = cast("list[object]", choices)[0]
         if not isinstance(first_choice, dict):
             raise InvalidProviderResponseError(
                 "Invalid chat choice",
             )
 
-        message = first_choice.get("message")
+        message = cast("dict[str, object]", first_choice).get("message")
         if not isinstance(message, dict):
             raise InvalidProviderResponseError(
                 "Chat response contained no message",
             )
 
-        content = message.get("content")
+        content = cast("dict[str, object]", message).get("content")
         if not isinstance(content, str) or not content.strip():
             raise InvalidProviderResponseError(
                 "Chat response contained no text",
