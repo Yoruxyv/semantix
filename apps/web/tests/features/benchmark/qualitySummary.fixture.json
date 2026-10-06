@@ -1,0 +1,749 @@
+{
+  "schema_version": 1,
+  "benchmark": "semantix-reuse-quality",
+  "evidence_kind": "certified-static-benchmark",
+  "certification": "reviewed",
+  "source_sha": "1111111111111111111111111111111111111111",
+  "source_dirty": false,
+  "source_files_sha256": {
+    "test-fixture": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "generated_at_utc": "2026-01-01T00:00:00+00:00",
+  "corpus": {
+    "schema_version": 1,
+    "version": "test-fixture",
+    "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "provenance": "independently-authored-synthetic",
+    "label_review": "maintainer-reviewed",
+    "split_policy": "Synthetic test-only fixture; not approval of the Semantix corpus."
+  },
+  "calibration_cases": 4,
+  "held_out_cases": 4,
+  "default_threshold": 0.92,
+  "threshold_grid": [0.5, 0.92, 1.0],
+  "selection_rule": "calibration only: minimize FP, then maximize TP, then highest threshold",
+  "similarity_semantics": "MemoryStore float64 cosine; inclusive >=; one seeded candidate per isolated case",
+  "runs": [
+    {
+      "embedding": {
+        "baseline": "token-count",
+        "identity": "semantix-quality:token-count:v1:d2048:raw",
+        "dimensions": 2048,
+        "normalization": "raw",
+        "kind": "lexical-control",
+        "revision": 1,
+        "model_id": null,
+        "model_preprocessing": "sha256-feature-counts-v1; case-sensitive; cache L2 normalization",
+        "runtime_versions": {
+          "python": "3.14.6",
+          "platform": "test-fixture",
+          "numpy": "2.4.6",
+          "pydantic": "2.13.4"
+        }
+      },
+      "calibrated_threshold": 1.0,
+      "sweep": [
+        {
+          "threshold": 0.5,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 2,
+            "false_positive": 2,
+            "false_negative": 0,
+            "true_negative": 0,
+            "reuse_precision": 0.5,
+            "reuse_recall": 1.0,
+            "false_accept_rate": 1.0,
+            "false_reject_rate": 0.0,
+            "generation_avoidance": 1.0,
+            "wrong_among_accepted": 0.5
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 2,
+            "false_positive": 2,
+            "false_negative": 0,
+            "true_negative": 0,
+            "reuse_precision": 0.5,
+            "reuse_recall": 1.0,
+            "false_accept_rate": 1.0,
+            "false_reject_rate": 0.0,
+            "generation_avoidance": 1.0,
+            "wrong_among_accepted": 0.5
+          }
+        },
+        {
+          "threshold": 0.92,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          }
+        },
+        {
+          "threshold": 1.0,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 0,
+            "false_negative": 1,
+            "true_negative": 2,
+            "reuse_precision": 1.0,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.25,
+            "wrong_among_accepted": 0.0
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 0,
+            "false_negative": 1,
+            "true_negative": 2,
+            "reuse_precision": 1.0,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.25,
+            "wrong_among_accepted": 0.0
+          }
+        }
+      ],
+      "held_out_categories": [
+        {
+          "category": "test-fixture",
+          "default": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          },
+          "calibrated": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 0,
+            "false_negative": 1,
+            "true_negative": 2,
+            "reuse_precision": 1.0,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.25,
+            "wrong_among_accepted": 0.0
+          }
+        }
+      ],
+      "preprocessing_ns_per_prompt": 10.0
+    },
+    {
+      "embedding": {
+        "baseline": "minilm-l6-v2",
+        "identity": "semantix-quality:minilm-l6-v2:1110a243fdf4706b3f48f1d95db1a4f5529b4d41:d384:raw",
+        "dimensions": 384,
+        "normalization": "raw",
+        "kind": "pretrained-semantic",
+        "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+        "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+        "model_preprocessing": "pinned uncased tokenizer; max_seq_length=256; mean pooling; float32 CPU; batch_size=1; normalize_embeddings=True; threads=1; deterministic",
+        "runtime_versions": {
+          "python": "3.14.6",
+          "platform": "test-fixture",
+          "numpy": "2.4.6",
+          "pydantic": "2.13.4",
+          "sentence-transformers": "6.1.0",
+          "torch": "2.14.1",
+          "transformers": "5.18.0",
+          "huggingface-hub": "1.33.0",
+          "tokenizers": "0.23.2",
+          "safetensors": "0.8.0"
+        }
+      },
+      "calibrated_threshold": 1.0,
+      "sweep": [
+        {
+          "threshold": 0.5,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 2,
+            "false_positive": 2,
+            "false_negative": 0,
+            "true_negative": 0,
+            "reuse_precision": 0.5,
+            "reuse_recall": 1.0,
+            "false_accept_rate": 1.0,
+            "false_reject_rate": 0.0,
+            "generation_avoidance": 1.0,
+            "wrong_among_accepted": 0.5
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 2,
+            "false_positive": 2,
+            "false_negative": 0,
+            "true_negative": 0,
+            "reuse_precision": 0.5,
+            "reuse_recall": 1.0,
+            "false_accept_rate": 1.0,
+            "false_reject_rate": 0.0,
+            "generation_avoidance": 1.0,
+            "wrong_among_accepted": 0.5
+          }
+        },
+        {
+          "threshold": 0.92,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          }
+        },
+        {
+          "threshold": 1.0,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 0,
+            "false_negative": 1,
+            "true_negative": 2,
+            "reuse_precision": 1.0,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.25,
+            "wrong_among_accepted": 0.0
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 0,
+            "false_negative": 1,
+            "true_negative": 2,
+            "reuse_precision": 1.0,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.25,
+            "wrong_among_accepted": 0.0
+          }
+        }
+      ],
+      "held_out_categories": [
+        {
+          "category": "test-fixture",
+          "default": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          },
+          "calibrated": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 0,
+            "false_negative": 1,
+            "true_negative": 2,
+            "reuse_precision": 1.0,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.25,
+            "wrong_among_accepted": 0.0
+          }
+        }
+      ],
+      "preprocessing_ns_per_prompt": 10.0
+    },
+    {
+      "embedding": {
+        "baseline": "minilm-l6-v2",
+        "identity": "semantix-quality:minilm-l6-v2:1110a243fdf4706b3f48f1d95db1a4f5529b4d41:d384:whitespace",
+        "dimensions": 384,
+        "normalization": "whitespace",
+        "kind": "pretrained-semantic",
+        "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+        "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+        "model_preprocessing": "pinned uncased tokenizer; max_seq_length=256; mean pooling; float32 CPU; batch_size=1; normalize_embeddings=True; threads=1; deterministic",
+        "runtime_versions": {
+          "python": "3.14.6",
+          "platform": "test-fixture",
+          "numpy": "2.4.6",
+          "pydantic": "2.13.4",
+          "sentence-transformers": "6.1.0",
+          "torch": "2.14.1",
+          "transformers": "5.18.0",
+          "huggingface-hub": "1.33.0",
+          "tokenizers": "0.23.2",
+          "safetensors": "0.8.0"
+        }
+      },
+      "calibrated_threshold": 1.0,
+      "sweep": [
+        {
+          "threshold": 0.5,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 2,
+            "false_positive": 2,
+            "false_negative": 0,
+            "true_negative": 0,
+            "reuse_precision": 0.5,
+            "reuse_recall": 1.0,
+            "false_accept_rate": 1.0,
+            "false_reject_rate": 0.0,
+            "generation_avoidance": 1.0,
+            "wrong_among_accepted": 0.5
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 2,
+            "false_positive": 2,
+            "false_negative": 0,
+            "true_negative": 0,
+            "reuse_precision": 0.5,
+            "reuse_recall": 1.0,
+            "false_accept_rate": 1.0,
+            "false_reject_rate": 0.0,
+            "generation_avoidance": 1.0,
+            "wrong_among_accepted": 0.5
+          }
+        },
+        {
+          "threshold": 0.92,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          }
+        },
+        {
+          "threshold": 1.0,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 0,
+            "false_negative": 1,
+            "true_negative": 2,
+            "reuse_precision": 1.0,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.25,
+            "wrong_among_accepted": 0.0
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 0,
+            "false_negative": 1,
+            "true_negative": 2,
+            "reuse_precision": 1.0,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.25,
+            "wrong_among_accepted": 0.0
+          }
+        }
+      ],
+      "held_out_categories": [
+        {
+          "category": "test-fixture",
+          "default": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          },
+          "calibrated": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 0,
+            "false_negative": 1,
+            "true_negative": 2,
+            "reuse_precision": 1.0,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.25,
+            "wrong_among_accepted": 0.0
+          }
+        }
+      ],
+      "preprocessing_ns_per_prompt": 10.0
+    },
+    {
+      "embedding": {
+        "baseline": "minilm-l6-v2",
+        "identity": "semantix-quality:minilm-l6-v2:1110a243fdf4706b3f48f1d95db1a4f5529b4d41:d384:NFC",
+        "dimensions": 384,
+        "normalization": "NFC",
+        "kind": "pretrained-semantic",
+        "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+        "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+        "model_preprocessing": "pinned uncased tokenizer; max_seq_length=256; mean pooling; float32 CPU; batch_size=1; normalize_embeddings=True; threads=1; deterministic",
+        "runtime_versions": {
+          "python": "3.14.6",
+          "platform": "test-fixture",
+          "numpy": "2.4.6",
+          "pydantic": "2.13.4",
+          "sentence-transformers": "6.1.0",
+          "torch": "2.14.1",
+          "transformers": "5.18.0",
+          "huggingface-hub": "1.33.0",
+          "tokenizers": "0.23.2",
+          "safetensors": "0.8.0"
+        }
+      },
+      "calibrated_threshold": 1.0,
+      "sweep": [
+        {
+          "threshold": 0.5,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 2,
+            "false_positive": 2,
+            "false_negative": 0,
+            "true_negative": 0,
+            "reuse_precision": 0.5,
+            "reuse_recall": 1.0,
+            "false_accept_rate": 1.0,
+            "false_reject_rate": 0.0,
+            "generation_avoidance": 1.0,
+            "wrong_among_accepted": 0.5
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 2,
+            "false_positive": 2,
+            "false_negative": 0,
+            "true_negative": 0,
+            "reuse_precision": 0.5,
+            "reuse_recall": 1.0,
+            "false_accept_rate": 1.0,
+            "false_reject_rate": 0.0,
+            "generation_avoidance": 1.0,
+            "wrong_among_accepted": 0.5
+          }
+        },
+        {
+          "threshold": 0.92,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          }
+        },
+        {
+          "threshold": 1.0,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 0,
+            "false_negative": 1,
+            "true_negative": 2,
+            "reuse_precision": 1.0,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.25,
+            "wrong_among_accepted": 0.0
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 0,
+            "false_negative": 1,
+            "true_negative": 2,
+            "reuse_precision": 1.0,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.25,
+            "wrong_among_accepted": 0.0
+          }
+        }
+      ],
+      "held_out_categories": [
+        {
+          "category": "test-fixture",
+          "default": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          },
+          "calibrated": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 0,
+            "false_negative": 1,
+            "true_negative": 2,
+            "reuse_precision": 1.0,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.25,
+            "wrong_among_accepted": 0.0
+          }
+        }
+      ],
+      "preprocessing_ns_per_prompt": 10.0
+    },
+    {
+      "embedding": {
+        "baseline": "char-trigram",
+        "identity": "semantix-quality:char-trigram:v1:d2048:NFC",
+        "dimensions": 2048,
+        "normalization": "NFC",
+        "kind": "lexical-control",
+        "revision": 1,
+        "model_id": null,
+        "model_preprocessing": "sha256-feature-counts-v1; case-sensitive; cache L2 normalization",
+        "runtime_versions": {
+          "python": "3.14.6",
+          "platform": "test-fixture",
+          "numpy": "2.4.6",
+          "pydantic": "2.13.4"
+        }
+      },
+      "calibrated_threshold": 1.0,
+      "sweep": [
+        {
+          "threshold": 0.5,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 2,
+            "false_positive": 2,
+            "false_negative": 0,
+            "true_negative": 0,
+            "reuse_precision": 0.5,
+            "reuse_recall": 1.0,
+            "false_accept_rate": 1.0,
+            "false_reject_rate": 0.0,
+            "generation_avoidance": 1.0,
+            "wrong_among_accepted": 0.5
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 2,
+            "false_positive": 2,
+            "false_negative": 0,
+            "true_negative": 0,
+            "reuse_precision": 0.5,
+            "reuse_recall": 1.0,
+            "false_accept_rate": 1.0,
+            "false_reject_rate": 0.0,
+            "generation_avoidance": 1.0,
+            "wrong_among_accepted": 0.5
+          }
+        },
+        {
+          "threshold": 0.92,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          }
+        },
+        {
+          "threshold": 1.0,
+          "calibration": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 0,
+            "false_negative": 1,
+            "true_negative": 2,
+            "reuse_precision": 1.0,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.25,
+            "wrong_among_accepted": 0.0
+          },
+          "held_out": {
+            "cases": 4,
+            "true_positive": 0,
+            "false_positive": 0,
+            "false_negative": 2,
+            "true_negative": 2,
+            "reuse_precision": null,
+            "reuse_recall": 0.0,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 1.0,
+            "generation_avoidance": 0.0,
+            "wrong_among_accepted": null
+          }
+        }
+      ],
+      "held_out_categories": [
+        {
+          "category": "test-fixture",
+          "default": {
+            "cases": 4,
+            "true_positive": 1,
+            "false_positive": 1,
+            "false_negative": 1,
+            "true_negative": 1,
+            "reuse_precision": 0.5,
+            "reuse_recall": 0.5,
+            "false_accept_rate": 0.5,
+            "false_reject_rate": 0.5,
+            "generation_avoidance": 0.5,
+            "wrong_among_accepted": 0.5
+          },
+          "calibrated": {
+            "cases": 4,
+            "true_positive": 0,
+            "false_positive": 0,
+            "false_negative": 2,
+            "true_negative": 2,
+            "reuse_precision": null,
+            "reuse_recall": 0.0,
+            "false_accept_rate": 0.0,
+            "false_reject_rate": 1.0,
+            "generation_avoidance": 0.0,
+            "wrong_among_accepted": null
+          }
+        }
+      ],
+      "preprocessing_ns_per_prompt": 10.0
+    }
+  ],
+  "limitations": [
+    "Synthetic renderer fixture only; these values are not Semantix benchmark evidence."
+  ]
+}

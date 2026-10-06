@@ -1,7 +1,7 @@
 # Current architecture
 
 This describes the implementation at the current source revision. For product principles
-see [DESIGN.md](DESIGN.md); for deployment procedures and measured limits see
+see [PRODUCT_PRINCIPLES.md](PRODUCT_PRINCIPLES.md); for deployment procedures and measured limits see
 [docs/operations/deployment.md](docs/operations/deployment.md) and
 [docs/operations/production-runtime-audit.md](docs/operations/production-runtime-audit.md).
 

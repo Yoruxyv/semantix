@@ -143,3 +143,12 @@ existing persistence/conformance tests; they validate isolation, revisions, TTL,
 thresholds, capacity, atomic writes, ownership, cancellation and failure cleanup.
 After collecting baselines, report measured bottlenecks, numerical/allocation risks
 and optimization proposals for maintainer review before changing the runtime.
+
+## Reuse quality
+
+See [Reuse quality evidence](reuse_quality/README.md) for the independently labelled,
+secret-free quality harness and reviewed static dashboard receipt. Quality and
+runtime performance answer different questions; their scores are not combined.
+
+The top-level workloads.json remains a runtime/performance input; it is unrelated
+to the maintained reuse-quality corpus under reuse_quality/data.

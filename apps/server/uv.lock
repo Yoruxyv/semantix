@@ -988,6 +988,14 @@ requires-dist = [
 ]
 provides-extras = ["pgvector", "providers", "openai", "huggingface", "gemini", "ollama", "anthropic", "dev"]
 
+[package.metadata.requires-dev]
+reuse-quality = [
+    { name = "huggingface-hub", specifier = "==1.33.0" },
+    { name = "sentence-transformers", specifier = "==6.1.0" },
+    { name = "torch", specifier = "==2.14.1" },
+    { name = "transformers", specifier = "==5.18.0" },
+]
+
 [[package]]
 name = "slowapi"
 version = "0.1.10"

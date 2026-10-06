@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "version": "1.0.0",
+  "sha256": "563b26f788cde8de3f74be9da6999cfaab46860e508635fcf6af53d28ff7b2a3",
+  "provenance": "independently-authored-synthetic",
+  "label_review": "maintainer-reviewed",
+  "split_policy": "Manually assigned response/task families before scoring; distinct source/candidate prompts across splits; balanced labels in every category/split. Never tune on held-out labels."
+}
