@@ -3,7 +3,7 @@
   "benchmark": "semantix-reuse-quality",
   "evidence_kind": "certified-static-benchmark",
   "certification": "reviewed",
-  "source_sha": "da128223fc50780a8ddb1cabca4b2683c58b79fd",
+  "source_sha": "9e97107834ceae66761a29237c04df0225e0ed0c",
   "source_dirty": false,
   "source_files_sha256": {
     "packages/cache/benchmarks/__init__.py": "670eb9223dc3803592e4d8a3483e487dc02525747393bd74ff9d579180ff3f83",
@@ -15,18 +15,20 @@
     "packages/cache/benchmarks/reuse_quality/schemas/summary.schema.json": "7a789f86e756b6426f4eade4853c2b5ccc47eeef50617bb599ba648a88508f0c",
     "packages/cache/pyproject.toml": "2c6e758a6401094a569071e90f6f61c7471b7797f5e8edada5180b593522a707",
     "packages/cache/src/semantix_cache/__init__.py": "f0a0984dac5da0e12175bd77ae5e4d750ad013ea02ee89bed84e552686b1a1fc",
-    "packages/cache/src/semantix_cache/_coalescing.py": "28ceb6f363009a6c6937b69e72874d75a3b0a0c4affa6152ea5b16d79b2a6e98",
+    "packages/cache/src/semantix_cache/_coalescing.py": "f2677cc74ebb1638ba551d66a850b0542200fe817b65c074abdf60af0333dca4",
+    "packages/cache/src/semantix_cache/_coalescing_metrics.py": "3173dff19b972c56ba851b78a166157229109dd641abfaafc5939d3e2d00291c",
     "packages/cache/src/semantix_cache/_lifecycle.py": "dcb82168432de82a4aa4cf63468726d456dec606cdb8b6e84c355b03b87dbc7c",
     "packages/cache/src/semantix_cache/_semantics.py": "6684379be26a467e144c19e21c0e1ff2dcb0608ac87527f8b307a3da4ceba605",
-    "packages/cache/src/semantix_cache/engine.py": "a72c09af2a595610f6260f21c0715435aa2962e8a0db1ed6c1c662ba99ca7bf6",
+    "packages/cache/src/semantix_cache/engine.py": "0b4e13903042625c4ac9b7bd8d921e18f1b1574fc7b3a32d7f14a075706914ad",
     "packages/cache/src/semantix_cache/errors.py": "8ea59e6c2ff3a24d8527fec9b09827930ccd69fc580a78578fb207ea82f9a284",
     "packages/cache/src/semantix_cache/memory.py": "ef4b3bb3ee352242c17b8e9c5434db2aaa1124c1a5b4bd629740a1a079cd2b02",
     "packages/cache/src/semantix_cache/models.py": "da683b9ff2d6b490ee1899ca15f35a78a6977d0af8c7e2d89132164ae898a4f3",
+    "packages/cache/src/semantix_cache/observability.py": "45505980358d9fd620cc40e9c658845d982f84252606d9ab5de9403fc7f08c2d",
     "packages/cache/src/semantix_cache/policies.py": "e141a23582a8404b5f0a460f1d40948d68cdc6fa3ca3c1dfbaf4ebe14d9ffbd7",
     "packages/cache/src/semantix_cache/protocols.py": "3c28123318bc77fc459b89a488bc3afc1daaf3258665a62966b38ab8a21c5e73",
     "packages/cache/uv.lock": "eade9489160c876b13aaa5a75fe3d20b744fb0db34bbcf25d8b48104be6e0a10"
   },
-  "generated_at_utc": "2026-10-06T01:45:15.920459+00:00",
+  "generated_at_utc": "2026-10-06T09:54:20.257542+00:00",
   "corpus": {
     "schema_version": 1,
     "version": "1.0.0",
@@ -911,7 +913,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 77.7625
+      "preprocessing_ns_per_prompt": 78.93125
     },
     {
       "embedding": {
@@ -1782,7 +1784,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 411.66875
+      "preprocessing_ns_per_prompt": 371.9125
     },
     {
       "embedding": {
@@ -2653,7 +2655,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 122.6
+      "preprocessing_ns_per_prompt": 126.34375
     },
     {
       "embedding": {
@@ -3518,7 +3520,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 81.21875
+      "preprocessing_ns_per_prompt": 79.75
     },
     {
       "embedding": {
@@ -4383,7 +4385,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 383.75
+      "preprocessing_ns_per_prompt": 544.9125
     },
     {
       "embedding": {
@@ -5248,7 +5250,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 125.88125
+      "preprocessing_ns_per_prompt": 127.15625
     },
     {
       "embedding": {
@@ -6113,7 +6115,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 77.93125
+      "preprocessing_ns_per_prompt": 76.2125
     },
     {
       "embedding": {
@@ -6978,7 +6980,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 382.53125
+      "preprocessing_ns_per_prompt": 397.79375
     },
     {
       "embedding": {
@@ -7843,7 +7845,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 125.95
+      "preprocessing_ns_per_prompt": 159.5625
     }
   ],
   "limitations": [
