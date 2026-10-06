@@ -1,0 +1,256 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "semantix_commit": {
+      "pattern": "^[a-f0-9]{40}$",
+      "title": "Semantix Commit",
+      "type": "string"
+    },
+    "branch": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,159}$",
+      "title": "Branch",
+      "type": "string"
+    },
+    "source_dirty": {
+      "title": "Source Dirty",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "challenge": {
+      "anyOf": [
+        {
+          "pattern": "^[ -~]{1,128}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Challenge"
+    },
+    "provider": {
+      "enum": [
+        "openai",
+        "gemini",
+        "huggingface",
+        "ollama",
+        "anthropic"
+      ],
+      "title": "Provider",
+      "type": "string"
+    },
+    "api_source": {
+      "enum": [
+        "first-party",
+        "local-first-party"
+      ],
+      "title": "Api Source",
+      "type": "string"
+    },
+    "adapter_path": {
+      "title": "Adapter Path",
+      "type": "string"
+    },
+    "utc_timestamp": {
+      "format": "date-time",
+      "title": "Utc Timestamp",
+      "type": "string"
+    },
+    "python_version": {
+      "title": "Python Version",
+      "type": "string"
+    },
+    "platform": {
+      "title": "Platform",
+      "type": "string"
+    },
+    "model": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$",
+      "title": "Model",
+      "type": "string"
+    },
+    "embedding_model": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$",
+      "title": "Embedding Model",
+      "type": "string"
+    },
+    "embedding_dimensions": {
+      "maximum": 16000,
+      "minimum": 1,
+      "title": "Embedding Dimensions",
+      "type": "integer"
+    },
+    "embedding_source": {
+      "enum": [
+        "first-party",
+        "deterministic-local"
+      ],
+      "title": "Embedding Source",
+      "type": "string"
+    },
+    "model_overridden": {
+      "title": "Model Overridden",
+      "type": "boolean"
+    },
+    "embedding_overridden": {
+      "title": "Embedding Overridden",
+      "type": "boolean"
+    },
+    "max_http_attempts": {
+      "maximum": 3,
+      "minimum": 1,
+      "title": "Max Http Attempts",
+      "type": "integer"
+    },
+    "total_timeout_seconds": {
+      "maximum": 120,
+      "minimum": 10,
+      "title": "Total Timeout Seconds",
+      "type": "number"
+    },
+    "request_timeout_seconds": {
+      "exclusiveMinimum": 0,
+      "maximum": 15,
+      "title": "Request Timeout Seconds",
+      "type": "number"
+    },
+    "http_attempts": {
+      "minimum": 0,
+      "title": "Http Attempts",
+      "type": "integer"
+    },
+    "http_status_category": {
+      "enum": [
+        "not_attempted",
+        "success",
+        "redirect",
+        "client_error",
+        "server_error",
+        "transport_error",
+        "timeout",
+        "attempt_limit",
+        "endpoint_rejected"
+      ],
+      "title": "Http Status Category",
+      "type": "string"
+    },
+    "embedding_calls": {
+      "minimum": 0,
+      "title": "Embedding Calls",
+      "type": "integer"
+    },
+    "generation_calls": {
+      "minimum": 0,
+      "title": "Generation Calls",
+      "type": "integer"
+    },
+    "cache_writes": {
+      "minimum": 0,
+      "title": "Cache Writes",
+      "type": "integer"
+    },
+    "confirmed_hits": {
+      "minimum": 0,
+      "title": "Confirmed Hits",
+      "type": "integer"
+    },
+    "first_resolve_miss": {
+      "title": "First Resolve Miss",
+      "type": "boolean"
+    },
+    "second_generation_skipped": {
+      "title": "Second Generation Skipped",
+      "type": "boolean"
+    },
+    "response_equal": {
+      "title": "Response Equal",
+      "type": "boolean"
+    },
+    "ownership_verified": {
+      "title": "Ownership Verified",
+      "type": "boolean"
+    },
+    "retry_count": {
+      "const": 0,
+      "title": "Retry Count",
+      "type": "integer"
+    },
+    "cleanup_status": {
+      "enum": [
+        "complete",
+        "failed"
+      ],
+      "title": "Cleanup Status",
+      "type": "string"
+    },
+    "remaining_async_tasks": {
+      "minimum": 0,
+      "title": "Remaining Async Tasks",
+      "type": "integer"
+    },
+    "result": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "UNAVAILABLE"
+      ],
+      "title": "Result",
+      "type": "string"
+    },
+    "failure_category": {
+      "enum": [
+        "none",
+        "provider_error",
+        "semantic_assertion",
+        "deadline",
+        "cleanup",
+        "task_leak"
+      ],
+      "title": "Failure Category",
+      "type": "string"
+    }
+  },
+  "required": [
+    "semantix_commit",
+    "branch",
+    "source_dirty",
+    "challenge",
+    "provider",
+    "api_source",
+    "adapter_path",
+    "utc_timestamp",
+    "python_version",
+    "platform",
+    "model",
+    "embedding_model",
+    "embedding_dimensions",
+    "embedding_source",
+    "model_overridden",
+    "embedding_overridden",
+    "max_http_attempts",
+    "total_timeout_seconds",
+    "request_timeout_seconds",
+    "http_attempts",
+    "http_status_category",
+    "embedding_calls",
+    "generation_calls",
+    "cache_writes",
+    "confirmed_hits",
+    "first_resolve_miss",
+    "second_generation_skipped",
+    "response_equal",
+    "ownership_verified",
+    "retry_count",
+    "cleanup_status",
+    "remaining_async_tasks",
+    "result",
+    "failure_category"
+  ],
+  "title": "Receipt",
+  "type": "object"
+}

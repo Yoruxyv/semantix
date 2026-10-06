@@ -72,6 +72,10 @@ after a defect is reproduced. Never share credentials or commit raw provider
 responses. Provider APIs can evolve independently; custom integrations remain the
 escape hatch for unsupported versions.
 
+Use the [local provider verifier](provider-live-verification.md) to produce a
+fresh sanitized receipt from privately entered credentials. The tool itself does
+not promote or demote the evidence above; live runs remain optional and explicit.
+
 ## Configuration and ownership
 
 Embedding constructors take keyword-only `client`, `model`, `embedding_space`,
