@@ -36,6 +36,15 @@ dev = [
   "twine>=6.2,<7",
 ]
 
+# Opt-in local model tooling; dependency groups are excluded from wheel metadata.
+[dependency-groups]
+reuse-quality = [
+  "sentence-transformers==6.1.0",
+  "torch==2.14.1",
+  "transformers==5.18.0",
+  "huggingface-hub==1.33.0",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

@@ -1,0 +1,483 @@
+{
+  "$defs": {
+    "CategoryResult": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+          "title": "Category",
+          "type": "string"
+        },
+        "default": {
+          "$ref": "#/$defs/Metrics"
+        },
+        "calibrated": {
+          "$ref": "#/$defs/Metrics"
+        }
+      },
+      "required": [
+        "category",
+        "default",
+        "calibrated"
+      ],
+      "title": "CategoryResult",
+      "type": "object"
+    },
+    "CorpusInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "provenance": {
+          "const": "independently-authored-synthetic",
+          "title": "Provenance",
+          "type": "string"
+        },
+        "label_review": {
+          "enum": [
+            "unreviewed",
+            "maintainer-reviewed"
+          ],
+          "title": "Label Review",
+          "type": "string"
+        },
+        "split_policy": {
+          "minLength": 1,
+          "title": "Split Policy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "version",
+        "sha256",
+        "provenance",
+        "label_review",
+        "split_policy"
+      ],
+      "title": "CorpusInfo",
+      "type": "object"
+    },
+    "Embedding": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline": {
+          "enum": [
+            "token-count",
+            "char-trigram",
+            "minilm-l6-v2"
+          ],
+          "title": "Baseline",
+          "type": "string"
+        },
+        "identity": {
+          "minLength": 1,
+          "title": "Identity",
+          "type": "string"
+        },
+        "dimensions": {
+          "enum": [
+            2048,
+            384
+          ],
+          "title": "Dimensions",
+          "type": "integer"
+        },
+        "normalization": {
+          "enum": [
+            "raw",
+            "whitespace",
+            "NFC"
+          ],
+          "title": "Normalization",
+          "type": "string"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "const": 1,
+              "type": "integer"
+            },
+            {
+              "pattern": "^[a-f0-9]{40}$",
+              "type": "string"
+            }
+          ],
+          "title": "Revision"
+        },
+        "kind": {
+          "enum": [
+            "lexical-control",
+            "pretrained-semantic"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "model_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model Id"
+        },
+        "model_preprocessing": {
+          "title": "Model Preprocessing",
+          "type": "string"
+        },
+        "runtime_versions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Runtime Versions",
+          "type": "object"
+        }
+      },
+      "required": [
+        "baseline",
+        "identity",
+        "dimensions",
+        "normalization",
+        "revision",
+        "kind",
+        "model_id",
+        "model_preprocessing",
+        "runtime_versions"
+      ],
+      "title": "Embedding",
+      "type": "object"
+    },
+    "Metrics": {
+      "additionalProperties": false,
+      "properties": {
+        "cases": {
+          "minimum": 0,
+          "title": "Cases",
+          "type": "integer"
+        },
+        "true_positive": {
+          "minimum": 0,
+          "title": "True Positive",
+          "type": "integer"
+        },
+        "false_positive": {
+          "minimum": 0,
+          "title": "False Positive",
+          "type": "integer"
+        },
+        "false_negative": {
+          "minimum": 0,
+          "title": "False Negative",
+          "type": "integer"
+        },
+        "true_negative": {
+          "minimum": 0,
+          "title": "True Negative",
+          "type": "integer"
+        },
+        "reuse_precision": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reuse Precision"
+        },
+        "reuse_recall": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reuse Recall"
+        },
+        "false_accept_rate": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "False Accept Rate"
+        },
+        "wrong_among_accepted": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Wrong Among Accepted"
+        },
+        "false_reject_rate": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "False Reject Rate"
+        },
+        "generation_avoidance": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Generation Avoidance"
+        }
+      },
+      "required": [
+        "cases",
+        "true_positive",
+        "false_positive",
+        "false_negative",
+        "true_negative",
+        "reuse_precision",
+        "reuse_recall",
+        "false_accept_rate",
+        "wrong_among_accepted",
+        "false_reject_rate",
+        "generation_avoidance"
+      ],
+      "title": "Metrics",
+      "type": "object"
+    },
+    "Run": {
+      "additionalProperties": false,
+      "properties": {
+        "embedding": {
+          "$ref": "#/$defs/Embedding"
+        },
+        "calibrated_threshold": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Calibrated Threshold",
+          "type": "number"
+        },
+        "sweep": {
+          "items": {
+            "$ref": "#/$defs/SweepPoint"
+          },
+          "minItems": 2,
+          "title": "Sweep",
+          "type": "array"
+        },
+        "held_out_categories": {
+          "items": {
+            "$ref": "#/$defs/CategoryResult"
+          },
+          "minItems": 1,
+          "title": "Held Out Categories",
+          "type": "array"
+        },
+        "preprocessing_ns_per_prompt": {
+          "minimum": 0,
+          "title": "Preprocessing Ns Per Prompt",
+          "type": "number"
+        }
+      },
+      "required": [
+        "embedding",
+        "calibrated_threshold",
+        "sweep",
+        "held_out_categories",
+        "preprocessing_ns_per_prompt"
+      ],
+      "title": "Run",
+      "type": "object"
+    },
+    "SweepPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "threshold": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Threshold",
+          "type": "number"
+        },
+        "calibration": {
+          "$ref": "#/$defs/Metrics"
+        },
+        "held_out": {
+          "$ref": "#/$defs/Metrics"
+        }
+      },
+      "required": [
+        "threshold",
+        "calibration",
+        "held_out"
+      ],
+      "title": "SweepPoint",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "benchmark": {
+      "const": "semantix-reuse-quality",
+      "title": "Benchmark",
+      "type": "string"
+    },
+    "evidence_kind": {
+      "enum": [
+        "development-benchmark",
+        "certified-static-benchmark"
+      ],
+      "title": "Evidence Kind",
+      "type": "string"
+    },
+    "certification": {
+      "enum": [
+        "unreviewed",
+        "reviewed"
+      ],
+      "title": "Certification",
+      "type": "string"
+    },
+    "source_sha": {
+      "pattern": "^[a-f0-9]{40}$",
+      "title": "Source Sha",
+      "type": "string"
+    },
+    "source_dirty": {
+      "title": "Source Dirty",
+      "type": "boolean"
+    },
+    "source_files_sha256": {
+      "additionalProperties": {
+        "pattern": "^[a-f0-9]{64}$",
+        "type": "string"
+      },
+      "title": "Source Files Sha256",
+      "type": "object"
+    },
+    "generated_at_utc": {
+      "title": "Generated At Utc",
+      "type": "string"
+    },
+    "corpus": {
+      "$ref": "#/$defs/CorpusInfo"
+    },
+    "calibration_cases": {
+      "minimum": 0,
+      "title": "Calibration Cases",
+      "type": "integer"
+    },
+    "held_out_cases": {
+      "minimum": 0,
+      "title": "Held Out Cases",
+      "type": "integer"
+    },
+    "default_threshold": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Default Threshold",
+      "type": "number"
+    },
+    "threshold_grid": {
+      "items": {
+        "maximum": 1,
+        "minimum": 0,
+        "type": "number"
+      },
+      "title": "Threshold Grid",
+      "type": "array"
+    },
+    "selection_rule": {
+      "const": "calibration only: minimize FP, then maximize TP, then highest threshold",
+      "title": "Selection Rule",
+      "type": "string"
+    },
+    "similarity_semantics": {
+      "const": "MemoryStore float64 cosine; inclusive >=; one seeded candidate per isolated case",
+      "title": "Similarity Semantics",
+      "type": "string"
+    },
+    "runs": {
+      "items": {
+        "$ref": "#/$defs/Run"
+      },
+      "minItems": 1,
+      "title": "Runs",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Limitations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "benchmark",
+    "evidence_kind",
+    "certification",
+    "source_sha",
+    "source_dirty",
+    "source_files_sha256",
+    "generated_at_utc",
+    "corpus",
+    "calibration_cases",
+    "held_out_cases",
+    "default_threshold",
+    "threshold_grid",
+    "selection_rule",
+    "similarity_semantics",
+    "runs",
+    "limitations"
+  ],
+  "title": "Summary",
+  "type": "object"
+}

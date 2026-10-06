@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: reuse-quality-validate
+        name: Validate reuse-quality corpus and reviewed evidence
+        entry: python -B ops/ci/validate_reuse_quality.py
+        language: system
+        pass_filenames: false
+        files: '^(packages/cache/benchmarks/reuse_quality/|apps/web/public/benchmarks/reuse-quality-summary\.json$|packages/cache/src/semantix_cache/[^/]+\.py$|packages/cache/benchmarks/(common|__init__)\.py$|packages/cache/(pyproject\.toml|uv\.lock)$)'

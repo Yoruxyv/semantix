@@ -12,10 +12,11 @@ import { BenchmarkRunWarning } from './run/BenchmarkRunWarning';
 import { BenchmarkSummary } from './results/BenchmarkSummary';
 import { EvaluationDatasetCatalog } from './datasets/EvaluationDatasetCatalog';
 import { EvaluationRunHistory } from './history/EvaluationRunHistory';
+import { ReuseQuality } from '../quality/ReuseQuality';
 
 export function BenchmarkDashboard(): JSX.Element {
   const controller = useBenchmark();
-  const [view, setView] = useState<'runs' | 'datasets' | 'history'>('runs');
+  const [view, setView] = useState<'runs' | 'datasets' | 'history' | 'quality'>('runs');
   const {
     datasetsLoading,
     datasetsRefreshing,
@@ -28,7 +29,9 @@ export function BenchmarkDashboard(): JSX.Element {
 
   let viewContent: JSX.Element;
 
-  if (view === 'datasets') {
+  if (view === 'quality') {
+    viewContent = <ReuseQuality />;
+  } else if (view === 'datasets') {
     viewContent = (
       <EvaluationDatasetCatalog
         controller={controller}
@@ -148,6 +151,14 @@ export function BenchmarkDashboard(): JSX.Element {
           onClick={() => setView('history')}
         >
           History
+        </Button>
+        <Button
+          aria-pressed={view === 'quality'}
+          size="compact"
+          variant={view === 'quality' ? 'primary' : 'secondary'}
+          onClick={() => setView('quality')}
+        >
+          Reuse quality
         </Button>
       </nav>
 

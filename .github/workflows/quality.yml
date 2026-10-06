@@ -57,12 +57,14 @@ jobs:
           version: "0.11.32"
       - name: Sync locked embedded dependencies
         run: uv sync --locked --extra dev --python "${{ matrix.python-version }}"
+      - name: Validate reuse-quality corpus and reviewed evidence
+        run: uv run --no-sync --offline python -B -m benchmarks.reuse_quality.benchmark validate
       - name: Lint and check formatting
         run: |
           uv run --no-sync ruff check --config ../../ruff.toml --output-format=github .
           uv run --no-sync ruff format --config ../../ruff.toml --check .
       - name: Check typing
-        run: uv run --no-sync mypy src tests examples
+        run: uv run --no-sync mypy src tests examples benchmarks/reuse_quality
       - name: Set up Node for Pyright
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
