@@ -61,10 +61,10 @@ jobs:
         run: uv run --no-sync --offline python -B -m benchmarks.reuse_quality.benchmark validate
       - name: Lint and check formatting
         run: |
-          uv run --no-sync ruff check --config ../../ruff.toml --output-format=github .
-          uv run --no-sync ruff format --config ../../ruff.toml --check .
+          uv run --no-sync ruff check --config ../../ruff.toml --output-format=github . ../../scripts/provider_live_verify.py ../../scripts/provider_live_verification
+          uv run --no-sync ruff format --config ../../ruff.toml --check . ../../scripts/provider_live_verify.py ../../scripts/provider_live_verification
       - name: Check typing
-        run: uv run --no-sync mypy src tests examples benchmarks/reuse_quality
+        run: uv run --no-sync mypy src tests examples benchmarks/reuse_quality ../../scripts/provider_live_verify.py ../../scripts/provider_live_verification
       - name: Set up Node for Pyright
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -72,7 +72,7 @@ jobs:
       - name: Run Pyright
         run: >-
           npx --yes pyright@1.1.414 --project ../../pyrightconfig.json
-          --pythonpath .venv/bin/python src examples
+          --pythonpath .venv/bin/python src examples ../../scripts/provider_live_verify.py ../../scripts/provider_live_verification
       - name: Test embedded behavior and coverage
         run: uv run --no-sync pytest --cov=semantix_cache
       - name: Execute custom integration examples
