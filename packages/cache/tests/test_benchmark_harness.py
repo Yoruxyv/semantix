@@ -9,6 +9,7 @@ import pytest
 
 from benchmarks.analyze import aggregate
 from benchmarks.common import Case, Dataset, summary, write_result
+from benchmarks.observability import experiment as observability_experiment
 from benchmarks.run_matrix import expand
 from benchmarks.runtime import trial
 
@@ -143,3 +144,39 @@ def test_analysis_preserves_iterations_and_measurement_provenance(
     paths[1].write_text(json.dumps(second), encoding="utf-8")
     with pytest.raises(ValueError, match="Measurement environment changed"):
         aggregate(paths)
+
+
+@pytest.mark.parametrize("collection", ["baseline", "disabled", "enabled"])
+@pytest.mark.parametrize("snapshots", [False, True])
+async def test_observability_driver(
+    collection: str, snapshots: bool, tmp_path: Path
+) -> None:
+    case = Case(
+        workload="burst",
+        dimensions=16,
+        cache_size=0,
+        capacity=32,
+        requests=16,
+        concurrency=8,
+        generation_delay=0.005,
+    )
+    result = await observability_experiment(
+        case,
+        tmp_path / "unused.json",
+        collection=collection,
+        key=True,
+        snapshots=snapshots,
+    )
+    assert result["correctness_passed"]
+    assert not result["errors"]
+    evidence = result["observability_experiment"]
+    assert evidence["flight_counts"] == (0, 0, 0, 0)
+    assert evidence["concurrent_snapshots"] is snapshots
+    if snapshots:
+        assert evidence["snapshot_reads"] > 0
+    if collection == "enabled":
+        value = evidence["snapshot"]
+        assert value["followers_joined"] == value["follower_hits"] == 14
+        assert value["leaders_admitted"] == result["generation_calls"] == 2
+    elif collection == "disabled":
+        assert evidence["snapshot"] is None

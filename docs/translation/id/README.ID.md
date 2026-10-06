@@ -197,6 +197,9 @@ menyimpulkan kesetaraan ContextVars/closure atau berkoordinasi antarproses. Foll
 mengonfirmasi hit masing-masing. Mengubah key itu saja tidak membatalkan jawaban
 tersimpan. Baca [aturan keamanan coalescing](../../../packages/cache/README.md#optional-cold-miss-coalescing).
 
+[Bukti numerik coalescing](../../embedded-observability.md) bersifat opsional melalui
+`collect_coalescing_metrics=True`. Instrumentasi umum tetap dimiliki aplikasi.
+
 Penggunaan `AsyncSemanticCache` yang terdokumentasi dicakup oleh
 [kebijakan kompatibilitas 0.1.x paket](../../../packages/cache/README.md#01x-compatibility).
 

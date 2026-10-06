@@ -15,6 +15,9 @@ application; no Semantix FastAPI server is required. The separate
 | [`memory.py`](semantix_cache/memory.py) | Bounded, process-local, non-durable `MemoryStore` |
 | [`_semantics.py`](semantix_cache/_semantics.py) | Pure canonicalization, keys, namespaces, vectors, TTL and decision rules shared with the server |
 | [`_lifecycle.py`](semantix_cache/_lifecycle.py) | Synchronous operation admission, busy-close and closed-state checks |
+| [`observability.py`](semantix_cache/observability.py) | Immutable numeric coalescing snapshot |
+| [`_coalescing.py`](semantix_cache/_coalescing.py) | Bounded completion gates, synchronization and isolated collection |
+| [`_coalescing_metrics.py`](semantix_cache/_coalescing_metrics.py) | Fixed numeric lifetime ledger; no payloads |
 | [`adapters/`](semantix_cache/adapters/__init__.py) | Maintained provider adapters, imported explicitly with optional HTTP dependencies |
 | [`stores/pgvector.py`](semantix_cache/stores/pgvector.py) | Optional application-database PostgreSQL/pgvector persistence |
 | [`stores/migrations/`](semantix_cache/stores/migrations/0001_cache.sql) | Packaged, checksum-tracked SQL template applied only by explicit initialization |

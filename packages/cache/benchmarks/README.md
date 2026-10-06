@@ -152,3 +152,41 @@ runtime performance answer different questions; their scores are not combined.
 
 The top-level workloads.json remains a runtime/performance input; it is unrelated
 to the maintained reuse-quality corpus under reuse_quality/data.
+
+## Coalescing collection overhead
+
+[`observability.py`](observability.py) runs one trial through the same runtime
+fixtures, request timing, warmup and cleanup checks. `--collection baseline` omits
+the new constructor argument; disabled/enabled pass False/True explicitly. Use a
+complete archived semantix_cache package on PYTHONPATH for baseline processes,
+not only an old engine imported with modified internal dependencies. The evidence
+records the actually loaded runtime file hashes and source path.
+
+From packages/cache (PowerShell example, accepted revision selected explicitly):
+
+```powershell
+$baseRevision = "<accepted-source-SHA>"
+New-Item -ItemType Directory -Force .cache/observability | Out-Null
+$archivePath = Join-Path (Get-Location) ".cache/observability/base.zip"
+git -C ../.. archive --format=zip --output=$archivePath $baseRevision packages/cache/src
+Expand-Archive -LiteralPath .cache/observability/base.zip -DestinationPath .cache/observability/base
+$caseJson = '{"store":"fixture","workload":"hits","dimensions":384,"cache_size":1,"requests":10000,"concurrency":1}'
+$env:PYTHONPATH = (Resolve-Path .cache/observability/base/packages/cache/src).Path
+uv run --no-sync --offline python -B -m benchmarks.observability --case-json $caseJson --collection baseline --output .cache/observability/control.json
+Remove-Item Env:PYTHONPATH
+uv run --no-sync --offline python -B -m benchmarks.observability --case-json $caseJson --collection enabled --output .cache/observability/treatment.json
+```
+
+Run at least three pairs in alternating order with unique output names. Repeat with
+collection disabled, with/without `--key`, and with MemoryStore (500 seeded entries).
+Use memory/burst, an empty initial store, concurrency 32 and a fixed synthetic
+provider delay for cold followers. `--snapshots` adds one application reader thread
+at a 1 ms wait interval only during measurement; it is joined before resource checks.
+Baseline readers perform the same scheduling without an observation API; disabled
+readers receive None; enabled readers copy full snapshots. This optional reader is
+benchmark tooling, not a runtime telemetry worker. It records read counts; no
+individual snapshot samples are retained. Output is restricted to ignored paths;
+failed runs are retained and exit nonzero. Keep controls/treatments' configurations,
+dataset hashes, source hashes, raw latencies and failures together. Apply the review
+gates in the [coalescing evidence guide](../../../docs/embedded-observability.md#performance-and-verification)
+without discarding noisy or failing runs.

@@ -67,6 +67,7 @@ def test_public_exports_and_signatures() -> None:
         "similarity_threshold",
         "prompt_normalizer",
         "operation_timeout_seconds",
+        "collect_coalescing_metrics",
     ]
     assert all(
         parameter.kind is inspect.Parameter.KEYWORD_ONLY
@@ -76,6 +77,10 @@ def test_public_exports_and_signatures() -> None:
     assert constructor.parameters["operation_timeout_seconds"].default == pytest.approx(
         30.0
     )
+    assert constructor.parameters["collect_coalescing_metrics"].default is False
+    snapshot = AsyncSemanticCache.coalescing_snapshot
+    assert not inspect.iscoroutinefunction(snapshot)
+    assert list(inspect.signature(snapshot).parameters) == ["self"]
     methods = {
         "get": ["self", "prompt", "namespace"],
         "set": ["self", "prompt", "response", "namespace", "cache_ttl_seconds"],
