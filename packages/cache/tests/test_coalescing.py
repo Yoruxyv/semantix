@@ -61,6 +61,30 @@ async def until(predicate: Callable[[], bool]) -> None:
 def drained(cache: AsyncSemanticCache) -> None:
     assert cache._flights.counts() == (0, 0, 0, 0)
     assert cache._state.active == 0
+    snapshot = cache.coalescing_snapshot()
+    if snapshot is not None:
+        assert snapshot.followers_pending == 0
+        assert snapshot.followers_joined == (
+            snapshot.follower_hits
+            + snapshot.follower_generated
+            + snapshot.follower_errors
+            + snapshot.follower_cancelled
+            + snapshot.follower_timeouts
+        )
+        assert (
+            snapshot.active_flights,
+            snapshot.retained_flights,
+            snapshot.participants,
+        ) == (0, 0, 0)
+
+
+@pytest.fixture(name="cache", params=[False, True], ids=["metrics-off", "metrics-on"])
+def collected_cache(
+    request: pytest.FixtureRequest, adapter: Adapter, store: SpyStore
+) -> AsyncSemanticCache:
+    return AsyncSemanticCache(
+        embedder=adapter, store=store, collect_coalescing_metrics=request.param
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -219,7 +243,9 @@ async def test_invalid_key_before_callbacks(
 async def test_non_equivalent_identities_never_join(change: str) -> None:
     adapter = Adapter()
     store = MemoryStore(embedding_space=adapter.embedding_space, default_ttl_seconds=1)
-    cache = AsyncSemanticCache(embedder=adapter, store=store)
+    cache = AsyncSemanticCache(
+        collect_coalescing_metrics=True, embedder=adapter, store=store
+    )
     generation = Generation()
     callable_first = generation.__call__ if change == "bound-method" else generation
     leader = asyncio.create_task(
@@ -262,11 +288,15 @@ async def test_non_equivalent_identities_never_join(change: str) -> None:
         second_callable = other_generate
     second_store = store
     if change == "instance":
-        other_cache = AsyncSemanticCache(embedder=adapter, store=store)
+        other_cache = AsyncSemanticCache(
+            collect_coalescing_metrics=True, embedder=adapter, store=store
+        )
     if change == "space":
         second_adapter = Adapter(identity="other-space")
         second_store = MemoryStore(embedding_space=second_adapter.embedding_space)
-        other_cache = AsyncSemanticCache(embedder=second_adapter, store=second_store)
+        other_cache = AsyncSemanticCache(
+            collect_coalescing_metrics=True, embedder=second_adapter, store=second_store
+        )
     follower = asyncio.create_task(
         other_cache.resolve(
             prompt,
@@ -408,7 +438,10 @@ async def test_leader_deadline_is_translated_before_followers_notified(
     adapter: Adapter, store: SpyStore
 ) -> None:
     cache = AsyncSemanticCache(
-        embedder=adapter, store=store, operation_timeout_seconds=0.1
+        collect_coalescing_metrics=True,
+        embedder=adapter,
+        store=store,
+        operation_timeout_seconds=0.1,
     )
     generation = Generation()
     leader, follower = await pair(cache, generation)
@@ -434,7 +467,10 @@ async def test_follower_original_deadline_never_resets(store: SpyStore) -> None:
 
     adapter = SlowFirstAdapter()
     cache = AsyncSemanticCache(
-        embedder=adapter, store=store, operation_timeout_seconds=0.2
+        collect_coalescing_metrics=True,
+        embedder=adapter,
+        store=store,
+        operation_timeout_seconds=0.2,
     )
     generation = Generation()
     delayed = asyncio.create_task(
@@ -454,6 +490,10 @@ async def test_follower_original_deadline_never_resets(store: SpyStore) -> None:
     generation.finish.set()
     assert (await leader).provider_called
     assert generation.calls == 1
+    snapshot = cache.coalescing_snapshot()
+    if snapshot is not None:
+        assert snapshot.follower_timeouts == snapshot.wait_count == 1
+        assert snapshot.follower_generations_started == 0
     drained(cache)
     await store.aclose()
 
@@ -471,7 +511,9 @@ async def test_persistence_failure_is_failed_flight(phase: str) -> None:
             raise CacheStoreError("persistence failed")
 
     store = FailingStore(adapter.embedding_space)
-    cache = AsyncSemanticCache(embedder=adapter, store=store)
+    cache = AsyncSemanticCache(
+        collect_coalescing_metrics=True, embedder=adapter, store=store
+    )
     generation = Generation()
     leader, follower = await pair(cache, generation)
     generation.finish.set()
@@ -480,6 +522,10 @@ async def test_persistence_failure_is_failed_flight(phase: str) -> None:
         for e in await asyncio.gather(leader, follower, return_exceptions=True)
     )
     assert generation.calls == 1
+    snapshot = cache.coalescing_snapshot()
+    if snapshot is not None:
+        assert snapshot.follower_errors == snapshot.wait_count == 1
+        assert snapshot.follower_generations_started == 0
     drained(cache)
     await store.aclose()
 
@@ -500,7 +546,9 @@ async def test_leader_cancel_during_persistence(phase: str) -> None:
             await block.wait()
 
     store = BlockingStore(adapter.embedding_space)
-    cache = AsyncSemanticCache(embedder=adapter, store=store)
+    cache = AsyncSemanticCache(
+        collect_coalescing_metrics=True, embedder=adapter, store=store
+    )
     generation = Generation()
     leader, follower = await pair(cache, generation)
     generation.finish.set()
@@ -569,7 +617,9 @@ async def test_follower_requires_own_authoritative_confirmation(churn: str) -> N
             )
 
     store = ChurningStore(adapter.embedding_space)
-    cache = AsyncSemanticCache(embedder=adapter, store=store)
+    cache = AsyncSemanticCache(
+        collect_coalescing_metrics=True, embedder=adapter, store=store
+    )
     generation = Generation()
     leader_task, follower = await pair(
         cache, generation, cache_ttl_seconds=0.02 if churn == "expired" else None
@@ -593,6 +643,13 @@ async def test_follower_requires_own_authoritative_confirmation(churn: str) -> N
             assert result.cache_written
             assert generation.calls == 2
     assert len(adapter.calls) == 2
+    snapshot = cache.coalescing_snapshot()
+    assert snapshot is not None
+    assert snapshot.followers_joined == snapshot.wait_count == 1
+    assert snapshot.follower_hits == (churn == "replacement")
+    assert snapshot.follower_generated == (churn not in {"replacement", "lookup-error"})
+    assert snapshot.follower_errors == (churn == "lookup-error")
+    assert snapshot.follower_generations_started == snapshot.follower_generated
     drained(cache)
     await store.aclose()
 
@@ -703,6 +760,10 @@ async def test_leader_recheck_closes_miss_to_admission_race(
     assert not result.provider_called
     assert generation.calls == 0
     assert reads == 2
+    snapshot = cache.coalescing_snapshot()
+    if snapshot is not None:
+        assert snapshot.leaders_admitted == 1
+        assert snapshot.followers_joined == snapshot.wait_count == 0
     drained(cache)
     await store.aclose()
 
@@ -754,7 +815,9 @@ async def test_postgresql_confirmation_ownership_and_pool_drain(
         pool=pg_pool, embedding_space=adapter.embedding_space, schema=schema
     )
     await store.initialize_schema(migration_pool=pg_pool)
-    cache = AsyncSemanticCache(embedder=adapter, store=store)
+    cache = AsyncSemanticCache(
+        collect_coalescing_metrics=True, embedder=adapter, store=store
+    )
     generation = Generation()
     try:
         leader, follower = await pair(cache, generation)
@@ -876,7 +939,9 @@ async def test_guard_never_spans_dependencies_or_user_code() -> None:
             await super().put(entry, ttl_seconds=ttl_seconds)
 
     store = GuardStore(adapter.embedding_space)
-    cache = AsyncSemanticCache(embedder=adapter, store=store)
+    cache = AsyncSemanticCache(
+        collect_coalescing_metrics=True, embedder=adapter, store=store
+    )
     holder.append(cache)
     generation = Generation()
 
@@ -1105,7 +1170,9 @@ async def test_postgresql_follower_churn_and_live_schema_checks(
         pool=pg_pool, embedding_space=adapter.embedding_space, schema=schema
     )
     await store.initialize_schema(migration_pool=pg_pool)
-    cache = AsyncSemanticCache(embedder=adapter, store=store)
+    cache = AsyncSemanticCache(
+        collect_coalescing_metrics=True, embedder=adapter, store=store
+    )
     generation = Generation()
     try:
         leader_task, follower = await pair(cache, generation)

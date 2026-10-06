@@ -15,6 +15,7 @@ reference HTTP client for that server, not the first public PyPI target.
 | [Embedded providers](embedded-providers.md) | Maintained adapters, optional extras and custom embedding/generation |
 | [Context identity and migration](context-identity-and-migration.md) | Explicit scopes, embedding revisions, offline recipes and safe migration |
 | [Embedded storage](embedded-storage.md) | Memory, PostgreSQL/pgvector and application-owned databases |
+| [Embedded coalescing evidence](embedded-observability.md) | Opt-in numeric snapshots, privacy and application-owned instrumentation |
 | [Custom integration](../packages/cache/examples/custom_integration.py) | Existing async embedding and generation flow |
 | [Custom store](../packages/cache/examples/custom_store.py) | Structural CacheStore example |
 | [CacheStore conformance](cache-store-conformance.md) | Reusable developer tests, fixtures and backend evidence boundaries |

@@ -17,6 +17,7 @@ Panduan embedded berikut tersedia dalam bahasa Inggris.
 | [Provider embedded](../../embedded-providers.md) | Adapter yang dipelihara, extra opsional, dan embedding/generation kustom |
 | [Identitas konteks dan migrasi](../../context-identity-and-migration.md) | Scope eksplisit, revisi embedding, contoh offline, dan migrasi aman |
 | [Storage embedded](../../embedded-storage.md) | Memory, PostgreSQL/pgvector, dan database milik aplikasi |
+| [Bukti coalescing embedded](../../embedded-observability.md) | Snapshot numerik opt-in, privasi, dan instrumentasi milik aplikasi |
 | [Integrasi kustom](../../../packages/cache/examples/custom_integration.py) | Alur embedding dan generation asinkron yang sudah ada |
 | [Store kustom](../../../packages/cache/examples/custom_store.py) | Contoh CacheStore struktural |
 | [Conformance CacheStore](../../cache-store-conformance.md) | Pengujian pengembang yang dapat digunakan ulang, fixture, dan batas bukti backend |

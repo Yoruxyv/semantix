@@ -20,6 +20,8 @@ def main(artifact_dir: Path = Path("dist")) -> None:
         )
         assert all(".." not in Path(name).parts for name in names)
         assert "semantix_cache/py.typed" in names
+        for module in ("observability", "_coalescing_metrics"):
+            assert f"semantix_cache/{module}.py" in names
         licenses = [
             name for name in names if name.endswith(".dist-info/licenses/LICENSE")
         ]
@@ -110,6 +112,8 @@ def main(artifact_dir: Path = Path("dist")) -> None:
                 )
             ), relative
         assert f"{root}/src/semantix_cache/py.typed" in archive.getnames()
+        for module in ("observability", "_coalescing_metrics"):
+            assert f"{root}/src/semantix_cache/{module}.py" in archive.getnames()
         assert f"{root}/examples/custom_integration.py" in archive.getnames()
         assert f"{root}/examples/custom_store.py" in archive.getnames()
         assert f"{root}/examples/test_custom_store_conformance.py" in archive.getnames()

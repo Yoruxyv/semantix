@@ -10,6 +10,7 @@ from types import TracebackType
 from typing import Self, cast
 
 from ._coalescing import Flights, Identity, Participation, validate_key
+from ._coalescing_metrics import Terminal
 from ._lifecycle import Lifecycle
 from ._semantics import (
     cache_key_value,
@@ -35,6 +36,7 @@ from .errors import (
     GenerationError,
 )
 from .models import CacheEntry, CacheHit, CacheMatch, CacheResult, EmbeddingSpace
+from .observability import CoalescingSnapshot
 from .policies import CachePolicy
 from .protocols import CacheStore, EmbeddingAdapter, GenerationCallable
 
@@ -46,6 +48,14 @@ class _Lookup:
     hit: CacheHit | None
 
 
+def _follower_error(error: BaseException) -> Terminal:
+    if isinstance(error, asyncio.CancelledError):
+        return "follower_cancelled"
+    if isinstance(error, CacheTimeoutError):
+        return "follower_timeouts"
+    return "follower_errors"
+
+
 class AsyncSemanticCache:
     def __init__(
         self,
@@ -55,8 +65,11 @@ class AsyncSemanticCache:
         similarity_threshold: float = 0.92,
         prompt_normalizer: Callable[[str], str] | None = None,
         operation_timeout_seconds: float = 30.0,
+        collect_coalescing_metrics: bool = False,
     ) -> None:
         try:
+            if type(cast(object, collect_coalescing_metrics)) is not bool:
+                raise ValueError("Coalescing collection must be a bool")
             self._threshold = finite_number(
                 similarity_threshold, minimum=0.0, maximum=1.0
             )
@@ -77,11 +90,15 @@ class AsyncSemanticCache:
         self._normalizer = prompt_normalizer
         self._space = self._checked_space()
         self._state = Lifecycle()
-        self._flights = Flights()
+        self._flights = Flights(collect_metrics=collect_coalescing_metrics)
 
     @property
     def similarity_threshold(self) -> float:
         return self._threshold
+
+    def coalescing_snapshot(self) -> CoalescingSnapshot | None:
+        """Copy numeric lifetime evidence, or None when collection is unavailable."""
+        return self._flights.snapshot()
 
     def _checked_space(self) -> EmbeddingSpace:
         embed_space, store_space = (
@@ -253,7 +270,11 @@ class AsyncSemanticCache:
         embedding: tuple[float, ...],
     ) -> _Lookup:
         if not participation.leader:
-            await asyncio.shield(participation.flight.gate)
+            started = self._flights.wait_started()
+            try:
+                await asyncio.shield(participation.flight.gate)
+            finally:
+                self._flights.wait_finished(started)
             if participation.flight.error is not None:
                 raise participation.flight.error
         return await self._lookup(prompt, namespace, embedding)
@@ -303,6 +324,7 @@ class AsyncSemanticCache:
         """
         started = perf_counter()
         participation: Participation | None = None
+        outcome: Terminal = "follower_errors"
         try:
             async with self._operation():
                 prompt, namespace = self._inputs(prompt, namespace)
@@ -372,6 +394,7 @@ class AsyncSemanticCache:
                     )
 
                 async def generation() -> str:
+                    self._flights.generation_started(participation)
                     return await self._generate(generate, prompt)
 
                 async def write(response: str, found: _Lookup | None) -> None:
@@ -413,8 +436,10 @@ class AsyncSemanticCache:
             if participation is not None and participation.leader:
                 # lookup() updates this nonlocal during resolve_flow.
                 self._flights.settle(participation.flight)  # pyright: ignore[reportUnreachable]
+            outcome = "follower_hits" if result.cache_hit else "follower_generated"
             return result
         except BaseException as error:
+            outcome = _follower_error(error)
             # Publish only after _operation translates an expired deadline. Explicit
             # leader cancellation remains CancelledError, with no hidden retry.
             if participation is not None and participation.leader:
@@ -424,7 +449,10 @@ class AsyncSemanticCache:
         finally:
             if participation is not None:
                 # lookup() updates this nonlocal during resolve_flow.
-                self._flights.release(participation.flight)  # pyright: ignore[reportUnreachable]
+                self._flights.release(  # pyright: ignore[reportUnreachable]
+                    participation.flight,
+                    outcome=None if participation.leader else outcome,
+                )
 
     async def delete(self, cache_key: str, *, namespace: str = "default") -> bool:
         async with self._operation():

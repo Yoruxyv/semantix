@@ -169,6 +169,10 @@ confirmation; it is not guaranteed for every application. Provider pricing, toke
 counts and application behavior determine actual dollar savings, which this
 deterministic experiment did not measure.
 
+Optional [numeric coalescing evidence](../../docs/embedded-observability.md) uses
+`collect_coalescing_metrics=True` and `coalescing_snapshot()`; collection defaults to
+False. General logging, metrics and tracing remain application-owned.
+
 ## 0.1.x compatibility
 
 Throughout the 0.1.x release line, supported public import paths, classes and

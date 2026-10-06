@@ -196,6 +196,9 @@ ContextVars/closures or coordinate across processes. Followers confirm their own
 hits. Changing that key alone does not invalidate stored answers. Read the
 [coalescing safety rules](packages/cache/README.md#optional-cold-miss-coalescing).
 
+Optional [numeric coalescing evidence](docs/embedded-observability.md) is collected
+only with `collect_coalescing_metrics=True`. General instrumentation remains application-owned.
+
 Documented `AsyncSemanticCache` usage is covered by the package's
 [0.1.x compatibility policy](packages/cache/README.md#01x-compatibility).
 
