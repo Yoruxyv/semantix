@@ -1,14 +1,14 @@
 # Documentation agent instructions
 
 Read [root instructions](../AGENTS.md), [current architecture](../ARCHITECTURE.md), and
-[product principles](../DESIGN.md). These rules cover docs, translated guides, and
+[product principles](../PRODUCT_PRINCIPLES.md). These rules cover docs, translated guides, and
 public repository prose.
 
 ## Documentation rules
 
 - Verify factual statements against current implementation, tests, API schemas,
   configuration, and CI. A plan or Graphify node is not proof that a feature exists.
-- Keep architecture wiring in ARCHITECTURE.md, durable product principles in DESIGN.md,
+- Keep architecture wiring in ARCHITECTURE.md, durable product principles in PRODUCT_PRINCIPLES.md,
   and procedural details in the appropriate guide or runbook. Do not silently document
   planned behavior as implemented.
 - Keep capacity and production claims tied to exact workload, hardware, provider,

@@ -11,7 +11,7 @@ billing system, or tenant administration platform.
 ## Instruction order
 
 Read this file first. Then read [ARCHITECTURE.md](ARCHITECTURE.md) when runtime
-structure or ownership matters, [DESIGN.md](DESIGN.md) when product decisions matter,
+structure or ownership matters, [PRODUCT_PRINCIPLES.md](PRODUCT_PRINCIPLES.md) when product decisions matter,
 and the nearest applicable subtree instructions:
 
 - [apps/server/AGENTS.md](apps/server/AGENTS.md) for the FastAPI service and tests.

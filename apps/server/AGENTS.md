@@ -1,7 +1,7 @@
 # Backend agent instructions
 
 Read [root instructions](../../AGENTS.md), [current architecture](../../ARCHITECTURE.md), and
-[product principles](../../DESIGN.md) first. These rules cover apps/server/app, apps/server/tests,
+[product principles](../../PRODUCT_PRINCIPLES.md) first. These rules cover apps/server/app, apps/server/tests,
 and backend scripts.
 
 ## Ownership and contracts

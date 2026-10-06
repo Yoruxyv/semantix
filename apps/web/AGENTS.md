@@ -1,7 +1,7 @@
 # Frontend agent instructions
 
 Read [root instructions](../../AGENTS.md), [current architecture](../../ARCHITECTURE.md), and
-[product principles](../../DESIGN.md) first. These rules cover apps/web/src, tests, and
+[product principles](../../PRODUCT_PRINCIPLES.md) first. These rules cover apps/web/src, tests, and
 frontend build configuration.
 
 ## Feature ownership
