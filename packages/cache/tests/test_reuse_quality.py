@@ -257,8 +257,12 @@ def test_schema_accounting_privacy_and_source_hashes(
         Summary.model_validate(wrong)
 
 
+@pytest.mark.parametrize(
+    "receipt_host", [None, {"python": "3.11.0", "platform": "Linux-test-host"}]
+)
 def test_metrics_reproduce_from_fixed_offline_scores(
     development_result: tuple[Summary, list[dict[str, object]]],
+    receipt_host: dict[str, str] | None,
 ) -> None:
     actual, raw = development_result
     _, cases = load_corpus()
@@ -278,12 +282,27 @@ def test_metrics_reproduce_from_fixed_offline_scores(
             )
     if PUBLIC.exists():
         expected = Summary.model_validate_json(PUBLIC.read_bytes())
+        if receipt_host is not None:
+            for run in expected.runs:
+                run.embedding.runtime_versions.update(receipt_host)
         assert actual.corpus == expected.corpus
         assert actual.source_files_sha256 == expected.source_files_sha256
+        # Host identity varies across the CI matrix; package versions and metrics do not.
         assert [
-            r.model_dump(exclude={"preprocessing_ns_per_prompt"}) for r in actual.runs
+            r.model_dump(
+                exclude={
+                    "preprocessing_ns_per_prompt": True,
+                    "embedding": {"runtime_versions": {"python", "platform"}},
+                }
+            )
+            for r in actual.runs
         ] == [
-            r.model_dump(exclude={"preprocessing_ns_per_prompt"})
+            r.model_dump(
+                exclude={
+                    "preprocessing_ns_per_prompt": True,
+                    "embedding": {"runtime_versions": {"python", "platform"}},
+                }
+            )
             for r in expected.runs
             if r.embedding.kind == "lexical-control"
         ]
@@ -325,13 +344,16 @@ def test_public_creation_and_replacement_require_completed_review(
     )
 
 
+@pytest.mark.parametrize("source_dirty", [False, True])
 def test_reviewed_writer_checks_hash_and_matches_review_metadata(
     tmp_path: Path,
     development_result: tuple[Summary, list[dict[str, object]]],
     monkeypatch: pytest.MonkeyPatch,
+    source_dirty: bool,
 ) -> None:
     # Review-complete metadata is a temporary test fixture, never written to the actual corpus.
     summary, _ = development_result
+    summary = summary.model_copy(update={"source_dirty": source_dirty})
     info = summary.corpus.model_copy(update={"label_review": "maintainer-reviewed"})
     reviewed = Summary.model_validate(
         {
@@ -359,7 +381,12 @@ def test_reviewed_writer_checks_hash_and_matches_review_metadata(
         write_reviewed_summary(
             wrong_corpus, directory=tmp_path, destination=destination
         )
-    with pytest.raises(ValueError, match="clean accepted source"):
+    with pytest.raises(
+        ValueError,
+        match="clean accepted source"
+        if source_dirty
+        else "does not match the approved corpus",
+    ):
         write_reviewed_summary(summary, directory=tmp_path, destination=destination)
     assert not destination.exists()
     write_reviewed_summary(reviewed, directory=tmp_path, destination=destination)

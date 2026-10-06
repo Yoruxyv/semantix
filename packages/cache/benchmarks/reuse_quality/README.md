@@ -257,6 +257,17 @@ uv run --no-sync python -m benchmarks.reuse_quality.benchmark --semantic --outpu
 This command fails before execution if label review is incomplete, and checks the
 hash, reviewed metadata, current clean Git state and source hashes again before
 writing. It never marks labels reviewed.
+
+After generation, from apps/web, apply the existing frontend JSON formatting:
+
+```text
+npx prettier public/benchmarks/reuse-quality-summary.json --write
+```
+
+Formatting must preserve the parsed receipt, including all metrics and identities.
+Run the shared validator again before committing. CI only checks formatting and
+evidence; it does not generate or rewrite the public receipt.
+
 The public file is deliberately absent until approval; the dashboard then shows
 its unavailable state. No placeholder receipt or development scores are served.
 
