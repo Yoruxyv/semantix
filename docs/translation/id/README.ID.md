@@ -132,6 +132,9 @@ preprocessing yang sama. Dimensi yang sama saja tidak membuktikan kompatibilitas
 TTL dimulai saat write dan tidak diperpanjang oleh hit. Lihat
 [kebijakan, TTL, dan pencocokan](../../../packages/cache/README.md#contract).
 
+Lihat [identitas konteks dan migrasi](../../context-identity-and-migration.md)
+untuk contoh scope model/tenant/knowledge/output, revisi embedding, dan migrasi aman.
+
 ## Kapabilitas utama
 
 - **API asinkron** — AsyncSemanticCache dengan CachePolicy, CacheResult, dan bukti CacheHit yang eksplisit.
@@ -493,6 +496,7 @@ print(result.response, result.cache_hit)
 | --- | --- |
 | [Panduan paket cache](../../../packages/cache/README.md) | Quick start embedded, kebijakan, kepemilikan, dan kompatibilitas kanonis |
 | [Provider embedded](../../embedded-providers.md) | Adapter yang dipelihara dan embedding/generation kustom |
+| [Identitas konteks dan migrasi](../../context-identity-and-migration.md) | Scope eksplisit, revisi embedding, dan migrasi aman |
 | [Storage embedded](../../embedded-storage.md) | Memory, PostgreSQL opsional, dan database aplikasi |
 | [Contoh](../../../packages/cache/examples/) | Generation dan store yang dikendalikan aplikasi |
 | [Metodologi benchmark](../../../packages/cache/benchmarks/README.md) | Workload runtime lokal yang reproducible beserta batasannya |

@@ -13,6 +13,7 @@ reference HTTP client for that server, not the first public PyPI target.
 | --- | --- |
 | [Cache package](../packages/cache/README.md) | First use, policies, results, lifecycle and canonical 0.1.x compatibility |
 | [Embedded providers](embedded-providers.md) | Maintained adapters, optional extras and custom embedding/generation |
+| [Context identity and migration](context-identity-and-migration.md) | Explicit scopes, embedding revisions, offline recipes and safe migration |
 | [Embedded storage](embedded-storage.md) | Memory, PostgreSQL/pgvector and application-owned databases |
 | [Custom integration](../packages/cache/examples/custom_integration.py) | Existing async embedding and generation flow |
 | [Custom store](../packages/cache/examples/custom_store.py) | Structural CacheStore and shared conformance |

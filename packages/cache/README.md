@@ -204,6 +204,9 @@ for preventing out-of-band schema tampering, as described in the
 [storage guide](../../docs/embedded-storage.md#existing-application-database).
 Downgrades are unsupported unless explicitly documented.
 
+For explicit model/tenant/knowledge/output scopes and safe cache migration, see
+the [context identity and migration guide](../../docs/context-identity-and-migration.md).
+
 ## Contract
 
 The facade exposes async `resolve`, `get`, `set`, `delete`,

@@ -133,6 +133,9 @@ preprocessing combination. Matching dimensions alone do not establish compatibil
 TTL starts at the write and does not extend on hits. See
 [policies, TTL and matching](packages/cache/README.md#contract).
 
+See [context identity and migration](docs/context-identity-and-migration.md) for
+model/tenant/knowledge/output scopes, embedding revisions and safe migration recipes.
+
 ## Key capabilities
 
 - **Async API** — AsyncSemanticCache with explicit CachePolicy, CacheResult and CacheHit evidence.
@@ -550,6 +553,7 @@ The [documentation index](docs/README.md) separates embedded and server guides.
 | --- | --- |
 | [Cache package guide](packages/cache/README.md) | Embedded quick start, policies, ownership and canonical compatibility |
 | [Embedded providers](docs/embedded-providers.md) | Maintained adapters and custom embedding/generation |
+| [Context identity and migration](docs/context-identity-and-migration.md) | Explicit scopes, embedding revisions and safe migration |
 | [Embedded storage](docs/embedded-storage.md) | Memory, optional PostgreSQL and user-owned databases |
 | [Examples](packages/cache/examples/) | Application-controlled generation and stores |
 | [Benchmark methodology](packages/cache/benchmarks/README.md) | Reproducible local runtime workloads and limitations |
