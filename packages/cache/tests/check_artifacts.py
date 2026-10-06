@@ -7,9 +7,9 @@ from email import message_from_bytes
 from pathlib import Path
 
 
-def main() -> None:
-    wheels = list(Path("dist").glob("*.whl"))
-    sdists = list(Path("dist").glob("*.tar.gz"))
+def main(artifact_dir: Path = Path("dist")) -> None:
+    wheels = list(artifact_dir.glob("*.whl"))
+    sdists = list(artifact_dir.glob("*.tar.gz"))
     assert len(wheels) == len(sdists) == 1
     with zipfile.ZipFile(wheels[0]) as archive:
         names = archive.namelist()
@@ -112,6 +112,11 @@ def main() -> None:
         assert f"{root}/src/semantix_cache/py.typed" in archive.getnames()
         assert f"{root}/examples/custom_integration.py" in archive.getnames()
         assert f"{root}/examples/custom_store.py" in archive.getnames()
+        assert f"{root}/examples/test_custom_store_conformance.py" in archive.getnames()
+        for module in ("__init__", "cases", "interactions"):
+            assert (
+                f"{root}/examples/store_conformance/{module}.py" in archive.getnames()
+            )
         assert f"{root}/examples/persistent_support.py" in archive.getnames()
         assert (
             f"{root}/src/semantix_cache/stores/migrations/0001_cache.sql"

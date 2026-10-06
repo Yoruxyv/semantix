@@ -73,7 +73,8 @@ jobs:
         run: >-
           npx --yes pyright@1.1.414 --project ../../pyrightconfig.json
           --pythonpath .venv/bin/python src examples ../../scripts/provider_live_verify.py ../../scripts/provider_live_verification
-      - name: Test embedded behavior and coverage
+      # The shared suite collects real MemoryStore/PgVectorStore and the standalone custom consumer.
+      - name: Test store conformance, embedded behavior and coverage
         run: uv run --no-sync pytest --cov=semantix_cache
       - name: Execute custom integration examples
         run: |

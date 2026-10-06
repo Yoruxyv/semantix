@@ -273,7 +273,8 @@ It must filter namespace/space/dimension/expiry, return immutable validated Cach
 snapshots, confirm the expected created_at revision atomically without extending TTL,
 and complete bounded-capacity writes truthfully. Entries have no embedded space tag:
 direct put callers must supply entries from the store's declared space. A facade checks
-its adapter and store metadata at construction and during operations.
+its adapter and store metadata at construction and during operations. Use the
+[developer conformance kit](../../docs/cache-store-conformance.md) to verify a custom store.
 
 AsyncSemanticCache borrows all injected resources and closes only its facade.
 MemoryStore owns its state and numerical workers. Double close is harmless; operations

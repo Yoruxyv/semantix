@@ -248,8 +248,8 @@ verify these ten requirements before choosing an implementation:
    writes/eviction where supported; bounded failure/cancellation cleanup, no blind replay.
 9. **Lifecycle:** finite I/O deadlines, explicit supplied/owned resources, safe typed
    errors, busy-close and idempotent close; do not block the event loop.
-10. **Conformance:** reproduce the shared behavior tests with your factory and an
-    authoritative expiry fixture; add your own connection/transaction failure cases.
+10. **Conformance:** run the [developer kit](cache-store-conformance.md) with your
+    factory and authoritative expiry fixture; add connection/transaction failure cases.
 
 Only shipped, tested adapters are maintained. There is no first-party MySQL adapter.
 A deployment without suitable vector similarity cannot satisfy semantic lookup just
@@ -258,9 +258,9 @@ available for providers/versions whose external APIs change independently.
 
 ## Validation and adapter-author evidence
 
-The reusable internal
-[store suite](../packages/cache/tests/test_store_conformance.py) runs against
-MemoryStore, PgVectorStore and the independent example. It covers empty/exact/similar
+The [developer conformance kit](cache-store-conformance.md) runs against
+MemoryStore, PgVectorStore and the independent example through the maintained
+[store suite](../packages/cache/tests/test_store_conformance.py). It covers empty/exact/similar
 search, threshold misses, isolation, dimensional validation, expiry, revisions, scoped
 mutation, LRU, concurrency and close. PostgreSQL-specific
 [tests](../packages/cache/tests/test_pgvector.py) exercise persistence, existing
