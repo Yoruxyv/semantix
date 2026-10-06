@@ -266,7 +266,7 @@ menjalankan workflow aplikasi tersebut.
 ## Contoh
 
 - [Embedding dan generation kustom](../../../packages/cache/examples/custom_integration.py).
-- [CacheStore kustom dan conformance](../../../packages/cache/examples/custom_store.py).
+- [CacheStore kustom](../../../packages/cache/examples/custom_store.py) dan [kit conformance untuk pengembang](../../cache-store-conformance.md).
 - [Customer support persisten](../../../packages/cache/examples/persistent_support.py).
 - [API publik dan struktur source](../../../packages/cache/src/README.md).
 

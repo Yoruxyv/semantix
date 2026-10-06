@@ -254,8 +254,8 @@ already cover the required negative isolation cases:
 | --- | --- |
 | Namespace A cannot hit B; incompatible identities cannot bind/reuse | `test_engine.py::test_namespaces_spaces_and_changed_metadata` |
 | Wrong vector dimensions are rejected before store work | `test_engine.py::test_bad_embedding` |
-| Stale revision cannot confirm, including after clear/reinsert | `test_store_conformance.py::test_revision_and_detached_candidate` |
-| Expired candidate cannot confirm; hits do not extend TTL | `test_store_conformance.py::test_expiry_retention_cap_and_non_sliding_hit` |
+| Stale revision cannot confirm, including after clear/reinsert | `test_store_conformance.py::TestBuiltInStores::test_revision_and_detached_candidate` |
+| Expired candidate cannot confirm; hits do not extend TTL | `test_store_conformance.py::TestBuiltInStores::test_expiry_retention_cap_and_non_sliding_hit` |
 | MemoryStore expiry is exact and authoritative | `test_memory.py::test_ttl_exact_boundary_cap_and_overwrite` |
 
 See [engine tests](../packages/cache/tests/test_engine.py),

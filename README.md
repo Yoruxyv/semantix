@@ -261,7 +261,7 @@ around their final approved text; Semantix does not run those application workfl
 ## Examples
 
 - [Custom embedding and generation](packages/cache/examples/custom_integration.py).
-- [Custom CacheStore and conformance](packages/cache/examples/custom_store.py).
+- [Custom CacheStore](packages/cache/examples/custom_store.py) and the [developer conformance kit](docs/cache-store-conformance.md).
 - [Persistent customer support](packages/cache/examples/persistent_support.py).
 - [Public API and source layout](packages/cache/src/README.md).
 

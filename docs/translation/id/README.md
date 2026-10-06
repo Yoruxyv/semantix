@@ -18,7 +18,8 @@ Panduan embedded berikut tersedia dalam bahasa Inggris.
 | [Identitas konteks dan migrasi](../../context-identity-and-migration.md) | Scope eksplisit, revisi embedding, contoh offline, dan migrasi aman |
 | [Storage embedded](../../embedded-storage.md) | Memory, PostgreSQL/pgvector, dan database milik aplikasi |
 | [Integrasi kustom](../../../packages/cache/examples/custom_integration.py) | Alur embedding dan generation asinkron yang sudah ada |
-| [Store kustom](../../../packages/cache/examples/custom_store.py) | CacheStore struktural dan conformance bersama |
+| [Store kustom](../../../packages/cache/examples/custom_store.py) | Contoh CacheStore struktural |
+| [Conformance CacheStore](../../cache-store-conformance.md) | Pengujian pengembang yang dapat digunakan ulang, fixture, dan batas bukti backend |
 | [Contoh support persisten](../../../packages/cache/examples/persistent_support.py) | Inisialisasi eksplisit dan cache customer-support yang bertahan antarproses |
 | [Benchmark runtime](../../../packages/cache/benchmarks/README.md) | Workload reproducible, profiling, dan batas pengukuran |
 | [Eksperimen coalescing](../../../packages/cache/benchmarks/COALESCING.md) | Pengurangan kerja provider dan tradeoff latensi cold follower |

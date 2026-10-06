@@ -16,7 +16,8 @@ reference HTTP client for that server, not the first public PyPI target.
 | [Context identity and migration](context-identity-and-migration.md) | Explicit scopes, embedding revisions, offline recipes and safe migration |
 | [Embedded storage](embedded-storage.md) | Memory, PostgreSQL/pgvector and application-owned databases |
 | [Custom integration](../packages/cache/examples/custom_integration.py) | Existing async embedding and generation flow |
-| [Custom store](../packages/cache/examples/custom_store.py) | Structural CacheStore and shared conformance |
+| [Custom store](../packages/cache/examples/custom_store.py) | Structural CacheStore example |
+| [CacheStore conformance](cache-store-conformance.md) | Reusable developer tests, fixtures and backend evidence boundaries |
 | [Persistent support example](../packages/cache/examples/persistent_support.py) | Explicit initialization and durable customer-support caching |
 | [Runtime benchmarks](../packages/cache/benchmarks/README.md) | Reproducible workloads, profiling and measurement limits |
 | [Coalescing experiments](../packages/cache/benchmarks/COALESCING.md) | Provider-work reduction and cold-follower latency tradeoffs |
