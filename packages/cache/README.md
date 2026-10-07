@@ -324,6 +324,10 @@ keeps its NumPy/Pydantic dependency boundary. Optional
 [PostgreSQL/pgvector storage and custom databases](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-storage.md)
 use `semantix_cache.stores.pgvector.PgVectorStore` with the `[pgvector]` extra.
 Schema initialization is explicit; normal cache use performs no DDL.
+Optional [Redis storage](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-redis.md)
+uses `semantix_cache.stores.redis.RedisStore` with `[redis]`, direct redis-py
+asyncio and bounded exact float64 scans. Setup is explicit; the initial server
+target is Redis Open Source 8.10.2 with noeviction.
 See the [source layout](https://github.com/Yoruxyv/semantix/blob/main/packages/cache/src/README.md) for package boundaries.
 
 ## Contributor checks
@@ -333,7 +337,9 @@ For environment setup and reviewed evidence validation, see the
 
 From this directory, contributor checks are below. Supply
 `PGVECTOR_TEST_DATABASE_URL` for an explicitly disposable database to execute the
-PostgreSQL cases; without it those cases skip. mypy also checks deprecated APIs.
+PostgreSQL cases; without it those cases skip. Set `REDIS_TEST_URL` only to
+disposable Redis 8.10.2 for Redis conformance/fault tests; required CI rejects
+skipped Redis cases. mypy also checks deprecated APIs.
 
 ~~~text
 uv sync --locked --extra dev

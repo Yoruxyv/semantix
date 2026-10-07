@@ -20,12 +20,14 @@ application; no Semantix FastAPI server is required. The separate
 | [`_coalescing_metrics.py`](semantix_cache/_coalescing_metrics.py) | Fixed numeric lifetime ledger; no payloads |
 | [`adapters/`](semantix_cache/adapters/__init__.py) | Maintained provider adapters, imported explicitly with optional HTTP dependencies |
 | [`stores/pgvector.py`](semantix_cache/stores/pgvector.py) | Optional application-database PostgreSQL/pgvector persistence |
+| [`stores/redis.py`](semantix_cache/stores/redis.py) | Optional bounded exact Redis storage with explicit schema and owned/borrowed clients |
 | [`stores/migrations/`](semantix_cache/stores/migrations/0001_cache.sql) | Packaged, checksum-tracked SQL template applied only by explicit initialization |
 | [`py.typed`](semantix_cache/py.typed) | Installed-package typing marker |
 
 Root imports use only NumPy/Pydantic and the standard library. They do not import
-HTTPX, asyncpg, FastAPI, provider SDKs, adapter modules or storage modules. Import
+HTTPX, asyncpg, redis, FastAPI, provider SDKs, adapter modules or storage modules. Import
 `PgVectorStore` from `semantix_cache.stores.pgvector` with the `[pgvector]` extra.
+Import `RedisStore` from `semantix_cache.stores.redis` with `[redis]`.
 There is no server/remote mode in `AsyncSemanticCache`.
 
 Applications own injected embedders, generation callables and stores. The facade

@@ -38,6 +38,13 @@
         "linux/amd64",
         "linux/arm64"
       ]
+    },
+    "redis:8.10.2": {
+      "digest": "sha256:c94085d298b738be22c9ccdc0ac3761fa6649df7dd82ad1d42367f3cb9714935",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
     }
   }
 }
