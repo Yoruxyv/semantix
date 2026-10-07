@@ -5,6 +5,7 @@ import ctypes
 import json
 import os
 import platform
+import sys
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,7 +23,7 @@ from semantix_cache.stores.redis import RedisStore
 
 
 def rss() -> int | None:
-    if os.name == "nt":
+    if sys.platform == "win32":
 
         class Counters(ctypes.Structure):
             _fields_ = [
