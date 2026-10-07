@@ -17,6 +17,7 @@ Repository = "https://github.com/Yoruxyv/semantix"
 
 [project.optional-dependencies]
 pgvector = ["asyncpg>=0.31,<0.32"]
+redis = ["redis>=8.1.0,<8.2"]
 providers = ["httpx>=0.28.1,<0.29"]
 openai = ["httpx>=0.28.1,<0.29"]
 huggingface = ["httpx>=0.28.1,<0.29"]
@@ -24,6 +25,7 @@ gemini = ["httpx>=0.28.1,<0.29"]
 ollama = ["httpx>=0.28.1,<0.29"]
 anthropic = ["httpx>=0.28.1,<0.29"]
 dev = [
+  "redis>=8.1.0,<8.2",
   "asyncpg>=0.31,<0.32",
   "asyncpg-stubs>=0.31.3,<0.32",
   "httpx>=0.28.1,<0.29",
@@ -58,7 +60,7 @@ pythonpath = ["."]
 asyncio_mode = "auto"
 cache_dir = ".cache/pytest"
 testpaths = ["tests"]
-markers = ["pgvector: requires a disposable PostgreSQL database with vector installed"]
+markers = ["pgvector: requires a disposable PostgreSQL database with vector installed", "redis: requires disposable Redis 8.10.2"]
 
 [tool.coverage.run]
 branch = true

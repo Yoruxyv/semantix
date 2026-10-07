@@ -47,6 +47,7 @@ def main(artifact_dir: Path = Path("dist")) -> None:
         assert set(metadata.get_all("Provides-Extra", [])) == extras | {
             "dev",
             "pgvector",
+            "redis",
         }
         for extra in extras:
             selected = [item for item in requirements if f'extra == "{extra}"' in item]
@@ -60,6 +61,12 @@ def main(artifact_dir: Path = Path("dist")) -> None:
         assert ">=0.31" in postgres[0]
         assert "<0.32" in postgres[0]
         assert "semantix_cache/stores/pgvector.py" in names
+        redis = [item for item in requirements if 'extra == "redis"' in item]
+        assert len(redis) == 1
+        assert redis[0].startswith("redis")
+        assert ">=8.1.0" in redis[0]
+        assert "<8.2" in redis[0]
+        assert "semantix_cache/stores/redis.py" in names
         migration = "semantix_cache/stores/migrations/0001_cache.sql"
         assert [name for name in names if name.endswith(".sql")] == [migration]
         assert archive.read(migration) == Path("src").joinpath(migration).read_bytes()

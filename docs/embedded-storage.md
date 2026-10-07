@@ -3,7 +3,7 @@
 `semantix-cache` runs in your Python process. It does not require the Semantix
 FastAPI server. Its async engine consumes the structural
 [`CacheStore` protocol](../packages/cache/src/semantix_cache/protocols.py), not SQL.
-The maintained stores are `MemoryStore` and the optional `PgVectorStore`.
+The maintained stores are `MemoryStore`, optional `PgVectorStore` and optional `RedisStore`.
 The separate `semantix_client` package is the optional/reference HTTP client.
 
 ## Choose a store
@@ -12,6 +12,7 @@ The separate `semantix_client` package is the optional/reference HTTP client.
 | --- | --- | --- | --- |
 | `MemoryStore` | Process-local, non-durable | Default NumPy/Pydantic core | Owns its state and workers |
 | `PgVectorStore` | PostgreSQL/pgvector | `semantix-cache[pgvector]` adds asyncpg | Borrows `pool=`; `connect()` creates an owned pool |
+| `RedisStore` | Redis primary; operator-managed persistence | `semantix-cache[redis]` adds redis-py | Borrows `client=`; `connect()` creates an owned client/pool |
 | Your `CacheStore` | Your implementation | Your application chooses | Your implementation documents ownership |
 
 MemoryStore is bounded and appropriate for tests, local use and small ephemeral
@@ -30,6 +31,9 @@ from semantix_cache.stores.pgvector import PgVectorStore
 
 Root imports load neither asyncpg nor provider HTTP dependencies. Imports and
 exports from `semantix_cache` are unchanged by adding persistent storage.
+
+See [Redis storage](embedded-redis.md) for its supported versions, exact scan,
+explicit setup, TTL/LRU, failure handling and persistence boundary.
 
 ## MemoryStore sizing: entries are not a byte budget
 

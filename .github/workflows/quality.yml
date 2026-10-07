@@ -29,8 +29,18 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
     env:
+      REDIS_TEST_URL: redis://127.0.0.1:6379/0
       PGVECTOR_TEST_DATABASE_URL: postgresql://postgres:ci-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/semantix_embedded_test
     services:
+      redis:
+        image: redis:8.10.2@sha256:c94085d298b738be22c9ccdc0ac3761fa6649df7dd82ad1d42367f3cb9714935
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
       postgres:
         image: pgvector/pgvector:pg17@sha256:d2ef61f42ef767baa5a1475393303cc235bcd92febd9d7014eddb48b41f3bad0
         env:
@@ -75,7 +85,9 @@ jobs:
           --pythonpath .venv/bin/python src examples ../../scripts/provider_live_verify.py ../../scripts/provider_live_verification
       # The shared suite collects real MemoryStore/PgVectorStore and the standalone custom consumer.
       - name: Test store conformance, embedded behavior and coverage
-        run: uv run --no-sync pytest --cov=semantix_cache
+        run: |
+          uv run --no-sync pytest --cov=semantix_cache --junitxml=.cache/embedded.xml
+          uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/embedded.xml').findall('.//testcase'); redis=[c for c in cases if c.get('classname', '').startswith('tests.test_redis')]; assert redis and all(c.find('skipped') is None for c in redis), 'Required Redis tests skipped'"
       - name: Execute custom integration examples
         run: |
           uv run --no-sync python examples/custom_integration.py
@@ -106,8 +118,61 @@ jobs:
           done
           "$wheel_python" -m pip install --disable-pip-version-check "dist/semantix_cache-0.1.0-py3-none-any.whl[pgvector]"
           "$wheel_python" tests/pgvector_wheel_smoke.py
+          "$wheel_python" -m pip install --disable-pip-version-check "dist/semantix_cache-0.1.0-py3-none-any.whl[redis]"
+          "$wheel_python" tests/redis_wheel_smoke.py
           "$wheel_python" -m pip install --disable-pip-version-check ../client
           "$wheel_python" -c "import sys; import semantix_client; assert 'semantix_cache' not in sys.modules; import semantix_cache; assert semantix_client.CachePolicy is not semantix_cache.CachePolicy"
+
+
+  redis:
+    name: Redis restart and fault integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: packages/cache
+    env:
+      REDIS_TEST_URL: redis://127.0.0.1:16379/0
+      REDIS_TEST_CONTAINER: semantix-redis-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+          version: "0.11.32"
+      - name: Sync locked embedded dependencies
+        run: uv sync --locked --extra dev
+      - name: Start labelled disposable AOF Redis
+        run: >-
+          docker run --detach --name "$REDIS_TEST_CONTAINER"
+          --label semantix.disposable=redis-store
+          --publish 127.0.0.1:16379:6379
+          redis:8.10.2@sha256:c94085d298b738be22c9ccdc0ac3761fa6649df7dd82ad1d42367f3cb9714935
+          redis-server --appendonly yes --appendfsync always --maxmemory-policy noeviction
+      - name: Verify AOF restart and real OOM/read-only failures
+        run: uv run --no-sync python tests/redis_infrastructure_smoke.py
+      - name: Measure supported exact scan workloads
+        run: uv run --no-sync python tests/redis_benchmark_smoke.py
+      - name: Upload Redis performance evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: redis-performance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: packages/cache/.cache/redis-performance.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove only this job's labelled container and volumes
+        if: ${{ always() }}
+        run: |
+          if docker inspect "$REDIS_TEST_CONTAINER" > /dev/null 2>&1; then
+            test "$(docker inspect --format '{{ index .Config.Labels "semantix.disposable" }}' "$REDIS_TEST_CONTAINER")" = "redis-store"
+            docker rm --force --volumes "$REDIS_TEST_CONTAINER"
+          fi
 
   backend:
     name: Backend quality
@@ -701,6 +766,7 @@ jobs:
       - hardened-windows-checkout
       - dependency-review
       - pgvector
+      - redis
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -715,6 +781,7 @@ jobs:
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           FRONTEND_LIGHTHOUSE_RESULT: ${{ needs.frontend-lighthouse.result }}
           HARDENED_WINDOWS_CHECKOUT_RESULT: ${{ needs.hardened-windows-checkout.result }}
+          REDIS_RESULT: ${{ needs.redis.result }}
           PGVECTOR_RESULT: ${{ needs.pgvector.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
           SDK_COMPATIBILITY_RESULT: ${{ needs.sdk-compatibility.result }}
@@ -732,5 +799,6 @@ jobs:
           test "$SECURITY_RESULT" = "success"
           test "$HARDENED_WINDOWS_CHECKOUT_RESULT" = "success"
           test "$PGVECTOR_RESULT" = "success"
+          test "$REDIS_RESULT" = "success"
           test "$DEPENDENCY_REVIEW_RESULT" = "success" \
             || test "$DEPENDENCY_REVIEW_RESULT" = "skipped"

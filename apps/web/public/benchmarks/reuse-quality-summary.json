@@ -3,7 +3,7 @@
   "benchmark": "semantix-reuse-quality",
   "evidence_kind": "certified-static-benchmark",
   "certification": "reviewed",
-  "source_sha": "9e97107834ceae66761a29237c04df0225e0ed0c",
+  "source_sha": "7be147a4629c5ba32d38c869fb71f5ce7a1b3ef0",
   "source_dirty": false,
   "source_files_sha256": {
     "packages/cache/benchmarks/__init__.py": "670eb9223dc3803592e4d8a3483e487dc02525747393bd74ff9d579180ff3f83",
@@ -13,7 +13,7 @@
     "packages/cache/benchmarks/reuse_quality/data/cases.jsonl": "563b26f788cde8de3f74be9da6999cfaab46860e508635fcf6af53d28ff7b2a3",
     "packages/cache/benchmarks/reuse_quality/data/corpus.manifest.json": "de6fb56a4d530a00b0f6f9efffbb6241e57ed1b20ab30a7f1dac2d58df566ce9",
     "packages/cache/benchmarks/reuse_quality/schemas/summary.schema.json": "7a789f86e756b6426f4eade4853c2b5ccc47eeef50617bb599ba648a88508f0c",
-    "packages/cache/pyproject.toml": "2c6e758a6401094a569071e90f6f61c7471b7797f5e8edada5180b593522a707",
+    "packages/cache/pyproject.toml": "969da0bdccf6f43fb145c460d7eda46cda4c82f6c6cffaefddfb9b73dfe013d4",
     "packages/cache/src/semantix_cache/__init__.py": "f0a0984dac5da0e12175bd77ae5e4d750ad013ea02ee89bed84e552686b1a1fc",
     "packages/cache/src/semantix_cache/_coalescing.py": "f2677cc74ebb1638ba551d66a850b0542200fe817b65c074abdf60af0333dca4",
     "packages/cache/src/semantix_cache/_coalescing_metrics.py": "3173dff19b972c56ba851b78a166157229109dd641abfaafc5939d3e2d00291c",
@@ -26,9 +26,9 @@
     "packages/cache/src/semantix_cache/observability.py": "45505980358d9fd620cc40e9c658845d982f84252606d9ab5de9403fc7f08c2d",
     "packages/cache/src/semantix_cache/policies.py": "e141a23582a8404b5f0a460f1d40948d68cdc6fa3ca3c1dfbaf4ebe14d9ffbd7",
     "packages/cache/src/semantix_cache/protocols.py": "3c28123318bc77fc459b89a488bc3afc1daaf3258665a62966b38ab8a21c5e73",
-    "packages/cache/uv.lock": "eade9489160c876b13aaa5a75fe3d20b744fb0db34bbcf25d8b48104be6e0a10"
+    "packages/cache/uv.lock": "21b9227e7e7b017c08179e1aaecd7e4f81b7c0a186351adf01541fa7f4ea9138"
   },
-  "generated_at_utc": "2026-10-06T09:54:20.257542+00:00",
+  "generated_at_utc": "2026-10-07T15:00:09.163931+00:00",
   "corpus": {
     "schema_version": 1,
     "version": "1.0.0",
@@ -913,7 +913,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 78.93125
+      "preprocessing_ns_per_prompt": 79.525
     },
     {
       "embedding": {
@@ -1784,7 +1784,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 371.9125
+      "preprocessing_ns_per_prompt": 389.7125
     },
     {
       "embedding": {
@@ -2655,7 +2655,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 126.34375
+      "preprocessing_ns_per_prompt": 125.50625
     },
     {
       "embedding": {
@@ -3520,7 +3520,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 79.75
+      "preprocessing_ns_per_prompt": 79.39375
     },
     {
       "embedding": {
@@ -4385,7 +4385,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 544.9125
+      "preprocessing_ns_per_prompt": 379.0
     },
     {
       "embedding": {
@@ -5250,7 +5250,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 127.15625
+      "preprocessing_ns_per_prompt": 123.975
     },
     {
       "embedding": {
@@ -6115,7 +6115,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 76.2125
+      "preprocessing_ns_per_prompt": 80.9375
     },
     {
       "embedding": {
@@ -6980,7 +6980,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 397.79375
+      "preprocessing_ns_per_prompt": 391.89375
     },
     {
       "embedding": {
@@ -7845,7 +7845,7 @@
           }
         }
       ],
-      "preprocessing_ns_per_prompt": 159.5625
+      "preprocessing_ns_per_prompt": 125.81875
     }
   ],
   "limitations": [

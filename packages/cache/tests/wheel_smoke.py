@@ -46,6 +46,7 @@ async def main() -> None:
         "starlette",
         "slowapi",
         "asyncpg",
+        "redis",
         "httpx",
         "pydantic_settings",
         "dotenv",
@@ -61,6 +62,13 @@ async def main() -> None:
         assert "docs/embedded-storage.md" in str(exc)
     else:
         raise AssertionError("PostgreSQL store imported without its optional driver")
+
+    try:
+        importlib.import_module("semantix_cache.stores.redis")
+    except ImportError as exc:
+        assert "semantix-cache[redis]" in str(exc)
+    else:
+        raise AssertionError("Redis store imported without its optional driver")
 
     for provider in ("openai", "huggingface", "gemini", "ollama", "anthropic"):
         try:

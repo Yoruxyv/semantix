@@ -983,10 +983,12 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.1.1,<10" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.4.0,<2" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.1.0,<8" },
+    { name = "redis", marker = "extra == 'dev'", specifier = ">=8.1.0,<8.2" },
+    { name = "redis", marker = "extra == 'redis'", specifier = ">=8.1.0,<8.2" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.16.3,<0.17" },
     { name = "twine", marker = "extra == 'dev'", specifier = ">=6.2,<7" },
 ]
-provides-extras = ["pgvector", "providers", "openai", "huggingface", "gemini", "ollama", "anthropic", "dev"]
+provides-extras = ["pgvector", "redis", "providers", "openai", "huggingface", "gemini", "ollama", "anthropic", "dev"]
 
 [package.metadata.requires-dev]
 reuse-quality = [
