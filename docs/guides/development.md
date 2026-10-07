@@ -3,6 +3,41 @@
 Use local toolchains for IDE integration, hot reload, and quality checks. The
 Docker workflow is documented in [Getting started](getting-started.md).
 
+## Embedded cache contributors
+
+Work on `semantix-cache` independently of the optional server/web products. From
+the repository root, prepare the existing locked development environment:
+
+```text
+cd packages/cache
+uv sync --locked --extra dev
+```
+
+Use the [cache contributor checks](../../packages/cache/README.md#contributor-checks)
+for Ruff, formatting, mypy, pytest/coverage, examples and artifact inspection.
+The [Quality workflow](../../.github/workflows/quality.yml) records the full
+Python 3.11-3.14 CI matrix and analysis targets. PostgreSQL cases require an
+explicitly disposable `PGVECTOR_TEST_DATABASE_URL`; without it they skip.
+Normal provider tests are deterministic and offline.
+
+- Store authors: [CacheStore conformance](../cache-store-conformance.md).
+- Provider contributors: [live-verification tooling](../provider-live-verification.md).
+  Live requests/cost require separate authorization; ordinary tests need no keys.
+- Evidence maintainers: [reuse-quality methodology and replacement workflow](../../packages/cache/benchmarks/reuse_quality/README.md#automatic-validation-and-explicit-evidence-replacement).
+
+From `packages/cache`, validate existing reviewed evidence without model downloads
+or file writes:
+
+```text
+uv run --no-sync --offline python -B -m benchmarks.reuse_quality.benchmark validate
+```
+
+Pre-commit selects relevant staged evidence inputs; CI validates the resulting
+state. Neither regenerates receipts or approves labels. Elapsed time, a different
+HEAD and unrelated commits do not stale evidence: relevant input/config/corpus
+hash changes do. Follow the linked explicit review/clean-source replacement
+workflow after an intentional relevant change; never regenerate just to pass CI.
+
 ## Backend
 
 The supported interpreter range is Python 3.11 through 3.14. The backend image

@@ -326,6 +326,11 @@ use `semantix_cache.stores.pgvector.PgVectorStore` with the `[pgvector]` extra.
 Schema initialization is explicit; normal cache use performs no DDL.
 See the [source layout](https://github.com/Yoruxyv/semantix/blob/main/packages/cache/src/README.md) for package boundaries.
 
+## Contributor checks
+
+For environment setup and reviewed evidence validation, see the
+[cache contributor workflow](https://github.com/Yoruxyv/semantix/blob/main/docs/guides/development.md#embedded-cache-contributors).
+
 From this directory, contributor checks are below. Supply
 `PGVECTOR_TEST_DATABASE_URL` for an explicitly disposable database to execute the
 PostgreSQL cases; without it those cases skip. mypy also checks deprecated APIs.
@@ -342,3 +347,32 @@ uv run --no-sync python -m build
 uv run --no-sync python -m twine check dist/*
 uv run --no-sync python tests/check_artifacts.py
 ~~~
+
+### Standalone source-distribution tests
+
+The sdist includes runtime sources, examples/conformance tooling, test helpers
+and all package test modules **except** these checkout-only tests:
+
+- `tests/test_benchmark_harness.py`
+- `tests/test_coalescing_benchmark.py`
+- `tests/test_reuse_quality.py`
+- `tests/test_provider_live_verify.py`
+
+Those four need repository benchmark/script/evidence trees and still run in the
+checkout/CI suite. They are excluded from the archive, not skipped in checkout
+pytest. `MANIFEST.in` defines this boundary; `tests/check_artifacts.py` enforces
+that the remaining test/helper set is included exactly. Benchmarks and repository
+scripts are not shipped to satisfy test imports.
+
+In a fresh development environment, install the built cache wheel with its
+`[dev]` extra, unpack the matching sdist, then run from its root:
+
+~~~text
+python -B -m pytest tests
+~~~
+
+This is the standalone sdist test contract, not the full repository quality gate
+or minimal-install promise. Tests require development dependencies; the runtime
+still needs only NumPy/Pydantic. PostgreSQL integration cases skip without a
+**disposable** `PGVECTOR_TEST_DATABASE_URL`; a skip is not database verification.
+Use the checkout for benchmark evidence validation and provider-verifier tests.

@@ -79,6 +79,11 @@ docker compose -f docker-compose.dev.yml --profile pgvector down
 
 Gunakan hardened stack hanya ketika memvalidasi konfigurasi yang berorientasi production. Lihat [Hardened deployment](operations/deployment.md) sebelum menjalankannya.
 
+### Contributor embedded cache
+
+Untuk development `semantix-cache` tanpa server atau Docker, mulai dari
+[workflow contributor cache](guides/development.md#contributor-embedded-cache).
+
 ### Local backend workflow
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/), kemudian buat development environment yang terkunci:

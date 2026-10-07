@@ -31,6 +31,58 @@ from semantix_cache.stores.pgvector import PgVectorStore
 Root imports load neither asyncpg nor provider HTTP dependencies. Imports and
 exports from `semantix_cache` are unchanged by adding persistent storage.
 
+## MemoryStore sizing: entries are not a byte budget
+
+MemoryStore defaults to 500 entries, permits at most 5,000, and shares its capacity
+across namespaces. These are entry counts, not fixed memory/RSS limits. Response
+length is capped at 100,000 **characters**, not bytes; Unicode representation,
+prompt length and embedding dimensions also affect memory. No byte-budget eviction
+or new runtime limit is implied.
+
+A bounded one-off measurement on 2026-10-07 used source
+`75775c6f8dd6bb654e57280516604ec97f92f3f0`, 64-bit CPython 3.14.6 on Windows 11,
+NumPy 2.4.6 and Pydantic 2.13.5. Each cell ran in a fresh process with one BLAS
+thread, the default 500-entry capacity/3,600-second TTL and one namespace. A
+synthetic embedder returned the finite vector `(1.0, 2.0, ..., D)`; public `set`
+stored 500 distinct short prompts and distinct ASCII responses of exactly the
+listed length. No language model or provider was called. Both response sizes are
+valid under the existing bound.
+
+After imports/embedder creation, start `tracemalloc`, collect garbage and record
+a baseline. Measure retained traced allocation after seeding, then after two
+unchanged public `get` calls and garbage collection. The second lookup retains
+the immutable float64 scoring matrix/norms. `sys.getsizeof` on stored response
+strings and on embedding tuples plus their float objects separates those
+components; snapshot `nbytes` measures its retained native buffers. Internal
+inspection here is measurement tooling, not a supported sizing API.
+
+All values below are MiB (2^20 bytes) for **500 entries**; components are included
+in the traced totals, not extra amounts to add to them.
+
+| Dimensions | Response chars/entry | Text payload (UTF-8) | Python vector tuples/floats | Retained native snapshot | Traced seeded delta | Traced warm delta | Traced peak delta |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 384 | 128 | 0.06 | 5.88 | 1.47 | 6.72 | 8.18 | 9.73 |
+| 384 | 32768 | 15.62 | 5.88 | 1.47 | 22.28 | 23.75 | 25.30 |
+| 1536 | 128 | 0.06 | 23.46 | 5.86 | 24.29 | 30.16 | 36.14 |
+| 1536 | 32768 | 15.62 | 23.46 | 5.86 | 39.86 | 45.72 | 51.71 |
+
+ASCII string headers added 20,500 bytes across 500 responses on this interpreter;
+the UTF-8 payload column alone omits them. Embeddings are stored as Python tuples
+of floats, not just `8 * N * D` packed bytes. After repeated unchanged lookup,
+the snapshot adds exactly `8 * N * D + 8 * N` buffer bytes, excluding NumPy array
+headers. Entry models, prompts/keys, expiry/revision metadata, LRU bookkeeping,
+thread/executor state and temporary allocations account for further overhead.
+Scoped mutations invalidate snapshots; an active numerical worker can retain an
+old snapshot until it drains.
+
+**RSS was not measured.** Traced allocations (including NumPy's registered buffer
+allocations) do not cover every native allocator, library, process or allocator
+reservation. Unicode, multiple active namespaces, concurrent work and churn can
+change retention/peaks; this synthetic table is not an exact production forecast.
+Choose capacity with representative payloads/dimensions, then measure whole-process
+RSS and peak/steady-state behavior under your application's load. Do not extrapolate
+a fixed RSS budget from entry count or this one-off allocation table.
+
 ## New PostgreSQL database
 
 Create a database through your normal operator tooling. Install pgvector on the
