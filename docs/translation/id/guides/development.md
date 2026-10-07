@@ -2,6 +2,42 @@
 
 Gunakan toolchain lokal untuk integrasi IDE, hot reload, dan pemeriksaan kualitas. Workflow Docker didokumentasikan di [Getting started](getting-started.md).
 
+## Contributor embedded cache
+
+Kerjakan `semantix-cache` secara terpisah dari produk server/web opsional. Dari
+root repository, siapkan development environment terkunci yang sudah ada:
+
+```text
+cd packages/cache
+uv sync --locked --extra dev
+```
+
+Gunakan [check contributor cache](../../../../packages/cache/README.md#contributor-checks)
+untuk Ruff, formatting, mypy, pytest/coverage, contoh, dan pemeriksaan artifact.
+[Workflow Quality](../../../../.github/workflows/quality.yml) mencatat matrix
+CI Python 3.11-3.14 dan target analisis lengkap. Kasus PostgreSQL memerlukan
+`PGVECTOR_TEST_DATABASE_URL` yang secara eksplisit menunjuk database disposable;
+tanpa itu kasus tersebut dilewati. Test provider normal deterministik dan offline.
+
+- Penulis store: [conformance CacheStore](../../../cache-store-conformance.md).
+- Contributor provider: [tool live-verification](../../../provider-live-verification.md).
+  Request/biaya live memerlukan izin terpisah; test biasa tidak memerlukan key.
+- Maintainer evidence: [metodologi reuse-quality dan workflow penggantian](../../../../packages/cache/benchmarks/reuse_quality/README.md#automatic-validation-and-explicit-evidence-replacement).
+
+Dari `packages/cache`, validasi evidence reviewed yang sudah ada tanpa download
+model atau penulisan file:
+
+```text
+uv run --no-sync --offline python -B -m benchmarks.reuse_quality.benchmark validate
+```
+
+Pre-commit memilih input evidence staged yang relevan; CI memvalidasi keadaan
+akhir. Keduanya tidak membuat ulang receipt atau menyetujui label. Waktu yang
+berlalu, HEAD berbeda, dan commit yang tidak terkait tidak membuat evidence stale:
+perubahan hash input/config/corpus yang relevan membuatnya stale. Setelah perubahan
+relevan yang disengaja, ikuti workflow review/penggantian dari source bersih yang
+ditautkan; jangan membuat ulang evidence hanya agar CI lolos.
+
 ## Backend
 
 Rentang interpreter yang didukung adalah Python 3.11 hingga 3.14. Backend image menggunakan Python 3.14, seluruh quality suite dijalankan pada 3.14, dan compatibility suite juga dijalankan pada 3.11, 3.12, dan 3.13 di CI.

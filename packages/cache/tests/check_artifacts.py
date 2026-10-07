@@ -76,6 +76,26 @@ def main(artifact_dir: Path = Path("dist")) -> None:
             assert f"semantix_cache/adapters/{module}.py" in names
     with tarfile.open(sdists[0]) as archive:
         root = "semantix_cache-0.1.0"
+        checkout_only_tests = {
+            "test_benchmark_harness.py",
+            "test_coalescing_benchmark.py",
+            "test_reuse_quality.py",
+            "test_provider_live_verify.py",
+        }
+        standalone_tests = {
+            path.relative_to(Path("tests")).as_posix()
+            for path in Path("tests").rglob("*.py")
+        } - checkout_only_tests
+        test_prefix = f"{root}/tests/"
+        archived_tests = {
+            name.removeprefix(test_prefix)
+            for name in archive.getnames()
+            if name.startswith(test_prefix) and name.endswith(".py")
+        }
+        assert archived_tests == standalone_tests, (
+            "Sdist standalone test/helper set differs from MANIFEST.in policy",
+            archived_tests ^ standalone_tests,
+        )
         top_files = {
             "LICENSE",
             "README.md",
