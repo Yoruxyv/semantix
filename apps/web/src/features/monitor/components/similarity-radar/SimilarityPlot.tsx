@@ -1,11 +1,6 @@
 import { PlotBackdrop } from './PlotBackdrop';
 import { SimilarityTooltip } from './SimilarityTooltip';
-import {
-  scoreToX,
-  VIEW_HEIGHT,
-  VIEW_WIDTH,
-  type PlotPoint,
-} from './model';
+import { scoreToX, VIEW_HEIGHT, VIEW_WIDTH, type PlotPoint } from './model';
 import { formatDecimal, formatSimilarity } from '@/shared/lib/formatters';
 import { cacheDecisionLabel } from '@/shared/domain/similarity';
 
@@ -61,16 +56,13 @@ export function SimilarityPlot({
           className="mt-2 flex flex-wrap justify-center gap-2 text-[11px]/5"
         >
           <li className="border border-white/10 bg-white/3 px-2 py-1 text-(--text-faint)">
-            <span className="text-(--text-muted)">WEAK</span>{' '}
-            <span>−1.00–0.75</span>
+            <span className="text-(--text-muted)">WEAK</span> <span>−1.00–0.75</span>
           </li>
           <li className="border border-(--gold)/20 bg-(--gold)/5 px-2 py-1 text-(--gold)">
-            <span>REVIEW</span>{' '}
-            <span>0.75–0.90</span>
+            <span>REVIEW</span> <span>0.75–0.90</span>
           </li>
           <li className="border border-(--teal)/20 bg-(--teal)/5 px-2 py-1 text-(--teal)">
-            <span>STRONG</span>{' '}
-            <span>0.90–1.00</span>
+            <span>STRONG</span> <span>0.90–1.00</span>
           </li>
         </ul>
       </div>
