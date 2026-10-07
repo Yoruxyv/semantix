@@ -324,7 +324,7 @@ keeps its NumPy/Pydantic dependency boundary. Optional
 [PostgreSQL/pgvector storage and custom databases](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-storage.md)
 use `semantix_cache.stores.pgvector.PgVectorStore` with the `[pgvector]` extra.
 Schema initialization is explicit; normal cache use performs no DDL.
-Optional [Redis storage](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-redis.md)
+Optional [Redis storage](https://github.com/Yoruxyv/semantix/blob/8d2da4c23ec8a7ea1d868b3caea2526cb815ea77/docs/embedded-redis.md)
 uses `semantix_cache.stores.redis.RedisStore` with `[redis]`, direct redis-py
 asyncio and bounded exact float64 scans. Setup is explicit; the initial server
 target is Redis Open Source 8.10.2 with noeviction.
