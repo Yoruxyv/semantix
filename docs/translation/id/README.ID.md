@@ -296,18 +296,28 @@ Tooling operasional berada di `ops/`; tooling developer di `scripts/`.
 
 ---
 
-### ✨ Yang Ditawarkan Semantix
+### ✨ Workspace server opsional
 
 | Workspace | Tujuan |
 |---|---|
 | **Monitor** | Mengirim probe kebijakan dalam namespace dan memeriksa hit, miss, latensi, prompt yang cocok, serta bukti similarity |
-| **Cache Inspector** | Mencari entri, memeriksa metadata, menghapus record, membersihkan namespace, dan mengelola threshold |
+| **Cache Inspector** | Mencari entri, memeriksa metadata, menghapus record, membersihkan namespace dengan aman |
 | **Evaluations** | Mengukur precision, recall, false hit, dan false miss; memeriksa bukti kasus terfilter serta mengekspor hasil run |
 | **Observability** | Melacak metrik proses dan memeriksa diagnostik runtime read-only yang aman |
 
 ### Tur produk
 
-Demo lokal dengan provider Hugging Face juga menampilkan workspace lainnya. Pilih pratinjau untuk melihat tangkapan layar berukuran penuh.
+Workbench server opsional memeriksa cache server yang terhubung, menjalankan
+evaluasi berurutan, dan mendiagnosis server tersebut. Workbench tidak mengamati
+cache embedded dari sembarang proses aplikasi. Demo lokal dengan provider
+Hugging Face menampilkan workspace yang sama. Pilih pratinjau untuk melihat
+tangkapan layar berukuran penuh.
+
+Simpan URL `/evaluations?view=runs`, `?view=datasets`, `?view=history`, atau
+`?view=reuse-quality` untuk membuka kembali subview yang dipilih. Reuse quality
+menampilkan [bukti statis library yang ditinjau dan metodologinya](../../../packages/cache/benchmarks/reuse_quality/README.md),
+dengan calibration dan held-out dipisahkan dari run server berurutan. Hasil
+sintetis ini tidak membuktikan kualitas produksi atau threshold yang aman secara universal.
 
 | Workspace | Tampilan saat ini |
 |---|---|
@@ -502,6 +512,7 @@ print(result.response, result.cache_hit)
 | [Identitas konteks dan migrasi](../../context-identity-and-migration.md) | Scope eksplisit, revisi embedding, dan migrasi aman |
 | [Storage embedded](../../embedded-storage.md) | Memory, PostgreSQL opsional, dan database aplikasi |
 | [Contoh](../../../packages/cache/examples/) | Generation dan store yang dikendalikan aplikasi |
+| [Kualitas reuse yang ditinjau](../../../packages/cache/benchmarks/reuse_quality/README.md) | Baseline semantik, kontrol leksikal, pemisahan calibration/held-out, dan batas bukti |
 | [Metodologi benchmark](../../../packages/cache/benchmarks/README.md) | Workload runtime lokal yang reproducible beserta batasannya |
 | [Getting started server](guides/getting-started.md) | Environment dan workflow Docker untuk server opsional |
 | [Panduan HTTP client](../../../packages/client/README.md) | Client bertipe untuk server kompatibel yang sudah berjalan |

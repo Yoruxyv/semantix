@@ -77,8 +77,8 @@ export function Navbar(): JSX.Element {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:gap-x-6">
         <div className="min-w-0 flex-1 lg:col-start-1 lg:row-start-1 lg:min-w-48 lg:flex-none">
           <p className="ui-label text-(--gold)">Semantix</p>
-          <p className="font-display mt-1 hidden text-lg italic text-(--text-soft) sm:block">
-            Semantic cache laboratory
+          <p className="font-display mt-1 text-sm italic text-(--text-soft) sm:block">
+            Optional server workbench
           </p>
         </div>
 

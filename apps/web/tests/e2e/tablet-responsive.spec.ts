@@ -344,6 +344,192 @@ test('runtime diagnostics remain readable, bounded, and accessible', async ({
   expect(accessibility.violations).toEqual([]);
 });
 
+test('cache mode dropdown preserves keyboard focus, selection, and compact layout', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const trigger = page.getByRole('button', { name: /Request cache mode/ });
+  const list = page.getByRole('listbox', { name: 'Request cache mode' });
+  await expect(
+    page.getByRole('heading', { name: 'Advanced cache policy' }),
+  ).toBeVisible();
+  await expect(page.locator('details')).toHaveCount(0);
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  await expect(list).toBeVisible();
+  await expect(page.getByRole('option')).toHaveText([
+    '✓Normal read and write',
+    'Read only',
+    'Refresh and write',
+    'Bypass cache',
+    'Private request',
+  ]);
+  const normal = page.getByRole('option', { name: 'Normal read and write' });
+  const readOnly = page.getByRole('option', { name: 'Read only' });
+  await expect(normal).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(readOnly).toBeFocused();
+  await expect(readOnly).toHaveAttribute('aria-selected', 'false');
+  await expect(trigger).toContainText('Normal read and write');
+  await page.keyboard.press('Enter');
+  await expect(list).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveAccessibleDescription(
+    'Read an eligible match but never store a generated response.',
+  );
+  await page.keyboard.press('Space');
+  await expect(readOnly).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(page.getByRole('option', { name: 'Private request' })).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('option', { name: 'Bypass cache' })).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(normal).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toContainText('Read only');
+  await trigger.click();
+  await page.getByRole('option', { name: 'Private request' }).click();
+  await expect(trigger).toHaveAccessibleDescription(
+    'Skip cache reads and writes. Prompt and response content are omitted from the recent query trace.',
+  );
+  await trigger.click();
+  await page.keyboard.press('Tab');
+  await expect(list).toBeHidden();
+  await expect(
+    page.getByRole('button', { name: 'Explain semantic caching in simple terms' }),
+  ).toBeFocused();
+  await trigger.click();
+  await page.keyboard.press('Shift+Tab');
+  await expect(list).toBeHidden();
+  await expect(page.getByLabel('Explicit namespace')).toBeFocused();
+  await trigger.click();
+  await page.getByLabel('Query text').click();
+  await expect(list).toBeHidden();
+  await expect(page.getByLabel('Query text')).toBeFocused();
+  await expect(trigger).toContainText('Private request');
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    const summary = page.getByText(/Effective request: namespace/);
+    const before = await summary.evaluate(
+      (element) => element.getBoundingClientRect().top + window.scrollY,
+    );
+    await trigger.click();
+    const menu = await list.boundingBox();
+    const field = await trigger.boundingBox();
+    expect(menu?.x).toBe(field?.x);
+    expect(menu?.width).toBe(field?.width);
+    expect(field?.height).toBe(
+      await page
+        .getByLabel('Explicit namespace')
+        .evaluate((element) => element.getBoundingClientRect().height),
+    );
+    expect(
+      await summary.evaluate(
+        (element) => element.getBoundingClientRect().top + window.scrollY,
+      ),
+    ).toBe(before);
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(1);
+    await page.keyboard.press('Escape');
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.locator('html').evaluate((element) => {
+    element.style.fontSize = '200%';
+  });
+  await trigger.click();
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations).toEqual([]);
+  await page.keyboard.press('Escape');
+  const closedAccessibility = await new AxeBuilder({ page }).analyze();
+  expect(closedAccessibility.violations).toEqual([]);
+});
+
+test('similarity plot fits the full scale with readable unclipped labels', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const plot = page.getByRole('region', { name: 'Similarity score visualization' });
+  await expect(plot.getByText('BACKEND 0.92')).toBeVisible();
+  const slider = page.getByLabel('Projection threshold', { exact: true });
+  await slider.focus();
+  await page.keyboard.press('End');
+  await expect(plot.getByText('PREVIEW 1.00')).toBeVisible();
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    const measurements = await plot.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      const svg = element.querySelector('svg');
+      const labels = Array.from(element.querySelectorAll('span'));
+      const ticks = labels.filter((label) =>
+        /^-?\d\.\d{2}$/.test(label.textContent ?? ''),
+      );
+      const tickBounds = ticks.map((tick) => tick.getBoundingClientRect());
+      return {
+        ticksOnOneBaseline: tickBounds.every((rect) => rect.top === tickBounds[0]?.top),
+        ticksDoNotOverlap: tickBounds.every(
+          (rect, index) =>
+            index === 0 || rect.left >= (tickBounds[index - 1]?.right ?? 0),
+        ),
+        width: bounds.width,
+        svgWidth: svg?.getBoundingClientRect().width,
+        overflow: element.scrollWidth - element.clientWidth,
+        labelsInside: labels.every((label) => {
+          const rect = label.getBoundingClientRect();
+          return rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1;
+        }),
+        regionFont: getComputedStyle(element.querySelector('li') ?? element).fontSize,
+        markerFont: getComputedStyle(
+          labels.find((label) => label.textContent?.includes('BACKEND')) ?? element,
+        ).fontSize,
+        tickFont: getComputedStyle(
+          labels.find((label) => label.textContent === '-1.00') ?? element,
+        ).fontSize,
+      };
+    });
+    expect(measurements.svgWidth).toBe(measurements.width);
+    expect(measurements.overflow).toBeLessThanOrEqual(1);
+    expect(measurements.labelsInside).toBe(true);
+    expect(measurements.regionFont).toBe('11px');
+    expect(measurements.markerFont).toBe('11px');
+    expect(measurements.tickFont).toBe('10px');
+    expect(measurements.ticksOnOneBaseline).toBe(true);
+    expect(measurements.ticksDoNotOverlap).toBe(true);
+    await expect(plot.getByText('-1.00', { exact: true })).toBeVisible();
+    await expect(plot.getByText('1.00', { exact: true })).toBeVisible();
+    expect(await plot.locator('line[stroke="var(--gold)"]').getAttribute('x1')).toBe(
+      '583.12',
+    );
+    expect(await plot.locator('line[stroke="var(--teal)"]').getAttribute('x1')).toBe(
+      '606',
+    );
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(1);
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.locator('html').evaluate((element) => {
+    element.style.fontSize = '200%';
+  });
+  expect(
+    await plot.evaluate((element) => element.scrollWidth - element.clientWidth),
+  ).toBeLessThanOrEqual(1);
+  await slider.focus();
+  await page.keyboard.press('Home');
+  await expect(plot.getByText('PREVIEW 0.00')).toBeVisible();
+  await expect(plot.getByText('BACKEND 0.92')).toBeVisible();
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations).toEqual([]);
+});
+
 test('Monitor policy evidence remains accessible and bounded at required widths', async ({
   page,
 }) => {
@@ -392,19 +578,11 @@ test('Monitor policy evidence remains accessible and bounded at required widths'
 
   await page.setViewportSize({ width: 820, height: 1_180 });
   await page.goto('/');
-  const disclosure = page.getByText('Advanced cache policy', {
-    exact: true,
-  });
-  await disclosure.focus();
-  await page.keyboard.press('Enter');
-  await expect(page.locator('details')).toHaveAttribute('open', '');
+  const modeSelector = page.getByRole('button', { name: /Request cache mode/ });
   await page.getByLabel('Explicit namespace').fill(namespace);
-  const refreshMode = page.getByRole('radio', {
-    name: /^Refresh and write/,
-  });
-  await refreshMode.focus();
-  await page.keyboard.press('Space');
-  await expect(refreshMode).toBeChecked();
+  await modeSelector.click();
+  await page.getByRole('option', { name: 'Refresh and write' }).click();
+  await expect(modeSelector).toContainText('Refresh and write');
 
   for (const viewport of VIEWPORTS) {
     await test.step(`monitor-${viewport.name}`, async () => {
@@ -424,7 +602,7 @@ test('Monitor policy evidence remains accessible and bounded at required widths'
 
       if ([744, 768, 820, 834].includes(viewport.width)) {
         const advancedColumns = await page
-          .locator('details > div')
+          .locator('[aria-labelledby="advanced-cache-policy-heading"] > div')
           .evaluate((element) => getComputedStyle(element).gridTemplateColumns);
         expect(advancedColumns.trim().split(/\s+/)).toHaveLength(1);
       }
@@ -432,11 +610,8 @@ test('Monitor policy evidence remains accessible and bounded at required widths'
   }
 
   await page.setViewportSize({ width: 820, height: 1_180 });
-  const normalMode = page.getByRole('radio', {
-    name: /^Normal read and write/,
-  });
-  await normalMode.focus();
-  await page.keyboard.press('Space');
+  await modeSelector.click();
+  await page.getByRole('option', { name: 'Normal read and write' }).click();
   await page.getByLabel('Query text').fill('Long responsive policy prompt');
   await page.getByRole('button', { name: 'Run query' }).click();
   await expect(
@@ -468,10 +643,10 @@ test('persistent catalog remains readable and bounded at required widths', async
   await page.setViewportSize({ width: 820, height: 1_180 });
   await page.goto('/evaluations');
 
-  const datasetsView = page.getByRole('button', { name: 'Datasets' });
+  const datasetsView = page.getByRole('link', { name: 'Datasets' });
   await datasetsView.focus();
   await page.keyboard.press('Enter');
-  await expect(datasetsView).toHaveAttribute('aria-pressed', 'true');
+  await expect(datasetsView).toHaveAttribute('aria-current', 'page');
   await expect(
     page.getByRole('heading', { name: 'Evaluation datasets' }),
   ).toBeVisible();
@@ -570,10 +745,10 @@ test('retained history comparison remains usable and accessible at required widt
   await page.setViewportSize({ width: 820, height: 1_180 });
   await page.goto('/evaluations');
 
-  const historyView = page.getByRole('button', { name: 'History' });
+  const historyView = page.getByRole('link', { name: 'History' });
   await historyView.focus();
   await page.keyboard.press('Enter');
-  await expect(historyView).toHaveAttribute('aria-pressed', 'true');
+  await expect(historyView).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: 'Run history' })).toBeVisible();
 
   const firstSelection = page
@@ -858,4 +1033,42 @@ test('evaluation controls and projections remain usable at required viewports', 
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(detailOverflow).toBeLessThanOrEqual(1);
+});
+
+test('routine metrics polling stays quiet while explicit refresh reports pending', async ({
+  page,
+}) => {
+  let requests = 0;
+  let hold = false;
+  let release: (() => void) | undefined;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/v1/metrics', async (route) => {
+    requests += 1;
+    if (hold) await pending;
+    await route.fallback();
+  });
+  await page.goto('/observability');
+  const metric = page.getByText('25.5 ms', { exact: true });
+  await expect(metric).toBeVisible();
+  const initialRequests = requests;
+  hold = true;
+  const refresh = page.getByRole('button', { name: 'Refresh metrics' });
+  await expect.poll(() => requests, { timeout: 10_000 }).toBe(initialRequests + 1);
+  await expect(metric).toBeVisible();
+  await expect(page.getByLabel('Loading runtime metrics')).toHaveCount(0);
+  await expect(page.getByText('Refreshing runtime metrics')).toHaveCount(0);
+  await expect(refresh).toHaveAttribute('aria-busy', 'false');
+  await expect(refresh).toBeEnabled();
+  await expect(page.locator('dl').first()).toHaveCSS('opacity', '1');
+  await refresh.click();
+  await expect(refresh).toHaveAttribute('aria-busy', 'true');
+  await expect(refresh).toBeDisabled();
+  await expect(page.getByText('Refreshing runtime metrics')).toBeVisible();
+  await expect(metric).toBeVisible();
+  expect(requests).toBe(initialRequests + 1);
+  release?.();
+  await expect(refresh).toBeEnabled();
+  await expect(page.getByText('Refreshing runtime metrics')).toHaveCount(0);
 });

@@ -52,11 +52,11 @@ export function PageHeader({
 
   return (
     <header className={classes}>
-      <div>
+      <div className="min-w-0">
         <p className={`ui-label ${EYEBROW_TONE_CLASSES[tone]}`}>{eyebrow}</p>
 
         <h1
-          className={`font-display italic text-(--text) ${TITLE_SIZE_CLASSES[size]}`}
+          className={`font-display wrap-break-word italic text-(--text) ${TITLE_SIZE_CLASSES[size]}`}
           id={headingId}
         >
           {title}

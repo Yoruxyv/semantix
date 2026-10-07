@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 
 import type { AuthStatus } from '@/features/auth/context/AuthContext';
+import { cacheNamespaceLabel } from '@/features/cache/namespace';
 import { Button } from '@/shared/components/ui';
 import { formatCount } from '@/shared/lib/formatters';
 
@@ -67,7 +68,7 @@ function SaveNamespaceControl({
           <option value="">Choose a namespace</option>
           {namespaces.map((namespace) => (
             <option key={namespace} value={namespace}>
-              {namespace}
+              {cacheNamespaceLabel(namespace)}
             </option>
           ))}
         </select>
@@ -79,7 +80,7 @@ function SaveNamespaceControl({
     <div>
       <p className="ui-label text-(--text-muted)">Namespace</p>
       <p className="font-data mt-2 wrap-break-word text-xs text-(--text-soft)">
-        {namespaces[0] ?? 'No authorized namespace'}
+        {cacheNamespaceLabel(namespaces[0] ?? 'No authorized namespace')}
       </p>
     </div>
   );

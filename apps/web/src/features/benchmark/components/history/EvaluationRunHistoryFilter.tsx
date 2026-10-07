@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 
 import type { AuthStatus } from '@/features/auth/context/AuthContext';
+import { cacheNamespaceLabel } from '@/features/cache/namespace';
 import { Button } from '@/shared/components/ui';
 
 const HISTORY_CONTROL_CLASS =
@@ -44,7 +45,7 @@ export function EvaluationRunHistoryFilter({
           >
             {namespaces.map((item) => (
               <option key={item} value={item}>
-                {item}
+                {cacheNamespaceLabel(item)}
               </option>
             ))}
           </select>
@@ -54,7 +55,7 @@ export function EvaluationRunHistoryFilter({
   } else if (authStatus === 'authenticated' && !hasGlobalNamespace) {
     namespaceControl = (
       <p className="font-data mt-3 text-xs text-(--text-soft)">
-        {namespace || 'No authorized namespace'}
+        {cacheNamespaceLabel(namespace) || 'No authorized namespace'}
       </p>
     );
   } else {

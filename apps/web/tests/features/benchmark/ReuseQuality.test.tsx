@@ -1,5 +1,12 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,6 +18,7 @@ import {
 import { isRecord } from '@/shared/api/validators';
 import { formatPercent } from '@/shared/lib/formatters';
 import { createTestQueryClient } from '../queryClient';
+import { deferred } from '../support';
 
 // Test-only receipt; this does not approve or certify the actual corpus.
 const receipt: unknown = JSON.parse(
@@ -22,9 +30,9 @@ if (!isRecord(receipt)) {
 }
 const rawReceipt = receipt;
 
-function renderEvidence(): void {
+function renderEvidence(client = createTestQueryClient()): void {
   render(
-    <QueryClientProvider client={createTestQueryClient()}>
+    <QueryClientProvider client={client}>
       <ReuseQuality />
     </QueryClientProvider>,
   );
@@ -44,7 +52,18 @@ describe('static reuse quality', () => {
     renderEvidence();
     expect(await screen.findByRole('heading', { name: 'Reuse quality' })).toBeTruthy();
     expect(screen.getByText(/not live telemetry/)).toBeTruthy();
-    expect(screen.getByText(summary.source_sha)).toBeTruthy();
+    expect(await screen.findByText(summary.source_sha)).toBeTruthy();
+    expect(
+      screen
+        .getByRole('link', { name: 'Read the reuse-quality methodology' })
+        .getAttribute('href'),
+    ).toBe(
+      'https://github.com/Yoruxyv/semantix/blob/main/packages/cache/benchmarks/reuse_quality/README.md',
+    );
+    expect(screen.getByText(/Neither 0.92 nor 1.0 guarantees safe reuse/)).toBeTruthy();
+    expect(screen.getByText('TP / (TP + FP)')).toBeTruthy();
+    expect(screen.getByText('FP / (FP + TN)')).toBeTruthy();
+    expect(screen.getByText('(TP + FP) / total')).toBeTruthy();
     expect(screen.getByText(summary.corpus.sha256)).toBeTruthy();
     expect(screen.getByText(summary.generated_at_utc)).toBeTruthy();
     const run = summary.runs.find(
@@ -135,6 +154,45 @@ describe('static reuse quality', () => {
     },
   );
 
+  it('retains validated evidence and selection during refetch failure, then recovers', async () => {
+    const client = createTestQueryClient();
+    const key = ['certified-static-reuse-quality'];
+    client.setQueryData(key, summary);
+    const request = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
+    const fetcher = vi.fn().mockReturnValueOnce(request.promise);
+    vi.stubGlobal('fetch', fetcher);
+    renderEvidence(client);
+    const source = screen.getByText(summary.source_sha);
+    const alternate = summary.runs.at(-1);
+    if (alternate === undefined) throw new Error('Missing alternate fixture run');
+    fireEvent.change(screen.getByLabelText('Embedding / normalization ablation'), {
+      target: { value: alternate.embedding.identity },
+    });
+    expect(screen.queryByText(/Loading static/)).toBeNull();
+    expect(screen.queryByText('Reuse quality unavailable')).toBeNull();
+    await act(async () => {
+      request.resolve({ ok: false, json: async () => receipt });
+    });
+    expect(await screen.findByText('Static evidence refresh failed')).toBeTruthy();
+    expect(screen.getByText(summary.source_sha)).toBe(source);
+    expect(screen.getByRole('combobox')).toHaveProperty(
+      'value',
+      alternate.embedding.identity,
+    );
+    expect(screen.queryByText('Reuse quality unavailable')).toBeNull();
+    fetcher.mockResolvedValue({ ok: true, json: async () => receipt });
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: key });
+    });
+    await waitFor(() =>
+      expect(screen.queryByText('Static evidence refresh failed')).toBeNull(),
+    );
+    expect(screen.getByText(summary.source_sha)).toBe(source);
+    expect(screen.getByRole('combobox')).toHaveProperty(
+      'value',
+      alternate.embedding.identity,
+    );
+  });
   it('fetches static content without API credentials and forwards cancellation', async () => {
     const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => receipt });
     vi.stubGlobal('fetch', fetcher);

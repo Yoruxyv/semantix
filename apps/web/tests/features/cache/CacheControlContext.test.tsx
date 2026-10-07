@@ -45,6 +45,9 @@ function CacheControlProbe(): JSX.Element {
   return (
     <div>
       <output data-testid="cache-state">{stateLabel}</output>
+      <output data-testid="cache-refresh-error">
+        {cacheState.status === 'ready' ? cacheState.refreshError : null}
+      </output>
       <output data-testid="cache-refresh-state">
         {isRefreshingCacheState ? 'refreshing' : 'idle'}
       </output>
@@ -225,4 +228,36 @@ describe('CacheControlProvider', () => {
     expect(screen.getByTestId('cache-state').textContent).toBe('0.94:4:0.92');
     expect(screen.getByTestId('cache-refresh-state').textContent).toBe('idle');
   });
+  it.each(['stats', 'threshold'])(
+    'preserves confirmed readings when the %s refresh fails, then recovers',
+    async (endpoint) => {
+      renderProbe();
+      await waitFor(() =>
+        expect(screen.getByTestId('cache-state').textContent).toBe('0.92:1:0.92'),
+      );
+      const failure = {
+        ok: false as const,
+        error: {
+          code: 'network_error' as const,
+          detail: 'Readings refresh failed',
+          status: null,
+        },
+      };
+      if (endpoint === 'stats') vi.mocked(getCacheStats).mockResolvedValueOnce(failure);
+      else vi.mocked(getCacheThreshold).mockResolvedValueOnce(failure);
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh cache state' }));
+      await waitFor(() =>
+        expect(screen.getByTestId('cache-refresh-error').textContent).toBe(
+          'Readings refresh failed',
+        ),
+      );
+      expect(screen.getByTestId('cache-state').textContent).toBe('0.92:1:0.92');
+      expect(screen.getByTestId('cache-refresh-state').textContent).toBe('idle');
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh cache state' }));
+      await waitFor(() =>
+        expect(screen.getByTestId('cache-refresh-error').textContent).toBe(''),
+      );
+      expect(screen.getByTestId('cache-state').textContent).toBe('0.92:1:0.92');
+    },
+  );
 });

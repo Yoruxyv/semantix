@@ -18,6 +18,7 @@ import {
 } from '@/features/observability/api/metricsApi';
 import { ObservabilityDashboard } from '@/features/observability/components/ObservabilityDashboard';
 import { deferred } from '../support';
+import { runtimeDiagnosticsKeys, runtimeMetricsKeys } from '@/shared/query/queryKeys';
 
 vi.mock('@/features/observability/api/metricsApi');
 
@@ -117,6 +118,30 @@ describe('ObservabilityDashboard', () => {
     expect(cacheGrid?.className).toContain('flex-wrap');
     expect(cacheGrid?.firstElementChild?.className).toContain('grow');
     expect(cacheGrid?.firstElementChild?.className).toContain('basis-56');
+  });
+
+  it('retains metrics and names their observation time when refresh fails', async () => {
+    vi.mocked(getRuntimeMetrics)
+      .mockResolvedValueOnce({ ok: true, data: metrics })
+      .mockResolvedValueOnce({
+        ok: false,
+        error: {
+          code: 'network_error',
+          detail: 'Metrics refresh failed safely',
+          status: null,
+        },
+      });
+    renderDashboard();
+    await screen.findByText('25.5 ms');
+    expect(
+      screen.getByText(/does not collect snapshots from embedded application caches/),
+    ).toBeTruthy();
+    const observed = document.querySelector('time');
+    expect(observed?.getAttribute('datetime')).toBe(metrics.observed_at);
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh metrics' }));
+    expect(await screen.findByText('Metrics refresh failed safely')).toBeTruthy();
+    expect(screen.getByText(/Showing the last successful observation/)).toBeTruthy();
+    expect(screen.getByText('25.5 ms')).toBeTruthy();
   });
 
   it('renders an endpoint error without simulated fallback data', async () => {
@@ -298,5 +323,97 @@ describe('ObservabilityDashboard', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+  it('keeps polling visually quiet and retains the last observation on failure', async () => {
+    vi.useFakeTimers();
+    const refresh = deferred<Awaited<ReturnType<typeof getRuntimeMetrics>>>();
+    vi.mocked(getRuntimeMetrics)
+      .mockResolvedValueOnce({ ok: true, data: metrics })
+      .mockReturnValueOnce(refresh.promise);
+    try {
+      renderDashboard();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      const value = screen.getByText('25.5 ms');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+      expect(getRuntimeMetrics).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('25.5 ms')).toBe(value);
+      expect(screen.queryByLabelText('Loading runtime metrics')).toBeNull();
+      expect(screen.queryByText('Refreshing runtime metrics')).toBeNull();
+      const button = screen.getByRole<HTMLButtonElement>('button', {
+        name: 'Refresh metrics',
+      });
+      expect(button.disabled).toBe(false);
+      expect(button.getAttribute('aria-busy')).toBe('false');
+      expect(value.closest('dl')?.getAttribute('aria-busy')).toBeNull();
+      await act(async () => {
+        refresh.resolve({ ok: true, data: { ...metrics, average_latency_ms: 26.5 } });
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByText('26.5 ms')).toBe(value);
+      vi.mocked(getRuntimeMetrics).mockResolvedValue({
+        ok: false,
+        error: { code: 'network_error', detail: 'Polling failed safely', status: null },
+      });
+      await act(async () => {
+        await queryClient.invalidateQueries({ queryKey: runtimeMetricsKeys.live() });
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByText('26.5 ms')).toBe(value);
+      expect(screen.getByText('Polling failed safely')).toBeTruthy();
+      expect(screen.queryByLabelText('Loading runtime metrics')).toBeNull();
+      expect(screen.queryByText('Refreshing runtime metrics')).toBeNull();
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps diagnostics revalidation quiet but reports an explicit refresh', async () => {
+    vi.mocked(getRuntimeMetrics).mockResolvedValue({ ok: true, data: metrics });
+    renderDashboard();
+    const value = await screen.findByText('One backend process');
+    const background = deferred<Awaited<ReturnType<typeof getRuntimeDiagnostics>>>();
+    vi.mocked(getRuntimeDiagnostics).mockReturnValueOnce(background.promise);
+    let revalidation: Promise<void> | undefined;
+    act(() => {
+      revalidation = queryClient.invalidateQueries({
+        queryKey: runtimeDiagnosticsKeys.live(),
+      });
+    });
+    await waitFor(() => expect(getRuntimeDiagnostics).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('One backend process')).toBe(value);
+    expect(screen.queryByText('Refreshing runtime diagnostics')).toBeNull();
+    expect(screen.queryByLabelText('Loading runtime diagnostics')).toBeNull();
+    const button = screen.getByRole<HTMLButtonElement>('button', {
+      name: 'Refresh diagnostics',
+    });
+    expect(button.disabled).toBe(false);
+    expect(button.getAttribute('aria-busy')).toBe('false');
+    await act(async () => {
+      background.resolve({ ok: true, data: diagnostics });
+      await revalidation;
+    });
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryState(runtimeDiagnosticsKeys.live())?.fetchStatus,
+      ).toBe('idle'),
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const manual = deferred<Awaited<ReturnType<typeof getRuntimeDiagnostics>>>();
+    vi.mocked(getRuntimeDiagnostics).mockReturnValueOnce(manual.promise);
+    fireEvent.click(button);
+    expect(await screen.findByText('Refreshing runtime diagnostics')).toBeTruthy();
+    expect(button.disabled).toBe(true);
+    expect(screen.getByText('One backend process')).toBe(value);
+    await act(async () => {
+      manual.resolve({ ok: true, data: diagnostics });
+    });
+    await waitFor(() => expect(button.disabled).toBe(false));
   });
 });

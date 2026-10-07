@@ -267,14 +267,12 @@ export function EvaluationDatasetCatalog({
         </Alert>
       )}
 
-      {(catalogQuery.isPending || catalogQuery.isFetching) && (
+      {catalogQuery.isPending && (
         <output
           aria-live="polite"
           className="font-data mt-4 block text-[10px]/5 text-(--text-muted)"
         >
-          {catalogQuery.isPending
-            ? 'Loading persisted dataset catalog...'
-            : 'Refreshing persisted dataset catalog...'}
+          Loading persisted dataset catalog...
         </output>
       )}
       {catalogStatus !== '' && (

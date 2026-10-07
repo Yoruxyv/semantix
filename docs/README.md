@@ -20,6 +20,7 @@ reference HTTP client for that server, not the first public PyPI target.
 | [Custom store](../packages/cache/examples/custom_store.py) | Structural CacheStore example |
 | [CacheStore conformance](cache-store-conformance.md) | Reusable developer tests, fixtures and backend evidence boundaries |
 | [Persistent support example](../packages/cache/examples/persistent_support.py) | Explicit initialization and durable customer-support caching |
+| [Reviewed reuse quality](../packages/cache/benchmarks/reuse_quality/README.md) | Static semantic evidence, lexical controls, calibration/held-out split and limitations |
 | [Runtime benchmarks](../packages/cache/benchmarks/README.md) | Reproducible workloads, profiling and measurement limits |
 | [Coalescing experiments](../packages/cache/benchmarks/COALESCING.md) | Provider-work reduction and cold-follower latency tradeoffs |
 

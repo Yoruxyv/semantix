@@ -115,7 +115,7 @@ export function CacheEntryCard({
     <li className="border-t border-(--hairline) py-5 transition-colors hover:bg-[rgba(234,230,221,0.025)]">
       <article>
         <header className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3">
               <span className="ui-label" style={{ color: status.color }}>
                 {status.label}
@@ -128,7 +128,7 @@ export function CacheEntryCard({
                 {shortCacheKey(entry.cache_key)}
               </code>
 
-              <span className="font-data text-[10px] text-(--text-muted)">
+              <span className="font-data min-w-0 break-all text-xs text-(--text-muted)">
                 namespace / {entry.namespace}
               </span>
             </div>

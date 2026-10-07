@@ -114,6 +114,10 @@ export function useCacheInspector({
     },
   });
 
+  const manualRefresh = useMutation({
+    mutationFn: () => entriesQuery.refetch({ cancelRefetch: false }),
+  });
+
   const data = entriesQuery.data ?? null;
   const loadError =
     data === null && entriesQuery.isError
@@ -131,8 +135,8 @@ export function useCacheInspector({
   }
 
   function refresh(): void {
-    if (!entriesQuery.isFetching) {
-      void entriesQuery.refetch({ cancelRefetch: false });
+    if (!manualRefresh.isPending) {
+      manualRefresh.mutate();
     }
   }
 
@@ -268,7 +272,7 @@ export function useCacheInspector({
     isClearing: mutation === 'clear',
     isLoading: data === null && entriesQuery.isPending,
     isMutating: mutation !== null,
-    isRefreshing: data !== null && entriesQuery.isFetching,
+    isRefreshing: manualRefresh.isPending,
     loadError,
     refreshError,
     mutation,

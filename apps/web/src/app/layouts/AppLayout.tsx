@@ -38,7 +38,12 @@ function Workspace({ mainRef }: WorkspaceProps): JSX.Element {
         </Alert>
       )}
 
-      <main className="py-10 sm:py-12" id="main-content" ref={mainRef} tabIndex={-1}>
+      <main
+        className="min-w-0 py-8 sm:py-10"
+        id="main-content"
+        ref={mainRef}
+        tabIndex={-1}
+      >
         <Outlet />
       </main>
     </>

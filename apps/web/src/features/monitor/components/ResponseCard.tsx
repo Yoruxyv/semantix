@@ -183,6 +183,11 @@ export function ResponseCard({
       >
         <p className="ui-label text-(--text-faint)">Decision evidence</p>
         <p className="mt-2 text-sm/6 text-(--text-soft)">{explanation}</p>
+        {result.cache_hit && (
+          <p className="mt-2 text-xs/5 text-(--text-muted)">
+            A cache hit reports the reuse decision. Review the response for correctness.
+          </p>
+        )}
 
         {evidence !== null && (
           <p className="font-data mt-3 wrap-break-word text-[11px]/5 text-(--text-muted)">

@@ -24,7 +24,6 @@ export function MonitorPage(): JSX.Element {
     cacheState,
     commitThreshold,
     isApplyingThreshold,
-    isRefreshingCacheState,
     previewThreshold,
     setPreviewThreshold,
   } = useCacheControl();
@@ -46,7 +45,7 @@ export function MonitorPage(): JSX.Element {
         </Alert>
       )}
 
-      <section className="mb-12 border-b border-(--hairline) pb-10">
+      <section className="mb-8 border-b border-(--hairline) pb-8">
         <QueryForm
           isLoading={queryState.status === 'loading'}
           onSubmit={submitPrompt}
@@ -84,13 +83,20 @@ export function MonitorPage(): JSX.Element {
 
       {cacheState.status === 'ready' && previewThreshold !== null && (
         <>
-          {isRefreshingCacheState && (
-            <output aria-live="polite" className="ui-label mb-5 block text-(--gold)">
-              Refreshing cache readings
-            </output>
+          {cacheState.refreshError !== undefined && (
+            <Alert
+              aria-live="polite"
+              className="mb-5 border-l border-(--coral) pl-4"
+              title="Cache readings may be stale"
+              tone="error"
+            >
+              <p className="font-data text-[11px]/5 text-(--text-soft)">
+                {cacheState.refreshError} Showing the last confirmed readings.
+              </p>
+            </Alert>
           )}
 
-          <div className="grid grid-cols-1 gap-14 min-[760px]:grid-cols-[minmax(280px,3fr)_minmax(0,2fr)]">
+          <div className="grid grid-cols-1 gap-8 min-[760px]:grid-cols-[minmax(280px,3fr)_minmax(0,2fr)]">
             <FieldMetrics
               cacheStats={cacheState.data.cacheStats}
               threshold={previewThreshold}

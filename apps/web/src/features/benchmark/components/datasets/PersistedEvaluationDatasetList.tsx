@@ -1,5 +1,7 @@
 import type { JSX } from 'react';
 
+import { cacheNamespaceLabel } from '@/features/cache/namespace';
+
 import { Button, EmptyState, InlineConfirmation } from '@/shared/components/ui';
 import { formatCount } from '@/shared/lib/formatters';
 
@@ -69,7 +71,7 @@ export function PersistedEvaluationDatasetList({
             >
               {namespaces.map((namespace) => (
                 <option key={namespace} value={namespace}>
-                  {namespace}
+                  {cacheNamespaceLabel(namespace)}
                 </option>
               ))}
             </select>

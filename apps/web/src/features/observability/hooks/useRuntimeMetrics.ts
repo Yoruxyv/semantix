@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import type { ApiError } from '@/shared/api/types';
@@ -46,14 +46,18 @@ export function useRuntimeMetrics(): RuntimeMetricsController {
     state = { status: 'loading' };
   }
 
+  const manualRefresh = useMutation({
+    mutationFn: () => query.refetch({ cancelRefetch: false }),
+  });
+
   const refresh = useCallback((): void => {
-    if (!query.isFetching) {
-      void query.refetch({ cancelRefetch: false });
+    if (!manualRefresh.isPending) {
+      manualRefresh.mutate();
     }
-  }, [query]);
+  }, [manualRefresh]);
 
   return {
-    isRefreshing: query.isFetching,
+    isRefreshing: manualRefresh.isPending,
     refreshError:
       query.data !== undefined && query.isError
         ? apiErrorFromUnknown(query.error)

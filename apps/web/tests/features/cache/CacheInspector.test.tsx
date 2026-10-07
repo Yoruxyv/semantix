@@ -449,8 +449,11 @@ describe('CacheInspector', () => {
     expect(screen.queryByLabelText('Loading cache entries')).toBeNull();
     await waitFor(() => expect(listCacheEntries).toHaveBeenCalledOnce());
     expect(
-      screen.getByRole('button', { name: 'Refreshing' }).getAttribute('aria-busy'),
-    ).toBe('true');
+      screen.getByRole('button', { name: 'Refresh' }).getAttribute('aria-busy'),
+    ).toBe('false');
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Refresh' }).disabled,
+    ).toBe(false);
 
     refresh.resolve(successfulPage([betaEntry], params));
     expect(await screen.findByText(betaEntry.prompt)).toBeTruthy();
@@ -534,5 +537,45 @@ describe('CacheInspector', () => {
     await waitFor(() => expect(clearCache).toHaveBeenCalledOnce());
     expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryData(detailKey)).toBeUndefined();
+  });
+  it('retains entries on failed revalidation and only marks manual refresh busy', async () => {
+    vi.mocked(listCacheEntries).mockImplementation(async (params) =>
+      successfulPage([alphaEntry], params),
+    );
+    renderInspector();
+    const entry = await screen.findByText(alphaEntry.prompt);
+    vi.mocked(listCacheEntries).mockResolvedValueOnce({
+      ok: false,
+      error: {
+        code: 'network_error',
+        detail: 'Background refresh failed',
+        status: null,
+      },
+    });
+    await queryClient.invalidateQueries({ queryKey: cacheEntryKeys.lists() });
+    expect(await screen.findByText(/Background refresh failed/)).toBeTruthy();
+    expect(screen.getByText(alphaEntry.prompt)).toBe(entry);
+    expect(screen.queryByLabelText('Loading cache entries')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Refreshing' })).toBeNull();
+    const refresh = deferred<Awaited<ReturnType<typeof listCacheEntries>>>();
+    vi.mocked(listCacheEntries).mockReturnValueOnce(refresh.promise);
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    const button = await screen.findByRole<HTMLButtonElement>('button', {
+      name: 'Refreshing',
+    });
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute('aria-busy')).toBe('true');
+    expect(screen.getByText(alphaEntry.prompt)).toBe(entry);
+    refresh.resolve(
+      successfulPage([betaEntry], {
+        offset: 0,
+        limit: 10,
+        namespace: '',
+        search: '',
+        sort: 'newest',
+      }),
+    );
+    expect(await screen.findByText(betaEntry.prompt)).toBeTruthy();
+    expect(screen.queryByText(/Background refresh failed/)).toBeNull();
   });
 });

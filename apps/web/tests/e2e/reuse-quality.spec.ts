@@ -28,7 +28,7 @@ test('static quality evidence is accessible, responsive and keyboard operable', 
     await route.fulfill({ contentType: 'application/json', body: receipt });
   });
   await page.goto('/evaluations');
-  const quality = page.getByRole('button', { name: 'Reuse quality', exact: true });
+  const quality = page.getByRole('link', { name: 'Reuse quality', exact: true });
   await quality.focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Reuse quality' })).toBeVisible();
@@ -47,6 +47,20 @@ test('static quality evidence is accessible, responsive and keyboard operable', 
   await expect(
     page.getByRole('table', { name: /Held-out threshold sweep/ }),
   ).toBeVisible();
+  await detailed.press('Enter');
+  await page.setViewportSize({ width: 320, height: 900 });
+  await detailed.press('Enter');
+  const tableRegion = page.getByRole('region', {
+    name: 'Threshold results, scroll horizontally for all columns',
+  });
+  await tableRegion.focus();
+  await tableRegion.press('ArrowRight');
+  await expect
+    .poll(() => tableRegion.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(0);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+  ).toBeLessThanOrEqual(1);
   await detailed.press('Enter');
   const configuration = page.getByLabel('Embedding / normalization ablation');
   await configuration.focus();
@@ -83,7 +97,7 @@ test('missing manifest never shows fallback evidence', async ({ page }) => {
     await route.fulfill({ status: 404, body: 'missing' });
   });
   await page.goto('/evaluations');
-  await page.getByRole('button', { name: 'Reuse quality', exact: true }).click();
+  await page.getByRole('link', { name: 'Reuse quality', exact: true }).click();
   await expect(page.getByText('Reuse quality unavailable')).toBeVisible();
   await expect(page.getByText(/No fallback metrics/)).toBeVisible();
   await expect(page.getByText('Source commit SHA')).toHaveCount(0);
