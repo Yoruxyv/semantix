@@ -9,7 +9,7 @@ export interface CacheControlData {
 
 export type CacheControlReadState =
   | { status: 'loading' }
-  | { status: 'ready'; data: CacheControlData }
+  | { status: 'ready'; data: CacheControlData; refreshError?: string }
   | { status: 'error'; error: string };
 
 export interface CacheControlContextValue {

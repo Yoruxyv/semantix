@@ -165,7 +165,6 @@ export function useBenchmark(): BenchmarkController {
   return {
     datasets,
     datasetsLoading,
-    datasetsRefreshing: datasetQuery.data !== undefined && datasetQuery.isFetching,
     canRun,
     canSaveImport,
     error: error ?? datasetError,

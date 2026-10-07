@@ -37,7 +37,6 @@ export interface BenchmarkForm {
 export interface BenchmarkController {
   datasets: BenchmarkDatasetSummary[];
   datasetsLoading: boolean;
-  datasetsRefreshing: boolean;
   canRun: boolean;
   canSaveImport: boolean;
   error: string | null;

@@ -274,8 +274,8 @@ describe('dashboard correctness', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByText('Advanced cache policy'));
-    fireEvent.click(screen.getByRole('radio', { name: /^Private request/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Request cache mode/ }));
+    fireEvent.click(screen.getByRole('option', { name: 'Private request' }));
     fireEvent.change(screen.getByLabelText('Query text'), {
       target: { value: privatePrompt },
     });

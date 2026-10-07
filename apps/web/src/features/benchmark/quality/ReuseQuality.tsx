@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
 
-import { EmptyState } from '@/shared/components/ui';
+import { Alert, EmptyState } from '@/shared/components/ui';
 import { formatDecimal, formatPercent } from '@/shared/lib/formatters';
 import { LineChart } from '../components/charts/LineChart';
 import {
@@ -9,6 +9,9 @@ import {
   type QualityMetrics,
   type QualitySummary,
 } from './qualitySummary';
+
+const METHODOLOGY_URL =
+  'https://github.com/Yoruxyv/semantix/blob/main/packages/cache/benchmarks/reuse_quality/README.md';
 
 function Evidence({ summary }: Readonly<{ summary: QualitySummary }>): JSX.Element {
   const [identity, setIdentity] = useState(
@@ -31,16 +34,26 @@ function Evidence({ summary }: Readonly<{ summary: QualitySummary }>): JSX.Eleme
       />
     );
   }
-  const metrics: Array<{ label: string; key: keyof QualityMetrics }> = [
-    { label: 'Reuse precision', key: 'reuse_precision' },
-    { label: 'False acceptance rate', key: 'false_accept_rate' },
-    { label: 'Reuse recall', key: 'reuse_recall' },
-    { label: 'Missed reuse / false rejection rate', key: 'false_reject_rate' },
-    {
-      label: 'Generation avoidance',
-      key: 'generation_avoidance',
-    },
-  ];
+  const metrics: Array<{ label: string; key: keyof QualityMetrics; formula: string }> =
+    [
+      { label: 'Reuse precision', key: 'reuse_precision', formula: 'TP / (TP + FP)' },
+      {
+        label: 'False acceptance rate',
+        key: 'false_accept_rate',
+        formula: 'FP / (FP + TN)',
+      },
+      { label: 'Reuse recall', key: 'reuse_recall', formula: 'TP / (TP + FN)' },
+      {
+        label: 'Missed reuse / false rejection rate',
+        key: 'false_reject_rate',
+        formula: 'FN / (TP + FN)',
+      },
+      {
+        label: 'Generation avoidance',
+        key: 'generation_avoidance',
+        formula: '(TP + FP) / total',
+      },
+    ];
   const series = [
     {
       label: 'False acceptance rate / negatives',
@@ -59,19 +72,12 @@ function Evidence({ summary }: Readonly<{ summary: QualitySummary }>): JSX.Eleme
     },
   ] as const;
   return (
-    <section aria-labelledby="reuse-quality-heading">
-      <h2 className="font-display text-2xl" id="reuse-quality-heading">
-        Reuse quality
-      </h2>
-      <p className="mt-2 text-sm/6 text-(--text-muted)">
-        Reviewed static benchmark evidence — not live telemetry. The pretrained semantic
-        baseline is primary; lexical controls are separate stress tests.
-      </p>
+    <>
       <label className="mt-5 block text-sm" htmlFor="quality-configuration">
         Embedding / normalization ablation
       </label>
       <select
-        className="mt-2 w-full max-w-xl border border-(--hairline) bg-(--surface) p-2"
+        className="mt-2 min-h-11 w-full min-w-0 max-w-xl border border-(--hairline) bg-(--surface) px-3 py-2 text-sm text-(--text) focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-(--gold)"
         id="quality-configuration"
         value={identity}
         onChange={(event) => setIdentity(event.target.value)}
@@ -96,12 +102,19 @@ function Evidence({ summary }: Readonly<{ summary: QualitySummary }>): JSX.Eleme
           ? 'Pretrained semantic baseline'
           : 'Lexical control'}
       </p>
-      <dl className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {metrics.map(({ label, key }) => (
+      <h3 className="mt-6 text-base font-semibold">
+        Held-out results at calibration-selected threshold{' '}
+        {formatDecimal(run.calibrated_threshold, 2)}
+      </h3>
+      <dl className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {metrics.map(({ label, key, formula }) => (
           <div className="border-t border-(--hairline) pt-3" key={key}>
             <dt className="text-sm text-(--text-muted)">{label}</dt>
             <dd className="font-data mt-2 text-xl">
               {formatPercent(point.held_out[key])}
+              <span className="mt-2 block text-xs font-normal text-(--text-muted)">
+                {formula}
+              </span>
             </dd>
           </div>
         ))}
@@ -179,11 +192,12 @@ function Evidence({ summary }: Readonly<{ summary: QualitySummary }>): JSX.Eleme
           series={series.map((item) => ({
             color: item.color,
             label: item.label,
-            points: run.sweep.map((row) => ({
-              kind: 'projected',
-              x: row.threshold,
-              y: row.held_out[item.key] ?? 0,
-            })),
+            points: run.sweep.flatMap((row) => {
+              const value = row.held_out[item.key];
+              return value === null
+                ? []
+                : [{ kind: 'projected' as const, x: row.threshold, y: value }];
+            }),
           }))}
         />
       </div>
@@ -191,13 +205,22 @@ function Evidence({ summary }: Readonly<{ summary: QualitySummary }>): JSX.Eleme
         Threshold selection minimizes calibration wrong reuse, then maximizes correct
         reuse. Held-out sweep is descriptive, never used for tuning. Default and
         calibrated decisions were replayed through the public cache API. Higher
-        thresholds can reduce wrong reuse while increasing generation. Runtime
-        normalization is unchanged.
+        thresholds can reduce wrong reuse while increasing generation. Neither 0.92 nor
+        1.0 guarantees safe reuse, and this synthetic corpus does not establish
+        production quality. Normalization is an ablation; runtime defaults are
+        unchanged.
       </p>
       <details className="mt-6 text-sm/6">
-        <summary className="cursor-pointer">Detailed threshold results</summary>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-sm/6">
+        <summary className="min-h-11 cursor-pointer py-3 focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-(--gold)">
+          Detailed threshold results
+        </summary>
+        <section
+          className="mt-4 overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-(--gold)"
+          aria-label="Threshold results, scroll horizontally for all columns"
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- WCAG 2.1.1: a named scroll region must accept keyboard focus, including when it has no focusable content.
+          tabIndex={0}
+        >
+          <table className="w-full min-w-max text-left text-sm/6">
             <caption className="mb-3 text-left">
               Held-out threshold sweep; calibration FP / TP shown separately
             </caption>
@@ -250,23 +273,25 @@ function Evidence({ summary }: Readonly<{ summary: QualitySummary }>): JSX.Eleme
               ))}
             </tbody>
           </table>
-        </div>
+        </section>
       </details>
       <details className="mt-6 text-sm/6">
-        <summary className="cursor-pointer">Evidence limitations</summary>
+        <summary className="min-h-11 cursor-pointer py-3 focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-(--gold)">
+          Evidence limitations
+        </summary>
         <ul className="mt-3 list-disc pl-5">
           {summary.limitations.map((limitation) => (
             <li key={limitation}>{limitation}</li>
           ))}
         </ul>
         <a
-          className="mt-3 inline-block underline"
+          className="mt-3 inline-block underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-(--gold)"
           href={import.meta.env.BASE_URL + 'benchmarks/reuse-quality-summary.json'}
         >
           Reviewed machine-readable manifest
         </a>
       </details>
-    </section>
+    </>
   );
 }
 
@@ -277,11 +302,30 @@ export function ReuseQuality(): JSX.Element {
     retry: false,
     staleTime: 0,
   });
-  if (query.isPending) {
-    return <output aria-live="polite">Loading static reuse-quality evidence…</output>;
-  }
-  if (query.isError) {
-    return (
+  let content: JSX.Element;
+  if (query.data !== undefined) {
+    content = (
+      <>
+        {query.isError && (
+          <Alert
+            aria-live="polite"
+            className="mb-4 border-l border-(--coral) pl-4 text-sm/6"
+            title="Static evidence refresh failed"
+            tone="error"
+          >
+            Showing the last validated reviewed receipt. It may be stale; its source,
+            corpus, and generation timestamp remain recorded below.
+          </Alert>
+        )}
+        <Evidence summary={query.data} />
+      </>
+    );
+  } else if (query.isPending) {
+    content = (
+      <output aria-live="polite">Loading static reuse-quality evidence…</output>
+    );
+  } else {
+    content = (
       <EmptyState
         className="py-5"
         title="Reuse quality unavailable"
@@ -289,5 +333,23 @@ export function ReuseQuality(): JSX.Element {
       />
     );
   }
-  return <Evidence summary={query.data} />;
+  return (
+    <section aria-labelledby="reuse-quality-heading">
+      <h2 className="font-display text-2xl italic" id="reuse-quality-heading">
+        Reuse quality
+      </h2>
+      <p className="mt-2 max-w-3xl text-sm/6 text-(--text-muted)">
+        Reviewed static benchmark evidence — not live telemetry. The pretrained semantic
+        baseline is primary; lexical controls are separate stress tests. Calibration
+        selects the threshold; held-out cases evaluate that choice.
+      </p>
+      <a
+        className="mt-3 inline-flex min-h-11 items-center text-sm text-(--teal) underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-(--gold)"
+        href={METHODOLOGY_URL}
+      >
+        Read the reuse-quality methodology
+      </a>
+      <div className="mt-4">{content}</div>
+    </section>
+  );
 }

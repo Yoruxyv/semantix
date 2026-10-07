@@ -3,6 +3,7 @@ import {
   formatCount,
   formatHoursMinutesDuration,
   formatLatency,
+  formatTimestamp,
 } from '@/shared/lib/formatters';
 import {
   RUNTIME_METRICS_REFRESH_INTERVAL_MS,
@@ -135,18 +136,16 @@ export function ObservabilityDashboard(): JSX.Element {
           <Button
             aria-busy={isRefreshing}
             className="border-(--hairline) bg-(--surface) text-(--text-soft) hover:border-(--gold) hover:text-(--gold) focus-visible:outline-(--gold)"
-            disabled={isRefreshing}
-            size="large"
+            disabled={isRefreshing || state.status === 'loading'}
             variant="secondary"
             onClick={refresh}
           >
             Refresh metrics
           </Button>
         }
-        className="border-b border-(--hairline) pb-8"
-        description="Query traffic, cache decisions, provider savings, coalescing, latency, and cache lifecycle counters from this backend process."
+        className="border-b border-(--hairline) pb-6"
+        description="Query traffic, cache decisions, generation attempts, coalescing, and latency from one server process. This workbench does not collect snapshots from embedded application caches."
         eyebrow="Live process telemetry"
-        size="large"
         title="Observability"
         tone="teal"
       />
@@ -171,11 +170,16 @@ export function ObservabilityDashboard(): JSX.Element {
           <Alert
             className="mb-6 border border-(--hairline) bg-(--surface) p-4"
             title="Metrics refresh failed"
+            aria-live="polite"
             tone="error"
           >
             <p className="mt-2 text-sm text-(--text-muted)">
-              {refreshError.detail ??
-                'Cached metrics remain visible while the endpoint recovers.'}
+              {refreshError.detail ?? 'The metrics endpoint could not be reached.'}
+            </p>
+            <p className="mt-2 text-xs/5 text-(--text-soft)">
+              Showing the last successful observation:{' '}
+              {formatTimestamp(state.data.observed_at)}. Counts may be stale; refresh to
+              confirm the current process state.
             </p>
           </Alert>
         )}
@@ -183,6 +187,13 @@ export function ObservabilityDashboard(): JSX.Element {
         {state.status === 'ready' && (
           <div className="space-y-8">
             <div className="flex flex-wrap gap-x-6 gap-y-2 border-b border-(--hairline) pb-4 text-xs text-(--text-faint)">
+              <span>
+                Observed:{' '}
+                <time dateTime={state.data.observed_at}>
+                  {formatTimestamp(state.data.observed_at)}
+                </time>
+              </span>
+
               <span>
                 Auto-refresh: {formatCount(RUNTIME_METRICS_REFRESH_INTERVAL_MS / 1_000)}{' '}
                 seconds

@@ -22,6 +22,7 @@ Panduan embedded berikut tersedia dalam bahasa Inggris.
 | [Store kustom](../../../packages/cache/examples/custom_store.py) | Contoh CacheStore struktural |
 | [Conformance CacheStore](../../cache-store-conformance.md) | Pengujian pengembang yang dapat digunakan ulang, fixture, dan batas bukti backend |
 | [Contoh support persisten](../../../packages/cache/examples/persistent_support.py) | Inisialisasi eksplisit dan cache customer-support yang bertahan antarproses |
+| [Kualitas reuse yang ditinjau](../../../packages/cache/benchmarks/reuse_quality/README.md) | Bukti semantik statis, kontrol leksikal, pemisahan calibration/held-out, dan batasannya |
 | [Benchmark runtime](../../../packages/cache/benchmarks/README.md) | Workload reproducible, profiling, dan batas pengukuran |
 | [Eksperimen coalescing](../../../packages/cache/benchmarks/COALESCING.md) | Pengurangan kerja provider dan tradeoff latensi cold follower |
 

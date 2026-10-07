@@ -20,7 +20,8 @@
   <a href="#how-it-works">How it works</a> ·
   <a href="#verified-ai-providers">Providers</a> ·
   <a href="#storage">Storage</a> ·
-  <a href="#performance">Benchmarks</a>
+  <a href="#performance">Benchmarks</a> ·
+  <a href="packages/cache/benchmarks/reuse_quality/README.md">Reuse quality</a>
 </p>
 
 **semantix-cache** is the intended first public PyPI product. Its 0.1.0 API
@@ -291,19 +292,20 @@ prerequisites. Operational tooling lives in `ops/`; developer tooling in `script
 
 ---
 
-### ✨ What Semantix provides
+### ✨ Optional server workspaces
 
 | Workspace | Purpose |
 |---|---|
 | **Monitor** | Submit namespace-scoped policy probes and inspect cache hits, misses, latency, matched prompts, and similarity evidence |
-| **Cache Inspector** | Search entries, inspect metadata, delete records, clear namespaces, and manage the threshold |
+| **Cache Inspector** | Search entries, inspect metadata, delete records, clear namespaces safely |
 | **Evaluations** | Measure precision, recall, false hits, false misses, inspect filtered case evidence, and export reproducible runs |
 | **Observability** | Track process metrics and inspect safe, read-only runtime diagnostics for evaluation reproducibility |
 
 ### Product tour
 
-The local Hugging Face demo exposes the same workspaces used to inspect cache
-behavior, evaluate decisions, and diagnose the running system. The screenshots
+The optional server workbench inspects its connected server cache, evaluates
+ordered runs, and diagnoses that server. It does not observe arbitrary embedded
+application caches. The local Hugging Face demo exposes the same workspaces. The screenshots
 below show the current UI; select any image to open the original resolution.
 
 #### Cache Inspector
@@ -316,7 +318,11 @@ metadata without exposing raw embeddings.
 #### Evaluations
 
 Run an isolated dataset and inspect measured cache behavior, provider calls,
-latency, and classification outcomes.
+latency, and classification outcomes. Bookmark `/evaluations?view=runs`,
+`?view=datasets`, `?view=history`, or `?view=reuse-quality` to reopen the selected
+view. Reuse quality displays [reviewed static library evidence and methodology](packages/cache/benchmarks/reuse_quality/README.md),
+with calibration and held-out results separate from ordered server runs. These
+synthetic results do not establish production quality or a universally safe threshold.
 
 [![Evaluations showing results for the built-in semantic safety dataset](docs/assets/screenshots/evaluations-results.png)](docs/assets/screenshots/evaluations-results.png)
 
@@ -559,6 +565,7 @@ The [documentation index](docs/README.md) separates embedded and server guides.
 | [Context identity and migration](docs/context-identity-and-migration.md) | Explicit scopes, embedding revisions and safe migration |
 | [Embedded storage](docs/embedded-storage.md) | Memory, optional PostgreSQL and user-owned databases |
 | [Examples](packages/cache/examples/) | Application-controlled generation and stores |
+| [Reviewed reuse quality](packages/cache/benchmarks/reuse_quality/README.md) | Semantic baseline, lexical controls, calibration/held-out split and evidence limitations |
 | [Benchmark methodology](packages/cache/benchmarks/README.md) | Reproducible local runtime workloads and limitations |
 | [Server getting started](docs/guides/getting-started.md) | Optional server environment files and Docker workflows |
 | [HTTP client guide](packages/client/README.md) | Typed client for an already-running compatible server |
@@ -718,9 +725,11 @@ Frontend:
 cd apps/web
 npm ci
 npm run lint
+npm run format:check
 npm run imports:check
-npm run test
+npm run test:coverage
 npm run build
+npm run bundle:check
 ```
 
 See [Development](docs/guides/development.md) for local toolchains, architecture

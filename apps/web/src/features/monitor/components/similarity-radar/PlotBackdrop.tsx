@@ -7,7 +7,6 @@ import {
   PLOT_TOP,
   scoreToX,
 } from './model';
-import { formatDecimal } from '@/shared/lib/formatters';
 
 import type { JSX } from 'react';
 
@@ -48,50 +47,12 @@ export function PlotBackdrop({
         y={PLOT_TOP}
       />
 
-      <text
-        fill="var(--text-faint)"
-        fontFamily="IBM Plex Mono"
-        fontSize="9"
-        x={PLOT_LEFT + 8}
-        y={PLOT_TOP + 15}
-      >
-        WEAK
-      </text>
-      <text
-        fill="var(--text-faint)"
-        fontFamily="IBM Plex Mono"
-        fontSize="9"
-        x={scoreToX(0.75) + 8}
-        y={PLOT_TOP + 15}
-      >
-        REVIEW
-      </text>
-      <text
-        fill="var(--text-faint)"
-        fontFamily="IBM Plex Mono"
-        fontSize="9"
-        x={scoreToX(0.9) + 8}
-        y={PLOT_TOP + 15}
-      >
-        STRONG
-      </text>
-
       {FIXED_TICKS.map((tick) => {
         const x = scoreToX(tick);
 
         return (
           <g key={tick}>
             <line stroke="var(--hairline)" x1={x} x2={x} y1={PLOT_TOP} y2={AXIS_Y} />
-            <text
-              fill="var(--text-faint)"
-              fontFamily="IBM Plex Mono"
-              fontSize="9"
-              textAnchor="middle"
-              x={x}
-              y={AXIS_Y + 18}
-            >
-              {formatDecimal(tick, 2)}
-            </text>
           </g>
         );
       })}
@@ -112,16 +73,6 @@ export function PlotBackdrop({
         y1={PLOT_TOP - 13}
         y2={AXIS_Y}
       />
-      <text
-        fill="var(--gold)"
-        fontFamily="IBM Plex Mono"
-        fontSize="9"
-        textAnchor="middle"
-        x={appliedThresholdX}
-        y={PLOT_TOP - 20}
-      >
-        BACKEND {formatDecimal(appliedThreshold, 2)}
-      </text>
 
       {hasPendingThreshold && (
         <>
@@ -134,16 +85,6 @@ export function PlotBackdrop({
             y1={PLOT_TOP}
             y2={AXIS_Y}
           />
-          <text
-            fill="var(--teal)"
-            fontFamily="IBM Plex Mono"
-            fontSize="9"
-            textAnchor="middle"
-            x={previewThresholdX}
-            y={AXIS_Y + 32}
-          >
-            PREVIEW {formatDecimal(previewThreshold, 2)}
-          </text>
         </>
       )}
     </>

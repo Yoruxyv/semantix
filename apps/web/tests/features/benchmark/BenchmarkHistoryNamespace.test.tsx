@@ -8,6 +8,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -25,10 +26,12 @@ vi.mock('../../../src/features/benchmark/api/benchmarkApi');
 
 let queryClient: QueryClient;
 
-function renderDashboard() {
+function renderDashboard(initialEntry = '/evaluations') {
   return render(<BenchmarkDashboard />, {
     wrapper: ({ children }: Readonly<{ children: ReactNode }>) => (
-      <QueryTestProvider client={queryClient}>{children}</QueryTestProvider>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <QueryTestProvider client={queryClient}>{children}</QueryTestProvider>
+      </MemoryRouter>
     ),
   });
 }

@@ -4,11 +4,14 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { canSubmitQueries } from '@/features/auth/permissions';
 import {
   CACHE_NAMESPACE_PATTERN_SOURCE,
+  cacheNamespaceLabel,
   isCacheNamespace,
   MAX_CACHE_NAMESPACE_LENGTH,
 } from '@/features/cache/namespace';
-import { Button } from '@/shared/components/ui';
+import { Button, PageHeader } from '@/shared/components/ui';
 import { formatCount } from '@/shared/lib/formatters';
+
+import { RequestCacheModeSelect } from './RequestCacheModeSelect';
 
 import {
   QUERY_POLICY_LABELS,
@@ -29,33 +32,6 @@ const EXAMPLE_PROMPTS = [
 
 const MAX_PROMPT_LENGTH = 2_000;
 const MAX_PROMPT_LENGTH_LABEL = formatCount(MAX_PROMPT_LENGTH);
-
-const POLICY_OPTIONS: ReadonlyArray<{
-  description: string;
-  mode: QueryPolicyMode;
-}> = [
-  {
-    mode: 'normal',
-    description: 'Read an eligible match or store a newly generated response.',
-  },
-  {
-    mode: 'read-only',
-    description: 'Read an eligible match but never store a generated response.',
-  },
-  {
-    mode: 'refresh',
-    description: 'Skip cache lookup, generate a response, and write it to cache.',
-  },
-  {
-    mode: 'bypass',
-    description: 'Skip cache reads and writes for this request.',
-  },
-  {
-    mode: 'private',
-    description:
-      'Skip cache reads and writes. Prompt and response content are omitted from the recent query trace.',
-  },
-];
 
 const POLICY_FIELDS: Record<
   QueryPolicyMode,
@@ -167,24 +143,27 @@ export function QueryForm({
     submitLabel = 'Operator access required';
   }
 
+  let submitDescription: string | undefined;
+  if (!canSubmit) {
+    submitDescription = 'query-access-note';
+  } else if (!namespaceValid) {
+    submitDescription = 'query-namespace-required';
+  }
+
   return (
     <section aria-labelledby="query-heading">
-      <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-        <div>
-          <h1 className="font-display text-3xl italic" id="query-heading">
-            Probe the cache
-          </h1>
-
-          <p className="mt-2 max-w-2xl text-sm/6 text-(--text-muted)">
-            Each prompt is embedded, compared with the nearest stored vector, then
-            either reused or sent upstream.
+      <PageHeader
+        actions={
+          <p className="ui-label text-(--text-faint)">
+            Max {MAX_PROMPT_LENGTH_LABEL} chars
           </p>
-        </div>
-
-        <p className="ui-label text-(--text-faint)">
-          Max {MAX_PROMPT_LENGTH_LABEL} chars
-        </p>
-      </div>
+        }
+        className="mb-6"
+        description="Run a controlled query against this server. Inspect whether its cache reused a response, called generation, or wrote an entry. Similarity is decision evidence, not proof of answer correctness."
+        eyebrow="Live server query"
+        headingId="query-heading"
+        title="Probe the cache"
+      />
 
       <form aria-busy={isLoading} onSubmit={(event) => void handleSubmit(event)}>
         <label className="ui-label mb-2 block text-(--text-muted)" htmlFor="prompt">
@@ -230,132 +209,102 @@ export function QueryForm({
           </p>
         )}
 
-        <details className="mt-5 border-y border-(--hairline) py-4">
-          <summary className="ui-label min-h-11 cursor-pointer py-3 text-(--teal) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--teal)">
-            Advanced cache policy
-          </summary>
+        <div className="mt-5 border-t border-(--hairline) pt-5">
+          <p className="ui-label text-(--text-muted)">Cache namespace</p>
 
-          <div className="mt-4 grid gap-6 lg:grid-cols-2">
-            <div>
-              <p className="ui-label text-(--text-muted)">Cache namespace</p>
+          {hasWildcardNamespace && (
+            <label className="mt-3 block">
+              <span className="text-sm text-(--text-soft)">Explicit namespace</span>
+              <input
+                aria-describedby={
+                  namespaceValid
+                    ? 'query-namespace-note'
+                    : 'query-namespace-note query-namespace-required'
+                }
+                aria-invalid={!namespaceValid}
+                className={CONTROL_CLASS}
+                maxLength={MAX_CACHE_NAMESPACE_LENGTH}
+                pattern={CACHE_NAMESPACE_PATTERN_SOURCE}
+                spellCheck={false}
+                value={namespace}
+                onChange={(event) => {
+                  setNamespace(event.target.value);
+                  setNamespaceError(null);
+                }}
+              />
+            </label>
+          )}
 
-              {hasWildcardNamespace && (
-                <label className="mt-3 block">
-                  <span className="text-sm text-(--text-soft)">Explicit namespace</span>
-                  <input
-                    aria-describedby="query-namespace-note"
-                    aria-invalid={namespaceError !== null}
-                    className={CONTROL_CLASS}
-                    maxLength={MAX_CACHE_NAMESPACE_LENGTH}
-                    pattern={CACHE_NAMESPACE_PATTERN_SOURCE}
-                    spellCheck={false}
-                    value={namespace}
-                    onChange={(event) => {
-                      setNamespace(event.target.value);
-                      setNamespaceError(null);
-                    }}
-                  />
-                </label>
-              )}
-
-              {!hasWildcardNamespace && explicitNamespaces.length > 1 && (
-                <label className="mt-3 block">
-                  <span className="text-sm text-(--text-soft)">
-                    Authorized namespace
-                  </span>
-                  <select
-                    aria-describedby="query-namespace-note"
-                    aria-invalid={namespaceError !== null}
-                    className={CONTROL_CLASS}
-                    value={namespace}
-                    onChange={(event) => {
-                      setNamespace(event.target.value);
-                      setNamespaceError(null);
-                    }}
-                  >
-                    <option value="">Choose a namespace</option>
-                    {explicitNamespaces.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-
-              {!hasWildcardNamespace && explicitNamespaces.length <= 1 && (
-                <p className="font-data mt-3 wrap-break-word text-xs text-(--text-soft)">
-                  {normalizedNamespace || 'No authorized namespace'}
-                </p>
-              )}
-
-              <p
-                className="font-data mt-2 text-[10px]/5 text-(--text-faint)"
-                id="query-namespace-note"
+          {!hasWildcardNamespace && explicitNamespaces.length > 1 && (
+            <label className="mt-3 block">
+              <span className="text-sm text-(--text-soft)">Authorized namespace</span>
+              <select
+                aria-describedby={
+                  namespaceValid
+                    ? 'query-namespace-note'
+                    : 'query-namespace-note query-namespace-required'
+                }
+                aria-invalid={!namespaceValid}
+                className={CONTROL_CLASS}
+                value={namespace}
+                onChange={(event) => {
+                  setNamespace(event.target.value);
+                  setNamespaceError(null);
+                }}
               >
-                Requests use one authorized namespace. Wildcard access never sends the
-                global marker.
-              </p>
+                <option value="">Choose a namespace</option>
+                {explicitNamespaces.map((item) => (
+                  <option key={item} value={item}>
+                    {cacheNamespaceLabel(item)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
-              {namespaceError !== null && (
-                <p
-                  className="font-data mt-2 text-[10px]/5 text-(--coral-text)"
-                  role="alert"
-                >
-                  {namespaceError}
-                </p>
-              )}
-            </div>
+          {!hasWildcardNamespace && explicitNamespaces.length <= 1 && (
+            <p className="font-data mt-3 wrap-break-word text-xs text-(--text-soft)">
+              {cacheNamespaceLabel(normalizedNamespace) || 'No authorized namespace'}
+            </p>
+          )}
 
-            <fieldset>
-              <legend className="ui-label text-(--text-muted)">
-                Request cache mode
-              </legend>
+          <p
+            className="font-data mt-2 text-[10px]/5 text-(--text-faint)"
+            id="query-namespace-note"
+          >
+            Requests use one authorized namespace. Wildcard access never sends the
+            global marker.
+          </p>
 
-              <div className="mt-3 space-y-3">
-                {POLICY_OPTIONS.map((option) => {
-                  const controlId = `query-policy-${option.mode}`;
-                  const descriptionId = `query-policy-${option.mode}-description`;
-                  return (
-                    <div
-                      className="flex min-h-11 items-start gap-3 border-l border-(--hairline) py-2 pl-3"
-                      key={option.mode}
-                    >
-                      <input
-                        aria-describedby={descriptionId}
-                        checked={policyMode === option.mode}
-                        className="mt-1 size-4 accent-(--gold)"
-                        id={controlId}
-                        name="query-policy"
-                        type="radio"
-                        value={option.mode}
-                        onChange={() => setPolicyMode(option.mode)}
-                      />
-                      <span className="min-w-0">
-                        <label
-                          className="block cursor-pointer text-sm text-(--text-soft)"
-                          htmlFor={controlId}
-                        >
-                          {QUERY_POLICY_LABELS[option.mode]}
-                        </label>
-                        <span
-                          className={
-                            option.mode === 'private'
-                              ? 'font-data mt-1 block text-[10px]/5 text-(--gold)'
-                              : 'font-data mt-1 block text-[10px]/5 text-(--text-faint)'
-                          }
-                          id={descriptionId}
-                        >
-                          {option.description}
-                        </span>
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </fieldset>
+          {!namespaceValid && (
+            <output
+              className="font-data mt-2 block text-[10px]/5 text-(--coral-text)"
+              id="query-namespace-required"
+            >
+              {namespaceError ??
+                'Choose one authorized cache namespace before running a query.'}
+            </output>
+          )}
+        </div>
+
+        <section
+          aria-labelledby="advanced-cache-policy-heading"
+          className="mt-5 border-t border-(--hairline) pt-5"
+        >
+          <h2
+            className="ui-label text-(--text-muted)"
+            id="advanced-cache-policy-heading"
+          >
+            Advanced cache policy
+          </h2>
+          <div className="mt-3">
+            <RequestCacheModeSelect
+              className={CONTROL_CLASS}
+              value={policyMode}
+              onChange={setPolicyMode}
+            />
           </div>
-        </details>
+        </section>
 
         <output
           aria-live="polite"
@@ -392,7 +341,7 @@ export function QueryForm({
           </div>
 
           <Button
-            aria-describedby={canSubmit ? undefined : 'query-access-note'}
+            aria-describedby={submitDescription}
             className="w-full disabled:opacity-55 lg:w-auto"
             disabled={isLoading || !canSubmit || !namespaceValid}
             type="submit"

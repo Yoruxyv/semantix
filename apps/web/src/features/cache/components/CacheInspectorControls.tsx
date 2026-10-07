@@ -48,7 +48,7 @@ export function CacheInspectorControls({
   const isNamespaceSelected = selectedNamespace !== '';
 
   const controlClass =
-    'font-data mt-2 min-h-10 w-full border border-(--hairline) bg-(--surface) px-3 py-2.5 text-xs text-(--text) outline-none transition-colors hover:border-(--text-faint) focus-visible:border-(--teal) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--teal)';
+    'font-data mt-2 min-h-11 w-full min-w-0 border border-(--hairline) bg-(--surface) px-3 py-2.5 text-xs text-(--text) outline-none transition-colors hover:border-(--text-faint) focus-visible:border-(--teal) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--teal)';
 
   return (
     <>

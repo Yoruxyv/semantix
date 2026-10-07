@@ -9,6 +9,7 @@ import {
 } from '@testing-library/react';
 import type { QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BenchmarkDashboard } from '@/features/benchmark/components/BenchmarkDashboard';
@@ -94,10 +95,12 @@ const importedPreview = {
   },
 };
 
-function renderDashboard() {
+function renderDashboard(initialEntry = '/evaluations') {
   return render(<BenchmarkDashboard />, {
     wrapper: ({ children }: Readonly<{ children: ReactNode }>) => (
-      <QueryTestProvider client={queryClient}>{children}</QueryTestProvider>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <QueryTestProvider client={queryClient}>{children}</QueryTestProvider>
+      </MemoryRouter>
     ),
   });
 }
@@ -173,6 +176,37 @@ describe('BenchmarkDashboard', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+  });
+
+  it.each(['runs', 'datasets', 'history', 'reuse-quality'])(
+    'opens the URL-selected %s view and preserves other URL state',
+    async (view) => {
+      renderDashboard(`/evaluations?view=${view}&dataset=quick#results`);
+      const navigation = screen.getByRole('navigation', {
+        name: 'Evaluation laboratory views',
+      });
+      const links = within(navigation).getAllByRole('link');
+      const selected = links.filter(
+        (link) => link.getAttribute('aria-current') === 'page',
+      );
+      expect(selected).toHaveLength(1);
+      expect(selected[0]?.getAttribute('href')).toContain(`view=${view}`);
+      for (const link of links) {
+        expect(link.getAttribute('href')).toContain('dataset=quick');
+        expect(link.getAttribute('href')).toMatch(/#results$/);
+      }
+      expect(runBenchmark).not.toHaveBeenCalled();
+      await waitFor(() => expect(getBenchmarkDatasets).toHaveBeenCalled());
+    },
+  );
+
+  it('falls back to Runs for an unknown URL view', async () => {
+    renderDashboard('/evaluations?view=unknown');
+    expect(
+      screen.getByRole('link', { name: 'Runs' }).getAttribute('aria-current'),
+    ).toBe('page');
+    await screen.findByRole('button', { name: 'Review benchmark run' });
+    expect(runBenchmark).not.toHaveBeenCalled();
   });
 
   it('warns before provider calls and submits the selected threshold', async () => {
@@ -316,7 +350,7 @@ describe('BenchmarkDashboard', () => {
 
     expect(screen.getByLabelText('Benchmark dataset')).toBeTruthy();
     expect(screen.queryByLabelText('Loading benchmark datasets')).toBeNull();
-    expect(screen.getByText('Refreshing dataset catalog')).toBeTruthy();
+    expect(screen.queryByText('Refreshing dataset catalog')).toBeNull();
     await waitFor(() => expect(getBenchmarkDatasets).toHaveBeenCalledOnce());
 
     await act(async () => {
@@ -439,7 +473,7 @@ describe('BenchmarkDashboard', () => {
   it('shows the session-only fallback without saving during validation', async () => {
     renderDashboard();
     await screen.findByRole('button', { name: 'Review benchmark run' });
-    fireEvent.click(screen.getByRole('button', { name: 'Datasets' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Datasets' }));
 
     expect(await screen.findByText('Persistence is disabled')).toBeTruthy();
     expect(screen.getByText(/session-only evaluation datasets/)).toBeTruthy();
@@ -479,7 +513,7 @@ describe('BenchmarkDashboard', () => {
     await screen.findByText('Validated preview');
     expect(persistEvaluationDataset).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Datasets' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Datasets' }));
     await screen.findByText('Save validated session dataset');
     fireEvent.click(screen.getByRole('button', { name: 'Save validated dataset' }));
 
@@ -565,7 +599,7 @@ describe('BenchmarkDashboard', () => {
       },
     });
     await screen.findByText('Validated preview');
-    fireEvent.click(screen.getByRole('button', { name: 'Datasets' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Datasets' }));
 
     const save = await screen.findByRole('button', {
       name: 'Save validated dataset',
@@ -637,7 +671,7 @@ describe('BenchmarkDashboard', () => {
     });
     renderDashboard();
     await screen.findByRole('button', { name: 'Review benchmark run' });
-    fireEvent.click(screen.getByRole('button', { name: 'Datasets' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Datasets' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Delete dataset' }));
 
     const confirmation = screen.getByRole('group', {

@@ -71,23 +71,16 @@ export function CacheControlProvider({
     setIsRefreshingCacheState(false);
     const shouldSyncPreview = syncPreview || !hasConfirmedState.current;
 
-    if (!statsResult.ok) {
-      setCacheState({
-        status: 'error',
-        error:
-          statsResult.error.detail ??
-          'Cache statistics and threshold could not be loaded.',
-      });
-      return;
-    }
-
-    if (!thresholdResult.ok) {
-      setCacheState({
-        status: 'error',
-        error:
-          thresholdResult.error.detail ??
-          'Cache statistics and threshold could not be loaded.',
-      });
+    if (!statsResult.ok || !thresholdResult.ok) {
+      const error =
+        (!statsResult.ok ? statsResult.error.detail : undefined) ??
+        (!thresholdResult.ok ? thresholdResult.error.detail : undefined) ??
+        'Cache statistics and threshold could not be loaded.';
+      setCacheState((current) =>
+        current.status === 'ready'
+          ? { ...current, refreshError: error }
+          : { status: 'error', error },
+      );
       return;
     }
 

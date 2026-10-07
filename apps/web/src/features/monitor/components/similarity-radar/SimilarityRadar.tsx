@@ -71,9 +71,6 @@ export function SimilarityRadar({
         totalTraces={traces.length}
         onActivePointChange={setSelectedPointId}
       />
-      <p className="font-data mt-2 text-[9px] text-(--text-faint) min-[520px]:hidden">
-        Scroll the plot horizontally to inspect the −1.0 to 1.0 score range.
-      </p>
 
       <SimilarityTraceList
         activePointId={activePointId}

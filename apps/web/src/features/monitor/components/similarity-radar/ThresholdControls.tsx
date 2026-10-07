@@ -84,8 +84,9 @@ export function ThresholdControls({
       </div>
 
       <p className="mt-5 max-w-xl text-xs/5 text-(--text-muted)" id="threshold-note">
-        Every dot sits at its real similarity score. Vertical position only prevents
-        overlap. Hover, focus, or select a trace to inspect its prompt and cache
+        Similarity scores span −1.00 to 1.00; configurable reuse thresholds stay within
+        0.00 to 1.00. Every dot sits at its real similarity score. Vertical position only
+        prevents overlap. Hover, focus, or select a trace to inspect its prompt and cache
         decision. Moving the slider previews which scored traces would qualify; it does
         not change backend behavior until you select Apply to cache.
       </p>

@@ -34,8 +34,8 @@ export function CachePage(): JSX.Element {
   return (
     <>
       <PageHeader
-        className="mb-9"
-        description="Search safe entry metadata, inspect reuse activity and expiry, or remove stale responses without exposing stored embeddings."
+        className="mb-6"
+        description="Inspect this server's persisted cache entries, reuse activity, and expiry. Search within an authorized namespace or remove stale responses; stored embeddings remain excluded."
         eyebrow="Storage controls"
         title="Cache inspector"
       />

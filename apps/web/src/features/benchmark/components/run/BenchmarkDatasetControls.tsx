@@ -1,6 +1,7 @@
 import { useMemo, type JSX } from 'react';
 
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { cacheNamespaceLabel } from '@/features/cache/namespace';
 
 import type {
   BenchmarkController,
@@ -43,7 +44,7 @@ export function BenchmarkDatasetControls({
         aria-label="Benchmark history namespace"
         className={`${BENCHMARK_CONTROL_CLASS} flex items-center`}
       >
-        {authorizedNamespaces[0]}
+        {cacheNamespaceLabel(authorizedNamespaces[0] ?? '')}
       </span>
     );
   } else if (
@@ -69,7 +70,7 @@ export function BenchmarkDatasetControls({
         <option value="">Choose a namespace</option>
         {authorizedNamespaces.map((namespace) => (
           <option key={namespace} value={namespace}>
-            {namespace}
+            {cacheNamespaceLabel(namespace)}
           </option>
         ))}
       </select>
@@ -188,7 +189,7 @@ export function BenchmarkDatasetControls({
           {historyNamespaceControl}
           <span
             className={`font-data mt-2 block text-[10px]/5 ${
-              historyNamespaceValid ? 'text-(--text-faint)' : 'text-(--coral)'
+              historyNamespaceValid ? 'text-(--text-faint)' : 'text-(--coral-text)'
             }`}
             id="benchmark-history-namespace-guidance"
           >

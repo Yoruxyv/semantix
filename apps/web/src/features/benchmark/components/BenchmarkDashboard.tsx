@@ -1,6 +1,7 @@
-import { useState, type JSX } from 'react';
+import type { JSX } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router';
 
-import { Alert, Button, EmptyState, PageHeader } from '@/shared/components/ui';
+import { Alert, EmptyState, PageHeader } from '@/shared/components/ui';
 import { useBenchmark } from '../hooks/useBenchmark';
 import { BenchmarkAnalysis } from './results/BenchmarkAnalysis';
 import { BenchmarkCharts } from './charts/BenchmarkCharts';
@@ -14,28 +15,39 @@ import { EvaluationDatasetCatalog } from './datasets/EvaluationDatasetCatalog';
 import { EvaluationRunHistory } from './history/EvaluationRunHistory';
 import { ReuseQuality } from '../quality/ReuseQuality';
 
+const EVALUATION_VIEWS = [
+  { key: 'runs', label: 'Runs' },
+  { key: 'datasets', label: 'Datasets' },
+  { key: 'history', label: 'History' },
+  { key: 'reuse-quality', label: 'Reuse quality' },
+] as const;
+type EvaluationView = (typeof EVALUATION_VIEWS)[number]['key'];
+
 export function BenchmarkDashboard(): JSX.Element {
   const controller = useBenchmark();
-  const [view, setView] = useState<'runs' | 'datasets' | 'history' | 'quality'>('runs');
-  const {
-    datasetsLoading,
-    datasetsRefreshing,
-    error,
-    isRunning,
-    result,
-    selectedDataset,
-    showWarning,
-  } = controller;
+  const { pathname, search, hash } = useLocation();
+  const navigate = useNavigate();
+  const requestedView = new URLSearchParams(search).get('view');
+  const view =
+    EVALUATION_VIEWS.find((item) => item.key === requestedView)?.key ?? 'runs';
+
+  function viewLocation(next: EvaluationView) {
+    const params = new URLSearchParams(search);
+    params.set('view', next);
+    return { pathname, search: `?${params.toString()}`, hash };
+  }
+  const { datasetsLoading, error, isRunning, result, selectedDataset, showWarning } =
+    controller;
 
   let viewContent: JSX.Element;
 
-  if (view === 'quality') {
+  if (view === 'reuse-quality') {
     viewContent = <ReuseQuality />;
   } else if (view === 'datasets') {
     viewContent = (
       <EvaluationDatasetCatalog
         controller={controller}
-        onUseDataset={() => setView('runs')}
+        onUseDataset={() => void navigate(viewLocation('runs'))}
       />
     );
   } else if (view === 'history') {
@@ -47,12 +59,6 @@ export function BenchmarkDashboard(): JSX.Element {
           <BenchmarkDatasetSkeleton />
         ) : (
           <BenchmarkControls controller={controller} />
-        )}
-
-        {datasetsRefreshing && (
-          <output aria-live="polite" className="ui-label mt-3 block text-(--gold)">
-            Refreshing dataset catalog
-          </output>
         )}
 
         {selectedDataset !== null && (
@@ -118,8 +124,8 @@ export function BenchmarkDashboard(): JSX.Element {
           ) : undefined
         }
         className="mb-7"
-        description="Measure cache quality, latency, provider savings, and threshold trade-offs against prompts with explicit expected decisions."
-        eyebrow="Controlled evaluation"
+        description="Run isolated, ordered server evaluations or inspect reviewed static library evidence. These describe different workflows; neither establishes a universally safe reuse threshold."
+        eyebrow="Evaluations and reviewed evidence"
         headingId="evaluation-heading"
         title="Evaluation laboratory"
       />
@@ -128,38 +134,20 @@ export function BenchmarkDashboard(): JSX.Element {
         aria-label="Evaluation laboratory views"
         className="mb-6 flex flex-wrap gap-3 border-b border-(--hairline) pb-4"
       >
-        <Button
-          aria-pressed={view === 'runs'}
-          size="compact"
-          variant={view === 'runs' ? 'primary' : 'secondary'}
-          onClick={() => setView('runs')}
-        >
-          Runs
-        </Button>
-        <Button
-          aria-pressed={view === 'datasets'}
-          size="compact"
-          variant={view === 'datasets' ? 'primary' : 'secondary'}
-          onClick={() => setView('datasets')}
-        >
-          Datasets
-        </Button>
-        <Button
-          aria-pressed={view === 'history'}
-          size="compact"
-          variant={view === 'history' ? 'primary' : 'secondary'}
-          onClick={() => setView('history')}
-        >
-          History
-        </Button>
-        <Button
-          aria-pressed={view === 'quality'}
-          size="compact"
-          variant={view === 'quality' ? 'primary' : 'secondary'}
-          onClick={() => setView('quality')}
-        >
-          Reuse quality
-        </Button>
+        {EVALUATION_VIEWS.map((item) => (
+          <Link
+            key={item.key}
+            aria-current={view === item.key ? 'page' : undefined}
+            className={`ui-label inline-flex min-h-11 items-center border px-3 py-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-(--gold) ${
+              view === item.key
+                ? 'border-(--gold) bg-(--gold) text-(--ink)'
+                : 'border-(--hairline) text-(--text-muted) hover:border-(--gold) hover:text-(--gold)'
+            }`}
+            to={viewLocation(item.key)}
+          >
+            {item.label}
+          </Link>
+        ))}
       </nav>
 
       {viewContent}

@@ -20,6 +20,40 @@ The ratios below use the composited token colors from `apps/web/src/index.css`.
 The darker `--coral` token remains available for borders, plot marks, and
 decorative accents. Small coral text uses `--coral-text`.
 
+## Workspace navigation and request context
+
+Evaluation subviews use native links with `aria-current` and URL state:
+`/evaluations?view=runs`, `?view=datasets`, `?view=history`, and
+`?view=reuse-quality`. Refresh, sharing, and browser history preserve the view;
+unknown values display Runs. The `/benchmarks` redirect preserves search and hash.
+
+Monitor namespace controls remain outside Advanced cache policy. A required
+missing or invalid selection has visible guidance associated with the disabled
+submit button and the namespace input. Selection never silently chooses a tenant.
+The surrounding workspace remounts when principal permissions change.
+Namespace selection labels show the built-in `default` as “Default”; editable
+identifiers, request payloads, cache metadata, and diagnostics retain `default`.
+Other namespace labels are unchanged.
+
+Advanced cache policy stays visible beside the namespace controls. Request cache
+mode uses a feature-owned button and listbox with the existing form-control style.
+Enter or Space opens it; arrows and Home/End move focus without selecting. Enter
+or clicking an option selects it. Escape cancels, Tab closes and continues normal
+focus order, and outside interaction dismisses it without stealing focus. Selected
+state, expanded state, visible focus, and the selected helper text remain available
+to assistive technology; private-mode trace behavior retains its emphasis.
+
+The similarity plot fits its container without a horizontal scrollbar. Its full
+−1.00 to 1.00 scale, reference bands, points, and threshold markers retain the same
+geometry. A wrapping band legend, fixed-size axis labels, compact ticks on one baseline,
+and edge-constrained marker captions stay readable at narrow widths.
+
+Reuse quality names its static evidence scope before loading and failure states,
+links to its methodology, and exposes the threshold table as a keyboard-scrollable
+region. Metrics retain their denominators and come from the reviewed receipt.
+Observability retains the timestamp of the last successful process observation
+when a refresh fails.
+
 ## Manual visual review
 
 Check the following at desktop and mobile widths:
@@ -66,10 +100,10 @@ Check the following at desktop and mobile widths:
 - malformed, missing, expired, deleted, and unauthorized live-entry links use
   a neutral announced state without disclosing foreign-key existence;
 - empty histogram bins have no visible bar.
-- Monitor Advanced cache policy uses a native disclosure and radio group with
-  textual mode explanations; its namespace, policy, summary, and Submit flow
+- Monitor Advanced cache policy stays visible and uses a button/listbox with
+  the selected mode's explanation; its namespace, policy, summary, and Submit flow
   remains one column at 744, 768, 820, and 834 px portrait widths;
-- private-mode trace behavior is described by its radio control, effective
+- private-mode trace behavior is described by the field's helper text, effective
   namespace and policy are announced with results, and the live-hit link has
   the descriptive name “Open matched live cache entry”;
 - Viewer query denial and scoped-admin threshold preview state are explained in
@@ -116,3 +150,5 @@ Run the automated token check with:
 cd apps/web
 npm run test -- tests/shared/accessibility/contrast.test.ts
 ```
+
+Routine polling and background revalidation retain the last successful data without skeletons, busy indicators, or dimming. Only initial loads without usable data show loading placeholders. Explicit Refresh actions keep their pending feedback; failed refreshes retain safe prior observations with a restrained stale/error message. Namespace or principal changes never reuse data from another scope.

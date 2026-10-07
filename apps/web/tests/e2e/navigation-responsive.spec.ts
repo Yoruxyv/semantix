@@ -258,3 +258,85 @@ test('zoom-equivalent, increased-text, and long-label layouts do not overflow', 
   });
   await expectNoHorizontalOverflow(page);
 });
+
+test('evaluation views survive refresh, sharing, history, and compatibility navigation', async ({
+  page,
+}) => {
+  await installApiFixtures(page);
+  await page.route('**/api/v1/evaluations/datasets/persisted?*', async (route) => {
+    await route.fulfill({
+      json: {
+        storage_mode: 'session',
+        persistence_enabled: false,
+        items: [],
+        total: 0,
+        offset: 0,
+        limit: 12,
+        has_more: false,
+        limits: {
+          default_retention_days: 30,
+          max_retention_days: 365,
+          max_persisted_per_namespace: 100,
+        },
+      },
+    });
+  });
+  await page.route('**/api/v1/evaluations/runs?*', async (route) => {
+    await route.fulfill({
+      json: {
+        storage_mode: 'disabled',
+        retention_enabled: false,
+        items: [],
+        total: 0,
+        offset: 0,
+        limit: 12,
+        has_more: false,
+      },
+    });
+  });
+  await page.goto('/evaluations?dataset=quick#results');
+  const views = page.getByRole('navigation', { name: 'Evaluation laboratory views' });
+  for (const [key, name] of [
+    ['runs', 'Runs'],
+    ['datasets', 'Datasets'],
+    ['history', 'History'],
+    ['reuse-quality', 'Reuse quality'],
+  ] as const) {
+    const link = views.getByRole('link', { name, exact: true });
+    await link.focus();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(new RegExp(`view=${key}`));
+    expect(new URL(page.url()).searchParams.get('dataset')).toBe('quick');
+    expect(new URL(page.url()).hash).toBe('#results');
+    await expect(link).toHaveAttribute('aria-current', 'page');
+    await page.reload();
+    await expect(link).toHaveAttribute('aria-current', 'page');
+    const sharedUrl = page.url();
+    await page.goto('/');
+    await page.goto(sharedUrl);
+    await expect(link).toHaveAttribute('aria-current', 'page');
+  }
+  await page.goto('/evaluations?view=runs');
+  await views.getByRole('link', { name: 'Datasets', exact: true }).click();
+  await views.getByRole('link', { name: 'History', exact: true }).click();
+  await page.goBack();
+  await expect(
+    views.getByRole('link', { name: 'Datasets', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
+  await page.goForward();
+  await expect(
+    views.getByRole('link', { name: 'History', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
+  await page.goto('/benchmarks?view=reuse-quality&dataset=quick#results');
+  await expect(page).toHaveURL(
+    /\/evaluations\?view=reuse-quality&dataset=quick#results$/,
+  );
+  await expect(
+    views.getByRole('link', { name: 'Reuse quality', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
+  await page.goto('/evaluations?view=unknown');
+  await expect(views.getByRole('link', { name: 'Runs', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+});

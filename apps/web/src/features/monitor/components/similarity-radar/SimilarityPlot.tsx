@@ -1,10 +1,17 @@
 import { PlotBackdrop } from './PlotBackdrop';
 import { SimilarityTooltip } from './SimilarityTooltip';
-import { VIEW_HEIGHT, VIEW_WIDTH, type PlotPoint } from './model';
-import { formatSimilarity } from '@/shared/lib/formatters';
+import {
+  scoreToX,
+  VIEW_HEIGHT,
+  VIEW_WIDTH,
+  type PlotPoint,
+} from './model';
+import { formatDecimal, formatSimilarity } from '@/shared/lib/formatters';
 import { cacheDecisionLabel } from '@/shared/domain/similarity';
 
 import type { JSX } from 'react';
+
+const AXIS_LABEL_TICKS = [-1, -0.5, 0, 0.5, 1];
 
 interface SimilarityPlotProps {
   activePointId: string | null;
@@ -33,15 +40,43 @@ export function SimilarityPlot({
   totalTraces,
 }: Readonly<SimilarityPlotProps>): JSX.Element {
   const activePoint = points.find((point) => point.id === activePointId) ?? null;
+  const hasPendingThreshold = Math.abs(previewThreshold - appliedThreshold) >= 0.001;
+  const markerLabelLeft = (score: number): string =>
+    `clamp(0px, calc(${(scoreToX(score) / VIEW_WIDTH) * 100}% - 6.5ch), calc(100% - 13ch))`;
 
   return (
-    <section
-      aria-label="Scrollable similarity threshold plot"
-      className="scrollbar-thin mt-3 overflow-x-auto pb-1"
-    >
+    <section aria-label="Similarity score visualization" className="mt-3 min-w-0">
+      <div className="font-data mb-3">
+        <div className="relative h-5 text-[11px]/5 text-(--gold)">
+          <span
+            className="absolute whitespace-nowrap"
+            style={{ left: markerLabelLeft(appliedThreshold) }}
+          >
+            BACKEND {formatDecimal(appliedThreshold, 2)}
+          </span>
+        </div>
+
+        <ul
+          aria-label="Score reference bands"
+          className="mt-2 flex flex-wrap justify-center gap-2 text-[11px]/5"
+        >
+          <li className="border border-white/10 bg-white/3 px-2 py-1 text-(--text-faint)">
+            <span className="text-(--text-muted)">WEAK</span>{' '}
+            <span>−1.00–0.75</span>
+          </li>
+          <li className="border border-(--gold)/20 bg-(--gold)/5 px-2 py-1 text-(--gold)">
+            <span>REVIEW</span>{' '}
+            <span>0.75–0.90</span>
+          </li>
+          <li className="border border-(--teal)/20 bg-(--teal)/5 px-2 py-1 text-(--teal)">
+            <span>STRONG</span>{' '}
+            <span>0.90–1.00</span>
+          </li>
+        </ul>
+      </div>
       <svg
         aria-label={`${points.length} of ${totalTraces} recent traces plotted on a minus-one-to-one similarity scale`}
-        className="block w-full min-w-[500px]"
+        className="block w-full"
         viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
       >
         <PlotBackdrop
@@ -98,6 +133,30 @@ export function SimilarityPlot({
 
         {activePoint !== null && <SimilarityTooltip point={activePoint} />}
       </svg>
+      <div className="font-data relative -mt-3 h-5 text-[10px]/5 tracking-normal text-(--text-muted)">
+        {AXIS_LABEL_TICKS.map((tick) => {
+          const transform = 'translateX(-50%)';
+          return (
+            <span
+              className="absolute top-0 whitespace-nowrap"
+              key={tick}
+              style={{ left: `${(scoreToX(tick) / VIEW_WIDTH) * 100}%`, transform }}
+            >
+              {formatDecimal(tick, 2)}
+            </span>
+          );
+        })}
+      </div>
+      {hasPendingThreshold && (
+        <div className="font-data relative mt-1 h-5 text-[11px]/5 text-(--teal)">
+          <span
+            className="absolute whitespace-nowrap"
+            style={{ left: markerLabelLeft(previewThreshold) }}
+          >
+            PREVIEW {formatDecimal(previewThreshold, 2)}
+          </span>
+        </div>
+      )}
     </section>
   );
 }
