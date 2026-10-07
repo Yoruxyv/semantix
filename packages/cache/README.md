@@ -151,7 +151,7 @@ vectors, 500 seeded candidates, capacity 5,000, threshold 0.92 and TTL 3,600 sec
 PostgreSQL 17.10/pgvector 0.8.5 ran locally in a four-CPU/2-GiB Docker container with
 an eight-connection pool. Each trial used a fresh Python process; setup, warmup and
 cleanup were excluded, and child BLAS threads were fixed at one. All measured requests
-completed without errors. See the [experiment methodology](benchmarks/COALESCING.md)
+completed without errors. See the [experiment methodology](https://github.com/Yoruxyv/semantix/blob/main/packages/cache/benchmarks/COALESCING.md)
 for reproduction and source/environment recording.
 
 Followers wait for the leader's successful generation and persistence, then perform
@@ -169,7 +169,7 @@ confirmation; it is not guaranteed for every application. Provider pricing, toke
 counts and application behavior determine actual dollar savings, which this
 deterministic experiment did not measure.
 
-Optional [numeric coalescing evidence](../../docs/embedded-observability.md) uses
+Optional [numeric coalescing evidence](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-observability.md) uses
 `collect_coalescing_metrics=True` and `coalescing_snapshot()`; collection defaults to
 False. General logging, metrics and tracing remain application-owned.
 
@@ -188,7 +188,7 @@ compatibility-policy amendment or version 0.2.0 or later with migration guidance
 
 Undocumented behavior, private internals and underscore-prefixed modules are not
 compatibility surfaces. Maintained provider retirement follows the
-[provider deprecation process](../../docs/embedded-providers.md#deprecation-path).
+[provider deprecation process](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-providers.md#deprecation-path).
 Arbitrary third-party providers, external provider availability and provider-side
 API behavior remain outside this compatibility promise. Custom integrations remain
 available when a provider's API changes.
@@ -205,11 +205,11 @@ checksums and perform no DDL. Unsupported, tampered or foreign layouts are rejec
 by these checks rather than silently adopted or downgraded. Modified database
 layouts are outside the compatibility promise; administrators remain responsible
 for preventing out-of-band schema tampering, as described in the
-[storage guide](../../docs/embedded-storage.md#existing-application-database).
+[storage guide](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-storage.md#existing-application-database).
 Downgrades are unsupported unless explicitly documented.
 
 For explicit model/tenant/knowledge/output scopes and safe cache migration, see
-the [context identity and migration guide](../../docs/context-identity-and-migration.md).
+the [context identity and migration guide](https://github.com/Yoruxyv/semantix/blob/main/docs/context-identity-and-migration.md).
 
 ## Contract
 
@@ -278,7 +278,7 @@ snapshots, confirm the expected created_at revision atomically without extending
 and complete bounded-capacity writes truthfully. Entries have no embedded space tag:
 direct put callers must supply entries from the store's declared space. A facade checks
 its adapter and store metadata at construction and during operations. Use the
-[developer conformance kit](../../docs/cache-store-conformance.md) to verify a custom store.
+[developer conformance kit](https://github.com/Yoruxyv/semantix/blob/main/docs/cache-store-conformance.md) to verify a custom store.
 
 AsyncSemanticCache borrows all injected resources and closes only its facade.
 MemoryStore owns its state and numerical workers. Double close is harmless; operations
@@ -303,7 +303,7 @@ application with appropriate care.
 
 The maintained OpenAI, Gemini, and Hugging Face adapters and independent custom
 integrations passed live MemoryStore miss → generate → write → confirmed-hit
-checks on **2026-10-05**. See the [provider guide](../../docs/embedded-providers.md#010-verification)
+checks on **2026-10-05**. See the [provider guide](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-providers.md#010-verification)
 for the tested models and scope. Ollama was previously exercised locally, but
 current release-verification evidence is incomplete.
 
@@ -318,13 +318,13 @@ never share credentials or raw provider responses.
 **semantix-client**, imported as **semantix_client**, remains the independent HTTP
 client for a Semantix service. It has no embedded/local-mode switch.
 
-Optional [provider adapters and custom integrations](../../docs/embedded-providers.md)
+Optional [provider adapters and custom integrations](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-providers.md)
 use borrowed HTTP clients; install only the HTTP extra you need. The default core
 keeps its NumPy/Pydantic dependency boundary. Optional
-[PostgreSQL/pgvector storage and custom databases](../../docs/embedded-storage.md)
+[PostgreSQL/pgvector storage and custom databases](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-storage.md)
 use `semantix_cache.stores.pgvector.PgVectorStore` with the `[pgvector]` extra.
 Schema initialization is explicit; normal cache use performs no DDL.
-See the [source layout](src/README.md) for package boundaries.
+See the [source layout](https://github.com/Yoruxyv/semantix/blob/main/packages/cache/src/README.md) for package boundaries.
 
 From this directory, contributor checks are below. Supply
 `PGVECTOR_TEST_DATABASE_URL` for an explicitly disposable database to execute the
