@@ -19,6 +19,21 @@ services:
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
 
+  redis:
+    image: redis:8.10.2@sha256:c94085d298b738be22c9ccdc0ac3761fa6649df7dd82ad1d42367f3cb9714935
+    profiles:
+      - redis
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+
   backend:
     build:
       context: .
@@ -63,6 +78,9 @@ services:
       postgres:
         condition: service_healthy
         required: false
+      redis:
+        condition: service_healthy
+        required: false
 
   frontend:
     build:
@@ -81,3 +99,4 @@ services:
 
 volumes:
   pgvector_data:
+  redis_data:

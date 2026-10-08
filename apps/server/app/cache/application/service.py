@@ -97,6 +97,7 @@ class SemanticCache:
             and threshold_eligible(candidate.similarity_score, similarity_threshold)
             and await self._backend.record_hit(
                 candidate.entry.cache_key,
+                namespace=namespace,
                 expected_created_at=candidate.entry.created_at,
             )
         ):

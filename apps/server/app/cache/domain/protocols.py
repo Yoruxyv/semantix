@@ -38,6 +38,7 @@ class CacheBackend(Protocol):
         self,
         cache_key: str,
         *,
+        namespace: str,
         expected_created_at: datetime,
     ) -> bool: ...
     async def record_miss(self, namespace: str) -> None: ...

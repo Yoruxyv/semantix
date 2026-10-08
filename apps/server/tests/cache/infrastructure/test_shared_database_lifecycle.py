@@ -73,9 +73,9 @@ async def test_memory_and_session_mode_open_no_database(
     [
         ("memory", "postgres", "disabled", ["evaluation"]),
         ("memory", "session", "postgres", ["evaluation"]),
-        ("pgvector", "session", "disabled", ["cache"]),
-        ("pgvector", "postgres", "disabled", ["cache", "evaluation"]),
-        ("pgvector", "session", "postgres", ["cache", "evaluation"]),
+        ("pgvector", "session", "disabled", []),
+        ("pgvector", "postgres", "disabled", ["evaluation"]),
+        ("pgvector", "session", "postgres", ["evaluation"]),
     ],
 )
 async def test_database_features_reuse_one_pool_and_apply_owned_migrations(

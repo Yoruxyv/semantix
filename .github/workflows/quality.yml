@@ -205,7 +205,7 @@ jobs:
           version: "0.11.32"
 
       - name: Sync locked backend dependencies
-        run: uv sync --locked --extra dev
+        run: uv sync --locked --extra dev --extra redis
 
       - name: Run Ruff lint
         run: uv run --no-sync ruff check --config ../../ruff.toml --output-format=github .
@@ -232,7 +232,7 @@ jobs:
           --pythonpath .venv/bin/python app scripts
 
       - name: Run backend unit tests with coverage
-        run: uv run --no-sync pytest -m "not pgvector" --cov=app
+        run: uv run --no-sync pytest -m "not pgvector and not redis" --cov=app
 
   backend-compatibility:
     name: Backend compatibility (Python ${{ matrix.python-version }})
@@ -268,10 +268,10 @@ jobs:
           version: "0.11.32"
 
       - name: Sync locked backend dependencies
-        run: uv sync --locked --extra dev --python "${{ matrix.python-version }}"
+        run: uv sync --locked --extra dev --extra redis --python "${{ matrix.python-version }}"
 
       - name: Run backend compatibility tests
-        run: uv run --no-sync --python "${{ matrix.python-version }}" pytest -m "not pgvector"
+        run: uv run --no-sync --python "${{ matrix.python-version }}" pytest -m "not pgvector and not redis"
 
   sdk:
     name: Python SDK quality
@@ -312,7 +312,7 @@ jobs:
 
       - name: Sync locked backend dependencies
         working-directory: apps/server
-        run: uv sync --locked --extra dev
+        run: uv sync --locked --extra dev --extra redis
 
       - name: Run SDK Ruff lint
         run: uv run --no-sync ruff check --config ../../ruff.toml --output-format=github .
@@ -629,7 +629,7 @@ jobs:
           python3 ops/ci/gateway_reset_smoke.py
 
   pgvector:
-    name: Pgvector integration
+    name: Platform PostgreSQL and Redis integration
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -637,6 +637,7 @@ jobs:
         working-directory: apps/server
     env:
       PGVECTOR_TEST_DATABASE_URL: "postgresql://semantix:ci-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/semantix"
+      REDIS_TEST_URL: redis://127.0.0.1:6379/0
       PYTHONPYCACHEPREFIX: /tmp/semantix-cache/python
     services:
       postgres:
@@ -649,6 +650,15 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U semantix -d semantix"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:8.10.2@sha256:c94085d298b738be22c9ccdc0ac3761fa6649df7dd82ad1d42367f3cb9714935
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
@@ -668,10 +678,12 @@ jobs:
           version: "0.11.32"
 
       - name: Sync locked backend dependencies
-        run: uv sync --locked --extra dev
+        run: uv sync --locked --extra dev --extra redis
 
-      - name: Run pgvector integration tests
-        run: uv run --no-sync pytest -m pgvector
+      - name: Run required PostgreSQL and Redis integration tests
+        run: |
+          uv run --no-sync pytest -m "pgvector or redis" --junitxml=.cache/platform.xml
+          uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/platform.xml').findall('.//testcase'); assert cases and all(c.find('skipped') is None for c in cases), 'Required platform integration tests skipped'; names=[c.get('name', '') for c in cases]; assert any('[redis]' in n for n in names) and any('[pgvector]' in n for n in names), 'Official store parity not collected'"
 
       - name: Exercise pgvector backup and restore
         env:

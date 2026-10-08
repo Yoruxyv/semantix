@@ -58,6 +58,7 @@ async def test_embedding_spaces_remain_isolated_across_restarts() -> None:
         await first.put(stored)
         assert await first.record_hit(
             stored.cache_key,
+            namespace=stored.namespace,
             expected_created_at=stored.created_at,
         )
         await first.record_miss(DEFAULT_CACHE_NAMESPACE)

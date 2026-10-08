@@ -1,9 +1,8 @@
-import asyncio
-
 import pytest
 
 from app.cache.infrastructure.backends.memory import InMemoryCacheBackend
 from app.observability.metrics import RuntimeMetrics
+from semantix_cache import MemoryStore
 from tests.cache.infrastructure.backends.support import cache_entry
 
 
@@ -51,7 +50,11 @@ def test_empty_metrics_preserve_missing_latency() -> None:
 
 
 @pytest.mark.asyncio
-async def test_memory_backend_records_evictions_and_expirations() -> None:
+async def test_memory_backend_records_evictions_and_expirations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = 100.0
+    monkeypatch.setattr("semantix_cache.memory.monotonic", lambda: now)
     metrics = RuntimeMetrics()
     backend = InMemoryCacheBackend(
         1,
@@ -59,6 +62,7 @@ async def test_memory_backend_records_evictions_and_expirations() -> None:
         dimensions=4,
         events=metrics,
     )
+    assert isinstance(backend.store, MemoryStore)
     first = cache_entry("first", "first response", vector_index=0)
     second = cache_entry("second", "second response", vector_index=1)
 
@@ -66,9 +70,23 @@ async def test_memory_backend_records_evictions_and_expirations() -> None:
     await backend.put(second)
     assert metrics.snapshot(cache_size=1).evictions == 1
 
-    await asyncio.sleep(0.02)
+    now += 1
+    page = await backend.list_entries(
+        offset=0, limit=20, namespace=None, search=None, sort="newest"
+    )
+    assert page.items == []
+    assert page.total == 0
     stats = await backend.stats(None)
     snapshot = metrics.snapshot(cache_size=stats.size)
-
     assert snapshot.cache_size == 0
-    assert snapshot.expirations == 1
+    assert snapshot.expirations == 0
+    assert backend.store.inspection_events == (1, 0)
+
+    # Inspection hides expiry without cleanup. Normal lookup removes it once.
+    for _ in range(2):
+        assert (
+            await backend.find_nearest(second.embedding, namespace=second.namespace)
+        ) is None
+        assert backend.store.inspection_events == (1, 1)
+        assert metrics.snapshot(cache_size=0).expirations == 1
+    await backend.store.aclose()
