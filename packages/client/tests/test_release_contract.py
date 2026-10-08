@@ -204,7 +204,7 @@ def test_health_rejects_invalid_provider_names(provider: str) -> None:
 
 @pytest.mark.parametrize(
     ("field", "value"),
-    [("cache_backend", "redis"), ("evaluation_dataset_storage", "sqlite")],
+    [("cache_backend", "qdrant"), ("evaluation_dataset_storage", "sqlite")],
 )
 def test_readiness_rejects_unknown_storage(field: str, value: str) -> None:
     payload = {

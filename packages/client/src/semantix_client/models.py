@@ -70,12 +70,12 @@ class ReadinessStatus:
 
     Attributes:
         status: Always ``"ready"`` on success.
-        cache_backend: Active cache storage, ``memory`` or ``pgvector``.
+        cache_backend: Active cache storage, ``memory``, ``pgvector`` or ``redis``.
         evaluation_dataset_storage: Dataset storage, ``session`` or ``postgres``.
     """
 
     status: Literal["ready"]
-    cache_backend: Literal["memory", "pgvector"]
+    cache_backend: Literal["memory", "pgvector", "redis"]
     evaluation_dataset_storage: Literal["session", "postgres"]
 
 
@@ -267,13 +267,13 @@ def _decode_readiness(value: object) -> ReadinessStatus:
         raise _invalid("status")
     cache_backend = _string(data, "cache_backend", max_length=100)
     dataset_storage = _string(data, "evaluation_dataset_storage", max_length=100)
-    if cache_backend not in {"memory", "pgvector"}:
+    if cache_backend not in {"memory", "pgvector", "redis"}:
         raise _invalid("cache_backend")
     if dataset_storage not in {"session", "postgres"}:
         raise _invalid("evaluation_dataset_storage")
     return ReadinessStatus(
         status="ready",
-        cache_backend=cast(Literal["memory", "pgvector"], cache_backend),
+        cache_backend=cast(Literal["memory", "pgvector", "redis"], cache_backend),
         evaluation_dataset_storage=cast(
             Literal["session", "postgres"], dataset_storage
         ),

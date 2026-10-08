@@ -69,7 +69,8 @@ async def test_async_query_serializes_requested_cache_ttl() -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_health_and_readiness() -> None:
+@pytest.mark.parametrize("backend", ["memory", "pgvector", "redis"])
+async def test_async_health_and_readiness(backend: str) -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/health":
             return httpx.Response(
@@ -84,7 +85,7 @@ async def test_async_health_and_readiness() -> None:
             200,
             json={
                 "status": "ready",
-                "cache_backend": "memory",
+                "cache_backend": backend,
                 "evaluation_dataset_storage": "session",
             },
         )
@@ -94,7 +95,7 @@ async def test_async_health_and_readiness() -> None:
         transport=httpx.MockTransport(handler),
     ) as client:
         assert (await client.health()).status == "ok"
-        assert (await client.ready()).status == "ready"
+        assert (await client.ready()).cache_backend == backend
 
 
 @pytest.mark.asyncio
