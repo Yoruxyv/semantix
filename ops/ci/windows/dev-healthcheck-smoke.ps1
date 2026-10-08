@@ -47,13 +47,18 @@ try {
     if (-not $env:POSTGRES_PASSWORD) { $env:POSTGRES_PASSWORD = New-SmokeSecret }
     $env:DATABASE_URL = "postgresql://$($env:POSTGRES_USER):$($env:POSTGRES_PASSWORD)@postgres:5432/$($env:POSTGRES_DB)"
 
+    # Official cache storage requires explicit setup before normal startup validation.
+    Invoke-Compose -Arguments @("--profile", "pgvector", "up", "--no-build", "--detach", "--wait", "--wait-timeout", "180", "postgres")
+    $env:MIGRATION_DATABASE_URL = $env:DATABASE_URL
+    $env:DATABASE_RUNTIME_ROLE = $env:POSTGRES_USER
+    Invoke-Compose -Arguments @("--profile", "pgvector", "run", "--rm", "--no-deps", "-e", "MIGRATION_DATABASE_URL", "-e", "DATABASE_RUNTIME_ROLE", "-e", "DATABASE_MIGRATION_MODE=external", "backend", "python", "-m", "app.infrastructure.migrate")
     Invoke-Compose -Arguments @("--profile", "pgvector", "up", "--build", "--detach", "--wait", "--wait-timeout", "180")
     Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$BackendPort/ready" | Out-Null
     Invoke-Compose -Arguments @("--profile", "pgvector", "down", "--volumes", "--remove-orphans")
 
     $env:CACHE_BACKEND = "memory"
     $env:MOCK_EMBEDDING_DIMENSIONS = "0"
-    Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
+    Remove-Item Env:DATABASE_URL, Env:MIGRATION_DATABASE_URL, Env:DATABASE_RUNTIME_ROLE -ErrorAction SilentlyContinue
 
     $ExitCode = Invoke-Compose `
         -Arguments @("up", "--build", "--detach", "--wait", "--wait-timeout", "45") `

@@ -469,8 +469,10 @@ def verify_blocked_db_shutdown(ip_a: str, ip_b: str) -> float:
     try:
         assert locker.stdin is not None
         locker.stdin.write(
-            "SELECT pg_advisory_lock(hashtext((SELECT embedding_space "
-            "FROM semantix.cache_entries LIMIT 1)));\n"
+            "SELECT pg_catalog.pg_advisory_lock(pg_catalog.hashtextextended("
+            "'semantix-cache:semantix_cache:workbench_:' || embedding_space || ':' || "
+            "embedding_dimensions::text, 0)) "
+            "FROM semantix_cache.workbench_cache_entries LIMIT 1;\n"
         )
         locker.stdin.flush()
         wait_for(
@@ -494,7 +496,7 @@ def verify_blocked_db_shutdown(ip_a: str, ip_b: str) -> float:
             wait_for(
                 "SELECT count(*) FROM pg_stat_activity WHERE "
                 "usename = 'semantix_runtime' AND wait_event_type = 'Lock' "
-                "AND query LIKE 'SELECT pg_advisory_xact_lock%'",
+                "AND query LIKE 'SELECT pg_catalog.pg_advisory_xact_lock%'",
                 "blocked backend database operation",
             )
             set_upstream("backend-b")
