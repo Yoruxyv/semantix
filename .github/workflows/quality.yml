@@ -91,6 +91,7 @@ jobs:
         run: |
           uv run --no-sync pytest --cov=semantix_cache --junitxml=.cache/embedded.xml
           uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/embedded.xml').findall('.//testcase'); redis=[c for c in cases if c.get('classname', '').startswith('tests.test_redis')]; assert redis and all(c.find('skipped') is None for c in redis), 'Required Redis tests skipped'"
+          uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/embedded.xml').findall('.//testcase'); pg=[c for c in cases if c.get('classname', '').startswith('tests.test_pgvector')]; assert pg and all(c.find('skipped') is None for c in pg), 'Required PostgreSQL tests skipped'"
       - name: Execute custom integration examples
         run: |
           uv run --no-sync python examples/custom_integration.py
