@@ -13,6 +13,7 @@ reference HTTP client for that server, not the first public PyPI target.
 | --- | --- |
 | [Cache package](../packages/cache/README.md) | First use, policies, results, lifecycle and canonical 0.1.x compatibility |
 | [Embedded providers](embedded-providers.md) | Maintained adapters, optional extras and custom embedding/generation |
+| [Semantic-answer accuracy limitations](semantic-accuracy-limitations.md) | Similarity, answer compatibility, frozen exploratory findings and safe reuse choices |
 | [Context identity and migration](context-identity-and-migration.md) | Explicit scopes, embedding revisions, offline recipes and safe migration |
 | [Embedded storage](embedded-storage.md) | Memory, PostgreSQL/pgvector, Redis and application-owned databases |
 | [Embedded Redis](embedded-redis.md) | Optional RedisStore setup, exact scan, TTL/LRU, ownership and recovery |
