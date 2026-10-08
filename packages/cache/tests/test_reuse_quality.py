@@ -1003,6 +1003,31 @@ def test_real_historical_git_objects_match_frozen_receipt() -> None:
     assert PUBLIC.read_bytes() == before
 
 
+def test_explicit_fetch_restores_frozen_receipt_in_fresh_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    receipt = Summary.model_validate_json(PUBLIC.read_bytes())
+    before = PUBLIC.read_bytes()
+
+    def git(*arguments: str) -> None:
+        subprocess.run(  # noqa: S603 -- fixed Git command in a disposable local repository
+            ["git", "-C", str(tmp_path), *arguments],  # noqa: S607 -- fixed local Git executable
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+
+    git("init", "--quiet")
+    # A normal fetch obtains reachable history, not an old unreferenced receipt source.
+    git("fetch", "--quiet", "--no-tags", "--depth=1", ROOT.as_uri(), "HEAD")
+    monkeypatch.setattr(quality, "ROOT", tmp_path)
+    with pytest.raises(ValueError, match="restore its Git history"):
+        validate_evidence()
+    git("fetch", "--quiet", "--no-tags", "--depth=1", ROOT.as_uri(), receipt.source_sha)
+    assert validate_evidence()[2]
+    assert PUBLIC.read_bytes() == before
+
+
 @pytest.mark.parametrize("revision", ["0" * 40, "HEAD", "--unsafe"])
 def test_historical_source_verification_fails_closed_without_a_commit(
     revision: str,

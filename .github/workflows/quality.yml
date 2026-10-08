@@ -70,6 +70,12 @@ jobs:
           version: "0.11.32"
       - name: Sync locked embedded dependencies
         run: uv sync --locked --extra dev --python "${{ matrix.python-version }}"
+      - name: Fetch recorded reuse-quality source
+        run: |
+          source_sha=$(uv run --no-sync --offline python -B -c "import json; from pathlib import Path; print(json.loads(Path('../../apps/web/public/benchmarks/reuse-quality-summary.json').read_text(encoding='utf-8'))['source_sha'])")
+          [[ "$source_sha" =~ ^[a-f0-9]{40}$ ]]
+          # Full branch history excludes recorded commits whose old refs were removed.
+          timeout 60s git fetch --no-tags --depth=1 origin "$source_sha"
       - name: Validate reuse-quality corpus and reviewed evidence
         run: uv run --no-sync --offline python -B -m benchmarks.reuse_quality.benchmark validate
       - name: Lint and check formatting

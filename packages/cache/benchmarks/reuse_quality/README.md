@@ -358,9 +358,12 @@ modules are excluded because this benchmark does not execute them.
 The recorded commit and all required blobs must be available locally. Validation
 fails if history is missing, a fingerprint is changed, or the complete input set
 has an omission or addition. It never fetches history or falls back to current
-files. Package CI checks out full history for this reason. The maintained corpus,
-schema, review status, model metadata, arithmetic and label accounting checks
-remain in place.
+files. Package CI explicitly fetches the recorded `source_sha` before running
+the offline validator: full branch history can omit commits whose original refs
+were removed. For a fresh clone, restore that commit separately with
+`git fetch --no-tags --depth=1 origin <recorded-source-sha>` before validation.
+The maintained corpus, schema, review status, model metadata, arithmetic and
+label accounting checks remain in place.
 
 A later source change can preserve historical provenance without reproducing the
 experiment or validating the new implementation. Current-source fingerprints and
