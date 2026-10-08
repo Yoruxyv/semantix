@@ -277,14 +277,17 @@ It includes HEAD, a dirty-source flag and canonical hashes of the feature's Pyth
 sources, corpus metadata, summary schema and actual cache runtime sources.
 Uncommitted development evidence is not attributed
 solely to an unchanged HEAD: these file hashes identify the tested work. Dirty source
-can never create a final reviewed receipt. Regenerate after a source change; do not silently serve stale numbers.
+can never create a final reviewed receipt. Later source changes do not rewrite
+historical evidence or certify the current implementation. A new current-source
+receipt requires a separately approved run and review.
 
 In /evaluations select **Reuse quality**. The feature fetches this static asset once
 per query lifecycle with cancellation, a timeout and no API credentials. It never
 scrapes raw outputs, runs a benchmark or selects a new threshold. An incompatible or
 missing receipt yields an unavailable state. React files contain no benchmark
-result constants. Python checks validate/reproduce
-the public receipt when present; frontend tests use an explicitly synthetic test-only
+result constants. Python checks validate historical provenance and separately
+check current offline lexical-control behavior; they do not rerun the historical
+pretrained-model experiment. Frontend tests use an explicitly synthetic test-only
 fixture so they can exercise rendering without approving the actual corpus.
 
 From apps/web:
@@ -343,20 +346,27 @@ state, plus the pinned semantic model/revision, dimensions, preprocessing and
 package identity. Missing public evidence is explicitly reported as unavailable, without
 creating a placeholder or certifying the corpus.
 
-Staleness compares the complete current input-file set and canonical hashes, not
-current HEAD. Inputs are this feature's Python implementation, cases, corpus
-manifest, summary schema, benchmarks/common.py, cache pyproject.toml/uv.lock, and
-the root semantix_cache Python modules forming the current facade/MemoryStore import
-closure. Optional provider adapters and PostgreSQL implementation are excluded
-because this benchmark does not execute them. Update this input boundary if a future
-benchmark actually uses those paths. Dependency pins are conservative execution
-inputs. No unrelated documentation or frontend styling is fingerprinted.
+Historical fingerprint verification reads the complete input-file set from the
+receipt's recorded `source_sha` Git commit. It hashes immutable Git blobs using
+the same canonical text rule as the original run; it does not read today's
+editable runtime files to authenticate an old experiment. Inputs are the
+feature's Python implementation, cases, corpus manifest, summary schema,
+benchmarks/common.py, cache pyproject.toml/uv.lock and root semantix_cache Python
+modules at that revision. Optional provider adapters and PostgreSQL/Redis store
+modules are excluded because this benchmark does not execute them.
 
-source_sha identifies the clean source commit that produced the receipt. A later
-receipt-only commit, or unrelated documentation/frontend changes, may have a different
-HEAD while these input hashes still match. Validation must continue to pass then.
-It does not require the current working tree to be clean; it requires the recorded
-public source_dirty flag to be false and the recorded inputs to remain current.
+The recorded commit and all required blobs must be available locally. Validation
+fails if history is missing, a fingerprint is changed, or the complete input set
+has an omission or addition. It never fetches history or falls back to current
+files. Package CI checks out full history for this reason. The maintained corpus,
+schema, review status, model metadata, arithmetic and label accounting checks
+remain in place.
+
+A later source change can preserve historical provenance without reproducing the
+experiment or validating the new implementation. Current-source fingerprints and
+behavior are checked separately in tests. Creating or replacing a receipt still
+requires clean current Git source, matching current fingerprints and completed
+maintainer review. Historical validation never authorizes publication.
 
 The local pre-commit hook selects only staged feature/evidence files, the public
 JSON receipt, root semantix_cache Python modules, benchmarks/common.py and cache
@@ -384,12 +394,13 @@ Canonical maintainer replacement sequence:
 6. Inspect the JSON and frontend diff; run validation again.
 7. Commit the receipt separately if appropriate and separately authorized.
 
-Recomputing receipts automatically would conceal changed evidence. A stale reviewed
-receipt therefore fails validation with instructions to rerun and review from clean
-source. Real pretrained semantic-model execution is an explicit maintainer operation,
-not a hook/CI task. Ordinary automation checks the reviewed receipt's pinned model,
-revision, dimensions, preprocessing, package identity and current input hashes without
-loading the model. Lexical controls and contract tests stay deterministic/offline.
+Recomputing receipts automatically would conceal changed evidence. Historical
+validation preserves the reviewed receipt and verifies its recorded provenance;
+it makes no current-source accuracy claim. Real pretrained semantic-model
+execution remains an explicit maintainer operation, outside hooks and ordinary
+CI. Automation checks pinned model metadata and historical fingerprints without
+loading a model. Current lexical-control and contract tests stay deterministic
+and offline.
 
 Validation errors print exact remediation commands to run from packages/cache:
 
