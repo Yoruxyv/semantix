@@ -78,25 +78,13 @@ Docker Desktop can share the repository drive, then recreate the affected
 service. Inspect idle usage with `docker stats --no-stream`. Do not expose the
 development stack to an untrusted network.
 
-### Development with pgvector
+### Development with persistent storage
 
-Set the backend database values:
-
-```env
-CACHE_BACKEND=pgvector
-DATABASE_URL=postgresql://semantix:semantix@postgres:5432/semantix
-DATABASE_MIGRATION_MODE=auto
-```
-
-Start the profile:
-
-```bash
-docker compose -f docker-compose.dev.yml --profile pgvector up --build -d
-```
-
-The database is available to host-side tools at `127.0.0.1:5433` by default. The development role intentionally owns migrations and runtime operations.
-
-The development commands keep the repository's existing `semantix` Compose project name, so an existing local `pgvector_data` volume continues to be used.
+Choose `pgvector` or `redis` and follow [server storage setup](platform-storage.md).
+Start the corresponding Docker profile's database, run explicit operator setup,
+then start backend/frontend. Cache startup validates storage and never performs
+automatic cache migrations. Existing PostgreSQL cache tables remain untouched;
+the new official binding starts empty. Keep existing volumes and back up first.
 
 ### Local toolchains
 
