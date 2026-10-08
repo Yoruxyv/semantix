@@ -1,5 +1,7 @@
 """Optional observations over real stores; no parallel authoritative metadata."""
 
+from __future__ import annotations
+
 import asyncio
 import json
 import os
