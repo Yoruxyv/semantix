@@ -286,7 +286,12 @@ def test_metrics_reproduce_from_fixed_offline_scores(
             for run in expected.runs:
                 run.embedding.runtime_versions.update(receipt_host)
         assert actual.corpus == expected.corpus
-        assert actual.source_files_sha256 == expected.source_files_sha256
+        # The old receipt describes its recorded Git source. This run separately
+        # checks current offline controls; it does not rerun the old model experiment.
+        assert (
+            quality.historical_source_hashes(expected.source_sha)
+            == expected.source_files_sha256
+        )
         # Host identity varies across the CI matrix; package versions and metrics do not.
         assert [
             r.model_dump(
@@ -529,6 +534,14 @@ def reviewed_project(
             "source_files_sha256": quality.source_hashes(),
         }
     )
+    frozen_hashes = reviewed.source_files_sha256.copy()
+
+    def historical(source_sha: str) -> dict[str, str]:
+        if source_sha != reviewed.source_sha:
+            raise ValueError("Historical source revision is unavailable")
+        return frozen_hashes.copy()
+
+    monkeypatch.setattr(quality, "historical_source_hashes", historical)
     public = tmp_path / "apps/web/public/benchmarks/reuse-quality-summary.json"
     public.parent.mkdir(parents=True)
     public.write_text(reviewed.model_dump_json(), encoding="utf-8")
@@ -552,9 +565,6 @@ def test_validation_accepts_corpus_without_creating_public_evidence(
         "cases",
         "cases-and-hash",
         "manifest",
-        "runtime",
-        "benchmark",
-        "dependencies",
         "omitted-source",
     ],
 )
@@ -580,16 +590,32 @@ def test_validation_rejects_changed_evidence_inputs(
         data = reviewed.model_dump()
         del data["source_files_sha256"]["packages/cache/src/semantix_cache/memory.py"]
         public.write_text(json.dumps(data), encoding="utf-8")
-    else:
-        relative = {
-            "runtime": "packages/cache/src/semantix_cache/memory.py",
-            "benchmark": "packages/cache/benchmarks/reuse_quality/benchmark.py",
-            "dependencies": "packages/cache/uv.lock",
-        }[change]
-        path = quality.ROOT / relative
-        path.write_bytes(path.read_bytes() + b"# intentional input change\n")
-    with pytest.raises(ValueError, match=r"hash mismatch|stale"):
+    with pytest.raises(ValueError, match=r"hash mismatch|corpus|fingerprints"):
         validate_evidence(directory=directory, public=public)
+
+
+@pytest.mark.parametrize("change", ["runtime", "benchmark", "dependencies"])
+def test_later_source_changes_preserve_history_but_block_current_publication(
+    reviewed_project: tuple[Path, Path, Summary],
+    monkeypatch: pytest.MonkeyPatch,
+    change: str,
+) -> None:
+    directory, public, reviewed = reviewed_project
+    relative = {
+        "runtime": "packages/cache/src/semantix_cache/memory.py",
+        "benchmark": "packages/cache/benchmarks/reuse_quality/benchmark.py",
+        "dependencies": "packages/cache/uv.lock",
+    }[change]
+    path = quality.ROOT / relative
+    path.write_bytes(path.read_bytes() + b"# intentional later source change\n")
+    assert validate_evidence(directory=directory, public=public)[2]
+    assert quality.source_hashes() != reviewed.source_files_sha256
+    monkeypatch.setattr(quality, "git_state", lambda: (reviewed.source_sha, False))
+    with pytest.raises(ValueError, match="source evidence is stale"):
+        write_reviewed_summary(
+            reviewed, directory=directory, destination=directory / "refused.json"
+        )
+    assert not (directory / "refused.json").exists()
 
 
 @pytest.mark.parametrize(
@@ -731,9 +757,13 @@ def test_validation_function_and_cli_make_no_file_writes(
 
     before = snapshot()
     assert validate_evidence(directory=directory, public=public)[2]
+    cli_inputs = [ROOT / relative for relative in quality.source_hashes()] + [PUBLIC]
+    cli_before = {
+        path: (path.stat().st_mtime_ns, path.read_bytes()) for path in cli_inputs
+    }
     result = subprocess.run(
         [sys.executable, "-B", "-m", "benchmarks.reuse_quality.benchmark", "validate"],
-        cwd=quality.ROOT / "packages/cache",
+        cwd=ROOT / "packages/cache",
         check=False,
         capture_output=True,
         text=True,
@@ -741,6 +771,9 @@ def test_validation_function_and_cli_make_no_file_writes(
     )
     assert result.returncode == 0, result.stderr
     assert "Reviewed public summary valid" in result.stdout
+    assert {
+        path: (path.stat().st_mtime_ns, path.read_bytes()) for path in cli_inputs
+    } == cli_before
     assert snapshot() == before
 
 
@@ -934,3 +967,100 @@ def test_reviewed_evidence_requires_all_semantic_ablations(
     data["runs"].pop()
     with pytest.raises(ValidationError, match="pinned semantic"):
         Summary.model_validate(data)
+
+
+@pytest.mark.parametrize("defect", ["fingerprint", "extra-source", "revision"])
+def test_historical_receipt_rejects_changed_provenance(
+    reviewed_project: tuple[Path, Path, Summary],
+    defect: str,
+) -> None:
+    directory, public, reviewed = reviewed_project
+    values = reviewed.model_dump()
+    if defect == "fingerprint":
+        values["source_files_sha256"]["packages/cache/src/semantix_cache/memory.py"] = (
+            "0" * 64
+        )
+    elif defect == "extra-source":
+        values["source_files_sha256"]["packages/cache/src/semantix_cache/extra.py"] = (
+            "0" * 64
+        )
+    else:
+        values["source_sha"] = "0" * 40
+    public.write_text(json.dumps(values), encoding="utf-8")
+    before = public.read_bytes()
+    with pytest.raises(ValueError, match="Historical"):
+        validate_evidence(directory=directory, public=public)
+    assert public.read_bytes() == before
+
+
+def test_real_historical_git_objects_match_frozen_receipt() -> None:
+    receipt = Summary.model_validate_json(PUBLIC.read_bytes())
+    before = PUBLIC.read_bytes()
+    assert (
+        quality.historical_source_hashes(receipt.source_sha)
+        == receipt.source_files_sha256
+    )
+    assert PUBLIC.read_bytes() == before
+
+
+def test_explicit_fetch_restores_frozen_receipt_in_fresh_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    receipt = Summary.model_validate_json(PUBLIC.read_bytes())
+    before = PUBLIC.read_bytes()
+
+    def git(*arguments: str) -> None:
+        subprocess.run(  # noqa: S603 -- fixed Git command in a disposable local repository
+            ["git", "-C", str(tmp_path), *arguments],  # noqa: S607 -- fixed local Git executable
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+
+    git("init", "--quiet")
+    # A normal fetch obtains reachable history, not an old unreferenced receipt source.
+    git("fetch", "--quiet", "--no-tags", "--depth=1", ROOT.as_uri(), "HEAD")
+    monkeypatch.setattr(quality, "ROOT", tmp_path)
+    with pytest.raises(ValueError, match="restore its Git history"):
+        validate_evidence()
+    git("fetch", "--quiet", "--no-tags", "--depth=1", ROOT.as_uri(), receipt.source_sha)
+    assert validate_evidence()[2]
+    assert PUBLIC.read_bytes() == before
+
+
+@pytest.mark.parametrize("revision", ["0" * 40, "HEAD", "--unsafe"])
+def test_historical_source_verification_fails_closed_without_a_commit(
+    revision: str,
+) -> None:
+    with pytest.raises(ValueError, match="Historical source revision"):
+        quality.historical_source_hashes(revision)
+
+
+@pytest.mark.parametrize("failure", ["timeout", "git", "not-commit"])
+def test_historical_source_verification_reports_unavailable_history(
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    receipt = Summary.model_validate_json(PUBLIC.read_bytes())
+
+    def unavailable(*args: object, **kwargs: object) -> bytes:
+        assert args[0] == [
+            "git",
+            "--no-replace-objects",
+            "--no-lazy-fetch",
+            "cat-file",
+            "-t",
+            receipt.source_sha,
+        ]
+        assert kwargs["timeout"] == 10
+        if failure == "timeout":
+            raise subprocess.TimeoutExpired("git", 10)
+        if failure == "git":
+            raise subprocess.CalledProcessError(128, "git")
+        return b"tree"
+
+    monkeypatch.setattr(
+        "benchmarks.reuse_quality.benchmark.subprocess.check_output", unavailable
+    )
+    with pytest.raises(ValueError, match="Historical source revision"):
+        quality.historical_source_hashes(receipt.source_sha)

@@ -2,7 +2,7 @@ import re
 from functools import lru_cache
 from ipaddress import ip_network
 from typing import Literal
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from pydantic import (
     BaseModel,
@@ -36,7 +36,7 @@ from app.providers.shared.urls import (
     normalize_ollama_url,
 )
 
-CacheBackendName = Literal["memory", "pgvector"]
+CacheBackendName = Literal["memory", "pgvector", "redis"]
 CoordinationBackendName = Literal["memory", "postgres"]
 AuthMode = Literal["disabled", "token"]
 AuthRole = Literal["viewer", "operator", "admin"]
@@ -73,6 +73,7 @@ class AuthPrincipalSettings(BaseModel):
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
+        hide_input_in_errors=True,
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
@@ -170,6 +171,18 @@ class Settings(BaseSettings):
     cache_backend: CacheBackendName = "memory"
     max_cache_size: int = Field(default=500, ge=1, le=100_000)
     cache_ttl_seconds: int | None = Field(default=3_600, gt=0)
+    cache_pgvector_schema: str = Field(
+        default="semantix_cache", pattern=r"^[a-z_][a-z0-9_]{0,62}$"
+    )
+    cache_pgvector_table_prefix: str = Field(
+        default="workbench_", pattern=r"^[a-z_][a-z0-9_]{0,44}$"
+    )
+    redis_url: SecretStr | None = None
+    redis_key_prefix: str = Field(
+        default="semantix_workbench", pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    )
+    redis_operation_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
+    redis_close_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
     database_url: SecretStr | None = None
     database_pool_min_size: int = Field(default=1, ge=1, le=50)
     database_pool_max_size: int = Field(default=5, ge=1, le=50)
@@ -274,6 +287,9 @@ class Settings(BaseSettings):
                 "persistent caches"
             )
 
+        if self.cache_backend == "redis":
+            self._validate_redis_configuration()
+
         if self.database_required:
             self._require_secret(self.database_url, "DATABASE_URL")
             self._validate_database_url()
@@ -360,6 +376,7 @@ class Settings(BaseSettings):
             self.anthropic_api_key,
             self.gemini_api_key,
             self.database_url,
+            self.redis_url,
         )
         configured = [
             secret.get_secret_value()
@@ -370,7 +387,38 @@ class Settings(BaseSettings):
             parsed = urlparse(self.database_url.get_secret_value())
             if parsed.password:
                 configured.append(parsed.password)
+        if self.redis_url is not None:
+            parsed = urlparse(self.redis_url.get_secret_value())
+            if parsed.password:
+                configured.extend((parsed.password, unquote(parsed.password)))
         return tuple(configured)
+
+    def _validate_redis_configuration(self) -> None:
+        self._require_secret(self.redis_url, "REDIS_URL")
+        if self.redis_url is None:
+            raise ValueError("REDIS_URL is required")
+        try:
+            parsed = urlparse(self.redis_url.get_secret_value())
+            port = parsed.port
+        except ValueError:
+            raise ValueError("REDIS_URL is invalid") from None
+        if (
+            parsed.scheme not in {"redis", "rediss"}
+            or not parsed.hostname
+            or parsed.fragment
+            or parsed.query
+            or port == 0
+        ):
+            raise ValueError(
+                "REDIS_URL must identify a direct standalone Redis primary"
+            )
+        if (
+            self.max_cache_size > 5000
+            or self.max_cache_size * self.embedding_dimensions * 8 > 64 * 1024 * 1024
+        ):
+            raise ValueError(
+                "Redis capacity must be <=5000 and vector projection <=64 MiB"
+            )
 
     def _validate_database_url(self) -> None:
         if self.database_url is None:

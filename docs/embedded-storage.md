@@ -6,6 +6,30 @@ FastAPI server. Its async engine consumes the structural
 The maintained stores are `MemoryStore`, optional `PgVectorStore` and optional `RedisStore`.
 The separate `semantix_client` package is the optional/reference HTTP client.
 
+The server/workbench also delegates to these official stores. See
+[server storage configuration](guides/platform-storage.md) for selection and setup.
+
+Concrete maintained stores additionally offer optional `inspect_entries` and
+`inspect_entry` observations. They exclude expired entries without purging them,
+recording hits, extending TTL or changing LRU. Lists contain prompts, identifiers
+and bounded response previews (at most 240 characters), never vectors or complete
+long answers. These fields remain sensitive; applications authorize namespace
+scope before inspection. Only explicitly scoped detail reads return a full answer.
+The package does not authenticate callers. Results are observations, never leases.
+
+`clear_all` is a separate administrative mutation across namespaces of the active
+store binding. Neither inspection nor clearing is required by the mandatory
+`CacheStore` protocol. Ordinary hit confirmation does not call inspection.
+
+Pages contain at most 100 entries. Memory scans its bounded binding; PostgreSQL
+counts/ranks metadata and limits the page before projecting response previews.
+Redis scans scalar metadata and decodes only the selected page. Redis prompt
+search must scan its existing payload fields in batches of at most 100, under one
+operation deadline and the existing binding capacity ceiling. No new index or
+metadata keys are introduced. Concurrent changes can shift live offsets and Redis
+search totals. See [server storage](guides/platform-storage.md#inspector-and-diagnostics)
+for authorization, search costs and pagination limitations.
+
 ## Choose a store
 
 | Store | Persistence | Dependency | Ownership |

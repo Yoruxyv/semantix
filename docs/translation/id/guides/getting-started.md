@@ -68,25 +68,13 @@ Image frontend development menginstal dependency Node dan menjalankan developmen
 
 Perubahan biasanya terlihat dalam waktu sekitar satu detik. Jika tidak, pastikan Docker Desktop dapat membagikan drive repository, lalu buat ulang service yang terdampak. Periksa penggunaan saat idle dengan `docker stats --no-stream`. Jangan mengekspos stack development ke jaringan yang tidak tepercaya.
 
-### Development dengan pgvector
+### Development dengan storage persisten
 
-Atur nilai database backend:
-
-```env
-CACHE_BACKEND=pgvector
-DATABASE_URL=postgresql://semantix:semantix@postgres:5432/semantix
-DATABASE_MIGRATION_MODE=auto
-```
-
-Jalankan profile:
-
-```bash
-docker compose -f docker-compose.dev.yml --profile pgvector up --build -d
-```
-
-Database tersedia untuk tool dari host di `127.0.0.1:5433` secara default. Development role sengaja memiliki tanggung jawab atas migrasi dan operasi runtime.
-
-Perintah development mempertahankan nama Compose project `semantix` yang sudah ada di repository, sehingga volume `pgvector_data` lokal yang sudah ada akan terus digunakan.
+Pilih `pgvector` atau `redis` dan ikuti [setup storage server](../../../guides/platform-storage.md).
+Mulai database dengan profile Docker yang sesuai, jalankan setup operator eksplisit,
+lalu mulai backend/frontend. Startup memvalidasi storage tanpa migrasi cache otomatis.
+Tabel cache PostgreSQL lama tidak diubah; binding resmi baru mulai kosong.
+Pertahankan volume yang ada dan buat backup terlebih dahulu.
 
 ### Toolchain lokal
 

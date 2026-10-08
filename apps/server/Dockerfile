@@ -12,10 +12,10 @@ WORKDIR /apps/server
 
 COPY apps/server/pyproject.toml apps/server/uv.lock ./
 COPY packages/cache /packages/cache
-RUN uv sync --locked --no-dev --no-install-project
+RUN uv sync --locked --extra redis --no-dev --no-install-project
 
 COPY apps/server/app ./app
-RUN uv sync --locked --no-dev --no-editable
+RUN uv sync --locked --extra redis --no-dev --no-editable
 
 FROM python:3.14-slim@sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5ebe91c401c8e83 AS runtime
 

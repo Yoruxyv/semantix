@@ -33,6 +33,12 @@ class MigrationSettings(BaseSettings):
     database_connect_timeout_seconds: float = Field(default=10.0, gt=0, le=120)
     database_command_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
     cache_backend: CacheBackendName = "pgvector"
+    cache_pgvector_schema: str = Field(
+        default="semantix_cache", pattern=r"^[a-z_][a-z0-9_]{0,62}$"
+    )
+    cache_pgvector_table_prefix: str = Field(
+        default="workbench_", pattern=r"^[a-z_][a-z0-9_]{0,44}$"
+    )
     coordination_backend: CoordinationBackendName = "memory"
     evaluation_dataset_storage: EvaluationDatasetStorageMode = "session"
     evaluation_run_history_storage: EvaluationRunHistoryStorageMode = "disabled"
@@ -66,10 +72,11 @@ async def run() -> None:
     )
     try:
         if settings.cache_backend == "pgvector":
-            await cache_database.apply_migrations(pool)
-            await cache_database.grant_runtime_privileges(
+            await cache_database.initialize_official_schema(
                 pool,
-                settings.database_runtime_role,
+                schema=settings.cache_pgvector_schema,
+                table_prefix=settings.cache_pgvector_table_prefix,
+                runtime_role=settings.database_runtime_role,
             )
         if settings.coordination_backend == "postgres":
             await coordination_database.apply_migrations(pool)

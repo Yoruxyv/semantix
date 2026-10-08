@@ -1,10 +1,10 @@
+import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from asyncpg.pool import Pool
 
 from app.benchmark.infrastructure import database as evaluation_database
-from app.cache.infrastructure import database as cache_database
 from app.core.config import Settings
 from app.core.exceptions import (
     CacheStorageError,
@@ -52,8 +52,6 @@ async def database_pool_lifespan(
         if settings.database_migration_mode == "auto":
             if settings.coordination_backend == "postgres":
                 await coordination_database.apply_migrations(pool)
-            if settings.cache_backend == "pgvector":
-                await cache_database.apply_migrations(pool)
             if (
                 settings.evaluation_dataset_storage == "postgres"
                 or settings.evaluation_run_history_storage == "postgres"
@@ -61,4 +59,9 @@ async def database_pool_lifespan(
                 await evaluation_database.apply_migrations(pool)
         yield pool
     finally:
-        await pool.close()
+        try:
+            async with asyncio.timeout(settings.database_command_timeout_seconds):
+                await pool.close()
+        except BaseException:
+            pool.terminate()
+            raise

@@ -382,6 +382,9 @@ adds exactly two aggregate history tables, `evaluation_runs` and
 session-auth lockout state, and the global similarity threshold. The backend
 starts only after that job succeeds.
 
+For official-store ownership, explicit cache setup and preserved legacy PostgreSQL
+records, see the [server storage transition](../guides/platform-storage.md#postgresql-setup-and-legacy-transition).
+
 Applied migrations record a SHA-256 checksum. Startup rejects a packaged
 migration whose contents no longer match its recorded checksum. A legacy
 `0001` row without a checksum is backfilled only after the released cache

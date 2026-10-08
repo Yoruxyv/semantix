@@ -8,6 +8,8 @@ from app.core.config import Settings
 from app.core.exceptions import CacheStorageError
 from app.infrastructure import database as shared_database
 from app.infrastructure.database import Migration
+from semantix_cache import EmbeddingSpace, SemantixCacheError
+from semantix_cache.stores.pgvector import PgVectorStore
 
 MIGRATION_PACKAGE = "app.cache.infrastructure.migrations"
 LEGACY_0001_RELATIONS = {
@@ -137,6 +139,49 @@ async def grant_runtime_privileges(pool: Pool, runtime_role: str) -> None:
         CACHE_TABLES,
         error_type=CacheStorageError,
     )
+
+
+async def initialize_official_schema(
+    pool: Pool,
+    *,
+    schema: str = "semantix_cache",
+    table_prefix: str = "workbench_",
+    runtime_role: str | None = None,
+) -> None:
+    """Explicit operator setup. Never read or convert legacy cache entries."""
+    store = PgVectorStore(
+        pool=pool,
+        embedding_space=EmbeddingSpace(identity="schema-setup", dimensions=1),
+        schema=schema,
+        table_prefix=table_prefix,
+    )
+    try:
+        await apply_migrations(pool)
+        await store.initialize_schema(migration_pool=pool)
+        if runtime_role is not None:
+            # Validation above makes schema/table interpolation safe. The ledger
+            # is read-only for the runtime role; only owned cache tables are mutable.
+            await shared_database.grant_runtime_privileges(
+                pool,
+                runtime_role,
+                ("semantix.cache_namespace_counters",),
+                error_type=CacheStorageError,
+            )
+            role = '"' + runtime_role + '"'
+            async with pool.acquire() as connection, connection.transaction():
+                await connection.execute(f'GRANT USAGE ON SCHEMA "{schema}" TO {role}')
+                await connection.execute(
+                    f'GRANT SELECT ON "{schema}"."{table_prefix}schema_migrations" TO {role}'
+                )
+                await connection.execute(
+                    f'GRANT SELECT, INSERT, UPDATE, DELETE ON "{schema}"."{table_prefix}binding_state", "{schema}"."{table_prefix}cache_entries" TO {role}'
+                )
+    except (SemantixCacheError, OSError, asyncpg.PostgresError):
+        raise CacheStorageError(
+            "Official PostgreSQL setup failed; verify schema ownership and migration privileges"
+        ) from None
+    finally:
+        await store.aclose()
 
 
 __all__ = [

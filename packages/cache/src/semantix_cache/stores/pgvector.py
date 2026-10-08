@@ -45,6 +45,14 @@ from ..errors import (
     CacheValidationError,
     SemantixCacheError,
 )
+from ..inspection import (
+    InspectionEntry,
+    InspectionPage,
+    InspectionSort,
+    inspection_arguments,
+    inspection_namespaces,
+    remaining,
+)
 from ..models import CacheEntry, CacheMatch, EmbeddingSpace
 
 _MARKER = "semantix-cache:pgvector:v1"
@@ -621,6 +629,147 @@ class PgVectorStore:
                 SELECT count(*) FROM removed WHERE expires_at IS NULL OR expires_at>clock_timestamp()
             """,
                 *scope,
+            )
+        return int(count)
+
+    async def _inspect(
+        self,
+        *,
+        namespace: str | None,
+        namespaces: tuple[str, ...] | None,
+        cache_key: str | None,
+        offset: int,
+        limit: int,
+        search: str | None,
+        sort: InspectionSort,
+    ) -> InspectionPage:
+        inspection_arguments(namespace, offset, limit, search, sort)
+        inspection_namespaces(namespaces)
+        if cache_key is not None:
+            try:
+                cache_key = cache_key_value(cache_key)
+            except ValueError:
+                raise CacheValidationError("Invalid inspection key") from None
+        order = {
+            "newest": "created_at DESC, cache_key, namespace",
+            "oldest": "created_at, cache_key, namespace",
+            "most_hit": "hit_count DESC, created_at DESC, cache_key, namespace",
+            "nearest_expiry": "expires_at ASC NULLS LAST, created_at DESC, cache_key, namespace",
+        }[sort]
+        async with (
+            self._connection() as connection,
+            connection.transaction(isolation="repeatable_read", readonly=True),
+        ):
+            layout = await self._layout(connection, require_schema=True)
+            scope = (
+                self.embedding_space.identity,
+                self.embedding_space.dimensions,
+                namespace,
+                list(namespaces) if namespaces is not None else None,
+                cache_key,
+                None if search is None else search.strip(),
+            )
+            eligible = f"""SELECT cache_key, namespace, prompt, created_at, expires_at, hit_count, last_accessed_at, access_order FROM {layout["entries"]} WHERE embedding_space=$1 AND embedding_dimensions=$2
+                AND (expires_at IS NULL OR expires_at>transaction_timestamp())
+                AND ($3::text IS NULL OR namespace=$3)
+                AND ($4::text[] IS NULL OR namespace=ANY($4))"""
+            filtered = "($5::text IS NULL OR cache_key=$5) AND ($6::text IS NULL OR POSITION(LOWER($6) IN LOWER(prompt))>0)"
+            total = await connection.fetchval(
+                f"SELECT count(*) FROM ({eligible}) eligible WHERE {filtered}", *scope
+            )
+            rows = await connection.fetch(
+                f"""WITH eligible AS MATERIALIZED ({eligible}), ranked AS (
+                SELECT *, row_number() OVER (ORDER BY access_order DESC, created_at DESC, cache_key, namespace) AS recency_rank
+                FROM eligible), page AS MATERIALIZED (
+                SELECT * FROM ranked WHERE {filtered} ORDER BY {order} OFFSET $7 LIMIT $8)
+                SELECT page.*, left(e.response,240) AS response_preview,
+                    length(e.response)>240 AS response_preview_truncated,
+                    CASE WHEN $5::text IS NULL THEN NULL ELSE e.response END AS response,
+                    transaction_timestamp() AS observed_at
+                FROM page JOIN {layout["entries"]} e
+                ON e.embedding_space=$1 AND e.embedding_dimensions=$2
+                    AND e.namespace=page.namespace AND e.cache_key=page.cache_key
+                ORDER BY {", ".join("page." + field.strip() for field in order.split(","))}""",
+                *scope,
+                offset,
+                limit,
+            )
+            try:
+                metadata = tuple(
+                    InspectionEntry(
+                        cache_key=row["cache_key"],
+                        namespace=row["namespace"],
+                        prompt=row["prompt"],
+                        response_preview=row["response_preview"],
+                        response_preview_truncated=row["response_preview_truncated"],
+                        response=row["response"],
+                        created_at=row["created_at"],
+                        expires_at=row["expires_at"],
+                        remaining_ttl_seconds=remaining(
+                            row["expires_at"], row["observed_at"]
+                        ),
+                        hit_count=row["hit_count"],
+                        last_accessed_at=row["last_accessed_at"],
+                        recency_rank=row["recency_rank"],
+                    )
+                    for row in rows
+                )
+            except ValueError:
+                raise CacheStoreError(
+                    "Invalid PostgreSQL inspection metadata"
+                ) from None
+            return InspectionPage(
+                items=metadata,
+                total=int(total),
+                offset=offset,
+                limit=limit,
+                has_more=offset + len(metadata) < int(total),
+            )
+
+    async def inspect_entries(
+        self,
+        *,
+        namespace: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+        search: str | None = None,
+        sort: InspectionSort = "newest",
+    ) -> InspectionPage:
+        return await self._inspect(
+            namespace=namespace,
+            namespaces=None,
+            cache_key=None,
+            offset=offset,
+            limit=limit,
+            search=search,
+            sort=sort,
+        )
+
+    async def inspect_entry(
+        self, cache_key: str, *, namespaces: tuple[str, ...] | None
+    ) -> InspectionEntry | None:
+        page = await self._inspect(
+            namespace=None,
+            namespaces=namespaces,
+            cache_key=cache_key,
+            offset=0,
+            limit=1,
+            search=None,
+            sort="newest",
+        )
+        return page.items[0] if page.items else None
+
+    async def clear_all(self) -> int:
+        """Administrative mutation of this binding across namespaces."""
+        async with self._connection() as connection, connection.transaction():
+            layout = await self._layout(connection, require_schema=True)
+            await self._lock(connection)
+            count = await connection.fetchval(
+                f"""WITH removed AS (DELETE FROM {layout["entries"]}
+                WHERE embedding_space=$1 AND embedding_dimensions=$2 RETURNING expires_at)
+                SELECT count(*) FROM removed WHERE expires_at IS NULL OR expires_at>clock_timestamp()""",
+                self.embedding_space.identity,
+                self.embedding_space.dimensions,
             )
         return int(count)
 

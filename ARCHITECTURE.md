@@ -11,8 +11,8 @@ Semantix consists of a FastAPI semantic-cache service, a React browser dashboard
 independently installable Python HTTP client. Applications can call the public HTTP API
 directly or use the SDK. The SDK is a remote client, not another cache engine.
 Configured embedding and generation providers are external to the cache service; the
-mock provider supports deterministic local use. The live cache is either process memory
-or PostgreSQL with pgvector, according to settings.
+mock provider supports deterministic local use. The live cache delegates to the
+package-owned MemoryStore, PgVectorStore or RedisStore, according to settings.
 
 An independently installable [semantix-cache](packages/cache/README.md) supplies the async
 embedded facade, bounded MemoryStore and optional PostgreSQL/pgvector or Redis persistence
@@ -128,13 +128,24 @@ coalescer or fleet-wide metrics store.
 
 One backend pool serves enabled PostgreSQL features. With memory cache, session-only
 datasets, disabled run history, and memory coordination, no database pool is required.
-Cache migration 0001 owns vector/cache tables; evaluation migrations 0002 and 0003 own
-datasets and aggregate run history; shared coordination migration 0004 owns rate,
-lockout, and threshold tables. The shared runner uses an advisory lock, transactions,
-ordered packaged migrations within each owner, and SHA-256 checksums. Development may
-apply enabled migrations automatically. Hardened Compose runs a one-shot migration
-service with a migration role before backends start; backend runtime uses a separately
-granted role and external migration mode. See
+The live cache delegates to the package-owned MemoryStore, PgVectorStore or RedisStore.
+Storage setup is explicit; normal startup validates the selected binding rather than
+creating or converting cache tables. PgVectorStore owns its marked schema and migration
+ledger (by default, semantix_cache.workbench_*). Server cache migration 0001 preserves
+the legacy semantix.cache_entries layout and server telemetry table; legacy answer/vector
+records are neither adopted nor automatically converted into the official store.
+
+Evaluation migrations 0002 and 0003 own datasets and aggregate run history; shared
+coordination migration 0004 owns rate, lockout, and threshold tables. The shared runner
+retains advisory locks, transactional ordered migrations and SHA-256 checksums.
+Development automatic migrations apply only to other enabled PostgreSQL features.
+Hardened Compose runs explicit setup in a one-shot migration service before backends;
+runtime uses a separately granted role without migration authority.
+
+Operators must back up existing data and run explicit setup before transition. Legacy
+PostgreSQL rows remain preserved while the new official cache binding starts empty.
+Rollback requires the preserved schema and a freshness/context review of older cached
+answers. See [server storage](docs/guides/platform-storage.md),
 [pool lifecycle](apps/server/app/infrastructure/lifecycle.py),
 [migrator](apps/server/app/infrastructure/migrate.py), and
 [deployment](docs/operations/deployment.md).

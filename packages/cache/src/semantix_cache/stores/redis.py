@@ -47,6 +47,14 @@ from ..errors import (
     CacheValidationError,
     SemantixCacheError,
 )
+from ..inspection import (
+    InspectionEntry,
+    InspectionPage,
+    InspectionSort,
+    inspection_arguments,
+    inspection_namespaces,
+    remaining,
+)
 from ..models import CacheEntry, CacheMatch, EmbeddingSpace
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
@@ -467,6 +475,74 @@ return 1
 
 _CHECKSUM = sha256((_INITIALIZE + _READ + _WRITE).encode()).hexdigest()
 
+# Optional administration retains the accepted descriptor and original scripts.
+# The wildcard is inaccessible through CacheStore.clear(), which validates namespaces.
+_CLEAR_ALL = _WRITE.replace("if member(key)==m then", "if true then")
+_INSPECT = (
+    _COMMON
+    + _DATA
+    + """
+state()
+local now=clock()
+local ranked=members()
+local eligible={}
+local scope=ARGV[7]
+local key=ARGV[8]
+local allowed=cjson.decode(ARGV[9])
+local rank=0
+for i=#ranked,1,-1 do
+    local m=ranked[i]
+    local ns,k=member(m)
+    local permitted=ARGV[9]=='null'
+    if not permitted then for _,n in ipairs(allowed) do if n==ns then permitted=true end end end
+    if (scope=='' or scope==ns) and permitted then
+        local values=item(m,now)
+        if values then
+            rank=rank+1
+            if key=='' or key==k then
+                eligible[#eligible+1]={m,values,tostring(rank),k,ns}
+            end
+        end
+    end
+end
+local sort=ARGV[12]
+table.sort(eligible,function(a,b)
+    local av,bv=a[2],b[2]
+    if sort=='most_hit' and av[3]~=bv[3] then return cmp(av[3],bv[3])>0 end
+    if sort=='nearest_expiry' and av[2]~=bv[2] then
+        if av[2]=='' then return false end
+        if bv[2]=='' then return true end
+        return cmp(av[2],bv[2])<0
+    end
+    if av[1]~=bv[1] then
+        if sort=='oldest' then return cmp(av[1],bv[1])<0 end
+        return cmp(av[1],bv[1])>0
+    end
+    if a[4]~=b[4] then return a[4]<b[4] end
+    return a[5]<b[5]
+end)
+local result={}
+local offset=tonumber(ARGV[10])
+local limit=tonumber(ARGV[11])
+for i=offset+1,math.min(#eligible,offset+limit) do
+    local row=eligible[i]
+    local m,values=row[1],row[2]
+    local p=cjson.decode(redis.call('HGET',entries,m..':p'))
+    if p.cache_key~=row[4] or p.namespace~=row[5] or type(p.prompt)~='string' or type(p.response)~='string' then fail() end
+    local chars=0
+    local finish=#p.response
+    for j=1,#p.response do
+        local b=string.byte(p.response,j)
+        if b<128 or b>=192 then chars=chars+1 end
+        if chars>240 then finish=j-1; break end
+    end
+    local response=key=='' and '' or p.response
+    result[#result+1]={m,p.prompt,response,string.sub(p.response,1,finish),values[1],values[2],values[3],values[4],row[3],now,chars>240 and '1' or '0'}
+end
+return {#eligible,result}
+"""
+)
+
 
 def _row(raw: object) -> tuple[bytes, bytes, bytes, bytes]:
     if not isinstance(raw, list):
@@ -683,6 +759,171 @@ class RedisStore:
             await self._client.eval_ro(
                 _READ, 3, *self._config.keys, *self._config.descriptor, "validate"
             )
+
+    async def _inspect(
+        self,
+        *,
+        namespace: str | None,
+        namespaces: tuple[str, ...] | None,
+        cache_key: str | None,
+        offset: int,
+        limit: int,
+        sort: InspectionSort,
+    ) -> InspectionPage:
+        raw = await self._client.eval_ro(
+            _INSPECT,
+            3,
+            *self._config.keys,
+            *self._config.descriptor,
+            namespace or "",
+            cache_key or "",
+            json.dumps(namespaces),
+            offset,
+            limit,
+            sort,
+        )
+        try:
+            if not isinstance(raw, list):
+                raise TypeError
+            parts = cast(list[object], raw)
+            if len(parts) != 2:
+                raise ValueError
+            total, rows = parts
+            if type(total) is not int or total < 0 or not isinstance(rows, list):
+                raise ValueError
+            records = cast(list[object], rows)
+            if len(records) > limit:
+                raise ValueError
+            result: list[InspectionEntry] = []
+            for row in records:
+                if not isinstance(row, list):
+                    raise TypeError
+                fields = cast(list[object], row)
+                if len(fields) != 11 or not all(isinstance(x, bytes) for x in fields):
+                    raise ValueError
+                record = cast(list[bytes], fields)
+                if record[10] not in (b"0", b"1") or (cache_key is None and record[2]):
+                    raise ValueError
+                ns, key = record[0].decode("ascii").split("|")
+                if (
+                    (namespace is not None and ns != namespace)
+                    or (namespaces is not None and ns not in namespaces)
+                    or (cache_key is not None and key != cache_key)
+                ):
+                    raise ValueError
+                expiry = None if not record[5] else _datetime(record[5])
+                observed = _datetime(record[9])
+                if expiry is not None and expiry <= observed:
+                    raise ValueError
+                result.append(
+                    InspectionEntry(
+                        cache_key=key,
+                        namespace=ns,
+                        prompt=record[1].decode("utf-8"),
+                        response_preview=record[3].decode("utf-8"),
+                        response_preview_truncated=record[10] == b"1",
+                        response=record[2].decode("utf-8")
+                        if cache_key is not None
+                        else None,
+                        created_at=_datetime(record[4]),
+                        expires_at=expiry,
+                        remaining_ttl_seconds=remaining(expiry, observed),
+                        hit_count=int(record[6]),
+                        last_accessed_at=None
+                        if not record[7]
+                        else _datetime(record[7]),
+                        recency_rank=int(record[8]),
+                    )
+                )
+            return InspectionPage(
+                items=tuple(result),
+                total=total,
+                offset=offset,
+                limit=limit,
+                has_more=offset + len(result) < total,
+            )
+        except (ValueError, TypeError, OverflowError):
+            _raise_safe(CacheStoreError("Invalid Redis inspection metadata"))
+
+    async def inspect_entries(
+        self,
+        *,
+        namespace: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+        search: str | None = None,
+        sort: InspectionSort = "newest",
+    ) -> InspectionPage:
+        async with self._operation():
+            inspection_arguments(namespace, offset, limit, search, sort)
+            needle = "" if search is None else search.strip().casefold()
+            if not needle:
+                return await self._inspect(
+                    namespace=namespace,
+                    namespaces=None,
+                    cache_key=None,
+                    offset=offset,
+                    limit=limit,
+                    sort=sort,
+                )
+            # ponytail: prompt search scans at most 5000 payloads in batches of 100;
+            # a separate prompt index is unjustified for this optional admin operation.
+            selected: list[InspectionEntry] = []
+            matched = 0
+            scanned = 0
+            while scanned < self._config.capacity:
+                page = await self._inspect(
+                    namespace=namespace,
+                    namespaces=None,
+                    cache_key=None,
+                    offset=scanned,
+                    limit=100,
+                    sort=sort,
+                )
+                for item in page.items:
+                    if needle in item.prompt.casefold():
+                        if offset <= matched < offset + limit:
+                            selected.append(item)
+                        matched += 1
+                scanned += 100
+                if not page.has_more:
+                    break
+            return InspectionPage(
+                items=tuple(selected),
+                total=matched,
+                offset=offset,
+                limit=limit,
+                has_more=offset + len(selected) < matched,
+            )
+
+    async def inspect_entry(
+        self, cache_key: str, *, namespaces: tuple[str, ...] | None
+    ) -> InspectionEntry | None:
+        async with self._operation():
+            inspection_namespaces(namespaces)
+            try:
+                cache_key = cache_key_value(cache_key)
+            except ValueError:
+                _raise_safe(CacheValidationError("Invalid inspection key"))
+            page = await self._inspect(
+                namespace=None,
+                namespaces=namespaces,
+                cache_key=cache_key,
+                offset=0,
+                limit=1,
+                sort="newest",
+            )
+            return page.items[0] if page.items else None
+
+    async def clear_all(self) -> int:
+        """Administrative mutation across namespaces in this Redis binding."""
+        async with self._operation():
+            result = await self._client.eval(
+                _CLEAR_ALL, 3, *self._config.keys, *self._config.descriptor, "clear", ""
+            )
+            if type(result) is not int or result < 0:
+                _raise_safe(CacheStoreError("Invalid Redis clear result"))
+            return result
 
     async def aclose(self) -> None:
         if self._owned:

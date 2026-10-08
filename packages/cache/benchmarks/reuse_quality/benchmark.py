@@ -89,12 +89,16 @@ class CorpusInfo(StrictModel):
     split_policy: str = Field(min_length=1)
 
 
-def canonical_bytes(path: Path) -> bytes:
-    """UTF-8 content, CRLF/CR -> LF, exactly one final LF; no Unicode folding."""
-    text = path.read_bytes().decode("utf-8")
+def _canonical(content: bytes) -> bytes:
+    text = content.decode("utf-8")
     return (text.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n") + "\n").encode(
         "utf-8"
     )
+
+
+def canonical_bytes(path: Path) -> bytes:
+    """UTF-8 content, CRLF/CR -> LF, exactly one final LF; no Unicode folding."""
+    return _canonical(path.read_bytes())
 
 
 def file_digest(path: Path) -> str:
@@ -641,21 +645,76 @@ def generate_schema(path: Path = SCHEMAS / "summary.schema.json") -> None:
     )
 
 
+def _source_paths(paths: Sequence[str]) -> list[str]:
+    """Same complete input boundary for current files and a recorded Git tree."""
+    fixed = {
+        "packages/cache/benchmarks/__init__.py",
+        "packages/cache/benchmarks/common.py",
+        "packages/cache/pyproject.toml",
+        "packages/cache/uv.lock",
+        "packages/cache/benchmarks/reuse_quality/data/cases.jsonl",
+        "packages/cache/benchmarks/reuse_quality/data/corpus.manifest.json",
+        "packages/cache/benchmarks/reuse_quality/schemas/summary.schema.json",
+    }
+    return sorted(
+        fixed
+        | {
+            path
+            for path in paths
+            if path.endswith(".py")
+            and Path(path).parent.as_posix()
+            in {
+                "packages/cache/benchmarks/reuse_quality",
+                "packages/cache/src/semantix_cache",
+            }
+        }
+    )
+
+
 def source_hashes() -> dict[str, str]:
     """Current MemoryStore execution inputs; excludes optional providers/stores."""
     paths = [
-        ROOT / "packages/cache/benchmarks/__init__.py",
-        ROOT / "packages/cache/benchmarks/common.py",
-        ROOT / "packages/cache/pyproject.toml",
-        ROOT / "packages/cache/uv.lock",
-        *sorted((ROOT / "packages/cache/benchmarks/reuse_quality").glob("*.py")),
-        ROOT / "packages/cache/benchmarks/reuse_quality/data/cases.jsonl",
-        ROOT / "packages/cache/benchmarks/reuse_quality/data/corpus.manifest.json",
-        ROOT / "packages/cache/benchmarks/reuse_quality/schemas/summary.schema.json",
-        # Current root modules form the complete public facade/MemoryStore import closure.
-        *sorted((ROOT / "packages/cache/src/semantix_cache").glob("*.py")),
+        p.relative_to(ROOT).as_posix()
+        for directory in (
+            "packages/cache/benchmarks/reuse_quality",
+            "packages/cache/src/semantix_cache",
+        )
+        for p in (ROOT / directory).glob("*.py")
     ]
-    return {p.relative_to(ROOT).as_posix(): file_digest(p) for p in sorted(paths)}
+    return {path: file_digest(ROOT / path) for path in _source_paths(paths)}
+
+
+def historical_source_hashes(source_sha: str) -> dict[str, str]:
+    """Verify recorded inputs from immutable Git objects, without executing them."""
+    if re.fullmatch(r"[a-f0-9]{40}", source_sha) is None:
+        raise ValueError("Historical source revision must be a full commit SHA")
+
+    def read(*args: str) -> bytes:
+        return subprocess.check_output(  # noqa: S603 -- validated SHA and Git-owned paths; read-only arguments
+            ["git", "--no-replace-objects", "--no-lazy-fetch", *args],  # noqa: S607 -- fixed local Git executable
+            cwd=ROOT,
+            stderr=subprocess.PIPE,
+            timeout=10,
+        )
+
+    try:
+        if read("cat-file", "-t", source_sha).strip() != b"commit":
+            raise ValueError("Historical source revision is not a commit")
+        paths = (
+            read("ls-tree", "-rz", "--name-only", source_sha)
+            .decode("utf-8")
+            .split("\0")
+        )
+        return {
+            path: hashlib.sha256(
+                _canonical(read("show", source_sha + ":" + path))
+            ).hexdigest()
+            for path in _source_paths(paths)
+        }
+    except (OSError, subprocess.SubprocessError, UnicodeError):
+        raise ValueError(
+            "Historical source revision is unavailable or unreadable; restore its Git history before validating evidence"
+        ) from None
 
 
 def check_corpus_accounting(summary: Summary, cases: Sequence[QualityCase]) -> None:
@@ -690,7 +749,7 @@ def validate_evidence(
     directory: Path = DATA,
     public: Path = PUBLIC,
 ) -> tuple[CorpusInfo, int, bool]:
-    """Read-only integrity/staleness checks; source SHA is provenance, not a HEAD gate."""
+    """Check frozen receipt integrity against its recorded source, not today's code."""
     info, cases = load_corpus(directory)
     check_schema(directory.parent / "schemas/summary.schema.json")
     if not public.exists():
@@ -716,13 +775,14 @@ def validate_evidence(
         flags=re.IGNORECASE,
     ):
         raise ValueError("Public summary contains workflow review wording")
-    stale = (
-        "Reviewed reuse-quality evidence is stale because benchmark/runtime inputs changed. "
-        "Re-run and review the benchmark from a clean source commit before replacing the public manifest. "
-        f"From packages/cache explicitly run: {CLI} --semantic --output ../../.cache/reuse-quality/reviewed.json --review-public."
-    )
-    if summary.corpus != info or summary.source_files_sha256 != source_hashes():
-        raise ValueError(stale)
+    if summary.corpus != info:
+        raise ValueError(
+            "Historical receipt does not match the maintained frozen corpus"
+        )
+    if summary.source_files_sha256 != historical_source_hashes(summary.source_sha):
+        raise ValueError(
+            "Historical receipt source fingerprints do not match the recorded revision"
+        )
     if (
         summary.threshold_grid != list(THRESHOLDS)
         or summary.default_threshold
@@ -1003,7 +1063,7 @@ def main() -> None:
                     f"Corpus valid: {info.version}, {count} cases, SHA256 {info.sha256}"
                 )
                 print(  # noqa: T201 -- CLI validation status
-                    "Reviewed public summary valid."
+                    "Reviewed public summary valid against recorded historical source; no model evaluation rerun."
                     if has_public
                     else "Public summary absent; reviewed benchmark evidence is unavailable."
                 )

@@ -1,7 +1,7 @@
 import asyncio
 from collections import OrderedDict
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from time import monotonic
 from types import TracebackType
@@ -19,6 +19,15 @@ from ._semantics import (
     resolve_ttl,
 )
 from .errors import CacheConfigurationError, CacheStoreError, CacheValidationError
+from .inspection import (
+    InspectionEntry,
+    InspectionPage,
+    InspectionSort,
+    inspection_arguments,
+    inspection_namespaces,
+    inspection_page,
+    preview,
+)
 from .models import CacheEntry, CacheMatch, EmbeddingSpace
 
 
@@ -27,6 +36,8 @@ class _Item:
     entry: CacheEntry
     expires_monotonic: float | None
     expires_at: datetime | None
+    hit_count: int = 0
+    last_accessed_at: datetime | None = None
 
 
 @dataclass
@@ -122,6 +133,8 @@ class MemoryStore:
         self._items: OrderedDict[str, _Item] = OrderedDict()
         self._snapshots: dict[str, _Snapshot] = {}
         self._last_revision: datetime | None = None
+        self._evictions = 0
+        self._expirations = 0
         self._lock = asyncio.Lock()
         self._slot = asyncio.Semaphore(1)
         self._workers: set[asyncio.Task[CacheMatch]] = set()
@@ -147,6 +160,7 @@ class MemoryStore:
             if item.expires_monotonic is not None and now >= item.expires_monotonic
         ]:
             self._discard(key)
+            self._expirations += 1
 
     @staticmethod
     def _scope(cache_key: str, namespace: str) -> tuple[str, str]:
@@ -235,6 +249,11 @@ class MemoryStore:
                     or item.entry.created_at != expected_created_at
                 ):
                     return False
+                self._items[key] = replace(
+                    item,
+                    hit_count=item.hit_count + 1,
+                    last_accessed_at=datetime.now(UTC),
+                )
                 self._items.move_to_end(key)
                 return True
 
@@ -277,6 +296,7 @@ class MemoryStore:
                 self._items.move_to_end(entry.cache_key)
                 while len(self._items) > self._max_size:
                     self._discard(next(iter(self._items)))
+                    self._evictions += 1
 
     async def delete_entry(self, cache_key: str, *, namespace: str) -> bool:
         with self._state.operation():
@@ -305,6 +325,94 @@ class MemoryStore:
                 for key in keys:
                     self._discard(key)
                 return len(keys)
+
+    def _inspection_entry(
+        self, item: _Item, rank: int, *, observed_at: float, include_response: bool
+    ) -> InspectionEntry:
+        return InspectionEntry(
+            cache_key=item.entry.cache_key,
+            namespace=item.entry.namespace,
+            prompt=item.entry.prompt,
+            response_preview=preview(item.entry.response),
+            response_preview_truncated=len(item.entry.response) > 240,
+            response=item.entry.response if include_response else None,
+            created_at=item.entry.created_at,
+            expires_at=item.expires_at,
+            remaining_ttl_seconds=None
+            if item.expires_monotonic is None
+            else max(0.0, item.expires_monotonic - observed_at),
+            hit_count=item.hit_count,
+            last_accessed_at=item.last_accessed_at,
+            recency_rank=rank,
+        )
+
+    async def inspect_entries(
+        self,
+        *,
+        namespace: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+        search: str | None = None,
+        sort: InspectionSort = "newest",
+    ) -> InspectionPage:
+        with self._state.operation():
+            inspection_arguments(namespace, offset, limit, search, sort)
+            async with self._lock:
+                now = monotonic()
+                items = [
+                    item
+                    for item in reversed(self._items.values())
+                    if (item.expires_monotonic is None or item.expires_monotonic > now)
+                    and (namespace is None or item.entry.namespace == namespace)
+                ]
+                metadata = [
+                    self._inspection_entry(
+                        item, rank, observed_at=now, include_response=False
+                    )
+                    for rank, item in enumerate(items, 1)
+                ]
+                return inspection_page(
+                    metadata, offset=offset, limit=limit, search=search, sort=sort
+                )
+
+    async def inspect_entry(
+        self, cache_key: str, *, namespaces: tuple[str, ...] | None
+    ) -> InspectionEntry | None:
+        with self._state.operation():
+            try:
+                key = cache_key_value(cache_key)
+            except ValueError:
+                raise CacheValidationError("Invalid inspection key") from None
+            inspection_namespaces(namespaces)
+            async with self._lock:
+                now = monotonic()
+                live = (
+                    item
+                    for item in reversed(self._items.values())
+                    if (item.expires_monotonic is None or item.expires_monotonic > now)
+                    and (namespaces is None or item.entry.namespace in namespaces)
+                )
+                for rank, item in enumerate(live, 1):
+                    if item.entry.cache_key == key:
+                        return self._inspection_entry(
+                            item, rank, observed_at=now, include_response=True
+                        )
+                return None
+
+    async def clear_all(self) -> int:
+        """Administrative mutation across namespaces in this store."""
+        with self._state.operation():
+            async with self._lock:
+                self._purge()
+                count = len(self._items)
+                self._items.clear()
+                self._snapshots.clear()
+                return count
+
+    @property
+    def inspection_events(self) -> tuple[int, int]:
+        """Process-local observed removals; not cache authority."""
+        return self._evictions, self._expirations
 
     async def aclose(self) -> None:
         self._state.close(workers=bool(self._workers))

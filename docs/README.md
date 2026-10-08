@@ -13,6 +13,7 @@ reference HTTP client for that server, not the first public PyPI target.
 | --- | --- |
 | [Cache package](../packages/cache/README.md) | First use, policies, results, lifecycle and canonical 0.1.x compatibility |
 | [Embedded providers](embedded-providers.md) | Maintained adapters, optional extras and custom embedding/generation |
+| [Semantic-answer accuracy limitations](semantic-accuracy-limitations.md) | Similarity, answer compatibility, frozen exploratory findings and safe reuse choices |
 | [Context identity and migration](context-identity-and-migration.md) | Explicit scopes, embedding revisions, offline recipes and safe migration |
 | [Embedded storage](embedded-storage.md) | Memory, PostgreSQL/pgvector, Redis and application-owned databases |
 | [Embedded Redis](embedded-redis.md) | Optional RedisStore setup, exact scan, TTL/LRU, ownership and recovery |
@@ -33,6 +34,7 @@ reference HTTP client for that server, not the first public PyPI target.
 | [Getting started](guides/getting-started.md) | Environment files, local toolchains, Docker workflows, and troubleshooting |
 | [Providers](guides/providers.md) | Hugging Face, OpenAI, Anthropic, Gemini, Ollama, and mock configuration |
 | [Custom provider adapters](guides/provider-extensions.md) | Explicit trusted server-side adapter registration and lifecycle contract |
+| [Server storage](guides/platform-storage.md) | Official MemoryStore, PgVectorStore and RedisStore configuration, explicit setup and legacy transition |
 | [pgvector](guides/pgvector.md) | Persistent cache storage, ports, migrations, and database verification |
 | [Cache policies](guides/cache-policies.md) | Thresholds, TTL, LRU, namespaces, privacy, and request coalescing |
 | [Benchmarking](guides/benchmarking.md) | Datasets, metrics, safeguards, projections, and exports |

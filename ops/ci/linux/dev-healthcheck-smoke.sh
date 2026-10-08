@@ -32,13 +32,20 @@ export POSTGRES_DB="${POSTGRES_DB:-semantix}"
 export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(generate_secret)}"
 export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
 
+# Official cache storage requires explicit setup before normal startup validation.
+"${compose[@]}" --profile pgvector up --no-build --detach --wait --wait-timeout 180 postgres
+export MIGRATION_DATABASE_URL="$DATABASE_URL"
+export DATABASE_RUNTIME_ROLE="$POSTGRES_USER"
+"${compose[@]}" --profile pgvector run --rm --no-deps \
+  -e MIGRATION_DATABASE_URL -e DATABASE_RUNTIME_ROLE -e DATABASE_MIGRATION_MODE=external \
+  backend python -m app.infrastructure.migrate
 "${compose[@]}" --profile pgvector up --no-build --detach --wait --wait-timeout 180
 curl --fail --silent --show-error "http://127.0.0.1:${backend_port}/ready"
 "${compose[@]}" --profile pgvector down --volumes --remove-orphans
 
 export CACHE_BACKEND=memory
 export MOCK_EMBEDDING_DIMENSIONS=0
-unset DATABASE_URL
+unset DATABASE_URL MIGRATION_DATABASE_URL DATABASE_RUNTIME_ROLE
 
 if "${compose[@]}" up --no-build --detach --wait --wait-timeout 45; then
   echo "Invalid backend configuration unexpectedly became healthy" >&2

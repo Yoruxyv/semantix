@@ -19,7 +19,7 @@ COPY apps/server/tests ./tests
 COPY apps/server/scripts ./scripts
 
 RUN mkdir -p "$PYTHONPYCACHEPREFIX" \
-    && uv sync --locked --extra dev
+    && uv sync --locked --extra dev --extra redis
 
 EXPOSE 8000
 

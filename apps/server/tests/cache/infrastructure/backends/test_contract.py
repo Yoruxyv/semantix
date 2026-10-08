@@ -9,16 +9,18 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-import app.cache.infrastructure.backends.memory as memory_backend_module
+import semantix_cache.memory as memory_backend_module
 from app.cache.domain.keys import prompt_cache_key
 from app.cache.domain.metadata import TRUNCATED_RESPONSE_PREVIEW_MESSAGE
-from app.cache.domain.models import CacheCandidate, CacheEntry
 from app.cache.domain.namespaces import DEFAULT_CACHE_NAMESPACE
 from app.cache.domain.protocols import CacheBackend
 from app.cache.infrastructure.backends.memory import InMemoryCacheBackend
+from app.cache.infrastructure.backends.official import OfficialStoreBackend
 from app.cache.infrastructure.factory import cache_backend_lifespan
+from app.cache.infrastructure.setup import initialize_redis
 from app.core.config import Settings
 from app.core.exceptions import CacheStorageError
+from semantix_cache import CacheMatch
 from tests.cache.infrastructure.backends.support import cache_entry
 from tests.support import TEST_EMBEDDING_DIMENSIONS, unit_vector
 
@@ -35,6 +37,7 @@ BackendBuilder = Callable[
             "pgvector",
             marks=pytest.mark.pgvector,
         ),
+        pytest.param("redis", marks=pytest.mark.redis),
     ]
 )
 def backend_builder(
@@ -42,6 +45,9 @@ def backend_builder(
 ) -> BackendBuilder:
     backend_name = str(request.param)
     database_url = os.getenv("PGVECTOR_TEST_DATABASE_URL")
+    redis_url = os.getenv("REDIS_TEST_URL")
+    if backend_name == "redis" and not redis_url:
+        pytest.skip("REDIS_TEST_URL is not configured")
     if backend_name == "pgvector" and not database_url:
         pytest.skip("PGVECTOR_TEST_DATABASE_URL is not configured")
 
@@ -53,6 +59,8 @@ def backend_builder(
         settings = Settings(
             cache_backend=backend_name,
             database_url=database_url,
+            redis_url=redis_url,
+            redis_key_prefix="server_contract_" + uuid4().hex,
             max_cache_size=max_size,
             cache_ttl_seconds=ttl_seconds,
             hf_api_key="test-only-placeholder",
@@ -60,6 +68,9 @@ def backend_builder(
             hf_embedding_dimensions=TEST_EMBEDDING_DIMENSIONS,
             allowed_origins=["http://localhost:5173"],
         )
+        if backend_name == "redis":
+            assert redis_url is not None
+            await initialize_redis(settings, initialization_url=redis_url)
         async with cache_backend_lifespan(
             settings,
             dimensions=TEST_EMBEDDING_DIMENSIONS,
@@ -101,6 +112,7 @@ async def test_similarity_and_entry_metadata(
         assert nearest.similarity_score == pytest.approx(1.0)
         assert await backend.record_hit(
             alpha.cache_key,
+            namespace=alpha.namespace,
             expected_created_at=alpha.created_at,
         )
 
@@ -310,6 +322,7 @@ async def test_cache_hit_does_not_extend_entry_ttl(
         assert candidate is not None
         assert await backend.record_hit(
             candidate.entry.cache_key,
+            namespace=candidate.entry.namespace,
             expected_created_at=candidate.entry.created_at,
         )
         after = await backend.get_entry(
@@ -326,9 +339,7 @@ async def test_memory_ttl_expiry_is_deterministic(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     now = 100.0
-    monkeypatch.setattr(
-        "app.cache.infrastructure.backends.memory.time.monotonic", lambda: now
-    )
+    monkeypatch.setattr("semantix_cache.memory.monotonic", lambda: now)
     backend = InMemoryCacheBackend(
         10,
         60,
@@ -448,6 +459,7 @@ async def test_namespace_filtering_stats_and_clear(
         assert nearest.entry.response == "alpha response"
         assert await backend.record_hit(
             alpha.cache_key,
+            namespace=alpha.namespace,
             expected_created_at=alpha.created_at,
         )
         await backend.record_miss("tenant-alpha")
@@ -504,7 +516,7 @@ async def test_invalid_vectors_are_rejected_consistently(
     backend_builder: BackendBuilder,
 ) -> None:
     async with backend_builder(10, None) as backend:
-        with pytest.raises(CacheStorageError, match="Zero magnitude"):
+        with pytest.raises(CacheStorageError, match="Official cache operation failed"):
             await backend.find_nearest(
                 [0.0] * TEST_EMBEDDING_DIMENSIONS,
                 namespace=DEFAULT_CACHE_NAMESPACE,
@@ -542,10 +554,12 @@ async def test_record_hit_rejects_an_overwritten_candidate(
 
         assert not await backend.record_hit(
             candidate.entry.cache_key,
+            namespace=candidate.entry.namespace,
             expected_created_at=candidate.entry.created_at,
         )
         assert await backend.record_hit(
             current_candidate.entry.cache_key,
+            namespace=current_candidate.entry.namespace,
             expected_created_at=current_candidate.entry.created_at,
         )
 
@@ -559,15 +573,16 @@ async def test_memory_lookup_calculation_releases_the_state_lock(
         None,
         dimensions=TEST_EMBEDDING_DIMENSIONS,
     )
-    original = memory_backend_module._find_nearest_in_snapshot
+    original = memory_backend_module._nearest
     calculation_started = threading.Event()
     continue_calculation = threading.Event()
     worker_threads: list[int] = []
 
     def paused_calculation(
         query: NDArray[np.float64],
-        entries: tuple[CacheEntry, ...],
-    ) -> CacheCandidate:
+        entries: memory_backend_module._Snapshot
+        | tuple[memory_backend_module._Item, ...],
+    ) -> CacheMatch:
         worker_threads.append(threading.get_ident())
         calculation_started.set()
         assert continue_calculation.wait(timeout=5)
@@ -575,7 +590,7 @@ async def test_memory_lookup_calculation_releases_the_state_lock(
 
     monkeypatch.setattr(
         memory_backend_module,
-        "_find_nearest_in_snapshot",
+        "_nearest",
         paused_calculation,
     )
     first = cache_entry("first", "first response", vector_index=0)
@@ -608,21 +623,22 @@ async def test_memory_lookup_drops_a_concurrently_deleted_candidate(
         None,
         dimensions=TEST_EMBEDDING_DIMENSIONS,
     )
-    original = memory_backend_module._find_nearest_in_snapshot
+    original = memory_backend_module._nearest
     calculation_started = threading.Event()
     continue_calculation = threading.Event()
 
     def paused_calculation(
         query: NDArray[np.float64],
-        entries: tuple[CacheEntry, ...],
-    ) -> CacheCandidate:
+        entries: memory_backend_module._Snapshot
+        | tuple[memory_backend_module._Item, ...],
+    ) -> CacheMatch:
         calculation_started.set()
         assert continue_calculation.wait(timeout=5)
         return original(query, entries)
 
     monkeypatch.setattr(
         memory_backend_module,
-        "_find_nearest_in_snapshot",
+        "_nearest",
         paused_calculation,
     )
     entry = cache_entry("deleted", "response", vector_index=0)
@@ -653,15 +669,16 @@ async def test_cancelled_memory_lookup_keeps_its_worker_slot(
         None,
         dimensions=TEST_EMBEDDING_DIMENSIONS,
     )
-    original = memory_backend_module._find_nearest_in_snapshot
+    original = memory_backend_module._nearest
     calculation_started = threading.Event()
     continue_calculation = threading.Event()
     worker_calls = 0
 
     def paused_first_calculation(
         query: NDArray[np.float64],
-        entries: tuple[CacheEntry, ...],
-    ) -> CacheCandidate:
+        entries: memory_backend_module._Snapshot
+        | tuple[memory_backend_module._Item, ...],
+    ) -> CacheMatch:
         nonlocal worker_calls
         worker_calls += 1
         if worker_calls == 1:
@@ -671,7 +688,7 @@ async def test_cancelled_memory_lookup_keeps_its_worker_slot(
 
     monkeypatch.setattr(
         memory_backend_module,
-        "_find_nearest_in_snapshot",
+        "_nearest",
         paused_first_calculation,
     )
     await backend.put(cache_entry("entry", "response", vector_index=0))
@@ -698,3 +715,40 @@ async def test_cancelled_memory_lookup_keeps_its_worker_slot(
         await first
     assert await second is not None
     assert worker_calls == 2
+
+
+@pytest.mark.asyncio
+async def test_normal_hit_never_reads_inspection(
+    backend_builder: BackendBuilder,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async with backend_builder(10, None) as backend:
+        assert isinstance(backend, OfficialStoreBackend)
+        item = cache_entry(
+            "normal hit", "response", namespace="tenant-alpha", vector_index=0
+        )
+        await backend.put(item)
+        candidate = await backend.find_nearest(unit_vector(), namespace="tenant-alpha")
+        assert candidate is not None
+
+        def forbidden(*args: object, **kwargs: object) -> None:
+            pytest.fail("Inspection ran during ordinary hit confirmation")
+
+        monkeypatch.setattr(backend.store, "inspect_entry", forbidden)
+        monkeypatch.setattr(backend.store, "inspect_entries", forbidden)
+        assert not await backend.record_hit(
+            item.cache_key,
+            namespace="tenant-beta",
+            expected_created_at=candidate.entry.created_at,
+        )
+        assert await backend.record_hit(
+            item.cache_key,
+            namespace="tenant-alpha",
+            expected_created_at=candidate.entry.created_at,
+        )
+        await backend.put(item)
+        assert not await backend.record_hit(
+            item.cache_key,
+            namespace="tenant-alpha",
+            expected_created_at=candidate.entry.created_at,
+        )

@@ -142,7 +142,8 @@ def test_blank_or_header_unsafe_token_is_rejected_without_echoing_it() -> None:
             assert token not in str(caught.value)
 
 
-def test_health_and_readiness_are_typed() -> None:
+@pytest.mark.parametrize("backend", ["memory", "pgvector", "redis"])
+def test_health_and_readiness_are_typed(backend: str) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/health":
             return httpx.Response(
@@ -158,7 +159,7 @@ def test_health_and_readiness_are_typed() -> None:
             200,
             json={
                 "status": "ready",
-                "cache_backend": "memory",
+                "cache_backend": backend,
                 "evaluation_dataset_storage": "session",
                 "future": True,
             },
@@ -169,7 +170,7 @@ def test_health_and_readiness_are_typed() -> None:
         transport=httpx.MockTransport(handler),
     ) as client:
         assert client.health().embedding_provider == "mock"
-        assert client.ready().cache_backend == "memory"
+        assert client.ready().cache_backend == backend
 
 
 def test_cache_hit_and_current_miss_variants_decode() -> None:
