@@ -362,9 +362,10 @@ and all package test modules **except** these checkout-only tests:
 - `tests/test_benchmark_harness.py`
 - `tests/test_coalescing_benchmark.py`
 - `tests/test_reuse_quality.py`
+- `tests/test_reuse_quality_contracts.py`
 - `tests/test_provider_live_verify.py`
 
-Those four need repository benchmark/script/evidence trees and still run in the
+Those five need repository benchmark/script/evidence trees and still run in the
 checkout/CI suite. They are excluded from the archive, not skipped in checkout
 pytest. `MANIFEST.in` defines this boundary; `tests/check_artifacts.py` enforces
 that the remaining test/helper set is included exactly. Benchmarks and repository
