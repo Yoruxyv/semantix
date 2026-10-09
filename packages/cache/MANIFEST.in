@@ -5,5 +5,6 @@ recursive-include tests *.py
 exclude tests/test_benchmark_harness.py
 exclude tests/test_coalescing_benchmark.py
 exclude tests/test_reuse_quality.py
+exclude tests/test_reuse_quality_contracts.py
 exclude tests/test_provider_live_verify.py
 recursive-include examples *.py

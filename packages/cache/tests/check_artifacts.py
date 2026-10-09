@@ -87,6 +87,7 @@ def main(artifact_dir: Path = Path("dist")) -> None:
             "test_benchmark_harness.py",
             "test_coalescing_benchmark.py",
             "test_reuse_quality.py",
+            "test_reuse_quality_contracts.py",
             "test_provider_live_verify.py",
         }
         standalone_tests = {

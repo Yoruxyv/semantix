@@ -594,7 +594,9 @@ def test_validation_rejects_changed_evidence_inputs(
         validate_evidence(directory=directory, public=public)
 
 
-@pytest.mark.parametrize("change", ["runtime", "benchmark", "dependencies"])
+@pytest.mark.parametrize(
+    "change", ["runtime", "benchmark", "contracts", "dependencies"]
+)
 def test_later_source_changes_preserve_history_but_block_current_publication(
     reviewed_project: tuple[Path, Path, Summary],
     monkeypatch: pytest.MonkeyPatch,
@@ -604,6 +606,7 @@ def test_later_source_changes_preserve_history_but_block_current_publication(
     relative = {
         "runtime": "packages/cache/src/semantix_cache/memory.py",
         "benchmark": "packages/cache/benchmarks/reuse_quality/benchmark.py",
+        "contracts": "packages/cache/benchmarks/reuse_quality/_contracts.py",
         "dependencies": "packages/cache/uv.lock",
     }[change]
     path = quality.ROOT / relative
