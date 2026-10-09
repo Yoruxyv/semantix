@@ -67,6 +67,7 @@ def main(artifact_dir: Path = Path("dist")) -> None:
         assert ">=8.1.0" in redis[0]
         assert "<8.2" in redis[0]
         assert "semantix_cache/stores/redis.py" in names
+        assert "semantix_cache/stores/_redis_scripts.py" in names
         migration = "semantix_cache/stores/migrations/0001_cache.sql"
         assert [name for name in names if name.endswith(".sql")] == [migration]
         assert archive.read(migration) == Path("src").joinpath(migration).read_bytes()
@@ -140,6 +141,9 @@ def main(artifact_dir: Path = Path("dist")) -> None:
                 )
             ), relative
         assert f"{root}/src/semantix_cache/py.typed" in archive.getnames()
+        assert (
+            f"{root}/src/semantix_cache/stores/_redis_scripts.py" in archive.getnames()
+        )
         for module in ("observability", "_coalescing_metrics"):
             assert f"{root}/src/semantix_cache/{module}.py" in archive.getnames()
         assert f"{root}/examples/custom_integration.py" in archive.getnames()
