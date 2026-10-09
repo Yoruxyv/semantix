@@ -91,7 +91,6 @@ known-first-party = ["app", "benchmarks", "examples", "semantix_cache", "semanti
 # Reviewed SQL builders assemble only module-owned identifiers;
 # runtime values remain PostgreSQL bind parameters.
 "**/app/benchmark/infrastructure/postgres_history_queries.py" = ["S608"]
-"**/app/cache/infrastructure/backends/pgvector_sql.py" = ["S608"]
 
 # Cache SQL interpolates only ASCII-validated, quoted schema/prefix identifiers
 # or quoted extension catalog identifiers; all runtime values use bind parameters.

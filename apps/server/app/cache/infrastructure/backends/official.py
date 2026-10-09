@@ -7,6 +7,7 @@ expiry or access-order index is retained here.
 import asyncio
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, TypeAlias
 
@@ -23,7 +24,6 @@ from app.cache.domain.metadata import TRUNCATED_RESPONSE_PREVIEW_MESSAGE
 from app.cache.domain.models import CacheCandidate, CacheEntry
 from app.cache.domain.namespaces import AuthorizedNamespaceScope
 from app.cache.domain.protocols import CacheEventRecorder
-from app.cache.infrastructure.backends.memory_records import CacheCounters
 from app.core.exceptions import CacheStorageError
 from semantix_cache import CacheEntry as OfficialEntry
 from semantix_cache import MemoryStore, SemantixCacheError
@@ -34,6 +34,12 @@ if TYPE_CHECKING:
     from semantix_cache.stores.redis import RedisStore
 
 OfficialStore: TypeAlias = "MemoryStore | PgVectorStore | RedisStore"
+
+
+@dataclass(slots=True)
+class CacheCounters:
+    hits: int = 0
+    misses: int = 0
 
 
 class OfficialStoreBackend:
