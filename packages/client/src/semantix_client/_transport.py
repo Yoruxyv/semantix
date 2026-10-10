@@ -1,6 +1,12 @@
 # Copyright (c) 2026 Hans Valerie
 # SPDX-License-Identifier: MIT
-"""Private sync and async HTTP transport implementations."""
+"""Private sync and async HTTP transports owned by the public clients.
+
+Each transport reuses one HTTPX connection pool. Requests use identity
+encoding, bound raw response content before JSON decoding, and preserve HTTP
+status categories when an error body is unusable. Public model validation
+happens after this layer. Neither transport retries requests automatically.
+"""
 
 import contextlib
 import json
@@ -34,6 +40,12 @@ class _ResponseTooLargeError(Exception):
 
 
 def _normalize_base_url(base_url: str) -> str:
+    """Normalize an HTTP(S) URL with an optional deployment path prefix.
+
+    Strip surrounding whitespace and trailing path slashes. Require a hostname
+    and a valid parsed port; reject embedded credentials and nonempty query or
+    fragment components. This does not check reachability or trusted destinations.
+    """
     candidate = base_url.strip()
     try:
         parsed = urlsplit(candidate)
@@ -56,6 +68,11 @@ def _normalize_base_url(base_url: str) -> str:
 
 
 def _timeout(value: float) -> httpx.Timeout:
+    """Validate a positive finite number for HTTPX's four timeout phases.
+
+    The value applies to connect, read, write and pool waits, rather than a total
+    wall-clock deadline for the request.
+    """
     if isinstance(value, bool) or not isinstance(value, int | float):
         raise SemantixConfigurationError("The Semantix timeout must be a number.")
     timeout = float(value)
@@ -67,6 +84,12 @@ def _timeout(value: float) -> httpx.Timeout:
 
 
 def _headers(token: str | None) -> dict[str, str]:
+    """Request JSON with identity encoding and the original optional token.
+
+    Reject empty, all-whitespace or CR/LF-containing tokens; otherwise preserve
+    the supplied value in the Bearer header. The server owns authentication and
+    authorization; this helper does not substitute a token digest.
+    """
     headers = {
         "Accept": "application/json",
         "Accept-Encoding": "identity",
@@ -81,6 +104,11 @@ def _headers(token: str | None) -> dict[str, str]:
 
 
 def _read_content(response: httpx.Response) -> bytes:
+    """Collect at most 1 MiB of raw streamed bytes, or already-consumed content.
+
+    Raise the private size sentinel before adding a chunk that exceeds the bound.
+    The caller's HTTPX stream context owns response closure, including on failure.
+    """
     content = bytearray()
     chunks = (response.content,) if response.is_stream_consumed else response.iter_raw()
     for chunk in chunks:
@@ -91,6 +119,11 @@ def _read_content(response: httpx.Response) -> bytes:
 
 
 async def _read_content_async(response: httpx.Response) -> bytes:
+    """Apply the same 1 MiB bound while asynchronously reading raw chunks.
+
+    Already-consumed responses use the synchronous reader. Response cleanup
+    belongs to the caller's asynchronous stream context.
+    """
     if response.is_stream_consumed:
         return _read_content(response)
     content = bytearray()
@@ -102,11 +135,17 @@ async def _read_content_async(response: httpx.Response) -> bytes:
 
 
 def _is_json_response(response: httpx.Response) -> bool:
+    """Accept application/json or a media type ending in +json, ignoring parameters."""
     media_type = str(response.headers.get("content-type", "")).split(";", 1)[0].strip()
     return media_type == "application/json" or media_type.endswith("+json")
 
 
 def _reject_encoded_response(response: httpx.Response, token: str | None) -> None:
+    """Accept absent/identity encoding before reading the response body.
+
+    Other encodings raise a response error on success or a status-classified API
+    error without body details on HTTP failure.
+    """
     encoding = response.headers.get("content-encoding", "").strip().lower()
     if encoding in {"", "identity"}:
         return
@@ -118,6 +157,7 @@ def _reject_encoded_response(response: httpx.Response, token: str | None) -> Non
 
 
 def _json(content: bytes) -> object:
+    """Decode JSON bytes, translating Unicode and JSON syntax failures."""
     try:
         return cast(object, json.loads(content))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -127,6 +167,11 @@ def _json(content: bytes) -> object:
 
 
 def _safe_text(value: object, *, limit: int, token: str | None) -> str | None:
+    """Replace C0 controls, redact exact token matches, then truncate text.
+
+    Empty or non-string fields become None. Token matching occurs after control
+    replacement; this is limited sanitization, not detection of arbitrary secrets.
+    """
     if not isinstance(value, str) or not value:
         return None
     sanitized = "".join(
@@ -138,6 +183,7 @@ def _safe_text(value: object, *, limit: int, token: str | None) -> str | None:
 
 
 def _retry_after(response: httpx.Response) -> int | None:
+    """Parse a positive integer delay; dates and nonpositive values give None."""
     value = response.headers.get("retry-after", "").strip()
     if not value.isdigit():
         return None
@@ -151,6 +197,13 @@ def _raise_api_error(
     *,
     token: str | None,
 ) -> None:
+    """Raise a status-classified error with bounded, sanitized body fields.
+
+    Codes are limited to 100 characters and details to 500. Unusable fields fall
+    back to http_error and None. Map 401/403/422/429 to their dedicated errors and
+    5xx to server errors; other non-success statuses use SemantixAPIError.
+    Retry-After is exposed as metadata, without scheduling a retry.
+    """
     data = cast("dict[object, object]", payload) if isinstance(payload, dict) else {}
     error_code = (
         _safe_text(
@@ -189,6 +242,13 @@ def _raise_api_error(
 def _decode_response(
     response: httpx.Response, content: bytes, token: str | None
 ) -> object:
+    """Decode success JSON or preserve an HTTP failure's status category.
+
+    Success requires an accepted JSON media type and parseable content. On HTTP
+    failure, malformed or non-JSON content falls back to a generic API error body;
+    valid JSON may supply bounded error/detail fields. Typed models are decoded
+    separately by the public client.
+    """
     if not response.is_success:
         payload = None
         if _is_json_response(response):
@@ -203,6 +263,12 @@ def _decode_response(
 
 
 class _SyncTransport:
+    """Own a pooled HTTPX Client until the public client closes it.
+
+    The optional injected transport is an internal test seam, not a public
+    extension API or a borrowed HTTPX client.
+    """
+
     def __init__(
         self,
         *,
@@ -226,6 +292,13 @@ class _SyncTransport:
         *,
         payload: Mapping[str, object] | None = None,
     ) -> object:
+        """Send one request and close its stream before decoding the JSON body.
+
+        Encoded or oversized HTTP failures retain status-based API errors without
+        body details; equivalent successful responses raise SemantixResponseError.
+        Translate HTTPX timeouts and request errors to SDK transport errors. No retry
+        occurs, and a failed local request does not establish the remote outcome.
+        """
         try:
             with self._client.stream(method, path, json=payload) as response:
                 _reject_encoded_response(response, self._token)
@@ -246,10 +319,17 @@ class _SyncTransport:
         return _decode_response(response, content, self._token)
 
     def close(self) -> None:
+        """Close the owned synchronous HTTPX connection pool."""
         self._client.close()
 
 
 class _AsyncTransport:
+    """Own a pooled HTTPX AsyncClient until the public client awaits closure.
+
+    Keep asynchronous stream and pool cleanup separate from the sync transport.
+    The optional transport argument is an internal test seam.
+    """
+
     def __init__(
         self,
         *,
@@ -273,6 +353,12 @@ class _AsyncTransport:
         *,
         payload: Mapping[str, object] | None = None,
     ) -> object:
+        """Await one request with the same bounds and status mapping as sync.
+
+        The HTTPX asynchronous stream context handles response cleanup. Cancellation
+        propagates; neither cancellation nor a transport error proves that remote
+        generation or cache writes were rolled back. Requests are not retried.
+        """
         try:
             async with self._client.stream(method, path, json=payload) as response:
                 _reject_encoded_response(response, self._token)
@@ -293,4 +379,5 @@ class _AsyncTransport:
         return _decode_response(response, content, self._token)
 
     async def close(self) -> None:
+        """Close the owned asynchronous HTTPX connection pool."""
         await self._client.aclose()

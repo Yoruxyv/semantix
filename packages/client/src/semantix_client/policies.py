@@ -8,6 +8,9 @@ from enum import Enum
 class CachePolicy(str, Enum):  # noqa: UP042 - preserve public SDK behavior
     """Cache modes; authorization and namespace rules remain server-owned.
 
+    PRIVATE is caller-selected trace minimization. The generation provider still
+    receives the prompt; this policy does not automatically detect sensitive text.
+
     Attributes:
         NORMAL: Read eligible cache entries and write generated misses.
         READ_ONLY: Read eligible entries without writing generated misses.
@@ -58,4 +61,5 @@ _POLICY_FIELDS: dict[CachePolicy, dict[str, bool]] = {
 
 
 def _policy_fields(policy: CachePolicy) -> dict[str, bool]:
+    """Return a fresh copy of wire flags; namespace and TTL are serialized separately."""
     return dict(_POLICY_FIELDS[policy])

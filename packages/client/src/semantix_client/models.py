@@ -68,6 +68,9 @@ class HealthStatus:
 class ReadinessStatus:
     """Active storage readiness; failed readiness raises a server error.
 
+    A successful server probe covers cache stats, the configured dataset catalog
+    and enabled coordination. It does not independently probe retained history.
+
     Attributes:
         status: Always ``"ready"`` on success.
         cache_backend: Active cache storage, ``memory``, ``pgvector`` or ``redis``.
@@ -178,6 +181,29 @@ def _nullable_datetime(data: dict[str, object], field: str) -> datetime | None:
 
 
 def _decode_query_result(value: object) -> QueryResult:
+    """Validate required fields and hit/miss evidence before returning a model.
+
+    All eleven keys are required, including nullable fields; extra keys are
+    ignored. Text bounds are 100,000 characters for the answer and 2,000 for a
+    matched prompt, separate from the transport byte limit. Scores are finite in
+    [-1, 1], thresholds in [0, 1], and latency/entry age are finite and nonnegative.
+
+    A hit requires a score meeting the threshold, all four matched-entry fields,
+    an aware timestamp, a 64-character lowercase hexadecimal key, skipped
+    generation and no provider call. A miss requires all matched-entry fields to
+    be None and exactly one of generation_skipped/provider_called to be true.
+    A coalesced follower uses the skipped-generation case. A miss may retain a
+    candidate score; this decoder does not compare that score with the threshold.
+
+    Args:
+        value: Parsed HTTP JSON body to validate.
+
+    Returns:
+        Frozen, slotted query evidence; validation does not authenticate the server.
+
+    Raises:
+        SemantixResponseError: Required fields or evidence violate these checks.
+    """
     data = _object(value)
     result = QueryResult(
         response=_string(data, "response", max_length=_MAX_RESPONSE_LENGTH),
@@ -244,6 +270,12 @@ def _decode_query_result(value: object) -> QueryResult:
 
 
 def _decode_health(value: object) -> HealthStatus:
+    """Require status ok and bounded provider identifiers, allowing extra keys.
+
+    Provider identifiers start with an ASCII letter or digit and contain at most
+    50 letters, digits, dots, underscores, colons or hyphens. Decoding this
+    liveness report does not probe providers or storage.
+    """
     data = _object(value)
     if _required(data, "status") != "ok":
         raise _invalid("status")
@@ -262,6 +294,10 @@ def _decode_health(value: object) -> HealthStatus:
 
 
 def _decode_readiness(value: object) -> ReadinessStatus:
+    """Require status ready and recognized cache/dataset modes, ignoring extra keys.
+
+    Decode server-reported readiness without performing any additional probes.
+    """
     data = _object(value)
     if _required(data, "status") != "ready":
         raise _invalid("status")

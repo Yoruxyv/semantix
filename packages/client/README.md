@@ -82,7 +82,7 @@ Both clients accept the same constructor options:
 | ---------- | ---------------------------------------------------------------------------------------------------- |
 | `base_url` | Required HTTP(S) origin, optionally with a path prefix. Use HTTP only for trusted local development. |
 | `token`    | Optional bearer token. It is required when the server has token authentication enabled.              |
-| `timeout`  | Finite positive timeout in seconds for each HTTP request. The default is `30.0`.                     |
+| `timeout`  | Positive finite connect/read/write/pool timeout in seconds; default `30.0`.                           |
 
 Each query also accepts a concrete `namespace`; it defaults to `default`. The
 server decides whether the token can use that namespace. The SDK does not read
@@ -262,7 +262,7 @@ leader performed the provider work.
 `PRIVATE` is an explicit caller decision. Semantix does not attempt to detect
 secrets automatically. `BYPASS` and `PRIVATE` have the same cache read/write
 behavior, but only `PRIVATE` requests receive the server's private trace
-minimization.
+minimization. The remote generation provider still receives the prompt.
 
 ### Per-request cache TTL
 
@@ -302,8 +302,9 @@ print(readiness.cache_backend, readiness.evaluation_dataset_storage)
 - `health()` calls `/health`. It confirms process liveness and returns the
   configured provider categories; it does not prove storage is available.
 - `ready()` calls `/ready`. It checks the active cache and configured evaluation
-  storage dependencies. A not-ready server returns HTTP 503, exposed as
-  `SemantixServerError` with server error code `not_ready`.
+  dataset catalog and, when enabled, the coordination threshold. It does not
+  independently probe optional retained run-history storage. A not-ready server
+  returns HTTP 503, exposed as `SemantixServerError` with error code `not_ready`.
 
 Neither probe calls a hosted generation or embedding provider. The async client
 provides `await client.health()` and `await client.ready()` with the same result
@@ -369,8 +370,9 @@ except SemantixResponseError:
     print("The server response did not match the public SDK contract.")
 ```
 
-The SDK does not expose arbitrary raw response bodies or private transport
-details through these exceptions.
+SDK error messages use fixed transport wording or bounded, sanitized server
+error fields. This does not guarantee that arbitrary server content or chained
+exceptions contain no sensitive data.
 
 ## Timeouts and retries
 
@@ -393,15 +395,20 @@ Query POST operations are **not automatically retried**. A query may invoke
 provider work and/or write to the cache, and the current API has no idempotency
 key. After a timeout or transport failure, the server may still have completed
 the request. Do not blindly retry a query; decide whether duplication is safe
-for the application and policy.
+for the application and policy. Cancelling an async query await likewise does
+not establish whether remote provider or cache work completed; cancellation
+propagates through the HTTPX stream context cleanup.
 
 ## Response safety
 
-The SDK accepts JSON responses only, requests identity encoding, and enforces a
-1 MiB raw-response limit before decoding. It rejects unexpected encoding,
-malformed JSON, oversized bodies, missing required fields, invalid field types,
-and inconsistent hit/miss evidence with `SemantixResponseError`. Successful
-responses may add future fields without breaking the current client.
+Successful SDK responses must be JSON. The SDK requests identity encoding with a
+1 MiB raw-response limit before decoding, separately from model field limits.
+On successful HTTP responses, unexpected encoding, malformed JSON, oversized
+bodies, missing required fields, invalid field types, and inconsistent hit/miss
+evidence raise `SemantixResponseError`. On non-success HTTP responses, encoded,
+oversized, malformed or non-JSON bodies retain the status-based API error with
+fallback body fields. Successful responses may add future fields without breaking
+the current client.
 
 ## Security guidance
 
