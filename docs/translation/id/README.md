@@ -50,6 +50,7 @@ Panduan embedded berikut tersedia dalam bahasa Inggris.
 | [API](reference/api.md)                     | Endpoint, autentikasi, request, response, dan error contract         |
 | [Schema dataset evaluasi v1 (Inggris)](../../reference/evaluation-dataset-schema-v1.md) | Field JSON, validasi, batas, persistensi, dan retensi |
 | [Architecture](reference/architecture.md)   | Runtime flow, feature ownership, boundary, dan deployment constraint |
+| [Keputusan rekayasa (Inggris)](../../engineering-decisions.md) | Pilihan yang diterapkan, alternatif, trade-off yang diterima, dan batas bukti |
 | [Accessibility](reference/accessibility.md) | Ekspektasi aksesibilitas dan command verifikasi                      |
 
 ## Operations

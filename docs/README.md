@@ -50,6 +50,7 @@ reference HTTP client for that server, not the first public PyPI target.
 | [API](reference/api.md) | Endpoints, authentication, requests, responses, and error contracts |
 | [Evaluation dataset schema v1](reference/evaluation-dataset-schema-v1.md) | Imported JSON fields, validation codes, limits, persistence, and retention |
 | [Architecture](reference/architecture.md) | Runtime flow, feature ownership, boundaries, and deployment constraints |
+| [Engineering decisions](engineering-decisions.md) | Implemented choices, alternatives, accepted trade-offs and evidence limits |
 | [Accessibility](reference/accessibility.md) | Accessibility expectations and verification commands |
 
 ## Operations
