@@ -1,10 +1,22 @@
 # Operasi dan pemulihan
 
-Runbook ini mencakup deployment Compose single-instance yang diperkeras. Uji setiap prosedur pada project terisolasi dan volume disposable sebelum menggunakannya untuk environment bersama.
+Runbook ini mencakup deployment Compose dua replika yang diperkeras. Uji setiap prosedur pada project terisolasi dan volume disposable sebelum menggunakannya untuk environment bersama.
 
 ## Kepemilikan dan kebijakan data
 
 Semantix memperlakukan entri cache pgvector dan namespace counters sebagai data turunan yang disposable. Respons provider tetap menjadi sumber kebenaran. Menghapus cache tidak menghapus data di sisi provider, konfigurasi authentication, atau konfigurasi aplikasi.
+
+Dataset evaluasi tersimpan berbeda: dataset dapat berisi prompt dan catatan
+sensitif dari operator yang tidak tersedia di tempat lain. Saat
+`EVALUATION_DATASET_STORAGE=postgres`, pemilik deployment harus menentukan apakah
+data harus dapat dipulihkan atau boleh dibuang, lalu menerapkan kebijakan tersebut
+pada backup, akses, retensi, dan penghapusan.
+
+Riwayat run evaluasi yang persisten juga memerlukan keputusan retensi eksplisit.
+Data ini hanya berupa agregat, tetapi dapat berisi identitas dataset, kategori,
+timestamp, fingerprint konfigurasi, metadata kegagalan terminal, dan hasil agregat.
+Sertakan dalam kebijakan backup, retensi, akses, dan penghapusan saat
+`EVALUATION_RUN_HISTORY_STORAGE=postgres`.
 
 Cache yang dingin memiliki konsekuensi operasional:
 
@@ -13,7 +25,13 @@ Cache yang dingin memiliki konsekuensi operasional:
 * entri cache, hit counters, dan miss counters dimulai dari nol;
 * data historis cache inspector hilang.
 
-Lakukan backup hanya jika mempertahankan warm-cache state atau riwayat inspeksi sepadan dengan waktu pemulihan. Operator yang melakukan deployment bertanggung jawab atas backup, rotasi, rollback, dan verifikasi. Pemilik provider harus diberi tahu sebelum destructive rebuild yang dapat meningkatkan traffic atau biaya provider.
+Lakukan backup jika mempertahankan warm-cache state, dataset evaluasi tersimpan,
+atau riwayat run agregat sepadan dengan biaya keamanan dan pemulihan. Backup dapat
+mempertahankan konten dataset setelah kedaluwarsa atau dihapus dari aplikasi,
+sehingga retensi backup dan penghapusan aman menjadi tanggung jawab operator yang
+terpisah. Operator yang melakukan deployment bertanggung jawab atas backup, rotasi,
+rollback, dan verifikasi. Pemilik provider harus diberi tahu sebelum destructive
+rebuild yang dapat meningkatkan traffic atau biaya provider.
 
 ## Aturan keselamatan
 
@@ -66,7 +84,7 @@ $env:SEMANTIX_RUNTIME_PASSWORD = $env:NEW_POSTGRES_RUNTIME_PASSWORD
 Hentikan gateway dan backend, tetapi biarkan PostgreSQL tetap berjalan:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml stop frontend backend
+docker compose --env-file .env.production -f docker-compose.prod.yml stop frontend backend-a backend-b
 ```
 
 Linux atau macOS:
@@ -95,7 +113,7 @@ Perbarui kedua password pada deployment secret store atau `.env.production`, kem
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate postgres
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate migrate backend frontend
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate migrate backend-a backend-b frontend
 ```
 
 Migration job harus berhasil exit sebelum backend menjadi healthy. Setelah itu, hapus temporary SQL file dan bersihkan temporary secret variables dari operator shell.
@@ -140,7 +158,12 @@ backups` dan gunakan `"${PostgresContainer}:/tmp/semantix.dump"` sebagai `docker
 source.
 
 Catat application commit, migration list, embedding provider/model,
-embedding dimensions, database name, dan dump checksum di samping backup. Backup yang dibuat untuk satu embedding space tidak otomatis berguna setelah embedding model atau dimensions diubah.
+embedding dimensions, cache schema/table prefix, pengaturan storage/retensi dataset
+evaluasi, pengaturan storage/retensi/kapasitas riwayat run, database name, dan dump
+checksum di samping backup. Perlakukan dump sebagai data sensitif karena dapat
+berisi respons provider yang di-cache serta prompt dan catatan dataset tersimpan.
+Backup yang dibuat untuk satu embedding space tidak otomatis berguna setelah
+embedding model atau dimensions diubah.
 
 ## Restore backup
 
@@ -157,20 +180,73 @@ docker compose --env-file .env.production -f docker-compose.prod.yml exec -T -e 
 docker compose --env-file .env.production -f docker-compose.prod.yml up --force-recreate migrate
 ```
 
-Migration job memverifikasi migration checksums dan me-restore runtime grants. Verifikasi extension, schema, dan row counts:
+Migration job memverifikasi checksum migration server dan package serta memulihkan
+runtime grants. Jalankan pemeriksaan read-only berikut sebagai role migration/operator;
+role runtime tidak memiliki akses umum ke ledger migration server. SQL ini
+menggunakan default server `CACHE_PGVECTOR_SCHEMA=semantix_cache` dan
+`CACHE_PGVECTOR_TABLE_PREFIX=workbench_`. Jika dikustomisasi, ganti schema/prefix
+dengan nilai binding yang dipulihkan; gunakan nilai yang sama untuk migration job dan runtime.
 
 ```sql
 SELECT extversion FROM pg_extension WHERE extname = 'vector';
 SELECT version, checksum FROM semantix.schema_migrations ORDER BY version;
-SELECT COUNT(*) FROM semantix.cache_entries;
+SELECT version, checksum
+FROM semantix_cache.workbench_schema_migrations ORDER BY version;
+SELECT embedding_space, embedding_dimensions, revision, access_order
+FROM semantix_cache.workbench_binding_state
+ORDER BY embedding_space, embedding_dimensions;
+SELECT COUNT(*) FROM semantix_cache.workbench_cache_entries;
 SELECT COUNT(*) FROM semantix.cache_namespace_counters;
 ```
 
-Kemudian jalankan backend dan frontend, periksa `/ready`, dan lakukan cache round trip. Pertahankan volume lama dan backup sampai verifikasi selesai.
+`workbench_cache_entries` menyimpan entri cache resmi yang aktif.
+`workbench_binding_state` mencatat identitas/dimensi embedding space, revision,
+dan access order; bandingkan space yang dipulihkan dengan backup dan konfigurasi
+runtime. Binding yang belum digunakan dapat tidak memiliki baris state. Ledger
+package `workbench_schema_migrations` terpisah dari `semantix.schema_migrations`.
+Job dan startup cache biasa memeriksa ownership marker ketiga table resmi
+(`semantix-cache:pgvector:v1`) serta version/checksum yang diharapkan package;
+sekadar menampilkan checksum atau menemukan baris tidak memvalidasi integritas.
+
+Table legacy `semantix.cache_entries` yang dipertahankan bukan cache aktif dan tidak
+dapat memverifikasi restore ini. `semantix.cache_namespace_counters` adalah telemetry
+request server, bukan sumber otoritatif untuk entri, eligibility, atau revision.
+Pertahankan table legacy. Job memberikan `USAGE` schema, `SELECT` ledger package,
+serta `SELECT, INSERT, UPDATE, DELETE` pada table entri/state resmi dan telemetry
+kepada runtime; job tidak memberikan wewenang migration kepada runtime.
+
+Jika `EVALUATION_DATASET_STORAGE=postgres`, verifikasi juga katalog dataset:
+
+```sql
+SELECT COUNT(*) FROM semantix.evaluation_datasets;
+SELECT COUNT(*) FROM semantix.evaluation_dataset_cases;
+```
+
+Jika `EVALUATION_RUN_HISTORY_STORAGE=postgres`, verifikasi juga riwayat run yang disimpan:
+
+```sql
+SELECT COUNT(*) FROM semantix.evaluation_runs;
+SELECT COUNT(*) FROM semantix.evaluation_run_thresholds;
+```
+
+Bandingkan jumlah baris dengan backup dan ekspektasi retensi. Baris cache dapat
+kosong atau kedaluwarsa; jumlah bukan nol saja tidak membuktikan entri dapat
+digunakan atau izin runtime benar. Kemudian jalankan backend dan frontend, periksa
+`/ready`, dan lakukan cache round trip yang diotorisasi untuk namespace (prompt
+unik: miss, pengulangan: hit, entri terbaca di Cache Inspector). Saat mempertahankan
+warm-cache state, verifikasi juga bahwa entri hasil restore yang belum kedaluwarsa
+dapat diinspeksi dan digunakan kembali dengan konfigurasi embedding semula.
+Verifikasi request list/detail dataset yang diotorisasi untuk namespace dan pembacaan
+riwayat run jika persistensinya aktif. Baris dataset kedaluwarsa dari backup lama
+tetap disembunyikan dan dihapus secara oportunistis. Pertahankan volume lama dan
+backup sampai verifikasi selesai.
 
 ## Buang dan rebuild cache
 
-Ini adalah recovery path default ketika cache tidak perlu dipertahankan. Periksa kembali volume label sebelum penghapusan:
+Ini adalah recovery path default hanya jika cache tidak perlu dipertahankan dan
+semua data evaluasi berbasis PostgreSQL yang penting, termasuk dataset tersimpan
+dan riwayat run, dinonaktifkan, telah di-backup secara terpisah, atau memang boleh
+dibuang. Periksa kembali volume label sebelum penghapusan:
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.prod.yml down
@@ -179,7 +255,11 @@ docker volume rm semantix-prod_pgvector_data
 docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
 ```
 
-Jangan mengganti dengan wildcard atau menghapus semua Docker volume. Startup berikutnya membuat roles, menjalankan migrations, dan memulai dengan cache tables dan counters yang kosong. Rencanakan cold-cache latency dan penggunaan provider selama entri melakukan warm-up.
+Jangan mengganti dengan wildcard atau menghapus semua Docker volume. Startup
+berikutnya membuat roles, menjalankan migrations, dan memulai dengan cache tables
+dan counters yang kosong. Penghapusan volume juga menghapus dataset evaluasi
+tersimpan dan riwayat run agregat secara permanen. Rencanakan cold-cache latency
+dan penggunaan provider selama entri melakukan warm-up.
 
 ## Rollback migration
 
@@ -187,7 +267,8 @@ Setiap migration dan version record-nya diterapkan dalam satu transaction. Migra
 
 Untuk application regression tanpa destructive schema changes, redeploy previous application image dan biarkan database tetap utuh. Untuk schema regression yang tidak kompatibel:
 
-* buang dan rebuild volume ketika cache data bersifat disposable; atau
+* buang dan rebuild volume hanya ketika cache, dataset tersimpan, dan riwayat run
+  boleh dibuang; atau
 * restore pre-deployment dump ke fresh volume ketika data harus dipertahankan.
 
 Jangan pernah menulis ulang applied migration, menghapus checksum row, atau membuat down-migration secara improvisasi selama incident.

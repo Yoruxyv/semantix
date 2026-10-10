@@ -49,12 +49,12 @@ Hardened stack memerlukan:
 * token authentication dan authorization berdasarkan role/namespace;
 * token dan database password yang kuat dan dikelola sebagai secret;
 * trusted-proxy CIDR yang eksplisit;
-* satu backend process kecuali shared rate-limit storage ditambahkan;
+* koordinasi PostgreSQL bersama untuk rate limiting, lockout sesi, dan threshold global pada kedua replika backend;
 * role database migration dan runtime yang terpisah;
 * tidak ada backend atau database port yang dapat diakses secara langsung oleh publik;
 * review operator terhadap data handling dan retention provider.
 
-Hardened stack yang disediakan bukan merupakan complete multi-tenant service. Stack tersebut tidak menambahkan distributed coordination, deployment-wide metrics, tenant billing, atau general identity provider.
+Hardened stack yang disediakan bukan merupakan complete multi-tenant service. Stack ini memakai koordinasi PostgreSQL bersama untuk kontrol tersebut, tetapi tidak menambahkan deployment-wide metrics, tenant billing, atau general identity provider.
 
 ## Keterbatasan desain yang diketahui
 

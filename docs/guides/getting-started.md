@@ -122,7 +122,7 @@ Set `VITE_API_BASE_URL=http://localhost:8000` in `apps/web/.env` for local Vite 
 The hardened stack uses:
 
 - a compiled frontend served by a non-root Nginx image;
-- an internal backend that is not published directly;
+- two backend replicas (`backend-a` and `backend-b`) behind the gateway, with no published backend ports;
 - a database on an internal Docker network with no host port;
 - token authentication, roles, and namespace scopes;
 - proxy-aware rate limiting;

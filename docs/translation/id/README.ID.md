@@ -366,7 +366,9 @@ Copy-Item apps\server\.env.example apps\server\.env
 
 #### 2. Konfigurasi development lokal
 
-Untuk konfigurasi persisten tanpa kredensial (zero-key), gunakan nilai berikut di `apps/server/.env`:
+Untuk konfigurasi persisten dengan provider mock tanpa API key, gunakan nilai
+berikut di `apps/server/.env`. Ganti placeholder URL database dengan role runtime
+terpisah yang dikonfigurasi di bawah; lakukan URL-encoding pada kredensial bila perlu:
 
 ```env
 EMBEDDING_PROVIDER=mock
@@ -374,8 +376,8 @@ GENERATION_PROVIDER=mock
 MOCK_EMBEDDING_DIMENSIONS=384
 
 CACHE_BACKEND=pgvector
-DATABASE_URL=postgresql://semantix:semantix@postgres:5432/semantix
-DATABASE_MIGRATION_MODE=auto
+DATABASE_URL=postgresql://replace-runtime-user:replace-runtime-password@postgres:5432/semantix
+DATABASE_MIGRATION_MODE=external
 EVALUATION_DATASET_STORAGE=postgres
 EVALUATION_DATASET_DEFAULT_RETENTION_DAYS=30
 
@@ -391,16 +393,93 @@ Untuk menggunakan Hugging Face, OpenAI, Anthropic, Gemini, atau Ollama, lihat [P
 
 #### 3. Jalankan stack development lengkap
 
+Jalankan hanya PostgreSQL dan tunggu health check-nya:
+
 ```bash
-docker compose -f docker-compose.dev.yml --profile pgvector up --build -d
+docker compose -f docker-compose.dev.yml --profile pgvector up -d --wait --wait-timeout 60 postgres
 ```
 
-Perintah tunggal ini akan menjalankan:
+Database development hanya membuat role bootstrap lokal `semantix`. Jangan
+menggunakan role berhak istimewa tersebut dalam `DATABASE_URL` backend. Muat
+variabel operator berikut secara aman ke shell, tanpa menyimpan kredensial
+migration di `apps/server/.env`, tracked files, shell history, atau logs:
 
-- frontend React dengan Vite hot reload;
-- backend FastAPI dengan Uvicorn reload;
-- PostgreSQL dengan pgvector;
-- migrasi database development otomatis.
+- `SEMANTIX_RUNTIME_USER` dan `SEMANTIX_RUNTIME_PASSWORD`: login runtime terpisah
+  yang cocok dengan `DATABASE_URL`, tanpa superuser, hak membuat role/database,
+  kepemilikan schema, atau wewenang migration;
+- `DATABASE_RUNTIME_ROLE`: nama yang sama dengan `SEMANTIX_RUNTIME_USER`;
+- `MIGRATION_DATABASE_URL`: koneksi bootstrap/migration untuk database development
+  ini, dengan wewenang mengaktifkan pgvector, menginisialisasi schema, dan memberikan akses.
+
+Di dalam container, kedua URL menggunakan `postgres:5432/semantix`. Tool pada host
+menggunakan `127.0.0.1:5433` secara default (`POSTGRES_PORT` dapat mengubah port
+publikasi). Untuk volume yang sudah ada, gunakan kredensial aktual dan lakukan
+backup sebelum setup.
+
+Untuk login runtime baru, gunakan kembali
+[provisioner role runtime](../../../ops/postgres/init-runtime-role.sh) yang sudah ada:
+
+```bash
+docker compose -f docker-compose.dev.yml --profile pgvector cp ops/postgres/init-runtime-role.sh postgres:/tmp/init-runtime-role.sh
+docker compose -f docker-compose.dev.yml --profile pgvector exec -T -e SEMANTIX_RUNTIME_USER -e SEMANTIX_RUNTIME_PASSWORD postgres sh /tmp/init-runtime-role.sh
+```
+
+Script membuat login yang belum ada dan memberikan `CONNECT` ke database; script
+ini tidak merotasi kredensial atau menghapus hak role yang sudah ada. Verifikasi
+role yang sudah ada secara terpisah. Perintah migration memberikan akses
+schema/table yang diperlukan; perintah tersebut tidak membuat login runtime.
+
+Jalankan setup eksplisit dalam container backend sekali jalan dan lanjutkan hanya
+jika perintah berhasil exit:
+
+```bash
+docker compose -f docker-compose.dev.yml --profile pgvector run --rm --no-deps --build -e DATABASE_MIGRATION_MODE=external -e MIGRATION_DATABASE_URL -e DATABASE_RUNTIME_ROLE backend python -m app.infrastructure.migrate
+```
+
+Image backend menyediakan Python, dependencies, dan working directory
+`/apps/server`. Container mewarisi pengaturan schema/prefix cache dan evaluasi dari
+`apps/server/.env`; samakan dengan runtime. Flag `-e` meneruskan variabel operator
+dari shell hanya ke job ini. Bersihkan variabel operator setelahnya.
+
+Startup cache biasa memvalidasi schema resmi dan tidak pernah menginisialisasinya.
+`DATABASE_MIGRATION_MODE=auto` hanya berlaku untuk fitur PostgreSQL lain yang aktif,
+termasuk penyimpanan evaluasi. Compose development memaksakan `auto` di atas nilai
+`.env`, sehingga override eksplisit diperlukan untuk job di atas dan runtime di
+bawah agar role runtime tidak menjalankan DDL.
+
+Jalankan backend/frontend dengan override environment Compose standar melalui
+stdin. Gunakan override yang sama setiap kali membuat ulang backend.
+
+Linux atau macOS:
+
+```bash
+docker compose -f docker-compose.dev.yml -f - --profile pgvector up --build -d backend frontend <<'YAML'
+services:
+  backend:
+    environment:
+      DATABASE_MIGRATION_MODE: external
+YAML
+```
+
+Windows PowerShell:
+
+```powershell
+@"
+services:
+  backend:
+    environment:
+      DATABASE_MIGRATION_MODE: external
+"@ | docker compose -f docker-compose.dev.yml -f - --profile pgvector up --build -d backend frontend
+```
+
+Ini menjalankan frontend React dengan Vite hot reload dan FastAPI dengan Uvicorn
+reload setelah setup database eksplisit. Pastikan `/ready` mengembalikan HTTP 200,
+lalu kirim prompt Monitor unik dua kali: harapkan miss diikuti hit dan entri yang
+dapat dibaca di Cache Inspector. Table cache resmi yang kosong segera setelah
+setup adalah valid; setup tidak menyalin baris cache legacy yang dipertahankan.
+Lihat [setup storage server](../../guides/platform-storage.md) untuk kepemilikan dan
+validasi schema. Prosedur ini tetap untuk development lokal yang tepercaya; gunakan
+[deployment yang diperkeras](operations/deployment.md) sebelum berbagi dengan pengguna tak tepercaya.
 
 #### 4. Buka aplikasi
 

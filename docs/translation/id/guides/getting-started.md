@@ -110,7 +110,7 @@ Atur `VITE_API_BASE_URL=http://localhost:8000` di `apps/web/.env` untuk developm
 Stack hardened menggunakan:
 
 * frontend terkompilasi yang disajikan oleh image Nginx non-root;
-* backend internal yang tidak dipublikasikan secara langsung;
+* dua replika backend (`backend-a` dan `backend-b`) di belakang gateway, tanpa port backend yang dipublikasikan;
 * database pada jaringan Docker internal tanpa host port;
 * autentikasi token, peran, dan cakupan namespace;
 * rate limiting yang memperhitungkan proxy;

@@ -175,8 +175,9 @@ backups` and use `"${PostgresContainer}:/tmp/semantix.dump"` as the `docker cp`
 source.
 
 Record the application commit, migration list, embedding provider/model,
-embedding dimensions, evaluation-dataset storage/retention settings,
-run-history storage/retention/capacity settings, database name, and dump
+embedding dimensions, cache schema/table prefix, evaluation-dataset
+storage/retention settings, run-history storage/retention/capacity settings,
+database name, and dump
 checksum beside the backup. Treat the dump as sensitive because
 it can contain cached provider responses plus persisted dataset prompts and
 notes. A backup made for one embedding space is not automatically useful after
@@ -197,25 +198,65 @@ docker compose --env-file .env.production -f docker-compose.prod.yml exec -T -e 
 docker compose --env-file .env.production -f docker-compose.prod.yml up --force-recreate migrate
 ```
 
-The migration job verifies migration checksums and restores runtime grants.
-Verify the extension, schema, and row counts:
+The migration job verifies the server and package migration checksums and restores
+runtime grants. Run the following read-only checks as the migration/operator role;
+the runtime role has no general access to the server migration ledger. This SQL
+uses the server defaults `CACHE_PGVECTOR_SCHEMA=semantix_cache` and
+`CACHE_PGVECTOR_TABLE_PREFIX=workbench_`. Substitute the restored binding's actual
+schema/prefix when customized; use the same values for the migration job and runtime.
 
 ```sql
 SELECT extversion FROM pg_extension WHERE extname = 'vector';
 SELECT version, checksum FROM semantix.schema_migrations ORDER BY version;
-SELECT COUNT(*) FROM semantix.cache_entries;
+SELECT version, checksum
+FROM semantix_cache.workbench_schema_migrations ORDER BY version;
+SELECT embedding_space, embedding_dimensions, revision, access_order
+FROM semantix_cache.workbench_binding_state
+ORDER BY embedding_space, embedding_dimensions;
+SELECT COUNT(*) FROM semantix_cache.workbench_cache_entries;
 SELECT COUNT(*) FROM semantix.cache_namespace_counters;
+```
+
+`workbench_cache_entries` holds the active official cache entries.
+`workbench_binding_state` records embedding-space identity/dimensions, revision,
+and access order; compare its restored spaces with the backup and runtime
+configuration. An unused binding may have no state rows. The package ledger
+`workbench_schema_migrations` is separate from `semantix.schema_migrations`.
+The job and ordinary cache startup check all three official tables' ownership
+marker (`semantix-cache:pgvector:v1`) and the package's expected version/checksum;
+simply printing a checksum or finding nonzero rows does not validate integrity.
+
+The preserved legacy `semantix.cache_entries` is not the active cache and cannot
+verify this restore. `semantix.cache_namespace_counters` is server request telemetry,
+not authoritative entries, eligibility, or revisions. Leave legacy tables intact.
+The job grants runtime schema `USAGE`, package-ledger `SELECT`, and
+`SELECT, INSERT, UPDATE, DELETE` on the official entries/state and telemetry tables;
+it does not grant runtime migration authority.
+
+If `EVALUATION_DATASET_STORAGE=postgres`, also verify the dataset catalog:
+
+```sql
 SELECT COUNT(*) FROM semantix.evaluation_datasets;
 SELECT COUNT(*) FROM semantix.evaluation_dataset_cases;
+```
+
+If `EVALUATION_RUN_HISTORY_STORAGE=postgres`, also verify retained run history:
+
+```sql
 SELECT COUNT(*) FROM semantix.evaluation_runs;
 SELECT COUNT(*) FROM semantix.evaluation_run_thresholds;
 ```
 
-Then start the backend and frontend, check `/ready`, execute a cache round trip,
-and verify a namespace-authorized dataset list/detail request when persistence
-is enabled. Expired dataset rows restored from an older backup remain hidden
-and are purged opportunistically. Keep the old volume and backup until
-verification completes.
+Compare counts with the backup and retention expectations. Empty or expired cache
+rows are possible; nonzero counts alone do not prove usable entries or runtime
+permissions. Then start the backend and frontend, check `/ready`, and execute a
+namespace-authorized cache round trip (unique prompt: miss, repeat: hit, readable
+Cache Inspector entry). When preserving warm-cache state, also verify an expected
+unexpired restored entry can be inspected and reused with the original embedding
+configuration. Verify a namespace-authorized dataset list/detail request and
+retained run-history reads when their persistence is enabled. Expired dataset rows
+restored from an older backup remain hidden and are purged opportunistically.
+Keep the old volume and backup until verification completes.
 
 ## Discard and rebuild the cache
 

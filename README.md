@@ -379,7 +379,9 @@ Copy-Item apps\server\.env.example apps\server\.env
 
 #### 2. Configure local development
 
-For a zero-key persistent setup, use these values in `apps/server/.env`:
+For a persistent setup with mock providers and no API keys, use these values in
+`apps/server/.env`. Replace the database URL placeholders with the separate
+runtime role configured below; URL-encode credentials when necessary:
 
 ```env
 EMBEDDING_PROVIDER=mock
@@ -387,8 +389,8 @@ GENERATION_PROVIDER=mock
 MOCK_EMBEDDING_DIMENSIONS=384
 
 CACHE_BACKEND=pgvector
-DATABASE_URL=postgresql://semantix:semantix@postgres:5432/semantix
-DATABASE_MIGRATION_MODE=auto
+DATABASE_URL=postgresql://replace-runtime-user:replace-runtime-password@postgres:5432/semantix
+DATABASE_MIGRATION_MODE=external
 EVALUATION_DATASET_STORAGE=postgres
 EVALUATION_DATASET_DEFAULT_RETENTION_DAYS=30
 
@@ -408,16 +410,92 @@ To use Hugging Face, OpenAI, Anthropic, Gemini, or Ollama, see
 
 #### 3. Start the complete development stack
 
+Start only PostgreSQL and wait for its health check:
+
 ```bash
-docker compose -f docker-compose.dev.yml --profile pgvector up --build -d
+docker compose -f docker-compose.dev.yml --profile pgvector up -d --wait --wait-timeout 60 postgres
 ```
 
-This single command starts:
+The development database creates only the local bootstrap role `semantix`.
+Do not use that privileged role in the backend's `DATABASE_URL`. Securely load
+these operator variables into your shell, without putting migration credentials
+in `apps/server/.env`, tracked files, shell history, or logs:
 
-- the React frontend with Vite hot reload;
-- the FastAPI backend with Uvicorn reload;
-- PostgreSQL with pgvector;
-- automatic development database migrations.
+- `SEMANTIX_RUNTIME_USER` and `SEMANTIX_RUNTIME_PASSWORD`: a separate runtime
+  login matching `DATABASE_URL`, with no superuser, role/database-creation, schema
+  ownership, or migration authority;
+- `DATABASE_RUNTIME_ROLE`: the same name as `SEMANTIX_RUNTIME_USER`;
+- `MIGRATION_DATABASE_URL`: the bootstrap/migration connection for this development
+  database, with authority to enable pgvector, initialize schemas, and grant access.
+
+Inside containers, both URLs use `postgres:5432/semantix`. A host tool instead
+uses `127.0.0.1:5433` by default (`POSTGRES_PORT` can change the published port).
+For an existing volume, use its actual credentials and back it up before setup.
+
+For a fresh runtime login, reuse the existing
+[runtime-role provisioner](ops/postgres/init-runtime-role.sh):
+
+```bash
+docker compose -f docker-compose.dev.yml --profile pgvector cp ops/postgres/init-runtime-role.sh postgres:/tmp/init-runtime-role.sh
+docker compose -f docker-compose.dev.yml --profile pgvector exec -T -e SEMANTIX_RUNTIME_USER -e SEMANTIX_RUNTIME_PASSWORD postgres sh /tmp/init-runtime-role.sh
+```
+
+The script creates a missing login and grants database `CONNECT`; it does not
+rotate credentials or remove privileges from an existing role. Verify an existing
+role separately. The migration command grants the required schema/table access;
+it does not create the runtime login.
+
+Run explicit setup in a one-shot backend container and continue only if it exits
+successfully:
+
+```bash
+docker compose -f docker-compose.dev.yml --profile pgvector run --rm --no-deps --build -e DATABASE_MIGRATION_MODE=external -e MIGRATION_DATABASE_URL -e DATABASE_RUNTIME_ROLE backend python -m app.infrastructure.migrate
+```
+
+The backend image supplies Python, dependencies, and `/apps/server` as its working
+directory. It inherits cache schema/prefix and evaluation settings from
+`apps/server/.env`; keep them identical to runtime. The `-e` flags pass operator
+variables from your shell only to this job. Clear the operator variables afterward.
+
+Ordinary cache startup validates the official schema and never initializes it.
+`DATABASE_MIGRATION_MODE=auto` applies only to other enabled PostgreSQL features,
+including evaluation storage. Development Compose forces `auto` even over the
+`.env` value, so explicitly override it for both the job above and the runtime
+below to keep DDL away from the runtime role.
+
+Start backend/frontend with the standard Compose environment override supplied
+on stdin. Use this same override whenever recreating the backend.
+
+Linux or macOS:
+
+```bash
+docker compose -f docker-compose.dev.yml -f - --profile pgvector up --build -d backend frontend <<'YAML'
+services:
+  backend:
+    environment:
+      DATABASE_MIGRATION_MODE: external
+YAML
+```
+
+Windows PowerShell:
+
+```powershell
+@"
+services:
+  backend:
+    environment:
+      DATABASE_MIGRATION_MODE: external
+"@ | docker compose -f docker-compose.dev.yml -f - --profile pgvector up --build -d backend frontend
+```
+
+This starts the React frontend with Vite hot reload and FastAPI with Uvicorn
+reload after explicit database setup. Check that `/ready` returns HTTP 200, then
+submit a unique Monitor prompt twice: expect a miss followed by a hit and a
+readable Cache Inspector entry. Empty official cache tables immediately after
+setup are valid; setup does not copy preserved legacy cache rows. See
+[server storage setup](docs/guides/platform-storage.md) for ownership and schema
+validation. This procedure remains for trusted local development; use
+[hardened deployment](docs/operations/deployment.md) before sharing with untrusted users.
 
 #### 4. Open the application
 

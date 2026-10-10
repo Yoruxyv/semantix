@@ -4,7 +4,7 @@ This deployment path is optional for local development and required before Seman
 
 ## Deployment boundary
 
-`docker-compose.prod.yml` publishes only the frontend gateway. Both backends are reachable only on the internal `edge` network. PostgreSQL is reachable only on the internal `data` network. The frontend gateway balances `/api`, `/health`, and `/ready` across `backend-a` and `backend-b`.
+`docker-compose.prod.yml` publishes only the frontend gateway. Neither backend publishes a host port; the gateway reaches `backend-a` and `backend-b` over `edge`. Both backends also join `data`, where PostgreSQL has no host port and the network is marked `internal: true`. The gateway balances `/api`, `/health`, and `/ready` across the two replicas.
 
 `docker-compose.prod.yml` uses the explicit Compose project name `semantix-prod`. Its PostgreSQL volume is therefore isolated from the local development volume and from volumes created by earlier versions of the default development stack.
 
@@ -44,8 +44,13 @@ count, canonical decoded UTF-8 content, and `cases × repetitions` query work.
 Accepted ranges are 1–500 cases, 1,024–1,048,576 decoded bytes, and 1–2,500
 query executions. Keep these limits within the capacity and data-handling
 policy of the deployment; threshold projections do not repeat provider work.
-The `session` dataset-storage default opens no database when the live cache
-uses memory and run history is disabled. Set dataset storage to `postgres` only
+The requested `cases × repetitions` cap is checked for inline sources. Built-in
+and persisted sources do not reapply that same check at the requested repetition
+count; saving a dataset validates it at one repetition. Budget their requested
+work explicitly rather than treating this setting as a universal run-admission cap.
+The `session` dataset-storage default does not itself require PostgreSQL. A memory
+live cache with session datasets, disabled history and memory coordination opens
+no PostgreSQL pool. Production PostgreSQL coordination still requires that pool. Set dataset storage to `postgres` only
 after configuring the database, retention, namespace capacity, backup, and
 recovery policy.
 
@@ -62,8 +67,9 @@ Run a TLS reverse proxy on the host and forward to `127.0.0.1:8080`. Public plai
 
 The backend stores only SHA-256 token digests in configuration. Users enter the original token at runtime. The browser keeps it in `sessionStorage`; it is not compiled into the frontend bundle.
 
-Production deployments must use HTTPS. Generate a token and digest with
-Python:
+Production deployments must use HTTPS. This digest scheme assumes high-entropy
+random access tokens; do not use it to store ordinary user-chosen passwords.
+Generate a token and digest with Python:
 
 ```bash
 python -c "import hashlib,secrets; t=secrets.token_urlsafe(32); print('token='+t); print('sha256='+hashlib.sha256(t.encode()).hexdigest())"
@@ -213,9 +219,11 @@ dependencies remain authoritative.
 
 Every principal receives one or more namespaces. A non-global principal cannot query, inspect, delete, or clear another namespace.
 
-When a principal has exactly one namespace, scoped operations without a
-namespace are automatically limited to it. Principals with multiple namespaces
-must select one for creation. Only `namespaces:["*"]` can list globally. The
+For cache list, statistics and clear operations, omission is scoped to a sole
+restricted namespace; multiple restricted namespaces must select one. Query
+JSON instead defaults an omitted namespace to `default`, which must be
+authorized. Principals with multiple namespaces must select one for creation.
+Only `namespaces:["*"]` can list globally. The
 `*` marker is authorization scope, never persisted ownership: wildcard
 administrators must provide a concrete namespace for persisted dataset create,
 delete, built-in history retention, retained-history deletion, and Monitor
@@ -312,10 +320,12 @@ For a planned restart, copy `apps/web/upstream.prod.conf` to a private host file
 docker compose --env-file .env.production -f docker-compose.prod.yml exec -T frontend nginx -t
 docker compose --env-file .env.production -f docker-compose.prod.yml exec -T frontend nginx -s reload
 docker compose --env-file .env.production -f docker-compose.prod.yml stop backend-a
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d backend-a
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps --force-recreate backend-a
 ```
 
-Repeat for `backend-b` only after `backend-a` is serving traffic. The gateway retries connection errors and timeouts on the other replica. Its API read timeout is 330 seconds and the backend stop grace is 360 seconds, covering the default 300-second evaluation limit; size them together if that limit changes. The gateway access log records status, upstream address, URI path, and duration without query strings, prompts, tokens, or responses.
+Repeat for `backend-b` only after `backend-a` is serving traffic. The gateway is configured for retries on connection errors and timeouts; this does not guarantee that every failed request is replayed or that no gateway errors occur. See the [production runtime audit](production-runtime-audit.md) for residual failures and evidence limits. Its API read timeout is 330 seconds and the backend stop grace is 360 seconds, covering the default 300-second evaluation limit; size them together if that limit changes. The gateway access log records status, upstream address, URI path, and duration without query strings, prompts, tokens, or responses.
+
+Each replica owns its HTTP client, PostgreSQL pool, evaluation run lock and runtime metrics. Coalescing and `/api/v1/metrics` remain process-local; aggregate replica-labelled observations externally. Shared cache, datasets/history when enabled, and PostgreSQL coordination persist independently of replica lifetimes.
 
 At the default pool maximum of five connections per replica, the two backends can use up to ten PostgreSQL connections, plus migration, maintenance, and monitoring connections. Reserve server headroom accordingly. Provider calls, retries, and evaluation runs can also occur on both replicas at once. Set provider quotas against the aggregate demand before using real providers; the mock-provider CI burst measures concurrency but does not establish a remote-provider quota.
 
@@ -352,10 +362,18 @@ responses.
 
 `GET /health` confirms the process can answer and reports only configured provider types. It is cheap and unrate-limited.
 
-`GET /ready` verifies the active cache dependency and, when enabled, the
-persistent evaluation dataset repository and durable run-history repository. It
-reports configured storage modes and does not call hosted embedding or
-generation providers. A later PostgreSQL outage produces HTTP `503`.
+`GET /ready` checks active cache statistics, the persistent evaluation dataset
+repository when configured, and the coordination threshold when coordination is
+configured. Handled cache, dataset or coordination storage failures return HTTP
+`503` with the `not_ready` error. Other failures use the normal error boundary.
+
+The successful response reports configured `cache_backend` and
+`evaluation_dataset_storage`, without an independent history-readiness result.
+Enabling durable run history does not add a direct run-history repository probe.
+The endpoint does not call hosted embedding or generation providers and cannot
+prove every later read or write will succeed. A gateway response covers the
+selected replica; use the direct checks in [Two-replica operation](#two-replica-operation)
+for rollout decisions.
 
 `GET /api/v1/diagnostics` is separate from those public probes. It requires a
 wildcard global Admin and returns only reviewed provider categories, safe
@@ -370,26 +388,33 @@ route behind the same authenticated proxy boundary as the other `/api` routes.
 The production database has two roles. Use URL-safe random passwords for the Compose example, or percent-encode credentials before placing them in a PostgreSQL URL.
 
 - `POSTGRES_MIGRATION_USER` owns extension/schema migration work;
-- `POSTGRES_RUNTIME_USER` receives only schema usage and DML privileges on the configured cache, evaluation, and coordination tables.
+- `POSTGRES_RUNTIME_USER` receives selected schema usage and table DML privileges, plus read-only access to the official cache migration ledger. These grants do not create migration authority or revoke any preexisting privileges.
 
 The initialization script creates the runtime login. The one-shot `migrate`
 service connects with `MIGRATION_DATABASE_URL`, applies migrations for the
 enabled cache, evaluation, and coordination features, grants runtime privileges,
-and exits. Cache migration `0001` installs pgvector and cache tables;
-evaluation migration `0002` adds dataset and case tables; migration `0003`
-adds exactly two aggregate history tables, `evaluation_runs` and
-`evaluation_run_thresholds`. Coordination migration `0004` adds rate buckets,
-session-auth lockout state, and the global similarity threshold. The backend
-starts only after that job succeeds.
+and exits. Explicit cache setup enables pgvector and applies server legacy
+migration `0001`, then initializes the package-owned official cache schema and
+ledger. Legacy entries are preserved and are not adopted into that store.
+Evaluation migration `0002` adds dataset and case tables; migration `0003` adds
+the aggregate history tables `evaluation_runs` and `evaluation_run_thresholds`.
+The evaluation bundle contains both migrations, while dataset/history enablement
+and runtime grants remain independent. Coordination migration `0004` adds rate
+buckets, session-auth lockout state, and the global similarity threshold. Both
+backends start only after the one-shot job succeeds. Do not run privileged
+migrations independently on each replica. This job does not build providers or
+verify their credentials.
 
 For official-store ownership, explicit cache setup and preserved legacy PostgreSQL
 records, see the [server storage transition](../guides/platform-storage.md#postgresql-setup-and-legacy-transition).
 
-Applied migrations record a SHA-256 checksum. Startup rejects a packaged
-migration whose contents no longer match its recorded checksum. A legacy
-`0001` row without a checksum is backfilled only after the released cache
-tables and required columns are verified; later checksum-less versions fail
-closed and require operator review.
+The migration runner records and verifies SHA-256 SQL-content checksums;
+a recorded non-null mismatch fails setup. A legacy `0001` row without a checksum
+is backfilled only after the implemented relation/required-column-name checks;
+these do not prove complete schema equivalence. Later checksum-less versions
+fail closed and require operator review. Production backends in `external` mode
+do not rerun server migrations. Ordinary cache startup validates the official
+package-owned layout and ledger instead.
 
 One PostgreSQL pool is shared by whichever PostgreSQL-backed Semantix features
 are enabled: pgvector cache, persisted evaluation datasets, durable run
@@ -408,6 +433,10 @@ Local development keeps:
 ```env
 DATABASE_MIGRATION_MODE=auto
 ```
+
+Development `auto` applies enabled PostgreSQL coordination/evaluation migrations;
+it does not initialize the official cache schema. Follow the explicit storage
+setup guide before starting a persistent cache.
 
 Never pass the migration DSN to the production backend service.
 
