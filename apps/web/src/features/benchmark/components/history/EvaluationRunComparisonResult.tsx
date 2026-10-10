@@ -104,6 +104,10 @@ function CompatibilitySummary({
   );
 }
 
+/**
+ * Present server compatibility and candidate-minus-baseline deltas without reruns.
+ * Delta presence gates the tables; the decoder excludes deltas for blocked comparisons.
+ */
 export function EvaluationRunComparisonResult({
   comparison,
 }: Readonly<{

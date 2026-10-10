@@ -131,6 +131,7 @@ function warning(value: unknown): EvaluationComparisonWarning {
   return { code: value.code, detail: value.detail };
 }
 
+/** Signed candidate-minus-baseline values; check shape, not the subtraction itself. */
 function metricDeltas(value: unknown): EvaluationComparisonMetricDeltas {
   if (!isRecord(value)) {
     throw new Error('Invalid evaluation comparison metric deltas');
@@ -165,6 +166,14 @@ function thresholdDelta(value: unknown): EvaluationThresholdComparisonDelta {
   return value as unknown as EvaluationThresholdComparisonDelta;
 }
 
+/**
+ * Decode distinct retained histories, rejecting raw query_results. Reported
+ * blockers disable comparison/deltas; warnings alone permit it. Status and
+ * can_compare must agree with those lists, whose derivation stays server-owned.
+ * Check each delta's ordered common threshold and respective source kinds, without
+ * requiring the complete intersection or recomputing amounts/fingerprint matches.
+ * Aggregate differences and opaque matches do not prove causality or provider identity.
+ */
 export function decodeEvaluationRunComparison(
   value: unknown,
 ): EvaluationRunComparisonResponse {

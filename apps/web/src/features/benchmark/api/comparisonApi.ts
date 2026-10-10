@@ -7,6 +7,11 @@ import type {
 } from '../comparisonTypes';
 import { decodeEvaluationRunComparison } from './comparisonDecoders';
 
+/**
+ * POST caller-selected baseline/candidate IDs, forwarding optional cancellation.
+ * The server authorizes Viewer access to both retained aggregates, then evaluates
+ * compatibility; it neither reruns providers nor applies a live cache threshold.
+ */
 export async function compareEvaluationRuns(
   payload: EvaluationRunComparisonRequest,
   signal?: AbortSignal,

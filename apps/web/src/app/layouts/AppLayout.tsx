@@ -50,6 +50,13 @@ function Workspace({ mainRef }: WorkspaceProps): JSX.Element {
   );
 }
 
+/**
+ * Gate workspace mounting on disabled/authenticated status. A changed key derived
+ * from status and principal fields remounts feature providers, resetting their
+ * local state. The key excludes the bearer token, so rotation with identical
+ * principal fields need not remount. Protected QueryClient cleanup is a separate
+ * AuthProvider action; this remount does not revoke remote access or work.
+ */
 function AppShell(): JSX.Element {
   const { session, status } = useAuth();
   const mainRef = useRef<HTMLElement>(null);

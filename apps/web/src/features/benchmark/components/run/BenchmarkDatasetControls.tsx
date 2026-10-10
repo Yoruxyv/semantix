@@ -32,6 +32,10 @@ export function BenchmarkDatasetControls({
     isRunning,
   } = controller;
 
+  /**
+   * For built-in history, show an inferred sole scope or an explicit namespace choice.
+   * Server authorization and retention stay independent of this control.
+   */
   let historyNamespaceControl: JSX.Element;
 
   if (

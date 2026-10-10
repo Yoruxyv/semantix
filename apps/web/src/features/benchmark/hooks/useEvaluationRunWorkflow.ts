@@ -27,6 +27,11 @@ interface EvaluationRunWorkflow {
   reviewRun: () => Promise<void>;
 }
 
+/**
+ * Own run submission generations and abort superseded/principal-changed/unmounted
+ * requests. Only current, unaborted responses update local results; current finally
+ * clears running state even on unexpected rejection. Abort is not remote rollback.
+ */
 export function useEvaluationRunWorkflow({
   authIdentity,
   canRun,
@@ -73,6 +78,7 @@ export function useEvaluationRunWorkflow({
     [],
   );
 
+  /** Check UI prerequisites and revalidate custom content before opening review; no run POST. */
   async function reviewRun(): Promise<void> {
     if (
       !canRun ||
@@ -94,6 +100,11 @@ export function useEvaluationRunWorkflow({
     setShowWarning(true);
   }
 
+  /**
+   * Recheck prerequisites and submit an acknowledged run. This method does not
+   * require an open warning; the caller UI owns that interaction. Handled ApiResult
+   * failures set the failure message; unexpected rejections propagate after finally.
+   */
   async function confirmRun(): Promise<void> {
     if (
       !canRun ||
@@ -140,6 +151,7 @@ export function useEvaluationRunWorkflow({
 
   return {
     isRunning,
+    /** Dismiss pending review only; does not abort an active run request. */
     cancelRun: () => setShowWarning(false),
     confirmRun,
     reviewRun,

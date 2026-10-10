@@ -18,6 +18,7 @@ function navClass(isActive: boolean): string {
   return `ui-label block border-b border-b-[var(--hairline)] border-l-2 px-3 py-3 transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)] lg:border-b lg:border-l-0 lg:py-2 ${tone}`;
 }
 
+// Intent preloads are best effort; route rendering handles its own load failures.
 function preloadRoute(pathname: string): void {
   void preloadRouteModule(pathname).catch(() => undefined);
 }

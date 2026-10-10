@@ -47,6 +47,12 @@ function EntryMetricItem({
   );
 }
 
+/**
+ * Expansion enables shared detail fetching only for a truncated preview. Keep
+ * sliced Markdown withheld; show returned full text, a null-response notice or
+ * read error as available. Collapsing hides the view without deleting query data.
+ * Row expiry/hit/recency are snapshots; inspection does not confirm a cache hit.
+ */
 export function CacheEntryCard({
   entry,
   isDeleting,

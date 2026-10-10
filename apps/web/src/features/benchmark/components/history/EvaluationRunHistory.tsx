@@ -22,6 +22,7 @@ import { EvaluationRunHistoryList } from './EvaluationRunHistoryList';
 
 const PAGE_SIZE = 12;
 
+/** Restricted authenticated readers start in their first scope; others delegate omission to the server. */
 function defaultNamespace(
   status: ReturnType<typeof useAuth>['status'],
   namespaces: string[],
@@ -33,6 +34,11 @@ function defaultNamespace(
   return '';
 }
 
+/**
+ * Own history filters, 12-row pages, detail selection and deletion/comparison UI.
+ * Principal-related effect dependencies reset scope/selection; workspace remount
+ * and protected-query cleanup have separate owners. Browser state is not retention.
+ */
 export function EvaluationRunHistory(): JSX.Element {
   const auth = useAuth();
   const queryClient = useQueryClient();
@@ -77,6 +83,7 @@ export function EvaluationRunHistory(): JSX.Element {
     resetComparison,
   ]);
 
+  /** List identity includes namespace/offset/size; empty namespace delegates server scope resolution. */
   const catalogQuery = useQuery({
     queryKey: benchmarkHistoryKeys.list(namespace, offset, PAGE_SIZE),
     queryFn: async ({ signal }) =>
@@ -92,6 +99,7 @@ export function EvaluationRunHistory(): JSX.Element {
       ),
   });
 
+  /** Fetch selected detail only when the received catalog enables retention; reads are separate observations. */
   const detailQuery = useQuery({
     queryKey: benchmarkHistoryKeys.detail(selectedRunId ?? ''),
     queryFn: async ({ signal }) => {
@@ -107,6 +115,7 @@ export function EvaluationRunHistory(): JSX.Element {
 
   const canDelete = canDeleteEvaluationRunHistory(auth.status, auth.session);
 
+  /** Validate concrete syntax and reset browsing/comparison; server authorization still applies. */
   function applyNamespace(): void {
     const trimmed = namespaceInput.trim();
     if (trimmed !== '' && !isCacheNamespace(trimmed)) {
@@ -121,6 +130,12 @@ export function EvaluationRunHistory(): JSX.Element {
     comparison.clear();
   }
 
+  /**
+   * Delete in the record's namespace, then clear local selection and invalidate
+   * history before the success notice. Finally clears busy state; no catch handles
+   * unexpected request/invalidation rejection, and the JSX void caller discards it.
+   * A rejected follow-up does not imply the server deletion was rolled back.
+   */
   async function deleteRun(item: EvaluationRunHistoryItem): Promise<void> {
     setDeletingRunId(item.run_id);
     setActionError(null);

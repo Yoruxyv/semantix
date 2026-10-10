@@ -1,3 +1,9 @@
+/**
+ * Store the original bearer credential in browser sessionStorage. It survives
+ * reloads within the page session and remains readable by same-origin JavaScript.
+ * AuthProvider owns verification and removal policy; these helpers neither trim
+ * nor validate tokens, and browser storage exceptions propagate to their callers.
+ */
 const AUTH_TOKEN_KEY = 'semantix.auth.token';
 
 export function getAuthToken(): string | null {

@@ -2,6 +2,7 @@ import { useEffect, useState, type JSX } from 'react';
 
 import { formatClockDuration } from '@/shared/lib/formatters';
 
+// This browser clock starts at module load and is independent of auth sessions.
 const SESSION_STARTED_AT = Date.now();
 
 interface SessionUptimeProps {

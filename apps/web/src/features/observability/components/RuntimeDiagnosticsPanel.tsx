@@ -24,6 +24,9 @@ function enabled(value: boolean): string {
   return value ? 'Enabled' : 'Disabled';
 }
 
+/**
+ * Persistence flags report configured modes; readiness covers a cache-stats check.
+ */
 function groups(data: RuntimeDiagnostics): DiagnosticGroup[] {
   return [
     {

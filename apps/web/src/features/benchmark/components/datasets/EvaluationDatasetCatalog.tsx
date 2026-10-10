@@ -33,6 +33,10 @@ interface EvaluationDatasetCatalogProps {
   onUseDataset: () => void;
 }
 
+/**
+ * Own browser catalog/detail queries and selection; the workflow owns explicit saves.
+ * Capability hints and namespace controls leave authorization/retention to the server.
+ */
 export function EvaluationDatasetCatalog({
   controller,
   onUseDataset,
@@ -66,6 +70,7 @@ export function EvaluationDatasetCatalog({
     setPendingDelete(null);
   }, [auth.status, auth.session?.name, hasGlobalNamespace, namespaces]);
 
+  /** An omitted list namespace delegates scope to the server for this principal. */
   const catalogQuery = useQuery({
     queryKey: benchmarkDatasetKeys.persistedList(
       listNamespace,
@@ -86,6 +91,7 @@ export function EvaluationDatasetCatalog({
   });
   const catalog = catalogQuery.data;
 
+  /** A changed catalog default replaces the editable retention value on refresh. */
   const defaultRetentionDays = catalog?.limits.default_retention_days;
   useEffect(() => {
     if (defaultRetentionDays !== undefined) {
@@ -144,6 +150,7 @@ export function EvaluationDatasetCatalog({
         setSelectedId(null);
       }
       controller.clearPersistedSelection(dataset.dataset_id);
+      /** Remote deletion has succeeded; a rejected invalidation cannot roll it back. */
       await queryClient.invalidateQueries({
         queryKey: benchmarkDatasetKeys.persisted(),
       });

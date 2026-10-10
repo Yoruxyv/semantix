@@ -14,6 +14,7 @@ import type {
   PersistedEvaluationDatasetDetail,
 } from '../types';
 
+/** Browser catalog stale/GC intervals; import size is a separate local file gate. */
 export const BENCHMARK_DATASET_STALE_TIME_MS = 10 * 60 * 1_000;
 export const BENCHMARK_DATASET_GC_TIME_MS = 30 * 60 * 1_000;
 export const EVALUATION_IMPORT_FILE_MAX_BYTES = 65_536;
@@ -75,6 +76,12 @@ interface HistoryNamespacePolicy {
   valid: boolean;
 }
 
+/**
+ * Built-in review policy, not server authorization. Disabled auth and wildcard
+ * or non-sole authenticated scopes require explicit concrete ownership; a sole
+ * restricted scope may be inferred. Nonblank choices check syntax/session scope.
+ * Persisted runs use their dataset namespace; inline work is not retained history.
+ */
 export function historyNamespacePolicy(
   authStatus: AuthStatus,
   namespaces: readonly string[],
@@ -128,6 +135,7 @@ export const DEFAULT_BENCHMARK_FORM: BenchmarkForm = {
   sweepStep: 0.05,
 };
 
+/** Display projection of a validated preview; custom form input becomes inline source. */
 export function customSummary(
   preview: EvaluationDatasetPreview,
 ): BenchmarkDatasetSummary {
@@ -146,6 +154,7 @@ export function customSummary(
   };
 }
 
+/** Recount display hits/categories from supplied cases without revalidating their digest. */
 export function persistedSummary(
   detail: PersistedEvaluationDatasetDetail,
 ): BenchmarkDatasetSummary {
@@ -168,6 +177,12 @@ export function persistedSummary(
   };
 }
 
+/**
+ * Map custom to inline and preserve persisted ID/scope. Only built-ins serialize
+ * nonblank trimmed history_namespace. Thresholds are caller-compiled projections.
+ * The explicit external-call acknowledgement permits this run's provider work;
+ * it does not establish actual calls or spend. The server validates independently.
+ */
 export function requestFromForm(
   form: BenchmarkForm,
   evaluationThresholds: number[],

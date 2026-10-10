@@ -32,6 +32,12 @@ export {
 } from './benchmarkController';
 export type { BenchmarkController, BenchmarkForm } from './benchmarkController';
 
+/**
+ * Compose form/result state, catalog data and independent dataset/run workflows.
+ * UI capabilities guide interactions; the server authorizes the requested work.
+ * This owner resets source/persisted/history selection on auth identity changes;
+ * child workflows own request abortion and their deeper state resets.
+ */
 export function useBenchmark(): BenchmarkController {
   const auth = useAuth();
   const [form, setForm] = useState<BenchmarkForm>(DEFAULT_BENCHMARK_FORM);
@@ -42,6 +48,7 @@ export function useBenchmark(): BenchmarkController {
   const hasAppliedDefaultDataset = useRef(false);
   const previousPrincipal = useRef<string | null>(null);
 
+  /** Catalog freshness/GC govern browser reuse, independently of server retention. */
   const datasetQuery = useQuery({
     queryKey: benchmarkDatasetKeys.catalog(),
     queryFn: async ({ signal }) =>
@@ -50,6 +57,7 @@ export function useBenchmark(): BenchmarkController {
     gcTime: BENCHMARK_DATASET_GC_TIME_MS,
   });
 
+  /** Apply the returned default once per mount, including when data comes from cache. */
   useEffect(() => {
     if (datasetQuery.data === undefined || hasAppliedDefaultDataset.current) {
       return;
@@ -62,6 +70,7 @@ export function useBenchmark(): BenchmarkController {
     }));
   }, [datasetQuery.data]);
 
+  /** Status, name, role and ordered namespace list define this local reset identity. */
   const authIdentity = useMemo(
     () =>
       `${auth.status}:${auth.session?.name ?? ''}:${
@@ -136,6 +145,7 @@ export function useBenchmark(): BenchmarkController {
         : persistedSummary(datasetWorkflow.persistedDataset);
   }
 
+  /** Require source-specific inputs; persisted detail must match both selected ID and scope. */
   let hasRunnableDataset = builtinDataset !== null;
   if (form.datasetSource === 'custom') {
     hasRunnableDataset =

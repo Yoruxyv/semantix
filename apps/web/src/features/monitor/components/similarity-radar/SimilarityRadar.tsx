@@ -58,8 +58,9 @@ export function SimilarityRadar({
 
       {points.length === 0 && (
         <p className="mt-3 border-l border-(--gold) pl-3 text-xs/5  text-(--text-muted)">
-          No scored comparison yet. The first query seeds the cache; the next query is
-          the first one that can produce a similarity score.
+          No scored comparison is available in the visible traces. Scores depend on
+          cache reads and eligible entries; bypassed reads return no score, and
+          read-only misses do not seed the cache.
         </p>
       )}
 

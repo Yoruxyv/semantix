@@ -70,6 +70,7 @@ export function FieldMetrics({
     traces.length === 0
       ? null
       : traces.reduce((total, trace) => total + trace.latencyMs, 0) / traces.length;
+  // Coalesced misses can skip generation; count provider calls independently of misses.
   const providerCalls = traces.filter((trace) => trace.providerCalled).length;
   const backendRequestCount =
     cacheStats === null ? 0 : cacheStats.hits + cacheStats.misses;
@@ -101,7 +102,7 @@ export function FieldMetrics({
       value: formatLatency(meanLatency),
     },
     {
-      detail: 'visible successful traces where backend cache_hit is false',
+      detail: 'visible successful traces where provider_called is true',
       label: 'Provider calls (visible)',
       tone: 'coral',
       value: formatCount(providerCalls),

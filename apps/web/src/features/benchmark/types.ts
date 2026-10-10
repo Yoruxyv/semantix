@@ -25,6 +25,10 @@ export interface BenchmarkDatasetListResponse {
   default_dataset_id: BenchmarkDatasetId;
 }
 
+/**
+ * Built-in request fields reused by the source-union EvaluationRunRequest.
+ * The current evaluations adapter sends that source-union shape.
+ */
 export interface BenchmarkRunRequest {
   dataset_id: BenchmarkDatasetId;
   threshold: number;
@@ -159,6 +163,7 @@ export interface BenchmarkMetrics {
   f1_score: number;
 }
 
+/** Sensitive run-local case evidence; matched keys belong to the isolated run cache. */
 export interface BenchmarkQueryResult {
   sequence: number;
   repetition: number;
@@ -178,6 +183,10 @@ export interface BenchmarkQueryResult {
   matched_cache_key: string | null;
 }
 
+/**
+ * Frozen-score rows; measured labels the selected cutoff, not a fresh replay.
+ * Even that row uses projected classifications and estimated latency.
+ */
 export interface ThresholdEvaluation {
   threshold: number;
   result_kind: 'measured' | 'projected';
@@ -242,6 +251,7 @@ export interface BenchmarkRunResponse {
 
 export type EvaluationRunTerminalState = 'completed' | 'failed' | 'timed_out';
 
+/** Retained terminal aggregates omit raw case records; metadata can still be sensitive. */
 export interface EvaluationRunHistoryItem {
   run_id: string;
   namespace: string;

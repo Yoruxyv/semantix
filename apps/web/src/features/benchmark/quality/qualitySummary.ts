@@ -221,6 +221,10 @@ function isSummary(value: unknown): value is QualitySummary {
   );
 }
 
+/**
+ * Validate static manifest compatibility and confusion-derived rates.
+ * Review/source/hash fields are declarations, not independently verified provenance.
+ */
 export function decodeQualitySummary(value: unknown): QualitySummary {
   if (!isSummary(value)) {
     throw new Error('Static reuse-quality evidence is missing or incompatible.');

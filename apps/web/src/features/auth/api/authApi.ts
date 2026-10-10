@@ -14,6 +14,10 @@ function decodeAuthConfig(value: unknown): AuthConfig {
   return { authentication_required: value.authentication_required };
 }
 
+/**
+ * Require a known role and non-empty name/scope strings, without normalizing them
+ * or validating namespace syntax. Extra response fields are ignored.
+ */
 function decodeAuthSession(value: unknown): AuthSession {
   if (
     !isRecord(value) ||
@@ -32,10 +36,16 @@ function decodeAuthSession(value: unknown): AuthSession {
   };
 }
 
+/** Read the public authentication policy; this does not verify a credential. */
 export function getAuthConfig(): Promise<ApiResult<AuthConfig>> {
   return request('/api/v1/auth/config', decodeAuthConfig, { method: 'GET' });
 }
 
+/**
+ * Ask the server to resolve the stored bearer token to its configured principal.
+ * This creates no credential or server session; AuthProvider owns browser state,
+ * token cleanup, and protected-query cleanup after the result.
+ */
 export function getAuthSession(): Promise<ApiResult<AuthSession>> {
   return request('/api/v1/auth/session', decodeAuthSession, { method: 'GET' });
 }

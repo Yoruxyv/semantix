@@ -51,6 +51,13 @@ interface EvaluationDatasetWorkflow {
   validateDefinition: (definition: unknown) => Promise<EvaluationDatasetPreview | null>;
 }
 
+/**
+ * Own in-memory import/preview and persisted selection, with independent save and
+ * validation generations/controllers. Principal changes invalidate both; unmount
+ * aborts owned requests. Current-generation finally blocks clear progress flags,
+ * while unexpected request/invalidation rejections still propagate to callers.
+ * Browser abortion does not roll back server persistence.
+ */
 export function useEvaluationDatasetWorkflow({
   authIdentity,
   canSaveImport,
@@ -78,6 +85,7 @@ export function useEvaluationDatasetWorkflow({
   const validationSequence = useRef(0);
   const previousPrincipal = useRef<string | null>(null);
 
+  /** Clear import/result/review and invalidate validation; an active save has a separate lifetime. */
   function clearImport(): void {
     validationSequence.current += 1;
     activeValidation.current?.abort();
@@ -130,6 +138,11 @@ export function useEvaluationDatasetWorkflow({
     [],
   );
 
+  /**
+   * Request a provider-free server preview for current repetitions/threshold count.
+   * Supersede prior validation and accept only the current, unaborted response;
+   * preview validation does not save the definition.
+   */
   async function validateDefinition(
     definition: unknown,
   ): Promise<EvaluationDatasetPreview | null> {
@@ -170,6 +183,11 @@ export function useEvaluationDatasetWorkflow({
     }
   }
 
+  /**
+   * Gate .json and File.size <= 65,536 before local parsing and server validation.
+   * File.text and JSON.parse failures share the local JSON error; generation checks
+   * suppress stale file reads without cancelling File.text itself.
+   */
   async function selectImportFile(file: File): Promise<void> {
     clearImport();
     const selectionId = validationSequence.current;
@@ -203,6 +221,12 @@ export function useEvaluationDatasetWorkflow({
     await validateDefinition(definition);
   }
 
+  /**
+   * Explicit UI-permitted save requires definition/preview and positive safe-integer
+   * retention; the server enforces namespace and configured storage limits.
+   * Await catalog invalidation before reporting success. An unexpected rejection
+   * can follow a successful remote save; these operations are not atomic.
+   */
   async function saveImport(
     namespace: string | undefined,
     retentionDays: number,
@@ -259,6 +283,7 @@ export function useEvaluationDatasetWorkflow({
     }
   }
 
+  /** Select stored identity/scope for the next run, clearing the prior result/review. */
   function selectPersistedDataset(dataset: PersistedEvaluationDatasetDetail): void {
     setPersistedDataset(dataset);
     setForm((current) => ({
@@ -273,6 +298,7 @@ export function useEvaluationDatasetWorkflow({
     setStatusMessage(`Selected persisted dataset ${dataset.name} for the next run.`);
   }
 
+  /** Clear matching stored selection/form identity only; always dismiss the review warning. */
   function clearPersistedSelection(datasetId: string): void {
     setPersistedDataset((current) =>
       current?.dataset_id === datasetId ? null : current,

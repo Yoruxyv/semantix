@@ -64,6 +64,7 @@ export const benchmarkHistoryKeys = {
   detail: (runId: string) => [...benchmarkHistoryKeys.details(), runId] as const,
 };
 
+/** Select cache roots for auth cleanup; this does not authorize requests. */
 export function isProtectedQueryKey(queryKey: QueryKey): boolean {
   const root = queryKey[0];
 

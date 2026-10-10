@@ -26,6 +26,7 @@ export function BenchmarkDatasetImport({
 
   function selectFile(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0];
+    /** Allow the same file to be selected again after validation or removal. */
     event.target.value = '';
     if (file !== undefined) {
       void controller.selectImportFile(file);

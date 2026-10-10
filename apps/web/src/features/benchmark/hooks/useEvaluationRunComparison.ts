@@ -18,6 +18,13 @@ export interface EvaluationRunComparisonController {
   compare: () => void;
 }
 
+/**
+ * Keep at most two ordered retained runs: first baseline, then candidate. The server
+ * checks both records' access/compatibility and compares aggregates without reruns.
+ * Selection changes reset the observed mutation result; reset detaches observation,
+ * not the request. No AbortSignal is passed, and canCompare reflects this observer's
+ * pending state rather than every comparison still executing remotely.
+ */
 export function useEvaluationRunComparison(): EvaluationRunComparisonController {
   const [selectedRuns, setSelectedRuns] = useState<EvaluationRunHistoryItem[]>([]);
 
@@ -69,6 +76,7 @@ export function useEvaluationRunComparison(): EvaluationRunComparisonController 
     setSelectedRuns([]);
   }, [resetResult]);
 
+  /** Submission checks selection; the pending-state button gate is the caller's responsibility. */
   const compare = useCallback(() => {
     if (selectedRuns.length !== 2) {
       return;

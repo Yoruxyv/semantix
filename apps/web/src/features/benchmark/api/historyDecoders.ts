@@ -41,6 +41,13 @@ function isNullableBoundedString(
   return value === null || (typeof value === 'string' && value.length <= maximumLength);
 }
 
+/**
+ * Dataset/reproducibility identity must agree, with accepted <= started <=
+ * completed < expires and persisted-source expiry capping retention. Inline
+ * sources are excluded. Completed items have metrics/no failure fields; failed
+ * or timed-out items have no metrics and a non-null code (empty text is allowed).
+ * Date parsing plus a timezone suffix checks ordering, not current storage/expiry.
+ */
 function historyItem(value: unknown): EvaluationRunHistoryItem {
   if (
     !isRecord(value) ||
@@ -127,6 +134,10 @@ function historyItem(value: unknown): EvaluationRunHistoryItem {
   };
 }
 
+/**
+ * Require enabled retention iff postgres; disabled lists are empty. Page bounds
+ * and has_more describe this response, without a concurrent-snapshot guarantee.
+ */
 export function decodeEvaluationRunHistoryList(
   value: unknown,
 ): EvaluationRunHistoryListResponse {
@@ -166,6 +177,12 @@ export function decodeEvaluationRunHistoryList(
   };
 }
 
+/**
+ * Failed/timed-out details have no threshold rows. Completed details reconcile
+ * query totals and the reproducibility threshold list, including one measured row.
+ * This aggregate is not a raw case transcript; SQL expiry/cascade rules and storage
+ * readiness belong to the server, outside these response checks.
+ */
 export function decodeEvaluationRunHistoryDetail(
   value: unknown,
 ): EvaluationRunHistoryDetail {

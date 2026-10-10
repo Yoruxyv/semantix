@@ -1,3 +1,14 @@
+/**
+ * Evaluations HTTP boundary: serialize caller payloads and decode responses.
+ * Shared request() adds browser credentials and maps handled fetch/JSON/decoder
+ * failures; serialization and header/credential setup can still reject. It adds
+ * no retry, total timeout, body-size cap or universal error sanitization.
+ * Workflows own state/query caching; server routes enforce roles and namespaces.
+ * Catalog/history list omission is global only for wildcard principals; a sole
+ * restricted scope is inferred, while multiple restricted scopes need a choice.
+ * Saves/deletes require concrete scope, with sole restricted-scope inference.
+ * All operations forward optional signals; abort does not certify remote rollback.
+ */
 import type { ApiResult } from '@/shared/api/types';
 import type {
   BenchmarkDatasetListResponse,
@@ -38,6 +49,11 @@ export async function getBenchmarkDatasets(
   );
 }
 
+/**
+ * POST an evaluation-run request; the legacy exported name does not use /benchmarks.
+ * The server requires Operator access and executes against an isolated cache.
+ * Successful execution and best-effort history retention have separate outcomes.
+ */
 export async function runBenchmark(
   payload: EvaluationRunRequest,
   signal?: AbortSignal,
@@ -55,6 +71,7 @@ export async function runBenchmark(
   );
 }
 
+/** POST a provider-free import preview (Operator); neither saves nor runs it. */
 export async function validateEvaluationDataset(
   payload: EvaluationDatasetValidationRequest,
   signal?: AbortSignal,
@@ -78,6 +95,7 @@ function namespaceQuery(namespace?: string): string {
     : `?namespace=${encodeURIComponent(namespace.trim())}`;
 }
 
+/** List configured storage evidence with trimmed scope and explicit offset/limit (0/20). */
 export async function getPersistedEvaluationDatasets(
   options: {
     namespace?: string;
@@ -100,6 +118,7 @@ export async function getPersistedEvaluationDatasets(
   );
 }
 
+/** Fetch authorized dataset detail by encoded ID; cases can contain raw prompts. */
 export async function getPersistedEvaluationDataset(
   datasetId: string,
   signal?: AbortSignal,
@@ -111,6 +130,7 @@ export async function getPersistedEvaluationDataset(
   );
 }
 
+/** Explicit Operator save; serialize caller scope/retention, subject to enabled storage. */
 export async function persistEvaluationDataset(
   payload: PersistEvaluationDatasetRequest,
   signal?: AbortSignal,
@@ -128,6 +148,7 @@ export async function persistEvaluationDataset(
   );
 }
 
+/** Admin deletion; blank/absent namespace is omitted and resolved by the server. */
 export async function deletePersistedEvaluationDataset(
   datasetId: string,
   namespace?: string,
@@ -142,6 +163,7 @@ export async function deletePersistedEvaluationDataset(
   );
 }
 
+/** List retained aggregates with trimmed scope and offset/limit (0/20); storage may be disabled. */
 export async function getEvaluationRunHistory(
   options: {
     namespace?: string;
@@ -164,6 +186,7 @@ export async function getEvaluationRunHistory(
   );
 }
 
+/** Fetch authorized aggregate/threshold evidence by encoded ID, without raw cases. */
 export async function getEvaluationRunHistoryDetail(
   runId: string,
   signal?: AbortSignal,
@@ -175,6 +198,7 @@ export async function getEvaluationRunHistoryDetail(
   );
 }
 
+/** Admin deletion; required namespace still passes through the helper's blank omission. */
 export async function deleteEvaluationRunHistory(
   runId: string,
   namespace: string,

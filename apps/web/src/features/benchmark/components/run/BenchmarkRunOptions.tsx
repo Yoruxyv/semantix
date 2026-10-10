@@ -14,6 +14,7 @@ interface BenchmarkRunOptionsProps {
   controller: BenchmarkController;
 }
 
+/** Local inputs feed review; native bounds and numeric fallback are not API validation. */
 export function BenchmarkRunOptions({
   controller,
 }: Readonly<BenchmarkRunOptionsProps>): JSX.Element {

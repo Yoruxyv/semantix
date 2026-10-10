@@ -21,6 +21,10 @@ interface RuntimeMetricsController {
   refresh: () => void;
 }
 
+/**
+ * Keep last successful data on query errors; ready does not imply freshness.
+ * isRefreshing tracks manual refresh, independently of scheduled fetching.
+ */
 export function useRuntimeMetrics(): RuntimeMetricsController {
   const query = useQuery({
     queryKey: runtimeMetricsKeys.live(),

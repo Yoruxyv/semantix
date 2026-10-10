@@ -6,6 +6,7 @@ import { Alert, PageHeader } from '@/shared/components/ui';
 
 import type { JSX } from 'react';
 
+/** Route-state text is a presentation hint, not durable mutation/audit evidence. */
 function cacheMutationNotice(state: unknown): string | null {
   if (
     typeof state === 'object' &&
@@ -24,6 +25,11 @@ export function CachePage(): JSX.Element {
   const { refreshCacheState } = useCacheControl();
   const { clearTraces } = useMonitor();
 
+  /**
+   * Inspector reports the mutation; clear removes only local Monitor traces.
+   * Both actions request cache-state refresh. The JSX wrapper discards this promise,
+   * so the inspector cannot await this refresh or catch its rejection.
+   */
   async function handleMutation(mutation: CacheMutation): Promise<void> {
     if (mutation === 'clear') {
       clearTraces();

@@ -8,6 +8,10 @@ interface BenchmarkRunWarningProps {
   controller: BenchmarkController;
 }
 
+/**
+ * Present review estimates and acknowledgement; confirmRun does not test showWarning.
+ * Cancel dismisses this warning only; it does not abort an active run.
+ */
 export function BenchmarkRunWarning({
   controller,
 }: Readonly<BenchmarkRunWarningProps>): JSX.Element | null {

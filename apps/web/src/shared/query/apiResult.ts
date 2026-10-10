@@ -1,5 +1,9 @@
 import type { ApiError, ApiResult } from '../api/types';
 
+/**
+ * Bridge handled failures to thrown errors, retaining only code/detail/status.
+ * Optional issues and retry-after metadata are not retained.
+ */
 export class ApiResultError extends Error {
   readonly code: string;
   readonly detail: string | null;

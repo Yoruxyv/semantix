@@ -19,6 +19,10 @@ function fingerprint(value: string): JSX.Element {
   );
 }
 
+/**
+ * Display retained terminal aggregates without reconstructing raw case evidence.
+ * Projected rows reuse frozen candidates from the one measured run.
+ */
 function TerminalEvidence({
   detail,
 }: Readonly<{ detail: EvaluationRunHistoryDetail }>): JSX.Element {

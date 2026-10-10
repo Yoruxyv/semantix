@@ -19,6 +19,12 @@ interface CacheControlProviderProps {
   children: ReactNode;
 }
 
+/**
+ * Own last confirmed threshold/stats and an independent editable preview for the
+ * keyed workspace. Ready data can survive a failed refresh with refreshError;
+ * loading/error states have no confirmed data. Preview edits do not write policy.
+ * Refresh/write generations and unmount cleanup guard local commits, not remote work.
+ */
 export function CacheControlProvider({
   children,
 }: Readonly<CacheControlProviderProps>): JSX.Element {
@@ -36,6 +42,12 @@ export function CacheControlProvider({
   const refreshSequence = useRef(0);
   const writeSequence = useRef(0);
 
+  /**
+   * Skip during apply; abort the older read and accept only current mounted results.
+   * Stats/threshold run concurrently, without a transactional snapshot. Handled
+   * failures retain ready data or enter error. Success syncs preview only when
+   * requested or not yet confirmed. Unexpected rejection bypasses this cleanup.
+   */
   const refreshCacheState = useCallback(async (syncPreview = false): Promise<void> => {
     if (isApplying.current) {
       return;
@@ -114,6 +126,13 @@ export function CacheControlProvider({
     setControlError(null);
   }, []);
 
+  /**
+   * Supersede refreshes and guard the write result by generation/mount. Success
+   * updates appliedThreshold only in ready state, and always updates preview.
+   * Handled failure releases the apply gate and awaits a preview-syncing recovery
+   * read before the notice; that read may fail or be superseded. No rollback or
+   * restoration is guaranteed. finally resets apply flags for the current write.
+   */
   const commitThreshold = useCallback(
     async (value: number): Promise<void> => {
       const writeId = writeSequence.current + 1;

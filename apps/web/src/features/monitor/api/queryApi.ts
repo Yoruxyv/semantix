@@ -19,6 +19,14 @@ import {
   THRESHOLD_MIN,
 } from '@/shared/domain/similarity';
 
+/**
+ * Validate all eleven fields and retain explicit nulls. Hits require a score at
+ * least the threshold, matched-entry evidence, and skipped generation without a
+ * provider call. Misses have null matched-entry fields and exactly one of skipped
+ * generation/provider-called, allowing coalesced followers and a nearest score.
+ * Scores are finite in [-1, 1], thresholds in [0, 1], ages/latencies non-negative;
+ * timestamps stay Date.parse-compatible strings. Extra fields are discarded.
+ */
 function decodeQueryResponse(value: unknown): QueryResponse {
   if (
     !isRecord(value) ||
@@ -75,6 +83,11 @@ function decodeQueryResponse(value: unknown): QueryResponse {
   };
 }
 
+/**
+ * POST the supplied Monitor payload unchanged to /api/v1/query. The caller owns
+ * policy selection and cancellation; the server owns authorization and policy
+ * precedence. Decoder failures are mapped by request to invalid_response.
+ */
 export function submitQuery(
   payload: QueryRequest,
   signal?: AbortSignal,

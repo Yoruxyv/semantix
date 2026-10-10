@@ -12,6 +12,13 @@ function scaled(value: number): number {
   return Math.round(value * SCALE);
 }
 
+/**
+ * Compile projection inputs on a rounded 1/10,000 grid: seed start/end/measured,
+ * step with integer units, deduplicate and sort. Measured can lie outside the sweep
+ * interval within [0,1]. Require 2-15 unique values; count-error results retain the
+ * constructed list. The server validates again; compilation calls no providers and
+ * does not change live thresholds or establish savings.
+ */
 export function compileThresholdSweep(
   start: number,
   end: number,

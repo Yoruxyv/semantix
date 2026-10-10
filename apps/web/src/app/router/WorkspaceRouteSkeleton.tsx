@@ -19,6 +19,7 @@ const CACHE_ENTRIES = [0, 1] as const;
 const CACHE_ENTRY_METRICS = [0, 1, 2, 3, 4, 5] as const;
 const OBSERVABILITY_GROUPS = [4, 5, 3] as const;
 
+// Prefixes choose a placeholder shape; they do not determine route matches.
 function kindForPath(pathname: string): WorkspaceKind {
   if (
     pathname.startsWith(APP_PATHS.evaluations) ||

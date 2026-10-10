@@ -97,6 +97,10 @@ export function BenchmarkAnalysis({
       ),
     [result.query_results],
   );
+  /**
+   * Reconcile returned outcomes before exposing the matrix, without verifying execution.
+   * Outcomes measure expected cache decisions, not factual correctness of answers.
+   */
   const evidenceCounts = useMemo(
     () =>
       Object.fromEntries(
@@ -123,6 +127,7 @@ export function BenchmarkAnalysis({
     returnFocusRef.current = null;
   }
 
+  /** Preserve the actual compact/desktop trigger for focus return when detail closes. */
   function openCase(query: BenchmarkQueryResult, trigger: HTMLButtonElement): void {
     returnFocusRef.current = trigger;
     setSelectedCase(query);

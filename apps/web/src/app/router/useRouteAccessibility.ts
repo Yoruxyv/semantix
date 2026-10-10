@@ -27,6 +27,7 @@ export function useRouteAccessibility(mainRef: RefObject<HTMLElement | null>): v
     document.title = titleForPath(pathname);
   }, [pathname]);
 
+  // Limit focus/scroll attempts to path-changing PUSH and the legacy REPLACE.
   useEffect(() => {
     const previousPath = previousPathname.current;
     const pathChanged = previousPath !== pathname;

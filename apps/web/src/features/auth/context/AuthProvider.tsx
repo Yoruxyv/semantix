@@ -28,6 +28,11 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+/**
+ * Own browser auth state and protected-query cleanup under the app QueryClient.
+ * Public policy discovery gates the workspace; the server authorizes operations.
+ * Storage/header setup rejections are not converted into auth error state here.
+ */
 export function AuthProvider({ children }: Readonly<AuthProviderProps>): JSX.Element {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<AuthStatus>('loading');
@@ -36,12 +41,22 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>): JSX.Ele
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [policyRequest, setPolicyRequest] = useState(0);
 
+  /** Remove only registered protected query roots; feature-local state is separate. */
   const clearProtectedQueries = useCallback((): void => {
     queryClient.removeQueries({
       predicate: (query) => isProtectedQueryKey(query.queryKey),
     });
   }, [queryClient]);
 
+  /**
+   * Trim and store the bearer credential before server verification. Accepted
+   * verification sets the principal and clears protected queries; handled failures
+   * clear that principal/queries. Only authentication_required removes the token;
+   * lockout and transient failures retain it. Retry-After or 30 seconds supplies
+   * the local lockout deadline, not the server's authoritative clock.
+   * No generation guard follows the await, so an older result can still apply
+   * after logout, policy retry or another authenticate. Setup rejections propagate.
+   */
   const authenticate = useCallback(
     async (token: string): Promise<boolean> => {
       const normalized = token.trim();
@@ -92,6 +107,7 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>): JSX.Ele
     [clearProtectedQueries],
   );
 
+  /** Clear stored credential, protected queries and local auth state, without invalidating pending verification. */
   const logout = useCallback((): void => {
     clearAuthToken();
     clearProtectedQueries();
@@ -101,6 +117,7 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>): JSX.Ele
     setStatus('unauthenticated');
   }, [clearProtectedQueries]);
 
+  /** Re-enter loading and rediscover policy with the stored token retained. */
   const retryAccessPolicy = useCallback((): void => {
     setError(null);
     setSession(null);
@@ -109,6 +126,12 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>): JSX.Ele
     setPolicyRequest((request) => request + 1);
   }, []);
 
+  /**
+   * Discover policy first: disabled mode permits configured local access; token
+   * mode verifies a stored credential or shows the unauthenticated gate. A handled
+   * config failure becomes error. Cleanup guards the config response only, not a
+   * session verification already delegated to authenticate.
+   */
   useEffect(() => {
     let active = true;
 

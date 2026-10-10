@@ -3,8 +3,10 @@ import { getAuthToken } from './authToken';
 import type { ApiError, ApiResult, ApiValidationIssue } from './types';
 import { isRecord } from './validators';
 
+/** Feature-owned validation of parsed JSON, including cross-field invariants. */
 export type Decoder<T> = (value: unknown) => T;
 
+/** Accept positive safe-integer delta seconds; HTTP dates do not produce metadata. */
 function retryAfterSeconds(headers: Headers): number | undefined {
   const value = headers.get('Retry-After');
   if (value === null || !/^\d+$/.test(value.trim())) {
@@ -15,6 +17,10 @@ function retryAfterSeconds(headers: Headers): number | undefined {
   return Number.isSafeInteger(seconds) && seconds > 0 ? seconds : undefined;
 }
 
+/**
+ * Preserve the distinction between omitted issues (undefined) and malformed ones
+ * (null), which invalidate the entire error envelope. Unknown fields are dropped.
+ */
 function decodeValidationIssues(
   value: unknown,
 ): ApiValidationIssue[] | null | undefined {
@@ -78,6 +84,19 @@ function decodeApiError(value: unknown, status: number, headers: Headers): ApiEr
   };
 }
 
+/**
+ * Join the configured API base and path, force JSON Content-Type, and attach the
+ * stored bearer token when present, overriding a caller Authorization header.
+ * The caller supplies the method, body, signal, and success decoder.
+ *
+ * Handled fetch failures become network_error with null status. Body-read or JSON
+ * failures become invalid_response with HTTP status; blank bodies decode as null.
+ * Non-2xx JSON uses the server error envelope; malformed envelopes or issues become
+ * invalid_error_response. Success-decoder failures also become invalid_response.
+ *
+ * Header/storage setup can reject before error mapping. Abort has no dedicated
+ * result code, and this wrapper adds no timeout, retry, body-size cap, or redaction.
+ */
 export async function request<T>(
   path: string,
   decoder: Decoder<T>,
@@ -147,6 +166,7 @@ export async function request<T>(
   }
 }
 
+/** Preserve init when absent; otherwise copy it and replace its signal. */
 export function withSignal(init: RequestInit, signal?: AbortSignal): RequestInit {
   return signal === undefined ? init : { ...init, signal };
 }

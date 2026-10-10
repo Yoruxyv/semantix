@@ -11,6 +11,10 @@ interface LazyNamedPage {
   preload: () => Promise<void>;
 }
 
+/**
+ * Share one module request between preload and lazy rendering; rejection clears
+ * this request cache, without resetting React.lazy's own rejected payload.
+ */
 function lazyNamedPage<
   TExportName extends string,
   TModule extends Record<TExportName, ComponentType>,

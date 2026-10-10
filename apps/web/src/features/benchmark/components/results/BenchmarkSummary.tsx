@@ -37,6 +37,10 @@ function Metric({ label, tone, value }: Readonly<MetricProps>): JSX.Element {
   );
 }
 
+/**
+ * Format supplied measured metrics, estimates and reproducibility identifiers.
+ * Display does not authenticate evidence or redact caller-controlled metadata.
+ */
 export function BenchmarkSummary({
   result,
 }: Readonly<BenchmarkSummaryProps>): JSX.Element {

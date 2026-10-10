@@ -30,6 +30,7 @@ function matchesPath(route: AppRouteDefinition, pathname: string): boolean {
   return pathname === routePath || pathname.startsWith(`${routePath}/`);
 }
 
+/** Preload the first top-level match only; child descriptors are not traversed. */
 export async function preloadRouteModule(pathname: string): Promise<void> {
   const route = routes.find((candidate) => matchesPath(candidate, pathname));
   await route?.preload?.();

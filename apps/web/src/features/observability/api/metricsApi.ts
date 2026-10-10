@@ -22,6 +22,9 @@ const isNormalizationAlgorithmVersion = createEnumGuard([
   'symspell-compound-v1',
 ] as const);
 
+/**
+ * Validate selected fields; cross-field invariants remain server-owned.
+ */
 function decodeRuntimeMetrics(value: unknown): RuntimeMetrics {
   if (
     !isRecord(value) ||
@@ -71,6 +74,9 @@ export function getRuntimeMetrics(
   );
 }
 
+/**
+ * Require the fixed receipt shape; fingerprints do not authenticate provenance.
+ */
 function decodeRuntimeDiagnostics(value: unknown): RuntimeDiagnostics {
   if (
     !isRecord(value) ||

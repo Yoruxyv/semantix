@@ -53,6 +53,13 @@ function errorDetail(error: unknown, fallback: string): string {
   return apiErrorFromUnknown(error).detail ?? fallback;
 }
 
+/**
+ * Own URL-backed search/namespace/sort/offset, ten-row pages and local confirmations.
+ * Unknown sorts use newest; unsafe/negative offsets use zero. Trimmed filters and
+ * pagination identify list queries, without becoming durable server filter state.
+ * Search/sort changes reset offset and pending deletion; namespace also cancels
+ * clear confirmation. Previously loaded data survives refresh errors.
+ */
 export function useCacheInspector({
   onMutation,
 }: Readonly<UseCacheInspectorOptions>): CacheInspectorController {
@@ -81,6 +88,7 @@ export function useCacheInspector({
     search: search.trim(),
     sort,
   };
+  /** The 20-second freshness and five-minute inactive retention are client policy, not entry TTL. */
   const entriesQuery = useQuery({
     queryKey: cacheEntryKeys.list(params),
     queryFn: async ({ signal }) =>
@@ -88,6 +96,7 @@ export function useCacheInspector({
     staleTime: 20 * 1_000,
     gcTime: 5 * 60 * 1_000,
   });
+  /** Remote success removes detail queries then awaits list invalidation before mutateAsync settles. */
   const deleteMutation = useMutation({
     mutationFn: async (cacheKey: string) =>
       dataFromApiResult(await deleteCacheEntry(cacheKey)),
@@ -114,6 +123,7 @@ export function useCacheInspector({
     },
   });
 
+  /** Pending manual refreshes are deduplicated; refetch does not cancel an active read. */
   const manualRefresh = useMutation({
     mutationFn: () => entriesQuery.refetch({ cancelRefetch: false }),
   });
@@ -225,6 +235,10 @@ export function useCacheInspector({
     setPendingDelete(null);
   }
 
+  /**
+   * After mutation/invalidation, dismiss confirmation, reset offset, then await the
+   * supplied callback. A later rejection does not undo a successful server delete.
+   */
   async function confirmDeleteEntry(cacheKey: string): Promise<void> {
     setActionError(null);
 
@@ -238,6 +252,10 @@ export function useCacheInspector({
     }
   }
 
+  /**
+   * Blank namespace omits scope for server resolution; search/page never constrain
+   * clearing. Follow-up/callback errors do not prove the remote clear was undone.
+   */
   async function confirmClearCache(): Promise<void> {
     setActionError(null);
 

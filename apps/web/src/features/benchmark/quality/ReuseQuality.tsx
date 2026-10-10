@@ -13,6 +13,10 @@ import {
 const METHODOLOGY_URL =
   'https://github.com/Yoruxyv/semantix/blob/main/packages/cache/benchmarks/reuse_quality/README.md';
 
+/**
+ * Select already-loaded static rows; mounted selection survives summary updates.
+ * Source/hash labels report manifest declarations, not live repository attestation.
+ */
 function Evidence({ summary }: Readonly<{ summary: QualitySummary }>): JSX.Element {
   const [identity, setIdentity] = useState(
     summary.runs.find(

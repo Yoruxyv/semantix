@@ -23,6 +23,10 @@ interface RuntimeDiagnosticsController {
   refresh: () => void;
 }
 
+/**
+ * Cache diagnostics without periodic polling; staleTime marks freshness only.
+ * Retain data on query errors; isRefreshing tracks the manual refetch mutation.
+ */
 export function useRuntimeDiagnostics(): RuntimeDiagnosticsController {
   const query = useQuery({
     queryKey: runtimeDiagnosticsKeys.live(),

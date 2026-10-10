@@ -29,6 +29,10 @@ import {
 const DATASET_IDS: readonly BenchmarkDatasetId[] = ['quick', 'extended'];
 const isDatasetId = createEnumGuard(DATASET_IDS);
 
+/**
+ * Require a quick/extended default present in the nonempty catalog. Individual
+ * rows use the general dataset-summary contract, not the default-ID enum.
+ */
 export function decodeBenchmarkDatasets(value: unknown): BenchmarkDatasetListResponse {
   if (
     !isRecord(value) ||
@@ -62,6 +66,12 @@ function warning(value: unknown): EvaluationDatasetWarning {
   return value as unknown as EvaluationDatasetWarning;
 }
 
+/**
+ * Check schema-1 preview evidence: case totals, unique categories and limits,
+ * maximum calls equal query executions, and zero provider calls already made.
+ * Projection work has a lower bound, not a recomputed formula. These checks do
+ * not establish a later run's workload enforcement. Spread fields are retained.
+ */
 export function decodeEvaluationDatasetPreview(
   value: unknown,
 ): EvaluationDatasetPreview {
@@ -144,6 +154,11 @@ function importedCase(value: unknown): ImportedEvaluationCase {
   return value as unknown as ImportedEvaluationCase;
 }
 
+/**
+ * Require imported schema-1 metadata, UUID/concrete-namespace shape and expiry
+ * after creation. Digest shape is checked without recomputing the cases' digest.
+ * Identity/date syntax grants no authorization or storage-authenticity proof.
+ */
 function persistedMetadata(value: unknown): PersistedEvaluationDatasetMetadata {
   if (
     !isRecord(value) ||
@@ -172,6 +187,11 @@ function persistedMetadata(value: unknown): PersistedEvaluationDatasetMetadata {
   return value as unknown as PersistedEvaluationDatasetMetadata;
 }
 
+/**
+ * Require postgres iff persistence is enabled; session catalogs must be empty.
+ * Validate page bounds, has_more accounting and retention limits as one response,
+ * without promising a stable snapshot across later requests. Extra fields remain.
+ */
 export function decodePersistedEvaluationDatasets(
   value: unknown,
 ): PersistedEvaluationDatasetListResponse {
@@ -214,6 +234,11 @@ export function decodePersistedEvaluationDatasets(
   } as unknown as PersistedEvaluationDatasetListResponse;
 }
 
+/**
+ * Check case count, unique IDs and references to earlier cases in payload order.
+ * Expected misses cannot name a match. Cases retain prompts/notes and extra fields;
+ * decoding does not anonymize them or verify expected answers.
+ */
 export function decodePersistedEvaluationDatasetDetail(
   value: unknown,
 ): PersistedEvaluationDatasetDetail {
@@ -240,6 +265,7 @@ export function decodePersistedEvaluationDatasetDetail(
   return { ...metadata, cases };
 }
 
+/** Validate the affirmative deletion receipt's ID/scope shape, not its authority. */
 export function decodeDeletePersistedEvaluationDataset(
   value: unknown,
 ): DeletePersistedEvaluationDatasetResponse {

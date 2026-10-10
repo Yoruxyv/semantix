@@ -10,6 +10,7 @@ interface ProviderProps {
   children: ReactNode;
 }
 
+/** Keep the app QueryClient and auth context above workspace gating/remounts. */
 export function AppProviders({ children }: Readonly<ProviderProps>): JSX.Element {
   const queryClient = useMemo(() => createAppQueryClient(), []);
 
@@ -20,6 +21,10 @@ export function AppProviders({ children }: Readonly<ProviderProps>): JSX.Element
   );
 }
 
+/**
+ * Scope cache controls and Monitor state to the keyed workspace in AppShell.
+ * CacheControlProvider is outermost because Monitor consumes its refresh action.
+ */
 export function WorkspaceProviders({ children }: Readonly<ProviderProps>): JSX.Element {
   return (
     <CacheControlProvider>

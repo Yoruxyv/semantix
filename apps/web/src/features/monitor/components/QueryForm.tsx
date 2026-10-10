@@ -33,6 +33,7 @@ const EXAMPLE_PROMPTS = [
 const MAX_PROMPT_LENGTH = 2_000;
 const MAX_PROMPT_LENGTH_LABEL = formatCount(MAX_PROMPT_LENGTH);
 
+/** Map local mode names to wire flags; policyMode itself is presentation context. */
 const POLICY_FIELDS: Record<
   QueryPolicyMode,
   Omit<QueryRequest, 'namespace' | 'prompt'>
@@ -72,6 +73,14 @@ const POLICY_FIELDS: Record<
 const CONTROL_CLASS =
   'mt-2 min-h-11 w-full min-w-0 border border-(--hairline) bg-(--surface) px-3 py-2 text-sm text-(--text) outline-none focus-visible:border-(--gold) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold)';
 
+/**
+ * Trim/validate a nonempty prompt (2,000 UTF-16 code units maximum) and a concrete
+ * namespace. Preselect a sole scope; multiple scopes require a choice; wildcard
+ * or disabled-auth access starts at default and accepts valid concrete input.
+ * The server independently enforces role and namespace access. Submit local mode
+ * plus the wire request/flags, with no TTL field, and propagate callback rejection.
+ * Loading disables selected controls but is not a guard inside handleSubmit.
+ */
 export function QueryForm({
   isLoading,
   onSubmit,

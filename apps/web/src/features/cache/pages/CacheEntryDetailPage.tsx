@@ -26,6 +26,7 @@ function shortCacheKey(cacheKey: string): string {
   return `${cacheKey.slice(0, 10)}...${cacheKey.slice(-6)}`;
 }
 
+/** Retain only string search state that is empty or starts with ?, on the fixed Cache path. */
 function returnSearchFromState(state: unknown): string {
   if (
     typeof state === 'object' &&
@@ -58,6 +59,12 @@ function DetailItem({
   );
 }
 
+/**
+ * Fetch only valid-shaped keys using the shared card/detail query key. Key syntax
+ * and the delete UI hint grant no access; the server checks role/namespace scope.
+ * Render metadata and preview even when detail data includes a full response;
+ * invalid keys and failed reads use neutral unavailable messaging.
+ */
 export function CacheEntryDetailPage(): JSX.Element {
   const { cacheKey = '' } = useParams();
   const location = useLocation();
@@ -93,6 +100,11 @@ export function CacheEntryDetailPage(): JSX.Element {
     }
   }
 
+  /**
+   * After confirmed DELETE, remove detail, await list invalidation and cache-state
+   * refresh together, then navigate with a local notice. Follow-up rejection can
+   * prevent navigation and show failure after the server has already deleted.
+   */
   async function confirmEntryDeletion(): Promise<void> {
     setDeleteError(null);
     try {

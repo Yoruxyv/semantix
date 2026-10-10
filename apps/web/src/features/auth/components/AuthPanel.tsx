@@ -65,6 +65,12 @@ function BootstrapErrorPanel({
   );
 }
 
+/**
+ * Present bearer verification, policy/session retry or the accepted principal.
+ * Token entry stays local until submitted to AuthProvider. The lockout interval
+ * presents its deadline and is cleaned up on change/unmount; it cannot unlock the
+ * server. A rejected authenticate promise does not reset the submission flag.
+ */
 export function AuthPanel(): JSX.Element | null {
   const {
     authenticate,

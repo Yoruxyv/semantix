@@ -118,6 +118,11 @@ const CSV_COLUMNS: readonly CsvColumn[] = [
   },
 ];
 
+/**
+ * Null becomes empty; strings starting =, +, - or @ get a leading apostrophe before
+ * CSV quote/newline escaping. This prefix mitigation is not a guarantee for every
+ * spreadsheet interpretation or import mode.
+ */
 function csvCell(value: CsvValue): string {
   if (value === null) {
     return '';
@@ -127,10 +132,16 @@ function csvCell(value: CsvValue): string {
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
+/** Serialize the available full run result, including sensitive case data, without redaction. */
 export function buildBenchmarkJson(result: BenchmarkRunResponse): string {
   return JSON.stringify(result, null, 2);
 }
 
+/**
+ * CSV schema 3: one row per query with repeated run/dataset/configuration metadata,
+ * nullable empty cells and CRLF row separators. Raw prompts, notes, matched prompts
+ * and keys remain exportable; this is richer than retained aggregate history.
+ */
 export function buildBenchmarkCsv(result: BenchmarkRunResponse): string {
   const header = CSV_COLUMNS.map((column) => column.header).join(',');
   const rows = result.query_results.map((query) =>
@@ -139,6 +150,11 @@ export function buildBenchmarkCsv(result: BenchmarkRunResponse): string {
   return [header, ...rows].join('\r\n');
 }
 
+/**
+ * User-triggered download: serialize, create Blob/object URL, click a temporary
+ * anchor and revoke the URL on the normal path. This requests a local file save,
+ * without delivery confirmation or redaction; revocation does not erase saved data.
+ */
 export function downloadBenchmark(
   result: BenchmarkRunResponse,
   format: 'json' | 'csv',

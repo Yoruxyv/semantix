@@ -1,3 +1,9 @@
+/**
+ * Browser cache HTTP adapter: request() attaches the stored bearer token and maps
+ * handled transport/HTTP/decoder failures to ApiResult; setup can still reject.
+ * The server enforces roles and namespaces. Reconstructed responses discard
+ * unknown fields and expose sensitive prompt/answer text, without embeddings.
+ */
 import type {
   CacheEntryListParams,
   CacheEntryListResponse,
@@ -24,6 +30,7 @@ import {
 
 const LEGACY_RESPONSE_PREVIEW_LENGTH = 240;
 
+/** Validate finite nonnegative observations and a [0, 1] hit rate, not fleet-wide authority. */
 function decodeCacheStats(value: unknown): CacheStatsResponse {
   if (
     !isRecord(value) ||
@@ -43,6 +50,13 @@ function decodeCacheStats(value: unknown): CacheStatsResponse {
   };
 }
 
+/**
+ * Validate key/namespace syntax and nonempty prompt/preview, not access rights.
+ * Missing/null full responses normalize to null; supplied strings must be nonempty.
+ * Date.parse guards accept more than strict ISO; expiry and remaining TTL must
+ * agree only in nullability. Hits are nonnegative integers, rank starts at 1,
+ * and is_expired remains a server observation rather than a local time check.
+ */
 function decodeCacheEntry(value: unknown): CacheEntryMetadata {
   if (
     !isRecord(value) ||
@@ -82,6 +96,7 @@ function decodeCacheEntry(value: unknown): CacheEntryMetadata {
     namespace: value.namespace,
     prompt: value.prompt,
     response_preview: value.response_preview,
+    /** Legacy 240-character previews ending in ... only imply truncation. */
     response_preview_truncated:
       value.response_preview_truncated ??
       (value.response_preview.length === LEGACY_RESPONSE_PREVIEW_LENGTH &&
@@ -97,6 +112,10 @@ function decodeCacheEntry(value: unknown): CacheEntryMetadata {
   };
 }
 
+/**
+ * Require integer pagination, limit 1-100, items <= limit, and has_more equal to
+ * offset + returned items < total. Concurrent expiry/mutation can shift pages.
+ */
 function decodeCacheEntryList(value: unknown): CacheEntryListResponse {
   if (
     !isRecord(value) ||
@@ -153,6 +172,7 @@ function decodeCacheThreshold(value: unknown): CacheThresholdResponse {
   return { threshold: value.threshold };
 }
 
+/** GET /api/v1/cache/stats without a namespace filter; scope is server-resolved. */
 export function getCacheStats(
   signal?: AbortSignal,
 ): Promise<ApiResult<CacheStatsResponse>> {
@@ -163,6 +183,12 @@ export function getCacheStats(
   );
 }
 
+/**
+ * GET /api/v1/cache/entries with offset/limit/sort and nonempty trimmed filters.
+ * Omitted namespace permits global scope for wildcard principals, infers a sole
+ * allowed namespace, or is rejected for multiple restricted namespaces. List
+ * rows carry previews; the current server leaves their full response null.
+ */
 export function listCacheEntries(
   params: CacheEntryListParams,
   signal?: AbortSignal,
@@ -188,6 +214,10 @@ export function listCacheEntries(
   );
 }
 
+/**
+ * GET /api/v1/cache/entries/{key} for authorized detail, without confirming reuse.
+ * Missing, expired and out-of-scope entries share the server's not-found response.
+ */
 export function getCacheEntry(
   cacheKey: string,
   signal?: AbortSignal,
@@ -199,6 +229,7 @@ export function getCacheEntry(
   );
 }
 
+/** DELETE /api/v1/cache/entries/{key}; the server requires admin and entry scope. */
 export function deleteCacheEntry(
   cacheKey: string,
 ): Promise<ApiResult<DeleteCacheEntryResponse>> {
@@ -209,6 +240,11 @@ export function deleteCacheEntry(
   );
 }
 
+/**
+ * DELETE /api/v1/cache, including namespace exactly when supplied. Omission is
+ * global only for wildcard admins; a sole restricted namespace is inferred and
+ * ambiguous restricted scope is rejected. Search/sort/page do not limit clearing.
+ */
 export function clearCache(namespace?: string): Promise<ApiResult<ClearCacheResponse>> {
   const query = new URLSearchParams();
   if (namespace !== undefined) {
@@ -219,6 +255,7 @@ export function clearCache(namespace?: string): Promise<ApiResult<ClearCacheResp
   return request(`/api/v1/cache${suffix}`, decodeClearCache, { method: 'DELETE' });
 }
 
+/** GET /api/v1/cache/threshold for the server's current global value. */
 export function getCacheThreshold(
   signal?: AbortSignal,
 ): Promise<ApiResult<CacheThresholdResponse>> {
@@ -229,6 +266,7 @@ export function getCacheThreshold(
   );
 }
 
+/** PUT /api/v1/cache/threshold with { threshold }; the server requires wildcard admin. */
 export function updateCacheThreshold(
   threshold: number,
 ): Promise<ApiResult<CacheThresholdResponse>> {

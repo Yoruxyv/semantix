@@ -36,10 +36,12 @@ export const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TIMEZONE_SUFFIX_PATTERN = /(Z|[+-]\d{2}:\d{2})$/i;
 
+/** Date.parse-compatible text with a timezone suffix; no strict ISO or clock proof. */
 export function isTimezoneAwareIsoDate(value: unknown): value is string {
   return isIsoDate(value) && TIMEZONE_SUFFIX_PATTERN.test(value);
 }
 
+/** Null or nonempty by string length, without trimming whitespace. */
 export function isNullableBoundedString(
   value: unknown,
   maximumLength: number,
@@ -47,6 +49,10 @@ export function isNullableBoundedString(
   return value === null || (isNonEmptyString(value) && value.length <= maximumLength);
 }
 
+/**
+ * Check expected-hit/miss totals and unique categories. Built-ins have null schema;
+ * inline/persisted summaries require schema 1. Reconstruct the known summary fields.
+ */
 export function decodeBenchmarkDatasetSummaryValue(
   value: unknown,
 ): BenchmarkDatasetSummary {
@@ -106,6 +112,12 @@ export function decodeBenchmarkDatasetSummaryValue(
   };
 }
 
+/**
+ * Reconcile hit/miss and classification counts; evaluation calls equal misses,
+ * and avoided calls equal hits. Ratios and nullable group latencies are bounded,
+ * not recomputed from counts. Timing/token/cost estimates are not billing proof.
+ * The original record is returned, including fields not checked here.
+ */
 export function decodeBenchmarkMetricsValue(value: unknown): BenchmarkMetrics {
   if (!isRecord(value)) {
     throw new Error('Invalid benchmark metrics');
@@ -169,6 +181,11 @@ export function decodeBenchmarkMetricsValue(value: unknown): BenchmarkMetrics {
   return value as unknown as BenchmarkMetrics;
 }
 
+/**
+ * Validate measured/projected row shape and TP + FP = avoided calls. Projections
+ * reuse frozen candidate observations, without provider reruns; owners check the
+ * threshold sequence and measured row. This helper does not check a run total.
+ */
 export function decodeThresholdEvaluationValue(value: unknown): ThresholdEvaluation {
   if (
     !isRecord(value) ||
@@ -198,6 +215,12 @@ export function decodeThresholdEvaluationValue(value: unknown): ThresholdEvaluat
   return value as unknown as ThresholdEvaluation;
 }
 
+/**
+ * Check source/schema, fingerprint shapes and bounded settings, including 2-15
+ * strictly increasing thresholds. Run/history owners link the measured threshold
+ * and dataset identity to their enclosing evidence. Fingerprints are supplied,
+ * not authenticated or a promise of deterministic external provider outputs.
+ */
 export function decodeBenchmarkReproducibilityValue(
   value: unknown,
 ): BenchmarkReproducibilityMetadata {

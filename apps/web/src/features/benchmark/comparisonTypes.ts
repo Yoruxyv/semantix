@@ -91,6 +91,10 @@ export interface EvaluationThresholdComparisonDelta {
   false_negative_misses: number;
 }
 
+/**
+ * Server-reported retained aggregates with candidate-minus-baseline deltas.
+ * Warnings alone permit deltas; incompatible results suppress them.
+ */
 export interface EvaluationRunComparisonResponse {
   baseline: EvaluationRunHistoryDetail;
   candidate: EvaluationRunHistoryDetail;

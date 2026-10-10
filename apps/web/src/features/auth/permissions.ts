@@ -1,3 +1,10 @@
+/**
+ * UI capability hints; the server enforces roles and concrete namespace access.
+ * Global metrics/threshold require an authenticated wildcard admin; query, run,
+ * and dataset-save actions require operator/admin; deletion requires admin.
+ * A disabled-auth context enables these controls for local operation. Other
+ * statuses deny access. These helpers do not authorize a selected namespace.
+ */
 import type { AuthContextValue } from './context/AuthContext';
 import type { AuthSession } from './types';
 

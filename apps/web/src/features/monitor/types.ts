@@ -1,5 +1,6 @@
 import type { ApiError } from '@/shared/api/types';
 
+/** Browser payload; QueryForm supplies the selected namespace and policy flags. */
 export interface QueryRequest {
   prompt: string;
   namespace?: string;
@@ -19,16 +20,19 @@ export const QUERY_POLICY_LABELS: Record<QueryPolicyMode, string> = {
   private: 'Private request',
 };
 
+/** Pair the wire payload with its local presentation mode; only request is sent. */
 export interface QuerySubmission {
   policyMode: QueryPolicyMode;
   request: QueryRequest;
 }
 
+/** Submitted namespace/mode context, separate from server-returned match evidence. */
 export interface QueryEvidence {
   namespace: string;
   policyMode: QueryPolicyMode;
 }
 
+/** Decoded server evidence; nullable fields stay null and timestamps stay strings. */
 export interface QueryResponse {
   response: string;
   cache_hit: boolean;
@@ -49,6 +53,10 @@ export type QueryState =
   | { status: 'success'; data: QueryResponse }
   | { status: 'error'; error: ApiError };
 
+/**
+ * Local presentation record, with a browser timestamp. MonitorProvider bounds
+ * this in-memory list and omits private requests; it is not durable run history.
+ */
 export interface QueryTrace {
   id: string;
   prompt: string;

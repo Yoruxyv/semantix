@@ -23,6 +23,10 @@ const EVALUATION_VIEWS = [
 ] as const;
 type EvaluationView = (typeof EVALUATION_VIEWS)[number]['key'];
 
+/**
+ * Compose URL-selected panels around one controller; panel changes can unmount children.
+ * Run-keyed analysis resets local filters/details when a different result is displayed.
+ */
 export function BenchmarkDashboard(): JSX.Element {
   const controller = useBenchmark();
   const { pathname, search, hash } = useLocation();

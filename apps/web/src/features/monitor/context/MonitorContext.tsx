@@ -11,6 +11,12 @@ interface MonitorProviderProps {
   children: ReactNode;
 }
 
+/**
+ * Keep query state, latest submitted context and up to 40 newest-first traces for
+ * this workspace instance, across route navigation. Trace IDs/times are created
+ * locally; these records are not durable server history. Private queries skip
+ * trace insertion, while their current form/query/result state can still exist.
+ */
 export function MonitorProvider({
   children,
 }: Readonly<MonitorProviderProps>): JSX.Element {
@@ -18,6 +24,12 @@ export function MonitorProvider({
   const { state: queryState, submit } = useQuery();
   const [traces, setTraces] = useState<QueryTrace[]>([]);
   const [latestEvidence, setLatestEvidence] = useState<QueryEvidence | null>(null);
+  /**
+   * Stop on a handled failure/stale null result. Otherwise record submitted
+   * namespace (default when omitted)/mode, optionally add a trace, then delegate
+   * cache-state refresh without requesting preview sync. Rejections propagate;
+   * a failed refresh does not roll back already queued evidence/trace updates.
+   */
   const submitPrompt = useCallback(
     async (submission: QuerySubmission): Promise<void> => {
       const result = await submit(submission.request);
@@ -53,6 +65,7 @@ export function MonitorProvider({
     [refreshCacheState, submit],
   );
 
+  /** Clear only trace history; retain latest evidence and current query state. */
   const clearTraces = useCallback((): void => {
     setTraces([]);
   }, []);

@@ -41,6 +41,12 @@ const RUN_RETENTION_STATES: readonly EvaluationRunRetentionState[] = [
 const isOutcome = createEnumGuard(OUTCOMES);
 const isRunRetentionState = createEnumGuard(RUN_RETENTION_STATES);
 
+/**
+ * "correct" means expected/actual hit agreement, not answer quality. Evaluation
+ * evidence requires provider_called to be the inverse of actual_cache_hit, with
+ * matched prompt/key only on hits. Similarity alone does not establish a hit;
+ * positive sequence/repetition fields do not establish a complete ordered grid.
+ */
 function queryResult(value: unknown): BenchmarkQueryResult {
   if (!isRecord(value)) {
     throw new Error('Invalid benchmark query result');
@@ -102,6 +108,7 @@ function queryResult(value: unknown): BenchmarkQueryResult {
   return value as unknown as BenchmarkQueryResult;
 }
 
+/** Retention attempt state is separate from execution success and future availability. */
 function runRetention(value: unknown): EvaluationRunRetentionStatus {
   if (!isRecord(value) || !isRunRetentionState(value.state)) {
     throw new Error('Invalid evaluation run retention status');
@@ -110,6 +117,13 @@ function runRetention(value: unknown): EvaluationRunRetentionStatus {
   return value as unknown as EvaluationRunRetentionStatus;
 }
 
+/**
+ * Reconcile query count (cases times repetitions), observed classifications and
+ * provider-call totals. Require ordered threshold rows with exactly one measured
+ * row at the run threshold, each row's classification total, and reproducibility
+ * agreement with dataset identity, options and the exact threshold sequence.
+ * Reconstruct the top level; nested records can retain unchecked extra fields.
+ */
 export function decodeBenchmarkRun(value: unknown): BenchmarkRunResponse {
   if (
     !isRecord(value) ||
