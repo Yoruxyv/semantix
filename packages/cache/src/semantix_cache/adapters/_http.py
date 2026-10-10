@@ -50,6 +50,12 @@ def configured_text(value: str) -> str:
 
 
 def provider_url(value: str, *, local: bool) -> str:
+    """Validate syntax for a hosted HTTPS root or an Ollama HTTP/HTTPS origin.
+
+    Reject userinfo, queries, fragments, whitespace, backslashes and invalid
+    ports; local origins also reject paths. Return the root without trailing
+    slashes. This validates syntax, not destination trust or network locality.
+    """
     configured_text(value)
     valid = False
     try:
@@ -77,7 +83,13 @@ def provider_url(value: str, *, local: bool) -> str:
 
 
 class HTTPAdapter:
-    """Private base; closing seals the adapter and never closes its borrowed client."""
+    """Private base; closing seals the adapter and never closes its borrowed client.
+
+    Concrete integrations inherit operation admission, finite request deadlines,
+    bounded JSON transport and async context management. This is implementation
+    support, not a public custom-provider extension API or the server transport.
+    There is no automatic retry, fallback or redirect following here.
+    """
 
     def __init__(
         self,
@@ -91,6 +103,25 @@ class HTTPAdapter:
         error: type[EmbeddingError] | type[GenerationError],
         local: bool = False,
     ) -> None:
+        """Validate transport configuration without opening a connection.
+
+        Args:
+            client: Existing HTTPX AsyncClient borrowed for the adapter's lifetime.
+            model: Explicit nonblank model identifier without edge whitespace
+                or control characters.
+            base_url: Hosted HTTPS root, or HTTP/HTTPS origin when ``local=True``;
+                no embedded credentials, query or fragment.
+            headers: Provider-specific headers stored for requests.
+            timeout_seconds: Finite positive total operation deadline and explicit
+                per-request HTTPX timeout, overriding client timeout defaults.
+            max_response_bytes: Positive integer limit on buffered body bytes.
+            error: EmbeddingError or GenerationError used for expected failures.
+            local: Permit an HTTP origin, without enforcing loopback/private routing.
+
+        Raises:
+            CacheConfigurationError: Client, model, URL, timeout or byte limit
+                fails the corresponding validation.
+        """
         if not isinstance(cast(object, client), httpx.AsyncClient):
             raise CacheConfigurationError("Expected a borrowed httpx.AsyncClient")
         try:
@@ -113,6 +144,39 @@ class HTTPAdapter:
     async def _post(
         self, path: str, body: dict[str, object], parse: Callable[[object], Parsed]
     ) -> Parsed:
+        """Admit one operation, POST bounded JSON and run a provider parsing callback.
+
+        Send Accept-Encoding identity and explicitly disable redirects. Reject all
+        non-2xx statuses, encoded bodies and oversized declared/received lengths.
+        Check chunks before growing the body buffer. The finite adapter deadline
+        includes reading, JSON decoding and ``parse``; synchronous work cannot be
+        interrupted, so a final clock check rejects a late successful result.
+
+        Expected HTTPX, timeout and JSON failures become the configured integration
+        error with payload-free messages and a newly constructed RuntimeError cause.
+        Parser errors and unrelated programming exceptions propagate unchanged;
+        this is not blanket exception sanitization. Client hooks/logging remain
+        caller-owned. A parsed ``None`` is still a successful result.
+
+        Response contexts and operation admission unwind on failure/cancellation.
+        External cancellation propagates, including when a transport swallowed it.
+        No retry, remote cancellation or request rollback is promised.
+
+        Args:
+            path: Integration-owned endpoint suffix appended to the validated root.
+            body: Provider-owned JSON request payload.
+            parse: Synchronous decoder/validator run on the JSON value within the
+                operation. Its result is returned without further interpretation.
+
+        Returns:
+            The provider parsing callback's result.
+
+        Raises:
+            CacheClosedError: The adapter has been sealed.
+            EmbeddingError: Expected integration failure for an embedding adapter.
+            GenerationError: Expected integration failure for a generation adapter.
+            asyncio.CancelledError: External cancellation, without closing the client.
+        """
         failure = ""
         # A parsed None is still a successful result.
         result: tuple[Parsed] | None = None
@@ -179,9 +243,19 @@ class HTTPAdapter:
         return result[0]
 
     async def aclose(self) -> None:
+        """Seal the adapter without waiting for operations or closing its HTTP client.
+
+        Repeated closure is harmless. Busy closure leaves the adapter open; drain
+        or cancel active tasks before retrying. Subsequent embedding/generation
+        requests and context entry raise CacheClosedError after successful closure.
+
+        Raises:
+            CacheBusyError: An admitted operation is still active.
+        """
         self._lifecycle.close()
 
     async def __aenter__(self) -> Self:
+        """Return this open adapter without opening or acquiring its HTTP client."""
         self._lifecycle.check_open()
         return self
 
@@ -191,10 +265,12 @@ class HTTPAdapter:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
+        """Seal this adapter through aclose, including its busy-operation check."""
         await self.aclose()
 
 
 def checked_space(value: object) -> EmbeddingSpace:
+    """Revalidate and copy even manually constructed EmbeddingSpace metadata."""
     if not isinstance(value, EmbeddingSpace):
         raise CacheConfigurationError("Expected explicit EmbeddingSpace metadata")
     try:
@@ -204,6 +280,7 @@ def checked_space(value: object) -> EmbeddingSpace:
 
 
 def request_text(value: str) -> None:
+    """Validate nonblank text of 1-2000 characters without rewriting its content."""
     if not isinstance(value, str) or not value.strip() or not 1 <= len(value) <= 2000:
         raise CacheValidationError(
             "Provider input must be non-empty text within 2000 characters"
@@ -220,6 +297,12 @@ def configured_key(value: str) -> str:
 
 
 def response_too_large(declared_length: str, maximum: int) -> bool:
+    """Check an ASCII decimal Content-Length, rejecting oversized integer text.
+
+    Missing/malformed lengths do not establish a bound; streaming checks still
+    enforce the limit. Digit strings beyond Python's conversion bound are
+    conservatively treated as too large rather than exposing raw parse errors.
+    """
     if not declared_length.isascii() or not declared_length.isdecimal():
         return False
     try:

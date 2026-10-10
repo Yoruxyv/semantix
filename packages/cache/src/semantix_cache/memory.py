@@ -105,7 +105,19 @@ def _nearest(
 
 
 class MemoryStore:
-    """Bounded process memory, exact cosine matching and cross-namespace LRU."""
+    """Bounded process-local storage with exact float64 cosine search.
+
+    One instance holds one embedding space; capacity and confirmed-hit LRU span
+    all its namespaces. Entries and inspection counters are non-durable. The
+    caller authorizes namespaces and supplies vectors from the declared space.
+    Search returns detached candidates; record_hit confirms a current revision.
+    Monotonic time controls expiry, while UTC expires_at is display metadata.
+
+    Reuse the store across requests. It owns its state and numerical workers;
+    async context exit calls aclose and requires idle operations and workers.
+    Direct store calls have no internal operation deadline; the facade or caller
+    supplies one. Cancellation cannot stop an admitted numerical thread.
+    """
 
     def __init__(
         self,
@@ -114,6 +126,19 @@ class MemoryStore:
         max_size: int = 500,
         default_ttl_seconds: float | None = 3600.0,
     ) -> None:
+        """Create an empty store bound to a validated embedding space.
+
+        Args:
+            embedding_space: Stable identity and dimensions for all stored vectors.
+            max_size: Entry capacity across namespaces, from 1 through 5,000.
+                Defaults to 500; this is an entry count, not a byte budget.
+            default_ttl_seconds: Positive finite retention up to 31,536,000 seconds,
+                defaulting to 3,600. None permits writes without expiry.
+
+        Raises:
+            CacheConfigurationError: If the space, capacity or default TTL is invalid.
+        """
+
         try:
             if not isinstance(cast(object, embedding_space), EmbeddingSpace):
                 raise CacheConfigurationError("Invalid memory store configuration")
@@ -182,6 +207,27 @@ class MemoryStore:
         *,
         namespace: str,
     ) -> CacheMatch | None:
+        """Search one namespace using a detached float64 numerical snapshot.
+
+        Search neither applies a threshold nor records a hit or promotes LRU.
+        Only one numerical worker is admitted at a time. Caller cancellation
+        propagates, but a started thread retains the slot until it finishes; close
+        remains busy meanwhile. Scoped mutations invalidate reusable snapshots.
+
+        Args:
+            embedding: Finite, nonzero vector with the bound space's dimensions.
+            namespace: Exact namespace to search; authorization is caller-owned.
+
+        Returns:
+            Nearest live candidate with score in [-1, 1], or None for an empty
+            scope or a winner expired/replaced/deleted before the final recheck.
+            Ties use ascending created_at, then key. A result can become stale
+            afterward and must still pass record_hit before reuse as a hit.
+
+        Raises:
+            CacheValidationError: If the vector or namespace is invalid.
+        """
+
         with self._state.operation():
             try:
                 namespace = namespace_value(namespace)
@@ -233,6 +279,22 @@ class MemoryStore:
         namespace: str,
         expected_created_at: datetime,
     ) -> bool:
+        """Confirm the expected live revision and update hit metadata under the lock.
+
+        Args:
+            cache_key: Candidate key within this store.
+            namespace: Exact candidate namespace.
+            expected_created_at: Timezone-aware revision from the candidate entry.
+
+        Returns:
+            True after incrementing process-local hit_count, setting last access
+            and promoting LRU. Revision and expiry stay unchanged. False for an
+            absent, expired, foreign or replaced candidate, without hit effects.
+
+        Raises:
+            CacheValidationError: If key, namespace or revision is invalid.
+        """
+
         with self._state.operation():
             key, namespace = self._scope(cache_key, namespace)
             if (
@@ -258,6 +320,24 @@ class MemoryStore:
                 return True
 
     async def put(self, entry: CacheEntry, *, ttl_seconds: float | None = None) -> None:
+        """Store a detached normalized entry and enforce cross-namespace capacity.
+
+        Replacement resets hit metadata and TTL, promotes LRU and advances the
+        created_at revision when needed. Revision history survives delete/clear.
+        Expired entries are purged before the least recently used entries are
+        evicted to enforce capacity. Hits never renew retention.
+
+        Args:
+            entry: Valid CacheEntry from this embedding space. Dimensions are
+                checked, but entries have no identity tag to verify provenance.
+            ttl_seconds: None inherits the default; a positive finite value up to
+                31,536,000 seconds is capped by a finite default. Both values None
+                mean no expiry. TTL starts at this write's monotonic time.
+
+        Raises:
+            CacheStoreError: If the entry, vector dimensions or TTL is invalid.
+        """
+
         with self._state.operation():
             try:
                 if not isinstance(cast(object, entry), CacheEntry):
@@ -299,6 +379,16 @@ class MemoryStore:
                     self._evictions += 1
 
     async def delete_entry(self, cache_key: str, *, namespace: str) -> bool:
+        """Remove a live key only if its namespace matches.
+
+        Returns:
+            True if removed; False if absent, expired or outside the namespace.
+            Expired entries are purged first; revision history is retained.
+
+        Raises:
+            CacheValidationError: If the key or namespace is invalid.
+        """
+
         with self._state.operation():
             key, namespace = self._scope(cache_key, namespace)
             async with self._lock:
@@ -310,6 +400,16 @@ class MemoryStore:
                 return True
 
     async def clear(self, *, namespace: str) -> int:
+        """Remove this namespace's live entries without resetting revision history.
+
+        Returns:
+            Number removed from the namespace after expired entries are purged.
+            Other namespaces' live entries are preserved.
+
+        Raises:
+            CacheValidationError: If the namespace is invalid.
+        """
+
         with self._state.operation():
             try:
                 namespace = namespace_value(namespace)
@@ -355,6 +455,27 @@ class MemoryStore:
         search: str | None = None,
         sort: InspectionSort = "newest",
     ) -> InspectionPage:
+        """Observe live metadata without purging entries or changing hits/LRU.
+
+        This optional API scans bounded memory. Prompts and 240-character response
+        previews remain sensitive; the caller authorizes the requested scope.
+
+        Args:
+            namespace: Exact namespace, or None for all namespaces in this store.
+            offset: Nonnegative live offset; concurrent changes can shift pages.
+            limit: Page size from 1 through 100.
+            search: Optional prompt substring, trimmed and casefolded, at most
+                2,000 characters. Blank text leaves results unfiltered.
+            sort: newest, oldest, most_hit or nearest_expiry.
+
+        Returns:
+            Detached page without vectors and with response=None. Counts, remaining
+            TTL and process-local hit/access metadata describe this observation.
+
+        Raises:
+            CacheValidationError: If pagination, scope, search or sort is invalid.
+        """
+
         with self._state.operation():
             inspection_arguments(namespace, offset, limit, search, sort)
             async with self._lock:
@@ -378,6 +499,22 @@ class MemoryStore:
     async def inspect_entry(
         self, cache_key: str, *, namespaces: tuple[str, ...] | None
     ) -> InspectionEntry | None:
+        """Observe one live entry, including its sensitive full response.
+
+        Args:
+            cache_key: Canonical key to inspect.
+            namespaces: Caller-authorized namespace tuple; () allows none and
+                None allows every namespace in this store. This is a filter,
+                not authentication.
+
+        Returns:
+            Detached detail or None if absent, expired or outside the scope.
+            This neither purges entries nor confirms a hit or changes LRU.
+
+        Raises:
+            CacheValidationError: If the key or namespace scope is invalid.
+        """
+
         with self._state.operation():
             try:
                 key = cache_key_value(cache_key)
@@ -400,7 +537,13 @@ class MemoryStore:
                 return None
 
     async def clear_all(self) -> int:
-        """Administrative mutation across namespaces in this store."""
+        """Administratively remove live entries across this store's namespaces.
+
+        Returns:
+            Number removed after expiry cleanup. Revision history and lifetime
+            removal counters remain. Authorization belongs to the caller; this
+            optional mutation is outside the mandatory CacheStore protocol.
+        """
         with self._state.operation():
             async with self._lock:
                 self._purge()
@@ -415,6 +558,17 @@ class MemoryStore:
         return self._evictions, self._expirations
 
     async def aclose(self) -> None:
+        """Close an idle store and discard its entries and retained snapshots.
+
+        Repeated close is harmless; later operations raise CacheClosedError.
+        This does not wait for or cancel work. Async context exit uses this same
+        close path and propagates body exceptions when close succeeds.
+
+        Raises:
+            CacheBusyError: If admitted operations or numerical workers remain;
+                the store stays open so the caller can drain work and retry.
+        """
+
         self._state.close(workers=bool(self._workers))
         self._items.clear()
         self._snapshots.clear()

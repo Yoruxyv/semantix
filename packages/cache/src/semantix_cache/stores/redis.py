@@ -305,6 +305,24 @@ class RedisStore:
     """A CacheStore binding to three owned keys on a Redis primary.
 
     Construction borrows the client and does not initialize or adopt keys.
+    The supported deployment is a direct writable standalone Redis Open Source
+    primary >=8.10.2,<8.11 using noeviction; Cluster, Sentinel, replica reads
+    and automatic failover are outside this boundary. Operators own persistence,
+    backups and stable server time; Redis storage alone is no durability promise.
+
+    Prefix, endpoint/database and exact space identity/dimensions select the
+    binding's meta hash, entries hash and LRU sorted set. Its marked descriptor
+    also checks script checksum, capacity and default TTL. Capacity spans all
+    namespaces; namespace authorization belongs to the caller. Lua mutations
+    atomically manage revisions, server-clock TTL and LRU. A dirty mutation
+    marker fails closed and needs operator recovery, never automatic adoption.
+
+    Operations include worker admission, I/O, scoring/decoding and acknowledgement
+    within one deadline. Expected transport/response failures use safe typed
+    errors without raw credentials or private payloads; programming errors and
+    cancellation propagate. After dispatch, an unacknowledged mutation may have
+    completed. There is no automatic replay, repair or fallback; inspect state
+    before deciding whether a new write or hit is appropriate.
     """
 
     def __init__(
@@ -318,6 +336,32 @@ class RedisStore:
         operation_timeout_seconds: float = 30.0,
         close_timeout_seconds: float = 30.0,
     ) -> None:
+        """Bind a borrowed binary RESP2 client without network setup or key creation.
+
+        The client/pool must keep its validated policy stable and remain
+        caller-owned after store close or async context exit.
+
+        Args:
+            client: Standard redis.asyncio.Redis and ConnectionPool from redis-py
+                8.1.x, with positive finite socket deadlines, binary responses
+                and async Retry(NoBackoff(), 0). Custom pools/parsers are unsupported.
+            embedding_space: Stable identity (at most 1,024 characters, no NUL)
+                and 1-16,000 dimensions for every entry in this binding.
+            key_prefix: Application-owned prefix; default semantix_cache. Matches
+                [A-Za-z0-9][A-Za-z0-9._:-]{0,127}; unrelated keys are never adopted.
+            max_size: Binding-wide capacity, 1-5,000, default 500. The projection
+                max_size * dimensions * 8 must fit 64 MiB; this is not an RSS limit.
+            default_ttl_seconds: Positive finite retention up to 31,536,000 seconds,
+                defaulting to 3,600. None permits writes without expiry.
+            operation_timeout_seconds: Positive finite total deadline, at most
+                86,400 seconds; defaults to 30.
+            close_timeout_seconds: Owned cleanup deadline with the same bounds and
+                default. Borrowed resources are never closed here.
+
+        Raises:
+            CacheConfigurationError: If the client policy or binding settings are invalid.
+        """
+
         if not isinstance(cast(object, embedding_space), EmbeddingSpace):
             raise CacheConfigurationError("Invalid Redis embedding space")
         self._config = _Configuration(
@@ -366,6 +410,25 @@ class RedisStore:
                 _raise_safe(failure)
 
     async def initialize_schema(self, *, initialization_client: Redis) -> None:
+        """Explicitly create a fresh descriptor or validate the identical ready layout.
+
+        Check supported server version/mode/primary role, noeviction and required
+        commands before the atomic initialization script. Repeated/concurrent
+        identical setup is safe. Partial, unmarked, mismatched or dirty bindings
+        are rejected; this never changes Redis configuration or repairs data.
+
+        Args:
+            initialization_client: Borrowed client with separately authorized setup
+                permissions, including INFO, CONFIG GET and COMMAND INFO. It must
+                target the runtime binding's endpoint/database and obey the same
+                client policy. The caller supplies and closes it.
+
+        Raises:
+            CacheConfigurationError: If the supplied client policy is unsupported.
+            CacheStoreError: If deployment/layout checks or expected Redis calls fail.
+            CacheTimeoutError: If the operation deadline expires.
+        """
+
         self._state.check_open()
         _client(initialization_client)
         async with self._operation():
@@ -409,6 +472,18 @@ class RedisStore:
             )
 
     async def validate_schema(self) -> None:
+        """Validate the existing marked binding using a read-only Lua call.
+
+        Check descriptor/checksum, ready status, counters and entry metadata;
+        this does not fully decode every payload/vector or repeat setup's server
+        configuration probes. Ordinary use never initializes an absent binding.
+
+        Raises:
+            CacheStoreError: For absent, mismatched, corrupt or dirty binding state,
+                or expected Redis failures.
+            CacheTimeoutError: If the operation deadline expires.
+        """
+
         async with self._operation():
             await self._client.eval_ro(
                 _READ, 3, *self._config.keys, *self._config.descriptor, "validate"
@@ -508,6 +583,30 @@ class RedisStore:
         search: str | None = None,
         sort: InspectionSort = "newest",
     ) -> InspectionPage:
+        """Observe live metadata without hit/LRU mutations or explicit expiry cleanup.
+
+        Read-only Lua scans scalar metadata and decodes only the selected page.
+        Prompt search scans payloads in batches of 100 up to binding capacity,
+        under one operation deadline; concurrent changes can shift offsets/totals
+        even within a searched page. Sensitive previews require authorization.
+
+        Args:
+            namespace: Exact namespace, or None for all in this binding.
+            offset: Nonnegative live offset, not a stable continuation token.
+            limit: Page size from 1 through 100.
+            search: Optional trimmed, casefolded prompt substring, at most 2,000
+                characters. Blank text does not trigger a payload search.
+            sort: newest, oldest, most_hit or nearest_expiry.
+
+        Returns:
+            Detached page with prompts and at most 240 response-preview characters,
+            no vectors and response=None. TTL/counters are observations, not leases
+            or durability promises; Redis native expiry may proceed independently.
+
+        Raises:
+            CacheValidationError: If inspection arguments are invalid.
+        """
+
         async with self._operation():
             inspection_arguments(namespace, offset, limit, search, sort)
             needle = "" if search is None else search.strip().casefold()
@@ -553,6 +652,21 @@ class RedisStore:
     async def inspect_entry(
         self, cache_key: str, *, namespaces: tuple[str, ...] | None
     ) -> InspectionEntry | None:
+        """Observe a live entry and its sensitive full response using read-only Lua.
+
+        Args:
+            cache_key: Canonical key within this binding.
+            namespaces: Caller-authorized tuple; () allows none, None allows all
+                namespaces. This filter does not authenticate the caller.
+
+        Returns:
+            Detached detail or None if absent, expired or outside the scope.
+            Observation neither confirms a hit nor extends TTL/promotes LRU.
+
+        Raises:
+            CacheValidationError: If the key or namespace scope is invalid.
+        """
+
         async with self._operation():
             inspection_namespaces(namespaces)
             try:
@@ -570,7 +684,13 @@ class RedisStore:
             return page.items[0] if page.items else None
 
     async def clear_all(self) -> int:
-        """Administrative mutation across namespaces in this Redis binding."""
+        """Administratively clear members across this Redis binding's namespaces.
+
+        Returns:
+            Live removal count; expired members may also be cleaned. The descriptor
+            and revision history remain. Caller authorization is required; this
+            optional mutation does not flush the database or remove unrelated keys.
+        """
         async with self._operation():
             result = await self._client.eval(
                 _CLEAR_ALL, 3, *self._config.keys, *self._config.descriptor, "clear", ""
@@ -580,12 +700,49 @@ class RedisStore:
             return result
 
     async def aclose(self) -> None:
+        """Seal an idle store and release only resources created by connect.
+
+        Owned close shares one bounded, shielded cleanup task across concurrent
+        and repeated calls. Caller cancellation propagates while cleanup continues;
+        a later close observes that same result, including failure, without retry.
+        Borrowed close only seals the wrapper. Persisted keys remain. Async context
+        exit uses this path and propagates body exceptions when close succeeds.
+
+        Raises:
+            CacheBusyError: If admitted operations or retained numerical workers
+                remain; admission stays open for draining and a later close.
+            CacheTimeoutError: If owned cleanup exceeds the close deadline.
+            CacheStoreError: For expected owned-client/pool cleanup failures.
+        """
+
         if self._owned:
             await asyncio.shield(self._start_close())
         else:
             self._state.close(workers=bool(self._workers))
 
     async def put(self, entry: CacheEntry, *, ttl_seconds: float | None = None) -> None:
+        """Write a normalized entry and enforce binding-wide LRU capacity with Lua.
+
+        Allocate an increasing revision, reset hit metadata/expiry, remove expired
+        members and evict least-recently-used overflow atomically. Deletion/clear
+        retain revision history. A script failure after business writes can leave
+        the binding dirty; later operations fail closed rather than repairing it.
+
+        Args:
+            entry: Valid CacheEntry from this space. Dimensions are checked;
+                identity provenance remains the caller's responsibility.
+            ttl_seconds: None inherits the default; a positive finite value up to
+                31,536,000 seconds is capped by a finite default. Both values None
+                mean no expiry. TTL starts at Redis TIME, is floored to whole
+                microseconds (submicrosecond TTL expires immediately), and never
+                slides on hits. Native field cleanup can lag logical expiry.
+
+        Raises:
+            CacheStoreError: If entry/TTL is invalid or expected Redis calls fail.
+            CacheTimeoutError: If the operation deadline expires; a dispatched
+                mutation may already have completed and is never replayed here.
+        """
+
         async with self._operation():
             try:
                 if not isinstance(cast(object, entry), CacheEntry):
@@ -629,6 +786,31 @@ class RedisStore:
     async def find_nearest(
         self, embedding: Sequence[float], *, namespace: str
     ) -> CacheMatch | None:
+        """Score a bounded vector snapshot with exact client-side float64 cosine.
+
+        A read-only script transfers all live vectors in the namespace without
+        other prompts/responses. One admitted numerical worker scores them; only
+        the winner payload is fetched under the expected revision. Search applies
+        no threshold and changes neither hit metadata nor LRU. Cancellation or
+        timeout leaves a started thread holding its slot until completion; close
+        can remain busy after the caller has exited.
+
+        Args:
+            embedding: Finite, nonzero vector with the bound space's dimensions.
+            namespace: Exact namespace to search; authorize it before calling.
+
+        Returns:
+            Detached validated candidate with score in [-1, 1], or None if empty
+            or the winner expired/replaced/deleted before retrieval, without a
+            rescan. Ties use ascending revision, then key. record_hit must still
+            confirm the candidate; retrieval is not a lease.
+
+        Raises:
+            CacheValidationError: If vector or namespace is invalid.
+            CacheStoreError: For corrupt eligible vectors/winner or expected Redis failures.
+            CacheTimeoutError: If admission, I/O, scoring or decoding exceeds the deadline.
+        """
+
         async with self._operation():
             try:
                 namespace = namespace_value(namespace)
@@ -696,6 +878,23 @@ class RedisStore:
     async def record_hit(
         self, cache_key: str, *, namespace: str, expected_created_at: datetime
     ) -> bool:
+        """Atomically confirm a live revision and apply hit effects with Lua.
+
+        Args:
+            cache_key: Candidate key within the bound space.
+            namespace: Exact candidate namespace.
+            expected_created_at: Timezone-aware revision from the candidate entry.
+
+        Returns:
+            True after incrementing hit count, recording Redis server last access
+            and promoting LRU. Revision/TTL stay unchanged. False rejects an absent,
+            expired, foreign or replaced candidate without hit effects. A lost
+            acknowledgement can follow a completed increment; no replay occurs.
+
+        Raises:
+            CacheValidationError: If key, namespace or revision is invalid.
+        """
+
         async with self._operation():
             member = self._member(cache_key, namespace)
             try:
@@ -716,6 +915,16 @@ class RedisStore:
             return bool(result)
 
     async def delete_entry(self, cache_key: str, *, namespace: str) -> bool:
+        """Remove only the given namespace/key member with an atomic Lua mutation.
+
+        Returns:
+            Whether it was live when removed. An expired member/tombstone can be
+            cleaned while returning False. Binding revision history is retained.
+
+        Raises:
+            CacheValidationError: If the key or namespace is invalid.
+        """
+
         async with self._operation():
             member = self._member(cache_key, namespace)
             return bool(
@@ -730,6 +939,16 @@ class RedisStore:
             )
 
     async def clear(self, *, namespace: str) -> int:
+        """Remove one namespace's members, retaining binding revision history.
+
+        Returns:
+            Number of live entries removed by Lua; expired members can also be
+            cleaned without being counted. Other namespaces remain intact.
+
+        Raises:
+            CacheValidationError: If the namespace is invalid.
+        """
+
         async with self._operation():
             try:
                 namespace = namespace_value(namespace)
@@ -759,6 +978,30 @@ class RedisStore:
         operation_timeout_seconds: float = 30.0,
         close_timeout_seconds: float = 30.0,
     ) -> RedisStore:
+        """Create an owned zero-retry client/pool and PING within a startup deadline.
+
+        Binding/deadline arguments otherwise follow the constructor. This performs
+        no initialization or schema validation; validate_schema checks an existing
+        binding. Failed/cancelled PING starts bounded shielded cleanup before
+        propagating the startup outcome; repeated cancellation can leave that
+        cleanup finishing independently.
+
+        Args:
+            url: Private redis:// or rediss:// URL with endpoint and database path.
+                Query parameters/fragments are rejected to prevent policy overrides.
+            max_connections: Standard pool ceiling from 1 through 100, default 5.
+            connect_timeout_seconds: Positive finite startup deadline, at most
+                86,400 seconds, default 10; also sets socket-connect timeout.
+
+        Returns:
+            Store owning its client and pool; close with aclose or async context exit.
+
+        Raises:
+            CacheConfigurationError: If connection/binding settings are invalid.
+            CacheTimeoutError: If startup or socket deadlines expire.
+            CacheStoreError: For expected Redis connection failures.
+        """
+
         failure: SemantixCacheError | None = None
         try:
             timeout = _timeout(connect_timeout_seconds)

@@ -163,6 +163,37 @@ class PgVectorStore:
         operation_timeout_seconds: float = 30.0,
         close_timeout_seconds: float = 30.0,
     ) -> None:
+        """Bind a borrowed asyncpg pool without connecting or initializing tables.
+
+        The pool stays caller-owned, including after context exit or aclose.
+        Storage operations validate markers and migration version/checksum before
+        using the selected tables. They have one deadline covering acquisition,
+        I/O, transaction completion and release. Cancellation propagates; expected
+        driver failures become safe CacheStoreError/CacheTimeoutError without raw
+        DSNs or server payloads. No automatic replay is provided; a lost commit
+        acknowledgement can leave a mutation's outcome uncertain.
+
+        Args:
+            pool: Existing asyncpg Pool, not an individual connection.
+            embedding_space: Identity (at most 1,024 characters, no NUL) and
+                dimensions (1-16,000) that scope entries in the shared tables.
+            schema: Cache schema; defaults to semantix_cache. Use a non-reserved
+                lowercase ASCII SQL identifier of at most 63 characters.
+            table_prefix: Optional prefix for owned entries, binding state,
+                migration ledger and index. Complete names must fit 63 characters.
+            max_size: Capacity across this space's namespaces, 1-100,000;
+                defaults to 500.
+            default_ttl_seconds: Positive finite retention up to 31,536,000 seconds,
+                defaulting to 3,600. None permits writes without expiry.
+            operation_timeout_seconds: Positive finite operation deadline, at most
+                86,400 seconds; defaults to 30.
+            close_timeout_seconds: Positive finite owned-pool close deadline with
+                the same bounds/default. Borrowed pools are never closed here.
+
+        Raises:
+            CacheConfigurationError: If the pool or binding configuration is invalid.
+        """
+
         self._config = _Configuration(
             embedding_space,
             schema,
@@ -194,6 +225,29 @@ class PgVectorStore:
         operation_timeout_seconds: float = 30.0,
         close_timeout_seconds: float = 30.0,
     ) -> PgVectorStore:
+        """Create and prewarm an owned pool without initializing or validating schema.
+
+        Other binding/deadline arguments follow the constructor. Failed or
+        cancelled startup terminates the partially opened pool; cancellation and
+        unexpected programming errors propagate. Call validate_schema before use.
+
+        Args:
+            dsn: Private postgres:// or postgresql:// connection URL. Keep it out
+                of logs and source control.
+            pool_min_size: Initial connection count, default 1.
+            pool_max_size: Pool ceiling, default 5; 1 <= min <= max <= 100.
+            connect_timeout_seconds: Positive finite total startup deadline, at
+                most 86,400 seconds; defaults to 10.
+
+        Returns:
+            Store owning its pool; close it with aclose or async context exit.
+
+        Raises:
+            CacheConfigurationError: If connection or binding settings are invalid.
+            CacheTimeoutError: If the startup deadline expires.
+            CacheStoreError: For expected connection/driver failures.
+        """
+
         config = _Configuration(
             embedding_space,
             schema,
@@ -355,6 +409,25 @@ class PgVectorStore:
         return layout
 
     async def initialize_schema(self, *, migration_pool: Pool) -> None:
+        """Explicitly initialize marked tables using separate migration authority.
+
+        Operators must install the vector extension first. In one transaction,
+        lock schema creation before the configured prefix, reject foreign/partial
+        layouts and apply the packaged migration with its checksum ledger. An
+        already valid layout is left intact; this does not convert legacy tables
+        or automatically migrate unknown versions.
+
+        Args:
+            migration_pool: Separately supplied, authorized asyncpg pool for DDL.
+                It is borrowed and never closed; runtime credentials need no DDL.
+
+        Raises:
+            CacheConfigurationError: If migration_pool is not an asyncpg Pool.
+            CacheStoreError: For absent extension, ownership/checksum mismatch or
+                expected database failures. Failed transactions roll back.
+            CacheTimeoutError: If the operation deadline expires.
+        """
+
         self._state.check_open()
         if not isinstance(cast(object, migration_pool), Pool):
             raise CacheConfigurationError(
@@ -391,6 +464,17 @@ class PgVectorStore:
             )
 
     async def validate_schema(self) -> None:
+        """Check the extension, three table markers and known ledger version/checksum.
+
+        This performs no DDL or adoption and is not a complete schema-tampering
+        audit. Administrators must prevent out-of-band changes.
+
+        Raises:
+            CacheStoreError: If required objects are absent, unowned, incompatible
+                or inaccessible, or an expected driver failure occurs.
+            CacheTimeoutError: If acquisition or validation exceeds the deadline.
+        """
+
         async with self._connection() as connection:
             await self._layout(connection, require_schema=True)
 
@@ -426,6 +510,28 @@ class PgVectorStore:
     async def find_nearest(
         self, embedding: Sequence[float], *, namespace: str
     ) -> CacheMatch | None:
+        """Select the exact cosine winner in SQL without confirming a hit.
+
+        Eligibility filters space identity, dimensions, namespace and PostgreSQL
+        clock expiry before comparison. Stored pgvector components are float32;
+        near-threshold scores can differ from MemoryStore's float64 results.
+        Search does not change hit metadata or LRU and applies no facade threshold.
+
+        Args:
+            embedding: Finite, nonzero vector with the bound dimensions.
+            namespace: Exact namespace; authorization belongs to the caller.
+
+        Returns:
+            Detached validated candidate with a score clamped to [-1, 1], or None
+            if no eligible row exists. Ties use ascending created_at, then key.
+            Expiry/replacement can intervene afterward; record_hit must confirm it.
+
+        Raises:
+            CacheValidationError: If the vector or namespace is invalid.
+            CacheStoreError: For invalid persisted evidence, layout or driver failures.
+            CacheTimeoutError: If the database operation deadline expires.
+        """
+
         scope = self._scope(namespace)
         try:
             vector = normalized_vector(
@@ -491,6 +597,22 @@ class PgVectorStore:
     async def record_hit(
         self, cache_key: str, *, namespace: str, expected_created_at: datetime
     ) -> bool:
+        """Confirm a live revision atomically under the binding advisory lock.
+
+        Args:
+            cache_key: Candidate key in the bound space.
+            namespace: Exact candidate namespace.
+            expected_created_at: Timezone-aware revision from the candidate entry.
+
+        Returns:
+            True after committing a hit increment, server last-access timestamp
+            and LRU promotion. Revision/expiry do not change. False for an absent,
+            expired, foreign or replaced candidate, without successful-hit effects.
+
+        Raises:
+            CacheValidationError: If the key, namespace or revision is invalid.
+        """
+
         scope = self._key(cache_key, namespace)
         if (
             not isinstance(expected_created_at, datetime)
@@ -523,6 +645,27 @@ class PgVectorStore:
         return result is True
 
     async def put(self, entry: CacheEntry, *, ttl_seconds: float | None = None) -> None:
+        """Upsert and enforce binding-wide capacity in one locked SQL transaction.
+
+        Allocate an increasing revision, reset hit metadata and TTL, promote LRU,
+        clean at most 500 expired rows explicitly and remove capacity overflow
+        before commit. Revision history survives delete/clear. Expected failures
+        roll back the transaction; a lost commit acknowledgement is not replayed.
+
+        Args:
+            entry: Valid CacheEntry from this space, with matching dimensions.
+                Identity provenance is caller-owned; PostgreSQL rejects response NUL.
+            ttl_seconds: None inherits the default. A positive finite TTL up to
+                31,536,000 seconds is capped by a finite default; both values None
+                mean no expiry. Retention starts at the database write clock,
+                resets on replacement and never slides on hits.
+
+        Raises:
+            CacheStoreError: If entry/TTL validation fails, or for expected layout
+                or database failures.
+            CacheTimeoutError: If the operation deadline expires.
+        """
+
         self._state.check_open()
         try:
             if not isinstance(cast(object, entry), CacheEntry):
@@ -604,6 +747,16 @@ class PgVectorStore:
             )
 
     async def delete_entry(self, cache_key: str, *, namespace: str) -> bool:
+        """Delete a live key in the exact space/namespace under the binding lock.
+
+        Returns:
+            True if a live row was removed, otherwise False. Revision history
+            and other namespaces/spaces are preserved.
+
+        Raises:
+            CacheValidationError: If the key or namespace is invalid.
+        """
+
         scope = self._key(cache_key, namespace)
         async with self._connection() as connection, connection.transaction():
             layout = await self._layout(connection, require_schema=True)
@@ -618,6 +771,16 @@ class PgVectorStore:
         return result is True
 
     async def clear(self, *, namespace: str) -> int:
+        """Delete namespace rows transactionally, retaining binding revision history.
+
+        Returns:
+            Number of live rows removed; expired rows are also deleted but not
+            counted. Other namespaces and embedding spaces are preserved.
+
+        Raises:
+            CacheValidationError: If the namespace is invalid.
+        """
+
         scope = self._scope(namespace)
         async with self._connection() as connection, connection.transaction():
             layout = await self._layout(connection, require_schema=True)
@@ -735,6 +898,28 @@ class PgVectorStore:
         search: str | None = None,
         sort: InspectionSort = "newest",
     ) -> InspectionPage:
+        """Observe live metadata in a read-only repeatable-read transaction.
+
+        Count and rank metadata, then limit the page before projecting sensitive
+        240-character response previews. Vectors are absent and response is None;
+        hits, LRU and expiry are unchanged. Authorize the requested scope first.
+
+        Args:
+            namespace: Exact namespace, or None for all in this space binding.
+            offset: Nonnegative live offset; later calls can see shifted results.
+            limit: Page size from 1 through 100.
+            search: Optional trimmed prompt substring, at most 2,000 characters;
+                case-insensitive matching uses PostgreSQL LOWER.
+            sort: newest, oldest, most_hit or nearest_expiry.
+
+        Returns:
+            Detached page whose total and TTL use this transaction's observation.
+            Persisted hit/access metadata is not a lease or durability guarantee.
+
+        Raises:
+            CacheValidationError: If inspection arguments are invalid.
+        """
+
         return await self._inspect(
             namespace=namespace,
             namespaces=None,
@@ -748,6 +933,21 @@ class PgVectorStore:
     async def inspect_entry(
         self, cache_key: str, *, namespaces: tuple[str, ...] | None
     ) -> InspectionEntry | None:
+        """Observe a live entry and its sensitive full response without hit effects.
+
+        Args:
+            cache_key: Canonical key within the bound embedding space.
+            namespaces: Caller-authorized tuple; () allows none, None allows all
+                namespaces. This filter does not authenticate the caller.
+
+        Returns:
+            Detached detail or None if absent, expired or outside the allowed scope,
+            using a read-only repeatable-read transaction. No expiry cleanup occurs.
+
+        Raises:
+            CacheValidationError: If the key or namespace scope is invalid.
+        """
+
         page = await self._inspect(
             namespace=None,
             namespaces=namespaces,
@@ -760,7 +960,13 @@ class PgVectorStore:
         return page.items[0] if page.items else None
 
     async def clear_all(self) -> int:
-        """Administrative mutation of this binding across namespaces."""
+        """Administratively delete this space binding's rows across namespaces.
+
+        Returns:
+            Live removal count; expired rows are deleted without being counted.
+            The transaction retains revision history and other embedding spaces.
+            This optional mutation requires caller-owned authorization.
+        """
         async with self._connection() as connection, connection.transaction():
             layout = await self._layout(connection, require_schema=True)
             await self._lock(connection)
@@ -774,6 +980,20 @@ class PgVectorStore:
         return int(count)
 
     async def aclose(self) -> None:
+        """Seal an idle store and close only an owned pool within its close deadline.
+
+        Borrowed pools remain caller-owned. Owned close directly awaits asyncpg;
+        failure/timeout/cancellation terminates remaining owned connections and
+        leaves the store sealed. Cancellation propagates. Later close calls return
+        without retrying cleanup; async context exit uses this path and propagates
+        body exceptions when close succeeds. Persisted entries are retained.
+
+        Raises:
+            CacheBusyError: If an admitted operation remains; the store stays open.
+            CacheTimeoutError: If owned-pool close exceeds its deadline.
+            CacheStoreError: For expected owned-pool close failures.
+        """
+
         if self._state.closed:
             return
         self._state.close()

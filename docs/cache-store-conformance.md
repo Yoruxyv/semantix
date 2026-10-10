@@ -96,8 +96,12 @@ backend clock/durability guarantees require separate evidence.
 Two optional probes describe real differences, not different core semantics:
 
 - `read_hit_metadata(key, namespace)` returns `HitMetadata(count, last_accessed)`
-  or `None` for an absent row. Supply it for backends with persisted counters.
-  MemoryStore and the example maintain LRU order, not public hit counters.
+  or `None` for an absent row. The built-in fixtures supply this persisted-metadata
+  probe for PostgreSQL/Redis and omit it for MemoryStore and the dictionary example.
+  MemoryStore does expose process-local hit/access metadata through optional
+  inspection; it also maintains LRU order. The example maintains LRU without hit
+  counters. Omitting this probe does not imply that inspection lacks counters,
+  and optional inspection does not require durable metadata.
 - `block_lookup()` is an async context manager yielding an `asyncio.Event`. It
   blocks a real nonempty lookup, signals admission, then releases/drains work on
   exit, including cancellation and timeout. Supply it for asynchronous backends.
@@ -107,7 +111,9 @@ Missing probes produce explicit skips. Do not call a backend fully verified for
 those capabilities on the basis of a skipped test. Counters and worker controls
 are fixture-owned observations, never new CacheStore methods. The built-in
 [factories](../packages/cache/tests/test_store_conformance.py) use known disposable
-tables and worker/pool instrumentation; the reusable kit imports no private
+tables and worker/pool instrumentation. The separate
+[Redis consumer](../packages/cache/tests/test_redis.py) supplies its own disposable
+keyspace and metadata/blocking probes. The reusable kit imports no private
 Semantix module.
 
 ## Run it
@@ -129,9 +135,12 @@ import `packages/cache/tests`, its fixtures or built-in store internals.
 The PostgreSQL tests require `PGVECTOR_TEST_DATABASE_URL` set through the
 environment to a **fresh disposable** pgvector database. Fixtures install the
 extension and remove only UUID-named schemas they own. No DSN means PostgreSQL
-skips; that does not verify PostgreSQL compatibility. The existing quality
-workflow runs all three consumers, full coverage and static checks with its pinned
-pgvector service on Python 3.11-3.14. No new database job or Redis dependency exists.
+skips; that does not verify PostgreSQL compatibility. The Redis consumer requires
+`REDIS_TEST_URL` pointing to disposable Redis 8.10.2; without it Redis cases skip.
+The existing quality
+workflow runs the shared consumers, full coverage and static checks with pinned
+pgvector and Redis services on Python 3.11-3.14. The kit itself adds no runtime
+dependency or backend implementation.
 
 ## Evidence boundaries
 
@@ -143,7 +152,7 @@ pgvector service on Python 3.11-3.14. No new database job or Redis dependency ex
 | Winner / ties | Exact/similar winner, equal-score oldest revision, hits do not reorder winners | Equal-revision key fallback requires kernel/persisted-row fixtures: public writes assign distinct monotonic revisions |
 | TTL | Default/capped/shorter/immortal retention; non-sliding confirmation; expired candidate rejected | Exact monotonic boundary/wall-clock jumps; PostgreSQL authoritative clock |
 | Replacement / revision | Content/vector/expiry reset; detached snapshots; monotonic revision survives delete/clear/reinsert; stale confirmation rejected | SQL rollback and durable binding revision |
-| Confirmation / hit metadata | Current revision succeeds, stale/expired/foreign fails; counters only change on confirmed hits, reset on replacement when exposed | Persisted counters and access ordering are PostgreSQL-specific |
+| Confirmation / hit metadata | Current revision succeeds, stale/expired/foreign fails; counters only change on confirmed hits, reset on replacement when exposed | This kit probes persisted counters/access ordering through PostgreSQL/Redis; MemoryStore inspection metadata is process-local |
 | Capacity / LRU | Capacity across namespaces; writes and successful confirmations update order; searches/rejected confirmations do not | Snapshot invalidation, bounded SQL cleanup and transactions |
 | Ownership / close | Facade borrows store; close twice; all public operations reject closed state | Borrowed versus owned pools, failed/cancelled close termination |
 | Cancellation / deadline | Real blocked lookup cancellation propagates, busy close rejected, facade deadline remains a typed error when probe supplied | Memory retained worker slot; PostgreSQL pool/transaction deadlines |
@@ -172,4 +181,6 @@ network partitions, disaster recovery, backup correctness, arbitrary retry-polic
 safety, cloud-provider behavior, authorization, tenant authentication, production
 security hardening, or performance/scalability. Test those claims against the
 adapter's actual backend and topology. Namespace isolation is not authentication.
-No RedisStore or QdrantStore is implemented or verified by this kit.
+Backend-owned consumers exercise MemoryStore, PgVectorStore, RedisStore and the
+independent dictionary example through the shared kit. No QdrantStore is
+implemented or verified.

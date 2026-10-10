@@ -1,4 +1,10 @@
-"""Provider response decoding with payload-free validation errors."""
+"""Provider response decoding with payload-free validation errors.
+
+Internal helpers implement the currently supported integrations' schemas;
+they are not public extension APIs. OpenAI and Hugging Face currently reuse
+``chat_text``, without requiring their future response contracts to converge.
+Each provider adapter chooses its payload and parser independently.
+"""
 
 import math
 from collections.abc import Sequence
@@ -11,6 +17,12 @@ from ..errors import EmbeddingError, GenerationError
 
 
 def components(value: object, dimensions: int) -> tuple[float, ...]:
+    """Convert a dimension-matched JSON list of finite numbers to float components.
+
+    Reject booleans, nonnumeric items and float-conversion overflow with
+    EmbeddingError. Zero rows are allowed here so token pooling can use them;
+    final magnitude validation belongs to ``vector``.
+    """
     if not isinstance(value, list):
         raise EmbeddingError("Provider returned an invalid embedding vector")
     items = cast("list[object]", value)
@@ -28,6 +40,11 @@ def components(value: object, dimensions: int) -> tuple[float, ...]:
 
 
 def vector(value: object, dimensions: int) -> Sequence[float]:
+    """Validate finite components and nonzero usable magnitude, preserving scale.
+
+    Run normalized_vector for validation but discard its normalized result;
+    return the original float components. The cache normalizes for comparison.
+    """
     result = components(value, dimensions)
     try:
         normalized_vector(result, dimensions=dimensions)
@@ -37,6 +54,13 @@ def vector(value: object, dimensions: int) -> Sequence[float]:
 
 
 def pooled_vector(value: object, dimensions: int) -> Sequence[float]:
+    """Unwrap singleton lists and mean-pool dimension-matched token rows in float64.
+
+    A flat vector is validated directly. Matrix rows use component validation,
+    allowing zero rows; the pooled result must still pass final vector/magnitude
+    validation. Reject empty, malformed or nonfinite output with EmbeddingError,
+    without returning the normalized validation copy.
+    """
     while (
         isinstance(value, list)
         and len(items := cast("list[object]", value)) == 1
@@ -55,6 +79,7 @@ def pooled_vector(value: object, dimensions: int) -> Sequence[float]:
 
 
 def text(value: object) -> str:
+    """Validate bounded nonblank generated text before stripping edge whitespace."""
     try:
         return valid_response(value).strip()
     except ValueError:
@@ -76,6 +101,12 @@ def first(value: object) -> dict[str, object]:
 
 
 def chat_text(payload: object) -> str:
+    """Extract first-choice chat text only after ``finish_reason="stop"``.
+
+    Reject truthy tool_calls or refusal fields and validate message content as
+    nonblank text within the shared output bound. Used by the current OpenAI
+    and Hugging Face integrations; their wire contracts remain independently owned.
+    """
     choice = first(mapping(payload).get("choices"))
     if choice.get("finish_reason") != "stop":
         raise GenerationError("Provider generation did not finish with completed text")
@@ -86,6 +117,12 @@ def chat_text(payload: object) -> str:
 
 
 def parts_text(parts: object, *, typed: bool = False) -> str:
+    """Join nonblank text parts, omitting entries marked ``thought is True``.
+
+    When ``typed`` is true, include only blocks with type ``text``. Ignore
+    malformed/nontext entries, then validate the joined text and its length.
+    The provider parser separately decides whether tool output is acceptable.
+    """
     if not isinstance(parts, list):
         raise GenerationError("Provider returned invalid completed text")
     pieces = [
@@ -100,6 +137,12 @@ def parts_text(parts: object, *, typed: bool = False) -> str:
 
 
 def gemini_text(payload: object) -> str:
+    """Require first-candidate STOP completion and reject any functionCall part.
+
+    Decode candidate content parts through parts_text, excluding thoughts and
+    validating the remaining joined text. Invalid completion/output raises
+    GenerationError; later candidates are not fallback answers.
+    """
     candidate = first(mapping(payload).get("candidates"))
     if candidate.get("finishReason") != "STOP":
         raise GenerationError("Provider generation did not finish with completed text")
@@ -112,6 +155,11 @@ def gemini_text(payload: object) -> str:
 
 
 def anthropic_text(payload: object) -> str:
+    """Require end_turn or stop_sequence completion and reject tool_use blocks.
+
+    Join typed text blocks through parts_text, excluding thoughts and checking
+    the completed text bound. Invalid completion/output raises GenerationError.
+    """
     message = mapping(payload)
     if message.get("stop_reason") not in ("end_turn", "stop_sequence"):
         raise GenerationError("Provider generation did not finish with completed text")
@@ -124,6 +172,11 @@ def anthropic_text(payload: object) -> str:
 
 
 def ollama_text(payload: object) -> str:
+    """Require done=True and a missing/null or stop done_reason before decoding text.
+
+    Validate response as bounded nonblank text; invalid completion/output
+    raises GenerationError.
+    """
     message = mapping(payload)
     if message.get("done") is not True or message.get("done_reason") not in (
         None,
@@ -134,6 +187,7 @@ def ollama_text(payload: object) -> str:
 
 
 def ollama_vector(payload: object, dimensions: int) -> Sequence[float]:
+    """Require exactly one Ollama embedding before vector/magnitude validation."""
     embeddings = mapping(payload).get("embeddings")
     if not isinstance(embeddings, list) or len(cast("list[object]", embeddings)) != 1:
         raise EmbeddingError("Provider returned an invalid embedding batch")
@@ -141,6 +195,7 @@ def ollama_vector(payload: object, dimensions: int) -> Sequence[float]:
 
 
 def openai_vector(payload: object, dimensions: int) -> Sequence[float]:
+    """Require exactly one OpenAI data item before vector/magnitude validation."""
     data = mapping(payload).get("data")
     if not isinstance(data, list) or len(cast("list[object]", data)) != 1:
         raise EmbeddingError("Provider returned an invalid embedding batch")

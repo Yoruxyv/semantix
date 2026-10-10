@@ -1,7 +1,26 @@
-"""Optional concrete-store observation; the mandatory CacheStore is unchanged.
+"""Optional concrete-store observations outside the mandatory CacheStore protocol.
 
-Snapshots are observations, never leases. Callers authorize namespaces first.
-Listing contains bounded previews, no vectors, and does not change access order.
+Inspection never confirms a cache hit, renews TTL or updates hit/access/LRU
+metadata. Stores exclude expired entries without explicit purge; native backend
+expiry may proceed independently. The caller/server authorizes namespace scope.
+
+InspectionEntry contains prompt/key metadata, a response_preview of at most 240
+characters and no embedding. Lists leave response=None; a scoped detail read can
+include the full response. Prompts, previews and explicit serialization remain
+sensitive even though payloads are omitted from repr. Previewing is not redaction.
+created_at is the observed revision; remaining_ttl_seconds and hit/access counters
+are observations, not leases or durability guarantees. Persistence and clock
+semantics belong to each store; MemoryStore counters are process-local.
+
+InspectionPage contains an immutable items tuple, filtered total, requested
+offset/limit and has_more. Pages are live observations: concurrent expiry,
+writes or confirmations may shift later offsets, ordering and totals. Redis
+prompt search can span several observations even within one call.
+
+InspectionSort accepts newest, oldest, most_hit and nearest_expiry. Equal primary
+sort values use newer revisions except oldest; cache keys break remaining ties.
+No-expiry entries sort last for nearest_expiry. recency_rank is scoped access
+order (1 is most recent), independent of display sorting and prompt filtering.
 """
 
 from datetime import datetime
@@ -48,6 +67,14 @@ def inspection_arguments(
     search: str | None,
     sort: InspectionSort,
 ) -> None:
+    """Validate list scope, paging, search length and sort without authorizing access.
+
+    Raises:
+        CacheValidationError: If namespace is invalid, offset is not a nonnegative
+            integer, limit is outside 1-100, search is not text or exceeds 2,000
+            characters, or sort is unsupported. Boolean paging values are rejected.
+    """
+
     try:
         if namespace is not None:
             namespace_value(namespace)
@@ -69,6 +96,14 @@ def inspection_arguments(
 
 
 def inspection_namespaces(namespaces: tuple[str, ...] | None) -> None:
+    """Validate a detail-read filter; None is unrestricted and () allows no namespaces.
+
+    This checks tuple structure/identifiers only. The caller must authorize scope.
+
+    Raises:
+        CacheValidationError: If the scope is not a tuple of valid namespaces.
+    """
+
     if namespaces is not None:
         try:
             if not isinstance(cast(object, namespaces), tuple):
@@ -87,6 +122,17 @@ def inspection_page(
     search: str | None,
     sort: InspectionSort,
 ) -> InspectionPage:
+    """Filter, sort and slice an already validated metadata observation.
+
+    Prompt search strips/casefolds text. This helper does not check authorization,
+    expiry or paging arguments; concrete stores validate and collect live entries
+    first. Sorting can mutate the supplied list when search is blank; recency_rank
+    stays as supplied, independent of filtering/display order.
+
+    Returns:
+        Detached page with filtered total and has_more for this observation.
+    """
+
     needle = None if search is None else search.strip().casefold()
     if needle:
         items = [item for item in items if needle in item.prompt.casefold()]

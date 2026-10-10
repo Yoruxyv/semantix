@@ -65,8 +65,13 @@ application-owned. ``semantix_cache.stores.pgvector.PgVectorStore`` supplies opt
 PostgreSQL persistence with ``semantix-cache[pgvector]``. A supplied pool is borrowed;
 ``await PgVectorStore.connect(...)`` owns its pool. Schema initialization is
 explicit, requires migration authority, and is separate from ordinary cache use.
+``semantix_cache.stores.redis.RedisStore`` provides optional storage with
+``semantix-cache[redis]`` on a supported standalone Redis primary. A supplied
+client is borrowed; ``connect()`` owns its client/pool. Binding setup is explicit;
+Redis-specific deadlines, retained workers and shielded close cleanup are
+documented in its module and the Redis storage guide.
 
-The root package needs NumPy and Pydantic, but does not load HTTPX, asyncpg,
+The root package needs NumPy and Pydantic, but does not load HTTPX, asyncpg, redis-py,
 FastAPI or provider SDKs. Custom ``EmbeddingAdapter``, ``GenerationCallable`` and
 ``CacheStore`` integrations remain available for unsupported providers or stores.
 
@@ -120,6 +125,7 @@ Use ``help(AsyncSemanticCache)`` or inspect ``engine``, ``models``, ``policies``
 - https://github.com/Yoruxyv/semantix/blob/main/packages/cache/README.md
 - https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-providers.md
 - https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-storage.md
+- https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-redis.md
 """
 
 from .engine import AsyncSemanticCache

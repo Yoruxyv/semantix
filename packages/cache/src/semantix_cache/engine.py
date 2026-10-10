@@ -57,6 +57,46 @@ def _follower_error(error: BaseException) -> Terminal:
 
 
 class AsyncSemanticCache:
+    """Coordinate semantic reuse over an application-owned embedder and store.
+
+    Use ``get``/``set`` for explicit reuse and approved writes, or ``resolve`` to
+    generate on a miss according to a CachePolicy. Reuse this facade across
+    requests. It borrows both collaborators; closing it does not close them.
+
+    Prompts are canonicalized before use. The optional normalizer changes only
+    embedding/matching text; generation receives the canonical prompt before
+    that normalization. Namespaces partition entries, not authenticate callers.
+    A hit needs an eligible score and atomic store confirmation of its revision
+    and expiry. Confirmation can update hit/access metadata and LRU order.
+
+    Each get/set/resolve/delete/clear call has one total operation deadline,
+    including embedding, store I/O, generation and any coalescing wait. Deadline
+    expiry becomes CacheTimeoutError; a callback's own TimeoutError propagates
+    unchanged while that deadline has not expired. Cancellation propagates. Collaborators
+    must cooperate with cancellation; the facade cannot roll back a committed
+    store mutation or guarantee that dependency-owned work has stopped.
+    Integration exceptions propagate without blanket wrapping or automatic
+    retries. These operations reject a closed facade with CacheClosedError or
+    changed embedding metadata with EmbeddingSpaceError. Async context exit closes
+    only an idle facade.
+
+    Args:
+        embedder: Async adapter with stable, valid EmbeddingSpace metadata.
+        store: Structural CacheStore with exactly the same space identity and
+            dimensions. Its default TTL must be valid.
+        similarity_threshold: Finite inclusive cosine cutoff in [0, 1].
+        prompt_normalizer: Optional synchronous matching-text transform. Its
+            result must canonicalize to a valid prompt.
+        operation_timeout_seconds: Positive finite total deadline per operation.
+        collect_coalescing_metrics: Whether to collect optional numeric lifetime
+            evidence. Collection defaults to False and may become unavailable.
+
+    Raises:
+        CacheConfigurationError: If threshold, deadline, normalizer, metrics flag
+            or the store's default TTL is invalid.
+        EmbeddingSpaceError: If collaborator spaces are invalid or incompatible.
+    """
+
     def __init__(
         self,
         *,
@@ -280,6 +320,25 @@ class AsyncSemanticCache:
         return await self._lookup(prompt, namespace, embedding)
 
     async def get(self, prompt: str, *, namespace: str = "default") -> CacheHit | None:
+        """Return a confirmed semantic hit, or None without generating.
+
+        Search is restricted to the namespace and bound embedding space. A candidate
+        below the inclusive threshold, expired or replaced before confirmation is a
+        miss. Successful confirmation can update hit/access metadata and LRU order;
+        this method is not side-effect-free inspection and does not extend TTL.
+
+        Args:
+            prompt: Text canonicalizing to 1-2,000 characters.
+            namespace: Exact namespace identifier, defaulting to "default".
+
+        Returns:
+            Detached hit evidence, or None when no eligible candidate is confirmed.
+
+        Raises:
+            CacheValidationError: If prompt, namespace or normalized text is invalid.
+            EmbeddingError: If embedding output or embedding-space metadata is invalid.
+            CacheStoreError: For typed store failures or malformed returned evidence.
+        """
         async with self._operation():
             prompt, namespace = self._inputs(prompt, namespace)
             return (await self._lookup(prompt, namespace)).hit
@@ -292,6 +351,29 @@ class AsyncSemanticCache:
         namespace: str = "default",
         cache_ttl_seconds: float | None = None,
     ) -> str:
+        """Store approved response text and return its deterministic cache key.
+
+        This embeds the matching text and replaces any entry with the same canonical
+        prompt and namespace. The store owns the new revision, expiry and capacity
+        handling. A successful write does not promise durability or future retention.
+
+        Args:
+            prompt: Text canonicalizing to 1-2,000 characters.
+            response: Completed nonblank text of at most 100,000 characters.
+            namespace: Exact namespace identifier, defaulting to "default".
+            cache_ttl_seconds: None inherits the store default. A positive finite value
+                up to 31,536,000 seconds may shorten, but never extend, a finite default.
+                No expiry is possible only when both requested and default TTL are None.
+
+        Returns:
+            SHA-256 cache key for the canonical prompt and namespace.
+
+        Raises:
+            CacheValidationError: If prompt, response, namespace, TTL or normalized text
+                is invalid.
+            EmbeddingError: If embedding output or embedding-space metadata is invalid.
+            CacheStoreError: For typed storage failures reported by the store.
+        """
         async with self._operation():
             prompt, namespace = self._inputs(prompt, namespace)
             ttl = self._ttl(cache_ttl_seconds)
@@ -321,6 +403,51 @@ class AsyncSemanticCache:
         their own generation. Leader cancellation fails its entire flight;
         follower cancellation affects only that follower. None preserves the
         independent behavior of existing calls. Other policies never coalesce.
+
+        NORMAL reads and writes on a miss. READ_ONLY reads and generates on a
+        miss without creating/replacing entries. REFRESH skips reads, generates
+        and writes. BYPASS and PRIVATE skip both cache reads and writes;
+        generation still runs. Read-enabled hits can still update confirmation
+        metadata. A write failure raises instead of returning successful evidence.
+
+        Args:
+            prompt: Text canonicalizing to 1-2,000 characters. Generation receives
+                this canonical text, not the optional matching normalization.
+            generate: Async function or object with async __call__, returning
+                completed nonblank text of at most 100,000 characters. It is
+                validated even when lookup would hit. A synchronous function
+                merely returning an awaitable is not accepted.
+            namespace: Exact cache partition; application authorization and
+                context isolation remain the caller's responsibility.
+            policy: CachePolicy controlling reads and writes as described above.
+            cache_ttl_seconds: None inherits the store default; a positive finite
+                override up to 31,536,000 seconds is capped by a finite default.
+                An explicit override requires NORMAL or REFRESH, even on a hit.
+            coalescing_key: Optional nonblank plain string, at most 256 UTF-8
+                bytes, attesting to immutable generation inputs. Joining is
+                instance/loop-local and requires the same callable object,
+                canonical prompt, exact normalized vector, configuration and
+                requested/default/effective TTL. Admission limits can leave
+                equivalent calls independent; embedding remains per caller.
+
+        Returns:
+            Response and this caller's lookup, generation and write evidence.
+            A miss can retain a candidate score despite failed confirmation.
+            provider_called means this callable ran, not that a network provider
+            was necessarily contacted. Followers return their own evidence.
+
+        Raises:
+            CacheValidationError: If operation inputs, policy, TTL, generation
+                callable or matching text are invalid.
+            EmbeddingError: If embedding output or space metadata is invalid.
+            GenerationError: If the callable returns invalid completed text.
+            CacheStoreError: For typed store failures or malformed returned evidence.
+            CacheTimeoutError: If the facade's total operation deadline expires.
+
+        Exceptions raised by generation or other custom integration code are
+        otherwise propagated unchanged, including a callback's own TimeoutError
+        before the facade deadline expires. Cancellation propagates; coalesced
+        leader failures are shared without retry or follower promotion.
         """
         started = perf_counter()
         participation: Participation | None = None
@@ -455,6 +582,19 @@ class AsyncSemanticCache:
                 )
 
     async def delete(self, cache_key: str, *, namespace: str = "default") -> bool:
+        """Delete one entry by key within the specified namespace and space.
+
+        Args:
+            cache_key: A cache key returned by set or confirmed-hit evidence.
+            namespace: Exact namespace identifier; it must match the entry's namespace.
+
+        Returns:
+            True if the store removed an entry, or False if none was available in scope.
+
+        Raises:
+            CacheValidationError: If the key or namespace is invalid.
+            CacheStoreError: For typed store failures or a non-boolean deletion result.
+        """
         async with self._operation():
             try:
                 key = cache_key_value(cache_key)
@@ -468,6 +608,19 @@ class AsyncSemanticCache:
             return result
 
     async def clear(self, *, namespace: str = "default") -> int:
+        """Remove entries only from the specified namespace and bound space.
+
+        Args:
+            namespace: Exact namespace identifier, defaulting to "default".
+
+        Returns:
+            Nonnegative removal count reported by the store. Expired-row cleanup follows
+            that store's contract; this is not an administrative cross-namespace clear.
+
+        Raises:
+            CacheValidationError: If the namespace is invalid.
+            CacheStoreError: For typed store failures or an invalid removal count.
+        """
         async with self._operation():
             try:
                 namespace = namespace_value(namespace)
@@ -480,9 +633,23 @@ class AsyncSemanticCache:
             return result
 
     async def aclose(self) -> None:
+        """Close an idle facade without closing its borrowed embedder or store.
+
+        This is idempotent after successful close and never cancels or drains work.
+        The caller must finish active operations and retained coalescing participants
+        before closing. A closed facade cannot be reopened.
+
+        Raises:
+            CacheBusyError: If admitted operations or retained flight records remain.
+        """
         self._state.close(workers=bool(self._flights.counts()[1]))
 
     async def __aenter__(self) -> Self:
+        """Return this open facade; no collaborator initialization is performed.
+
+        Raises:
+            CacheClosedError: If the facade is already closed.
+        """
         self._state.check_open()
         return self
 
@@ -492,4 +659,9 @@ class AsyncSemanticCache:
         exc: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
+        """Close at context exit; propagate body exceptions if close succeeds.
+
+        The collaborators remain application-owned. As with aclose, active operations
+        can raise CacheBusyError instead of being cancelled or drained.
+        """
         await self.aclose()

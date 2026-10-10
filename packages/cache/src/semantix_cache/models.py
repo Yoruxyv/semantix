@@ -69,6 +69,14 @@ class _Model(BaseModel):
 
 
 class EmbeddingSpace(_Model):
+    """Immutable validated identity and dimensionality for compatible vectors.
+
+    Identity should distinguish model/revision, preprocessing and pooling. Equal
+    dimensions alone do not imply compatibility; the facade requires exact space
+    equality and rejects changed metadata. This model describes a space without
+    checking a provider's behavior or authenticating callers.
+    """
+
     identity: str = Field(min_length=1, repr=False)
     dimensions: int = Field(gt=0)
 
@@ -80,6 +88,16 @@ class EmbeddingSpace(_Model):
 
 
 class CacheEntry(_Model):
+    """Immutable validated payload at the store boundary.
+
+    The key must match the canonical prompt and namespace. Embeddings become
+    immutable finite, nonzero tuples; dimension compatibility is checked by the
+    facade/store, and model validation alone does not normalize vector values.
+    created_at is timezone-aware UTC and serves as the revision token in returned
+    candidates; a store may advance it on write to prevent stale confirmation.
+    Payloads omitted from repr remain present in normal serialization.
+    """
+
     cache_key: CacheKey
     namespace: Namespace
     prompt: Prompt = Field(repr=False)
@@ -97,12 +115,28 @@ class CacheEntry(_Model):
 
 
 class CacheMatch(_Model):
+    """Detached nearest-candidate evidence, not a confirmed cache hit.
+
+    similarity_score is a finite cosine score in [-1, 1]; it need not meet a facade
+    threshold. The entry revision must still pass atomic store confirmation, since
+    expiry, replacement or deletion can intervene. expires_at is UTC retention
+    metadata, or None; the store's own clock determines authoritative expiry.
+    """
+
     entry: CacheEntry = Field(repr=False)
     similarity_score: Score
     expires_at: Timestamp | None
 
 
 class CacheHit(_Model):
+    """Immutable confirmed-hit evidence returned by the facade.
+
+    The validated score meets the inclusive similarity_threshold. Match fields
+    identify the reused prompt/key/revision; age is nonnegative, and expires_at is
+    optional UTC retention metadata. Constructing this model performs no lookup or
+    confirmation and does not authorize the namespace or renew the entry's TTL.
+    """
+
     response: Response = Field(repr=False)
     similarity_score: Score
     similarity_threshold: Threshold
@@ -120,6 +154,17 @@ class CacheHit(_Model):
 
 
 class CacheResult(_Model):
+    """Immutable response and per-caller evidence from resolve.
+
+    A hit requires complete match evidence and skips generation. cache_written
+    stays False even if confirmation updates hit/access metadata. A miss may
+    retain a candidate score below threshold or after failed confirmation;
+    matched fields stay None. provider_called records invocation of the
+    application generation callable, not necessarily external network work.
+    cache_written records a completed policy-permitted entry write, not durability
+    or future retention. Validation checks evidence consistency, not storage state.
+    """
+
     response: Response = Field(repr=False)
     cache_hit: bool
     similarity_score: Score | None

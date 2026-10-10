@@ -47,10 +47,11 @@ cache operations and inspector results.
 
 API and Python SDK callers may request `cache_ttl_seconds` from `1` through
 `31,536,000` on Normal or Refresh requests. The server remains authoritative:
-a finite `CACHE_TTL_SECONDS` caps the request, while a server configured with
-no default TTL uses the requested value. Omission or `null` keeps the configured
-default and never means no expiry. Cache hits do not extend an entry's lifetime;
-a Refresh write replaces the entry and starts its effective TTL at that write.
+a finite `CACHE_TTL_SECONDS` caps the request; without a default, the server
+uses the requested value. Omission or `null` inherits the configured default
+and cannot disable a finite default. With no default and no override, entries
+have no TTL expiry. Cache hits do not extend an entry's lifetime; a Refresh
+write replaces the entry and starts its effective TTL at that write.
 
 Read only, Bypass, and Private requests cannot write, so supplying a request TTL
 with those modes returns HTTP `422` before provider work. Concurrent misses may

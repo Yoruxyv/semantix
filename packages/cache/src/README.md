@@ -54,6 +54,13 @@ uv run --no-sync pytest --cov=semantix_cache
 ```
 
 mypy enables deprecation diagnostics. Supply `PGVECTOR_TEST_DATABASE_URL` only for
-a disposable database to execute all storage integration cases; without it those
-cases skip. The internal store-conformance suite lives in `../tests` and is reusable
-by custom adapter authors without introducing pytest into the runtime package.
+a disposable PostgreSQL database and `REDIS_TEST_URL` only for disposable Redis
+8.10.2 to execute the respective storage integration cases. Without the matching
+URL those cases skip. For custom-store development, use the source-based kit in
+[`../examples/store_conformance/`](../examples/store_conformance/__init__.py), following
+its [standalone consumer](../examples/test_custom_store_conformance.py). The
+repository's [built-in store tests](../tests/test_store_conformance.py) supply
+MemoryStore/PgVectorStore fixtures and collect that custom consumer; they are not
+the reusable kit. See the [conformance guide](../../../docs/cache-store-conformance.md)
+for setup and evidence boundaries. Examples ship in the source archive, not the
+wheel; the kit requires development pytest tooling, never a runtime dependency.
