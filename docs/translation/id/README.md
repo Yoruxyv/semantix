@@ -7,6 +7,11 @@ yang belum diterbitkan dan contoh MemoryStore tanpa kredensial.
 Server/workbench resmi bersifat opsional. semantix-client adalah HTTP client
 referensi yang dipelihara untuk server tersebut, bukan target PyPI publik pertama.
 
+Pilih jalur: [caching Python embedded](#library-python-embedded),
+[produk HTTP opsional](#serverworkbench-dan-http-client-opsional),
+[keputusan dan batasan](#alasan-rekayasa-dan-batasan), atau
+[operasikan deployment](#operations).
+
 ## Library Python embedded
 
 Panduan embedded berikut tersedia dalam bahasa Inggris.
@@ -15,6 +20,7 @@ Panduan embedded berikut tersedia dalam bahasa Inggris.
 | --- | --- |
 | [Paket cache](../../../packages/cache/README.md) | Penggunaan awal, kebijakan, hasil, lifecycle, dan kompatibilitas 0.1.x kanonis |
 | [Provider embedded](../../embedded-providers.md) | Adapter yang dipelihara, extra opsional, dan embedding/generation kustom |
+| [Verifikasi provider live (Inggris)](../../provider-live-verification.md) | Receipt provider embedded opt-in, scope model/source yang tepat, cleanup, dan batas bukti |
 | [Identitas konteks dan migrasi](../../context-identity-and-migration.md) | Scope eksplisit, revisi embedding, contoh offline, dan migrasi aman |
 | [Storage embedded](../../embedded-storage.md) | Memory, PostgreSQL/pgvector, Redis, dan database milik aplikasi |
 | [Redis embedded (Inggris)](../../embedded-redis.md) | Setup RedisStore opsional, pencarian eksak, TTL/LRU, ownership, dan pemulihan |
@@ -43,14 +49,20 @@ Panduan embedded berikut tersedia dalam bahasa Inggris.
 | [Python SDK](../../../packages/client/README.md)                          | Instalasi dan penggunaan client HTTP sinkron dan asinkron                       |
 | [Development](guides/development.md)                        | Toolchain yang didukung, pemeriksaan kualitas, aturan arsitektur, dan kontribusi |
 
+## Alasan rekayasa dan batasan
+
+| Reference | Gunakan untuk |
+| --- | --- |
+| [Keputusan rekayasa (Inggris)](../../engineering-decisions.md) | Urutan kegagalan, ownership, alternatif, trade-off storage/replika, dan batas bukti |
+| [Batas akurasi jawaban semantik (Inggris)](../../semantic-accuracy-limitations.md) | Similarity, kompatibilitas jawaban, temuan eksplorasi yang dibekukan, dan pilihan reuse |
+| [Architecture](reference/architecture.md)   | Runtime flow, feature ownership, boundary, dan deployment constraint |
+
 ## Reference
 
 | Reference                                   | Gunakan untuk                                                        |
 | ------------------------------------------- | -------------------------------------------------------------------- |
 | [API](reference/api.md)                     | Endpoint, autentikasi, request, response, dan error contract         |
 | [Schema dataset evaluasi v1 (Inggris)](../../reference/evaluation-dataset-schema-v1.md) | Field JSON, validasi, batas, persistensi, dan retensi |
-| [Architecture](reference/architecture.md)   | Runtime flow, feature ownership, boundary, dan deployment constraint |
-| [Keputusan rekayasa (Inggris)](../../engineering-decisions.md) | Pilihan yang diterapkan, alternatif, trade-off yang diterima, dan batas bukti |
 | [Accessibility](reference/accessibility.md) | Ekspektasi aksesibilitas dan command verifikasi                      |
 
 ## Operations
@@ -62,4 +74,5 @@ Panduan embedded berikut tersedia dalam bahasa Inggris.
 | [Operations and recovery](operations/recovery.md)   | Rotasi credential, backup, restore, cache rebuild, rollback, dan incident |
 | [Load testing](operations/load-testing.md#baseline-kapasitas-pada-host-docker-lokal) | Baseline kapasitas, skenario k6 yang aman, dan runtime observability |
 | [Audit runtime produksi (Inggris)](../../operations/production-runtime-audit.md) | Keamanan topologi yang diuji, pemulihan, dan bukti beban |
+| [Koordinasi multi-replika (Inggris)](../../operations/multi-replica-readiness.md) | Temuan historis, authority bersama saat ini, dan verifikasi dua replika yang terbatas |
 | [Supply-chain security](operations/supply-chain.md) | Image pin, security scan, artifact SBOM/provenance, dan dependency update |
