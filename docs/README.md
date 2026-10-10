@@ -7,13 +7,18 @@ no Semantix server. The root [README](../README.md) explains the unpublished
 The official server/workbench is optional. semantix-client is the maintained
 reference HTTP client for that server, not the first public PyPI target.
 
+Choose a path: [embed Python caching](#embedded-python-library),
+[use the optional HTTP products](#optional-serverworkbench-and-http-client),
+[understand decisions and limits](#engineering-rationale-and-limits), or
+[operate a deployment](#operations).
+
 ## Embedded Python library
 
 | Guide | Use it for |
 | --- | --- |
 | [Cache package](../packages/cache/README.md) | First use, policies, results, lifecycle and canonical 0.1.x compatibility |
 | [Embedded providers](embedded-providers.md) | Maintained adapters, optional extras and custom embedding/generation |
-| [Semantic-answer accuracy limitations](semantic-accuracy-limitations.md) | Similarity, answer compatibility, frozen exploratory findings and safe reuse choices |
+| [Provider live verification](provider-live-verification.md) | Opt-in embedded-provider receipts, exact model/source scope, cleanup and evidence limits |
 | [Context identity and migration](context-identity-and-migration.md) | Explicit scopes, embedding revisions, offline recipes and safe migration |
 | [Embedded storage](embedded-storage.md) | Memory, PostgreSQL/pgvector, Redis and application-owned databases |
 | [Embedded Redis](embedded-redis.md) | Optional RedisStore setup, exact scan, TTL/LRU, ownership and recovery |
@@ -43,13 +48,20 @@ reference HTTP client for that server, not the first public PyPI target.
 | [Python SDK](../packages/client/README.md) | Install and use the typed sync and async public HTTP clients |
 | [Development](guides/development.md) | Supported toolchains, quality checks, architecture rules, and contributions |
 
+## Engineering rationale and limits
+
+| Reference | Use it for |
+| --- | --- |
+| [Engineering decisions](engineering-decisions.md) | Worked failure sequences, ownership, alternatives, storage/replica trade-offs and evidence limits |
+| [Semantic-answer accuracy limitations](semantic-accuracy-limitations.md) | Similarity, answer compatibility, frozen exploratory findings and safe reuse choices |
+| [Architecture](reference/architecture.md) | Runtime flow, feature ownership, boundaries, and deployment constraints |
+
 ## Reference
 
 | Reference | Use it for |
 |---|---|
 | [API](reference/api.md) | Endpoints, authentication, requests, responses, and error contracts |
 | [Evaluation dataset schema v1](reference/evaluation-dataset-schema-v1.md) | Imported JSON fields, validation codes, limits, persistence, and retention |
-| [Architecture](reference/architecture.md) | Runtime flow, feature ownership, boundaries, and deployment constraints |
 | [Accessibility](reference/accessibility.md) | Accessibility expectations and verification commands |
 
 ## Operations
@@ -61,4 +73,5 @@ reference HTTP client for that server, not the first public PyPI target.
 | [Operations and recovery](operations/recovery.md) | Credential rotation, backup, restore, cache rebuild, rollback, and incidents |
 | [Load testing](operations/load-testing.md#capacity-baseline-on-the-local-docker-host) | Capacity baseline, safe k6 scenarios, and runtime observability |
 | [Production runtime audit](operations/production-runtime-audit.md) | Exact-topology safety, recovery, load evidence, and release verdict |
+| [Multi-replica coordination](operations/multi-replica-readiness.md) | Historical findings, current shared authorities and bounded two-replica verification |
 | [Supply-chain security](operations/supply-chain.md) | Image pins, security scans, SBOM/provenance artifacts, and dependency updates |
