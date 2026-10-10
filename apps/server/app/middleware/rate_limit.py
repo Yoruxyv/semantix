@@ -1,3 +1,12 @@
+"""Apply configured route quotas using local or PostgreSQL coordination.
+
+Local buckets use the application's unique scope, resolved address and
+quota. Shared buckets use address, route template and quota in PostgreSQL;
+replicas must share that authority and compatible settings. Only decorated
+routes consume these quotas; authentication bootstrap and health probes do
+not. Session lockouts have a separate policy in ``app.api.auth``.
+"""
+
 from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import ParamSpec, TypeVar, cast
@@ -16,6 +25,7 @@ PERIOD_SECONDS = {"second": 1, "minute": 60, "hour": 3600, "day": 86400}
 
 
 def app_rate_limit(key: str) -> str:
+    """Extract the quota embedded in the local limiter's application key."""
     return key.rsplit("|", maxsplit=1)[1]
 
 
@@ -26,12 +36,31 @@ def _app_scoped_client_address(request: Request) -> str:
 
 
 class CoordinationLimiter:
+    """Select the configured admission authority for decorated async routes.
+
+    PostgreSQL denial raises SharedRateLimitExceeded; coordination failures
+    propagate without falling back to local counters. Local SlowAPI denials
+    and shared denials both have public HTTP 429 handlers.
+    """
+
     def __init__(self) -> None:
         self.local = Limiter(key_func=_app_scoped_client_address)
 
     def limit(
         self, limit_value: Callable[[str], str]
     ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
+        """Decorate a route that receives Request as the ``request`` keyword.
+
+        Args:
+            limit_value: SlowAPI quota callback for local coordination, normally
+                app_rate_limit. PostgreSQL coordination uses settings.rate_limit.
+
+        Returns:
+            Signature-preserving decorator admitting requests before calling the
+            route. A missing Request raises TypeError; denials and storage failures
+            propagate to the registered HTTP handlers.
+        """
+
         def decorate(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
             # SlowAPI returns a bare Callable; pin its signature at this boundary.
             local = cast(Callable[P, Awaitable[R]], self.local.limit(limit_value)(func))  # pyright: ignore[reportUnknownMemberType]

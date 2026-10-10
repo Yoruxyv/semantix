@@ -1,3 +1,18 @@
+"""Define application failures and their registered public HTTP translations.
+
+Authentication failure is 401, insufficient permission is 403, and quota or
+session lockout is 429. Provider failures use safe 502/503 categories;
+cache/evaluation storage failures normally use 500, coordination uses 503,
+and evaluation timeout uses 504. Readiness has its own storage-failure 503.
+
+AppError responses use declared public details rather than exception text.
+Validation exposes field locations, not submitted values. HTTPException
+string details are forwarded, so callers must supply public-safe text.
+Unexpected Exceptions get an empty-detail 500 and internal logging under
+the configured redaction policy. Lifespan failures and cancellation are
+outside this request-response translation contract.
+"""
+
 import logging
 from collections.abc import Mapping, Sequence
 from typing import NotRequired, TypedDict, cast
@@ -19,6 +34,13 @@ class PublicErrorIssue(TypedDict):
 
 
 class AppError(Exception):
+    """Carry a declared HTTP status/code/detail independently of internal args.
+
+    Subclasses define public response categories. The request handler never
+    serializes exception args, but headers and structured issues are forwarded
+    and therefore must already be safe for public use.
+    """
+
     status_code = 500
     error_code = "internal_error"
     public_detail: str | None = None
@@ -29,6 +51,13 @@ class AppError(Exception):
         headers: Mapping[str, str] | None = None,
         issues: Sequence[PublicErrorIssue] | None = None,
     ) -> None:
+        """Keep internal exception context separate from public response additions.
+
+        Args:
+            *args: Internal exception arguments, excluded from the public response.
+            headers: Public-safe headers copied for the response.
+            issues: Public-safe structured validation issues, copied when provided.
+        """
         super().__init__(*args)
         self.headers = dict(headers or {})
         self.issues = list(issues) if issues is not None else None
@@ -237,6 +266,7 @@ def _response(
 
 
 async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Translate declared public details, headers and issues, not exception args."""
     error = cast(AppError, exc)
     logger.warning(
         "Application error type=%s path=%s", type(error).__name__, request.url.path
@@ -251,6 +281,7 @@ async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
 
 
 async def validation_error_handler(_request: Request, exc: Exception) -> JSONResponse:
+    """Return HTTP 422 field locations without validation inputs or messages."""
     error = cast(RequestValidationError, exc)
     locations = {".".join(str(part) for part in item["loc"]) for item in error.errors()}
     return _response(
@@ -266,6 +297,11 @@ async def rate_limit_error_handler(_request: Request, exc: Exception) -> JSONRes
 
 
 async def http_error_handler(_request: Request, exc: Exception) -> JSONResponse:
+    """Forward an HTTPException status and only its public-safe string detail.
+
+    Original exception headers are not copied by this handler; the common
+    response builder adds a Bearer challenge for HTTP 401.
+    """
     error = cast(HTTPException, exc)
     return _response(
         error.status_code,
@@ -275,6 +311,7 @@ async def http_error_handler(_request: Request, exc: Exception) -> JSONResponse:
 
 
 async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Log an unexpected Exception internally and return an empty-detail 500."""
     logger.error(
         "Unhandled error path=%s type=%s",
         request.url.path,

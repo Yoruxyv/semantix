@@ -1,3 +1,12 @@
+"""Construct selected server adapters with borrowed application HTTP transport.
+
+``registry`` owns capability declarations and metadata resolution. This module
+invokes builders and checks their structural provider interfaces; adapters
+retain ownership of their wire formats. Application lifespan owns the client,
+including cleanup after construction failure. The factory does not manage
+additional resources allocated by custom builders.
+"""
+
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
@@ -31,6 +40,14 @@ from app.providers.registry import (
 
 @dataclass(frozen=True, slots=True)
 class ProviderBundle:
+    """Constructed adapters with their selected provider names and metadata.
+
+    Embedding dimensions and space configure the embedding service and cache;
+    generation configuration contributes to benchmark identity. These values
+    come from registry selection, not introspection of adapter output. The bundle
+    does not own or close the injected HTTP client.
+    """
+
     embedding_provider: EmbeddingProvider
     generation_provider: GenerationProvider
     embedding_provider_name: ProviderName
@@ -41,6 +58,17 @@ class ProviderBundle:
 
 
 def create_default_provider_registry(settings: Settings) -> ProviderRegistry:
+    """Register built-in adapters without selecting or constructing them.
+
+    Args:
+        settings: Configuration captured by builders and metadata resolvers.
+
+    Returns:
+        A fresh, unfrozen registry for Hugging Face, OpenAI, Anthropic, Gemini,
+        Ollama and mock providers. Anthropic declares generation only; the
+        others declare both capabilities. Custom registrations can be added
+        before application creation. Selected metadata is evaluated later.
+    """
     registry = ProviderRegistry()
     registry.register(
         _registration(
@@ -112,6 +140,23 @@ def create_embedding_provider(
     client: httpx.AsyncClient,
     settings: Settings,
 ) -> EmbeddingProvider:
+    """Resolve built-in selections and construct only the embedding adapter.
+
+    Both configured provider names and their metadata are resolved against a
+    fresh default registry. For custom registrations, use application bootstrap
+    or ``create_provider_bundle`` with an explicit selection.
+
+    Args:
+        client: Borrowed HTTP client; the caller retains ownership.
+        settings: Provider selections, credentials and construction limits.
+
+    Returns:
+        The selected built-in embedding provider.
+
+    Raises:
+        ValueError: Either selection or its metadata is invalid.
+        TypeError: The builder result lacks the embedding provider interface.
+    """
     selection = create_default_provider_registry(settings).resolve(
         settings.embedding_provider,
         settings.generation_provider,
@@ -126,6 +171,23 @@ def create_generation_provider(
     client: httpx.AsyncClient,
     settings: Settings,
 ) -> GenerationProvider:
+    """Resolve built-in selections and construct only the generation adapter.
+
+    Both configured provider names and their metadata are resolved against a
+    fresh default registry. For custom registrations, use application bootstrap
+    or ``create_provider_bundle`` with an explicit selection.
+
+    Args:
+        client: Borrowed HTTP client; the caller retains ownership.
+        settings: Provider selections, credentials and construction limits.
+
+    Returns:
+        The selected built-in generation provider.
+
+    Raises:
+        ValueError: Either selection or its metadata is invalid.
+        TypeError: The builder result lacks the generation provider interface.
+    """
     selection = create_default_provider_registry(settings).resolve(
         settings.embedding_provider,
         settings.generation_provider,
@@ -142,6 +204,30 @@ def create_provider_bundle(
     *,
     selection: ResolvedProviderSelection | None = None,
 ) -> ProviderBundle:
+    """Build both capabilities and attach the selection's resolved metadata.
+
+    When both selections refer to the same registration, invoke its builder
+    once and require the result to implement both provider protocols. Otherwise
+    invoke each builder separately with the same build context and client.
+    Structural checks do not validate method signatures or future outputs.
+
+    Builder exceptions propagate. Callers retain client ownership on failure;
+    custom builder resources need their own deployment cleanup.
+
+    Args:
+        client: Borrowed HTTP client, normally owned by application lifespan.
+        settings: Construction limits and default selections when needed.
+        selection: Previously resolved registrations and metadata, including
+            custom providers. If supplied, use them without re-resolution;
+            otherwise resolve both configured names in a fresh default registry.
+
+    Returns:
+        Adapters, selected names, embedding identity and generation metadata.
+
+    Raises:
+        ValueError: Default selection or its metadata is invalid.
+        TypeError: A builder result lacks a selected provider interface.
+    """
     resolved = selection or create_default_provider_registry(settings).resolve(
         settings.embedding_provider,
         settings.generation_provider,

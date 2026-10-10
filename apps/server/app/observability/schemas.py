@@ -1,3 +1,20 @@
+"""Project bounded observations into public metrics and allowlisted diagnostics.
+
+MetricsResponse adapts MetricsSnapshot: query counters and latency history
+are process-local, while cache_size is supplied by a separate store read.
+Average latency uses completed requests; p95 uses the bounded recent sample.
+The model checks latency/sample agreement and errors <= requests, not a
+deployment-wide total or an atomic cache/counter snapshot.
+
+RuntimeDiagnosticsResponse explicitly selects safe runtime configuration,
+fingerprints, capacity limits, persistence booleans and a supplied cache
+readiness observation. It does not serialize Settings or return credentials,
+URLs, model names, namespace/dataset identities, prompts or responses. These
+fields are single-process observations; fingerprints and persistence flags do
+not prove external availability. Authorization belongs to the global-admin
+route dependencies, not to these model builders.
+"""
+
 from dataclasses import asdict
 from datetime import UTC, datetime
 from typing import Literal
@@ -35,6 +52,14 @@ class MetricsResponse(StrictModel):
 
     @classmethod
     def from_snapshot(cls, snapshot: MetricsSnapshot) -> "MetricsResponse":
+        """Validate a detached process snapshot for the metrics response.
+
+        Args:
+            snapshot: Aggregate query observations with an independently read cache size.
+
+        Returns:
+            Response validated against field bounds and latency/count invariants.
+        """
         return cls(**asdict(snapshot))
 
     @model_validator(mode="after")
@@ -83,6 +108,17 @@ class RuntimeDiagnosticsResponse(StrictModel):
         cache_readiness: Literal["ready", "unavailable"],
         max_request_body_bytes: int,
     ) -> "RuntimeDiagnosticsResponse":
+        """Build diagnostics from an explicit configuration allowlist.
+
+        Args:
+            runtime: Application-owned benchmark configuration, never raw Settings.
+            cache_backend: Configured backend name, not an availability guarantee.
+            cache_readiness: Outcome already observed by the route's cache-stats check.
+            max_request_body_bytes: Configured HTTP body bound reported for imports.
+
+        Returns:
+            Timestamped single-process metadata without probing providers or storage.
+        """
         return cls(
             observed_at=datetime.now(UTC),
             process_scope="single_backend_process",

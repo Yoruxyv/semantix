@@ -1,3 +1,12 @@
+"""Persist explicit imported datasets, including private case text, in PostgreSQL.
+
+Metadata and ordered cases use the existing evaluation schema, separate from the
+embedded cache store. Repository queries enforce supplied namespace filters;
+HTTP authentication/authorization and import validation belong to callers.
+Dataset capacity rejects creation rather than pruning active datasets. Existing
+foreign keys cascade source deletion to cases and linked retained run history.
+"""
+
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Sequence
@@ -73,6 +82,11 @@ def _dataset(
     metadata: PersistedEvaluationDatasetMetadata,
     cases: Sequence[BenchmarkCase],
 ) -> BenchmarkDataset:
+    """Rebuild persisted identity/counts from metadata and the supplied case order.
+
+    Version comes from schema_version and the stored digest is carried unchanged,
+    not recomputed. The detail reader separately checks metadata's case count.
+    """
     expected_hits = sum(case.expected_cache_hit for case in cases)
     categories = list(dict.fromkeys(case.category for case in cases))
     return BenchmarkDataset(
@@ -96,6 +110,14 @@ def _dataset(
 
 
 class PostgresEvaluationDatasetRepository:
+    """Borrow a shared pool for scoped imported-dataset persistence and reads.
+
+    Opening/closing the pool, migrations, role grants and caller authorization
+    remain outside this adapter. Connections are released through the pool's
+    context manager. Methods use the configured pool/driver timeout behavior;
+    this repository does not add its own deadline or background cleanup task.
+    """
+
     def __init__(
         self,
         pool: Pool,
@@ -103,6 +125,16 @@ class PostgresEvaluationDatasetRepository:
         max_per_namespace: int,
         cleanup_batch_size: int,
     ) -> None:
+        """Validate repository limits without acquiring a connection.
+
+        Args:
+            pool: Application-owned shared PostgreSQL pool to borrow.
+            max_per_namespace: Maximum active datasets before creation is rejected.
+            cleanup_batch_size: Maximum expired parent rows selected per purge.
+
+        Raises:
+            ValueError: Either repository limit is not positive.
+        """
         if max_per_namespace < 1 or cleanup_batch_size < 1:
             raise ValueError("Persistent dataset repository limits must be positive")
         self._pool = pool
@@ -111,6 +143,12 @@ class PostgresEvaluationDatasetRepository:
 
     @asynccontextmanager
     async def _connection(self) -> AsyncGenerator[Connection[Record], None]:
+        """Borrow a connection and translate only handled OS/PostgreSQL failures.
+
+        Existing AppError and cancellation propagate. OSError/asyncpg.PostgresError
+        become EvaluationDatasetStorageError with a generic internal message and a
+        chained cause; other conversion/driver exceptions are not all intercepted.
+        """
         try:
             async with self._pool.acquire() as connection:
                 yield cast(Connection, connection)
@@ -126,6 +164,11 @@ class PostgresEvaluationDatasetRepository:
         connection: Connection[Record],
         namespace: str | None,
     ) -> None:
+        """Delete at most one configured batch of expired parents in the supplied scope.
+
+        None selects all namespaces. Foreign-key cascades may remove additional
+        dependent rows; the batch bounds parents, not total cascaded row work.
+        """
         await connection.execute(
             PURGE_EXPIRED,
             namespace,
@@ -139,6 +182,22 @@ class PostgresEvaluationDatasetRepository:
         offset: int,
         limit: int,
     ) -> PersistedEvaluationDatasetPage:
+        """Purge a bounded expired batch, then count and page active metadata.
+
+        These statements share a transaction without an explicitly stronger isolation
+        level; count/page are not promised to be a concurrent stable snapshot.
+
+        Args:
+            namespace: Caller-authorized filter, or None for an authorized global list.
+            offset: Validated pagination offset.
+            limit: Validated maximum returned metadata rows.
+
+        Returns:
+            Active metadata ordered by created_at descending, then dataset_id.
+
+        Raises:
+            EvaluationDatasetStorageError: A handled OS/PostgreSQL operation fails.
+        """
         async with self._connection() as connection, connection.transaction():
             await self._purge_expired(connection, namespace)
             total = int(
@@ -187,6 +246,26 @@ class PostgresEvaluationDatasetRepository:
         *,
         authorized_namespaces: AuthorizedNamespaceScope,
     ) -> PersistedEvaluationDataset | None:
+        """Read visible active metadata and cases ordered by stored sequence.
+
+        Parent and case reads share a transaction with its default isolation. Check
+        reconstructed case count against metadata before returning, without re-running
+        import validation or recomputing the digest. Imported prompts/notes are private
+        contents; knowing the UUID does not bypass the supplied namespace scope.
+
+        Args:
+            dataset_id: Persisted UUID string; invalid strings return None.
+            authorized_namespaces: Authorized scope, None for unrestricted reads or
+                an empty set for no permitted namespace.
+
+        Returns:
+            Ordered dataset with metadata, or None for invalid, expired, absent or
+            invisible identity, without disclosing which lookup condition failed.
+
+        Raises:
+            EvaluationDatasetStorageError: Case count is inconsistent or a handled
+                OS/PostgreSQL operation fails. Other row-conversion errors can propagate.
+        """
         try:
             resolved_id = UUID(dataset_id)
         except ValueError:
@@ -255,6 +334,29 @@ class PostgresEvaluationDatasetRepository:
         validated: ValidatedImportedDataset,
         retention_days: int,
     ) -> PersistedEvaluationDataset:
+        """Explicitly save validated metadata and ordered case records in one transaction.
+
+        Assign a fresh UUID and UTC created/expiry times using requested retention.
+        The caller supplies validated data, retention bounds and authorized namespace.
+        Acquire an advisory transaction lock keyed by namespace, purge one expired
+        batch, count active datasets and reject a full namespace before inserting.
+        Metadata and one-based case sequences commit together. Mapping the result is
+        afterward. The lock coordinates this creation path, not every read/delete or
+        the separately keyed history-persistence path.
+
+        Args:
+            namespace: Concrete caller-authorized ownership namespace.
+            validated: Import validation result, including counts and semantic digest.
+            retention_days: Caller-validated duration from creation to expiry.
+
+        Returns:
+            Newly assigned metadata and reconstructed persisted dataset identity.
+
+        Raises:
+            EvaluationDatasetCapacityError: Active namespace capacity is full.
+            EvaluationDatasetStorageError: Insert evidence is missing or a handled
+                OS/PostgreSQL operation fails.
+        """
         dataset_id = uuid4()
         created_at = datetime.now(UTC)
         expires_at = created_at + timedelta(days=retention_days)
@@ -363,6 +465,18 @@ class PostgresEvaluationDatasetRepository:
         *,
         namespace: str,
     ) -> bool:
+        """Delete an active identity in one concrete namespace after bounded cleanup.
+
+        Existing foreign keys cascade its cases and source-linked run/threshold rows.
+        Cleanup and deletion share a transaction; false does not mean cleanup did no work.
+
+        Args:
+            dataset_id: UUID string; invalid strings return False without SQL.
+            namespace: Concrete namespace already authorized by the caller.
+
+        Returns:
+            Whether the targeted active scoped parent was deleted.
+        """
         try:
             resolved_id = UUID(dataset_id)
         except ValueError:
@@ -383,6 +497,11 @@ class PostgresEvaluationDatasetRepository:
         return deleted is not None
 
     async def readiness(self) -> None:
+        """Check dataset-parent table read access without loading private records.
+
+        This is not a write/child-table/provider/history probe. Handled OS/PostgreSQL
+        failures use the same storage-error translation as other connection operations.
+        """
         async with self._connection() as connection:
             await connection.fetchval(
                 "SELECT COUNT(*) FROM semantix.evaluation_datasets WHERE FALSE"

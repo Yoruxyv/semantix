@@ -1,3 +1,10 @@
+"""Resolve the client key used by rate limits and session lockout tracking.
+
+Trust is defined by deployment CIDRs and the immediate peer, not by the
+presence of forwarding headers. See ``docs/operations/deployment.md`` for
+the gateway and host-proxy boundary; trusted proxies must sanitize headers.
+"""
+
 from ipaddress import IPv4Network, IPv6Network, ip_address, ip_network
 
 from fastapi import Request
@@ -20,6 +27,20 @@ def _is_trusted(address: str, settings: Settings) -> bool:
 
 
 def client_address(request: Request) -> str:
+    """Resolve an address through explicitly trusted X-Forwarded-For hops.
+
+    Ignore forwarding headers from untrusted peers. For trusted peers, reject
+    the entire chain if any address is invalid, otherwise walk right to left
+    to the first untrusted address. If every hop is trusted, use the leftmost.
+    Other forwarding headers are not consulted.
+
+    Args:
+        request: Request with the immediate peer and application proxy settings.
+
+    Returns:
+        Resolved address, the peer on absent or malformed forwarding data, or
+        ``unknown`` when no client peer is available.
+    """
     peer = "unknown" if request.client is None else request.client.host
     settings: Settings = request.app.state.settings
     if not _is_trusted(peer, settings):

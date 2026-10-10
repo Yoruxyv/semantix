@@ -1,3 +1,20 @@
+"""Validate deployment settings without opening providers or storage.
+
+Settings reads case-insensitive environment names and ``.env`` values;
+get_settings caches the resolved instance. Provider validation applies to
+selected providers. Cache backend, coordination, dataset persistence and
+run history are independent choices; any PostgreSQL feature requires the
+runtime DATABASE_URL and shares one pool. Migration credentials belong to
+deployment tooling, not Settings. ``auto`` migrates enabled coordination
+and evaluation tables; official cache setup remains explicit in both modes.
+
+AUTH_MODE=disabled grants the trusted-local-development admin. Token mode
+requires unique principal names and SHA-256 token digests. A principal's
+namespaces must be unique; ``*`` is allowed alone and only for admins.
+Allowed CORS origins cannot be wildcards, and trusted proxy CIDRs define
+which immediate peers may supply a forwarded address, not user identity.
+"""
+
 import re
 from functools import lru_cache
 from ipaddress import ip_network
@@ -275,6 +292,21 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_selected_configuration(self) -> "Settings":
+        """Enforce dependencies among provider, storage and authentication choices.
+
+        PostgreSQL selections require a runtime DSN and ordered pool bounds;
+        Redis selection validates its URL and bounded vector capacity. Dataset
+        retention must be ordered, and durable run history requires explicit
+        retention, namespace capacity and cleanup limits. Token mode requires
+        principals with unique names/digests and admin-only wildcard scope.
+
+        Returns:
+            The validated settings instance, without connecting to dependencies.
+
+        Raises:
+            ValueError: Selected settings violate a cross-field invariant or a
+                required provider/storage/authentication setting is missing.
+        """
         validate_provider_configuration(self)
 
         if (
@@ -352,16 +384,30 @@ class Settings(BaseSettings):
 
     @property
     def embedding_space(self) -> str:
+        """Return a built-in provider's model-based cache identity.
+
+        Custom provider identities come from registry metadata, not this helper.
+
+        Raises:
+            RuntimeError: The provider is custom or its model was not validated.
+        """
         return selected_embedding_space(self)
 
     @property
     def database_dsn(self) -> str:
+        """Reveal the validated runtime DSN only for connection creation.
+
+        Raises:
+            RuntimeError: No database URL was supplied; callers must first require
+                a PostgreSQL feature. The returned value is secret, not log data.
+        """
         if self.database_url is None:
             raise RuntimeError("DATABASE_URL was not validated")
         return self.database_url.get_secret_value()
 
     @property
     def database_required(self) -> bool:
+        """Report whether cache, dataset, history or coordination needs PostgreSQL."""
         return (
             self.cache_backend == "pgvector"
             or self.evaluation_dataset_storage == "postgres"
@@ -370,6 +416,13 @@ class Settings(BaseSettings):
         )
 
     def configured_secrets(self) -> tuple[str, ...]:
+        """Collect configured credentials and URL forms for logging redaction.
+
+        Returns:
+            Secret provider keys, database/Redis URLs and extracted password forms.
+            Registry secrets are added separately by the factory. This is not an
+            allowlist for serializing settings or discovering caller bearer tokens.
+        """
         secrets = (
             self.hf_api_key,
             self.openai_api_key,
@@ -451,5 +504,10 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Load and cache validated environment settings for default construction.
+
+    Environment changes are not re-read on each request; callers can inject
+    an explicit Settings instance into create_app instead.
+    """
     # Required fields are supplied by BaseSettings environment sources.
     return Settings()  # pyright: ignore[reportCallIssue]

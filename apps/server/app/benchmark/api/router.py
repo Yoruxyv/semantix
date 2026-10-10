@@ -1,3 +1,25 @@
+"""Route distinct dataset, execution and retained-history workflows.
+
+Both routers borrow BenchmarkService and apply the configured route quota.
+Viewers read built-in catalogs, authorized persisted datasets/history and
+comparisons. Operators validate imports, persist datasets and execute runs;
+admins delete persisted datasets or history in a concrete authorized namespace.
+
+/benchmarks provides built-in catalogs and synchronous runs. /evaluations
+adds imported/persisted sources and history. Validation returns a provider-free
+preview; persistence is an explicit operation, not a side effect of validation
+or inline execution. Runs use isolated in-memory caches rather than the live
+interactive cache, and threshold projections never update live configuration.
+
+Scoped listings may infer a sole namespace; wildcard access allows global
+listings. Persistence, persisted-source execution and deletion require concrete
+scope, including for wildcard admins. Built-in evaluation history also resolves
+concrete scope when requested or enabled. Detail/comparison reads pass authorized
+namespace sets to storage so missing and foreign IDs share not-found behavior.
+Dataset persistence and terminal aggregate history are separately configured;
+inline runs are not retained, and retention failure need not fail a completed run.
+"""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -57,6 +79,11 @@ async def run_benchmark(
     benchmark: BenchmarkDependency,
     principal: OperatorPrincipal,
 ) -> BenchmarkRunResponse:
+    """Execute a built-in benchmark synchronously with an isolated run cache.
+
+    This legacy execution route does not select a retained-history namespace.
+    External provider calls require the request's explicit acknowledgement.
+    """
     return await benchmark.run(payload)
 
 
@@ -84,6 +111,15 @@ async def validate_evaluation_dataset(
     benchmark: BenchmarkDependency,
     principal: OperatorPrincipal,
 ) -> EvaluationDatasetPreview:
+    """Validate imported data and estimate workload without calling providers.
+
+    Returns:
+        Preview with zero provider calls; this neither persists data nor runs it.
+
+    Raises:
+        EvaluationDatasetValidationError: Import rules fail, producing safe
+            structured issues with HTTP 422.
+    """
     return benchmark.validate_dataset(payload)
 
 
@@ -124,6 +160,15 @@ async def persist_evaluation_dataset(
     benchmark: BenchmarkDependency,
     principal: OperatorPrincipal,
 ) -> PersistedEvaluationDatasetDetail:
+    """Persist an operator-authorized import in a concrete namespace.
+
+    Returns:
+        Stored dataset detail with HTTP 201 and bounded retention metadata.
+
+    Raises:
+        EvaluationDatasetPersistenceDisabledError: No persistent catalog is
+            configured, producing HTTP 409 rather than silently saving locally.
+    """
     namespace = resolve_namespace(
         principal,
         payload.namespace,
@@ -165,6 +210,7 @@ async def delete_persisted_evaluation_dataset(
     principal: AdminPrincipal,
     namespace: EvaluationNamespaceQuery = None,
 ) -> DeletePersistedEvaluationDatasetResponse:
+    """Delete a stored dataset as admin in one concrete authorized namespace."""
     authorized_namespace = resolve_namespace(
         principal,
         namespace,
@@ -196,6 +242,7 @@ async def list_evaluation_run_history(
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> EvaluationRunHistoryListResponse:
+    """List viewer-authorized aggregates, or an explicit empty disabled catalog."""
     authorized_namespace = resolve_namespace(
         principal,
         namespace,
@@ -216,6 +263,13 @@ async def run_evaluation(
     benchmark: BenchmarkDependency,
     principal: OperatorPrincipal,
 ) -> BenchmarkRunResponse:
+    """Execute a validated source with operator authorization and isolated cache.
+
+    Persisted sources resolve concrete access before loading. Built-in sources
+    resolve history scope when requested or retention is enabled; inline sources
+    remain unretained. The service revalidates inline data rather than trusting a
+    prior preview. The response describes the completed run and retention outcome.
+    """
     authorized_namespaces: AuthorizedNamespaceScope = frozenset()
     builtin_history_namespace: str | None = None
     if isinstance(payload.dataset_source, PersistedEvaluationDatasetSource):
@@ -256,6 +310,11 @@ async def compare_evaluation_run_history(
     benchmark: BenchmarkDependency,
     principal: ViewerPrincipal,
 ) -> EvaluationRunComparisonResponse:
+    """Compare two viewer-authorized retained runs without executing providers.
+
+    Both reads enforce namespace scope. Compatibility blockers suppress deltas,
+    including cross-namespace comparisons by otherwise global principals.
+    """
     return await benchmark.compare_run_history(
         payload,
         authorized_namespaces=(
@@ -275,6 +334,7 @@ async def get_evaluation_run_history(
     benchmark: BenchmarkDependency,
     principal: ViewerPrincipal,
 ) -> EvaluationRunHistoryDetail:
+    """Read viewer-authorized historical aggregates without per-query evidence."""
     return await benchmark.run_history_detail(
         run_id.hex,
         authorized_namespaces=(
@@ -295,6 +355,7 @@ async def delete_evaluation_run_history(
     principal: AdminPrincipal,
     namespace: EvaluationNamespaceQuery = None,
 ) -> DeleteEvaluationRunHistoryResponse:
+    """Delete retained history as admin in a concrete authorized namespace."""
     authorized_namespace = resolve_namespace(
         principal,
         namespace,

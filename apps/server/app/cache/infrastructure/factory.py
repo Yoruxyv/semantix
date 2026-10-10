@@ -1,3 +1,10 @@
+"""Compose the selected package store for the lifetime of server cache services.
+
+Normal startup binds/validates existing storage; explicit setup owns cache
+migrations and binding initialization. The returned server adapter adds
+presentation and telemetry while the package store remains authoritative.
+"""
+
 import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -28,6 +35,36 @@ async def cache_backend_lifespan(
     events: CacheEventRecorder | None = None,
     pool: Pool | None = None,
 ) -> AsyncGenerator[CacheBackend, None]:
+    """Yield a configured cache adapter and release resources owned by this scope.
+
+    Memory creates a process-local store. PostgreSQL borrows a supplied pool or
+    opens its own, validates the official schema, then separately reads server
+    telemetry. Redis connect owns its client/pool and validates the existing marked
+    binding. Neither persistent branch installs or adopts a cache schema.
+
+    On exit or failed setup, close any assigned store first. A nested finally then
+    attempts to close only a pool opened here, under the database command timeout;
+    a failed/cancelled pool close terminates it and re-raises. Supplied pools remain
+    caller-owned. Store cleanup errors can replace an earlier failure, and partial
+    startup/cancellation does not guarantee successful cleanup. Redis connect owns
+    cleanup before it returns a store. Application query services borrow this
+    backend while the enclosing lifespan is active.
+
+    Args:
+        settings: Validated backend, binding, capacity, TTL and timeout configuration.
+        dimensions: Required dimension count of the selected embedding provider.
+        embedding_space: Provider/configuration identity binding compatible vectors.
+        events: Optional synchronous application eviction/expiration recorder.
+        pool: Optional borrowed application pool for PostgreSQL storage and telemetry.
+
+    Yields:
+        Server CacheBackend adapting one package-owned store.
+
+    Raises:
+        CacheStorageError: Unsupported/missing backend configuration or translated
+            official setup/operation/cleanup failures. Other failures and cancellation
+            propagate; this context also handles official errors thrown from its body.
+    """
     owned_pool: Pool | None = None
     backend: OfficialStoreBackend | None = None
     try:

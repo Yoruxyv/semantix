@@ -1,3 +1,9 @@
+"""Build allowlisted configuration evidence without contacting providers.
+
+Provider/normalization fingerprints are supplied by runtime composition. Dataset
+digests describe the semantic subset in ``app.benchmark.domain.datasets``.
+"""
+
 import hashlib
 import json
 
@@ -14,7 +20,26 @@ def build_reproducibility_metadata(
     dataset: BenchmarkDatasetSummary,
     runtime: BenchmarkRuntimeConfiguration,
 ) -> BenchmarkReproducibilityMetadata:
-    """Build the safe, deterministic metadata describing an evaluation run."""
+    """Build the safe, deterministic metadata describing an evaluation run.
+
+    Hash compact sorted-key JSON (default ASCII escaping) as UTF-8 with SHA-256.
+    The allowlist includes dataset identity/source/version/digest, provider categories
+    and fingerprints, embedding dimensions, normalization identity, measured and
+    evaluation thresholds, repetitions/reset, cost assumptions, timeout and comparison
+    contract version 1. Run IDs and timestamps do not enter this configuration hash.
+    Raw prompts/responses, model names, URLs and credentials are not copied into it;
+    dataset digests are still derived from prompt semantics and are not encryption.
+    Evidence describes supplied configuration, not guaranteed deterministic provider
+    output or identical outcomes on a future run.
+
+    Args:
+        request: Validated workload/threshold settings and cost assumptions.
+        dataset: Resolved summary with dataset identity and semantic digest.
+        runtime: Allowlisted runtime identity and precomputed fingerprints.
+
+    Returns:
+        Validated metadata with the configuration fingerprint.
+    """
 
     safe_configuration: dict[str, object] = {
         "application_version": runtime.application_version,

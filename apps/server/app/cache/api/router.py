@@ -1,3 +1,19 @@
+"""Expose live-cache inspection, administration and global threshold policy.
+
+Every route uses the configured quota and a borrowed SemanticCache. Viewers
+can read authorized statistics, lists and details, and the global threshold.
+Admins can delete entries or clear authorized scope; updating the threshold
+requires a wildcard global admin. Threshold changes affect live queries and
+are independent of evaluation comparisons or recommendations.
+
+List/stats/clear resolve an optional namespace: a restricted sole namespace
+can be inferred, while only wildcard principals may omit it for global scope.
+Entry-key operations instead pass the principal's namespace set to storage;
+knowledge of a key grants no access. Inspection returns sensitive prompt and
+response data without confirming a hit or refreshing hit/LRU metadata. Pages
+describe live observations and can shift between concurrent requests.
+"""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, Request
@@ -54,6 +70,11 @@ async def list_cache_entries(
     search: Annotated[str | None, Query(max_length=MAX_PROMPT_LENGTH)] = None,
     sort: Annotated[CacheEntrySort, Query()] = "newest",
 ) -> CacheEntryListResponse:
+    """List viewer-authorized metadata with bounded offset pagination.
+
+    Search is a trimmed, case-insensitive prompt substring. Sorting changes
+    presentation, not recency; listings contain previews without full responses.
+    """
     authorized_namespace = resolve_namespace(principal, namespace, allow_global=True)
     return await cache.list_entries(
         offset=offset,
@@ -72,6 +93,12 @@ async def get_cache_entry(
     cache: SemanticCacheDependency,
     principal: ViewerPrincipal,
 ) -> CacheEntryMetadata:
+    """Read a sensitive full response within the viewer's authorized scope.
+
+    Raises:
+        CacheEntryNotFoundError: The entry is absent, expired or outside the
+            permitted namespaces; these cases share the public HTTP 404.
+    """
     return await cache.get_entry(
         cache_key,
         authorized_namespaces=(
@@ -88,6 +115,7 @@ async def delete_cache_entry(
     cache: SemanticCacheDependency,
     principal: AdminPrincipal,
 ) -> DeleteCacheEntryResponse:
+    """Delete as admin; absent or out-of-scope entries share the public HTTP 404."""
     await cache.delete_entry(
         cache_key,
         authorized_namespaces=(
@@ -105,6 +133,7 @@ async def clear_cache(
     principal: AdminPrincipal,
     namespace: CacheNamespaceQuery = None,
 ) -> ClearCacheResponse:
+    """Clear admin-authorized scope; only wildcard access permits global clearing."""
     authorized_namespace = resolve_namespace(principal, namespace, allow_global=True)
     await cache.clear(authorized_namespace)
     return ClearCacheResponse(cleared=True)
@@ -128,5 +157,6 @@ async def update_threshold(
     cache: SemanticCacheDependency,
     principal: GlobalAdminPrincipal,
 ) -> CacheThresholdResponse:
+    """Set the live global threshold through the global-admin dependency."""
     threshold = await cache.write_similarity_threshold(payload.threshold)
     return CacheThresholdResponse(threshold=threshold)

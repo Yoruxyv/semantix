@@ -1,3 +1,10 @@
+"""Keep public liveness separate from selected storage readiness checks.
+
+Neither endpoint authenticates callers or consumes ordinary route quotas.
+Settings and provider names are supplied at construction; storage services
+used by readiness are supplied by the application lifespan.
+"""
+
 from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 
@@ -13,6 +20,7 @@ router = APIRouter(tags=["health"])
 
 @router.get("/health", response_model=HealthResponse)
 async def health(request: Request) -> HealthResponse:
+    """Report process liveness and configured provider names without probing I/O."""
     return HealthResponse(
         status="ok",
         embedding_provider=request.app.state.embedding_provider_name,
@@ -26,6 +34,20 @@ async def health(request: Request) -> HealthResponse:
     responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "Not ready"}},
 )
 async def ready(request: Request) -> ReadinessResponse | JSONResponse:
+    """Probe cache stats, the enabled dataset catalog and coordination threshold.
+
+    The dataset catalog checks its repository only when configured. This path
+    does not probe generation, embeddings or the run-history repository, and
+    does not prove that every later storage operation will succeed.
+
+    Args:
+        request: Request whose application has completed lifespan startup.
+
+    Returns:
+        Configured cache and dataset storage modes on success. Cache,
+        coordination and dataset storage errors produce a safe ``not_ready``
+        HTTP 503 response; other failures use the normal exception boundary.
+    """
     try:
         await request.app.state.semantic_cache.stats()
         await request.app.state.benchmark_service.dataset_catalog_readiness()

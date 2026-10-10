@@ -1,3 +1,10 @@
+"""Share package semantic limits while owning server preview/evaluation defaults.
+
+The four imported semantic limits are the existing __all__ re-exports.
+Remaining constants supply server preview and evaluation configuration/schema
+bounds; their enforcement belongs to the consuming settings and validators.
+"""
+
 from semantix_cache._semantics import (
     MAX_MEMORY_CACHE_SIZE,
     MAX_PROMPT_LENGTH,

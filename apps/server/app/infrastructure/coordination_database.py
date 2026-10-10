@@ -1,3 +1,13 @@
+"""Bind optional PostgreSQL coordination resources to shared migration helpers.
+
+Own rate-limit buckets, authentication attempts and cache-threshold state, not
+authoritative semantic-cache entries. Load this package's migration resources;
+application/setup callers decide whether PostgreSQL coordination is enabled.
+Pools are borrowed. Shared discovery/locking/checksum/grant rules use
+CoordinationStorageError here; grants target only COORDINATION_TABLES and do
+not create roles or remove existing privileges.
+"""
+
 from asyncpg.pool import Pool
 
 from app.core.exceptions import CoordinationStorageError

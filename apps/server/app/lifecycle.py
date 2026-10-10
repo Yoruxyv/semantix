@@ -1,3 +1,10 @@
+"""Own server runtime resources and publish services for request dependencies.
+
+The lifespan owns the shared HTTP client and enters the database and cache
+contexts. Providers, coordination, repositories and services borrow those
+resources; ``app.api.deps`` retrieves the constructed services from state.
+"""
+
 import hashlib
 import json
 from collections.abc import AsyncGenerator, Callable
@@ -44,6 +51,36 @@ def create_lifespan(
     *,
     logging_secrets: tuple[str, ...],
 ) -> Lifespan:
+    """Create the deferred startup and shutdown context for one application.
+
+    On entry, build normalization and metrics, open the shared HTTP client
+    and build providers, then open any required PostgreSQL pool and initialize
+    or validate the selected cache backend.
+    Official persistent cache setup is explicit; this context does not create
+    the official PostgreSQL cache schema. Coordination seeds a missing global
+    threshold, and enabled evaluation repositories borrow the shared pool.
+    Finally, publish cache, query and benchmark services on application state.
+
+    On shutdown or startup failure, entered contexts unwind in order: cache
+    store, database pool, HTTP client. Cleanup errors can propagate. Provider
+    adapters borrow the HTTP client; this lifespan does not discover or close
+    additional resources created by custom builders. Startup is not a provider
+    inference probe or a complete storage readiness check.
+    Provider, storage and cleanup failures propagate from their owning components.
+
+    Args:
+        settings: Validated backend choices, limits and deployment policy.
+        provider_selection: Metadata and builders resolved before startup.
+        logging_secrets: Configured settings and registry secrets for redaction.
+
+    Returns:
+        FastAPI lifespan callable; resources open when its context is entered.
+
+    Raises:
+        RuntimeError: On context entry, required pool or run-history settings
+            are missing.
+    """
+
     @asynccontextmanager
     async def lifespan(
         application: FastAPI,

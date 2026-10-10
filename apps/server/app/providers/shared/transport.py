@@ -1,4 +1,10 @@
-"""Retrying JSON transport shared by HTTP provider adapters."""
+"""Retrying JSON transport shared by HTTP provider adapters.
+
+This module handles bounded response reading, operation deadlines and common
+HTTP error classification. Adapters independently own endpoint/authentication
+policy, payload schemas and decoding of the returned JSON value. URL validation
+belongs to configuration and adapter setup, not ``post_json``.
+"""
 
 import asyncio
 import json
@@ -24,6 +30,7 @@ from app.core.exceptions import (
     ProviderRetryableError,
 )
 
+# Create a fresh retry iterator for each operation, without sharing attempt state.
 RetryFactory = Callable[[], AsyncRetrying]
 DEFAULT_PROVIDER_MAX_RESPONSE_BYTES = _DEFAULT_PROVIDER_MAX_RESPONSE_BYTES
 _STREAM_CHUNK_BYTES = 64 * 1024
@@ -43,6 +50,19 @@ def create_retry_factory(
     multiplier_seconds: float,
     max_wait_seconds: float,
 ) -> RetryFactory:
+    """Configure fresh retry policies for ``ProviderRetryableError`` only.
+
+    Args:
+        attempts: Maximum total attempts, including the initial request.
+        multiplier_seconds: Scale for randomized exponential backoff.
+        max_wait_seconds: Upper bound on an individual backoff wait.
+
+    Returns:
+        A factory producing a new Tenacity iterator for each operation. On
+        exhaustion it re-raises the last eligible error. Authentication,
+        request and invalid-response errors are not retried by this policy.
+    """
+
     def retry_factory() -> AsyncRetrying:
         return AsyncRetrying(
             retry=retry_if_exception_type(
@@ -68,6 +88,54 @@ async def post_json(
     retry_factory: RetryFactory,
     max_response_bytes: int = DEFAULT_PROVIDER_MAX_RESPONSE_BYTES,
 ) -> object:
+    """POST JSON with a retry policy and return a bounded, decoded JSON value.
+
+    The supplied client's ``timeout.read`` sets one operation deadline across
+    attempts, backoff, response reading and JSON decoding. ``None`` disables
+    that total deadline; the client's other HTTPX timeouts still apply.
+    A check after synchronous decoding rejects results completed too late;
+    decoding itself cannot be interrupted while it blocks the event loop.
+    Operation deadline expiry is translated outside the retry loop.
+
+    HTTP 429, statuses >=500 and HTTPX ``RequestError`` become retryable errors.
+    HTTP 401/403 become authentication errors; other statuses >=400 become
+    request errors. The supplied policy decides which exceptions to retry;
+    ``create_retry_factory`` retries only ``ProviderRetryableError``.
+
+    Requests force ``Accept-Encoding: identity``. Nonempty response encodings
+    other than identity are rejected before body reading. A valid declared
+    Content-Length above the limit is rejected early; streamed chunks are
+    checked before extending the bounded body buffer. Invalid JSON/Unicode,
+    encoded bodies and size violations are not retried by
+    ``create_retry_factory``. Provider-specific validation remains the adapter's job.
+
+    Response streams exit their context on success, errors and cancellation.
+    Cancellation or timeout does not prove that the remote request was not
+    processed; retries can repeat remote work. Server handlers use fixed public
+    error details; retained exception causes are not universally sanitized.
+
+    Args:
+        client: Borrowed HTTPX client; this function never closes it.
+        endpoint: Adapter-selected URL, already validated where required.
+        headers: Provider headers, copied before overriding Accept-Encoding.
+        body: Provider-owned request payload sent as JSON.
+        retry_factory: Creates a fresh async retry iterator for this operation.
+        max_response_bytes: Positive byte limit for the buffered response body.
+
+    Returns:
+        The decoded JSON value, without a guaranteed object shape or provider
+        schema. Successful transport does not establish semantic validity.
+
+    Raises:
+        ProviderRetryableError: A retryable status or HTTPX request error escapes
+            the policy, the operation deadline expires, or iteration ends
+            without a result.
+        ProviderAuthenticationError: HTTP 401 or 403.
+        ProviderRequestError: Another HTTP status >=400 outside retryable cases.
+        InvalidProviderResponseError: Malformed JSON/Unicode, rejected content
+            encoding or response body exceeding the limit.
+        asyncio.CancelledError: External cancellation propagates unchanged.
+    """
     loop = asyncio.get_running_loop()
     timeout_seconds = client.timeout.read
     deadline = None if timeout_seconds is None else loop.time() + timeout_seconds

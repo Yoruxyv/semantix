@@ -1,3 +1,10 @@
+"""Keep local session-authentication lockout state for one application.
+
+The session route supplies trusted client addresses and resets successful
+attempts after any active lock expires. PostgreSQL coordination implements
+shared state separately; this tracker neither persists nor spans replicas.
+"""
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from math import ceil
@@ -18,7 +25,13 @@ class _ClientAttempts:
 
 
 class AuthenticationAttemptTracker:
-    """Track progressive authentication lockouts for one application process."""
+    """Track progressive authentication lockouts for one application process.
+
+    Three failures at each stage trigger 30, 60, then 3,600 seconds; later
+    stages keep the final duration. Active-lock attempts do not extend it or
+    add failures. Reset clears escalation, and stale state is pruned on access.
+    A lock protects the in-memory state; it provides no cross-process authority.
+    """
 
     def __init__(
         self,
@@ -26,6 +39,13 @@ class AuthenticationAttemptTracker:
         clock: Callable[[], float] = monotonic,
         stale_state_seconds: int = STALE_STATE_SECONDS,
     ) -> None:
+        """Create an empty tracker with a replaceable monotonic clock.
+
+        Args:
+            clock: Time source used for lock expiry and inactivity, in seconds.
+            stale_state_seconds: Inactivity period after which state is forgotten
+                during a later check or failure; defaults to one day.
+        """
         self._clock = clock
         self._stale_state_seconds = stale_state_seconds
         self._attempts: dict[str, _ClientAttempts] = {}

@@ -6,6 +6,8 @@ from semantix_cache import EmbeddingSpace, MemoryStore
 
 
 class InMemoryCacheBackend(OfficialStoreBackend):
+    """Compose MemoryStore with server presentation and process-local telemetry."""
+
     def __init__(
         self,
         max_size: int,
@@ -15,6 +17,15 @@ class InMemoryCacheBackend(OfficialStoreBackend):
         events: CacheEventRecorder | None = None,
         embedding_space: str = "server-memory",
     ) -> None:
+        """Create a package MemoryStore; its composing lifespan owns closure.
+
+        Args:
+            max_size: Store-wide capacity across namespaces.
+            ttl_seconds: Default retention, or None for no default expiry.
+            dimensions: Required vector dimensions in this binding.
+            events: Optional synchronous MemoryStore eviction/expiration recorder.
+            embedding_space: Identity for compatible vectors in this process-local store.
+        """
         super().__init__(
             MemoryStore(
                 embedding_space=EmbeddingSpace(

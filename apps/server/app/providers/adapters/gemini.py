@@ -1,3 +1,13 @@
+"""Server Gemini embedContent and generateContent wire contracts.
+
+Application lifespan owns the injected HTTP client; these adapters never close it.
+Constructors expect deployment-validated configuration. ``post_json`` applies the
+retry policy, byte limit and deadline derived from the client's read timeout;
+provider-specific parsing occurs after that transport call and is not retried.
+Cancellation propagates during HTTP waits without guaranteeing remote rollback.
+See ``app.providers.shared.transport`` and ``docs/guides/providers.md``.
+"""
+
 from collections.abc import Sequence
 from typing import cast
 from urllib.parse import quote
@@ -24,6 +34,8 @@ DEFAULT_RETRY_FACTORY = create_retry_factory(
 
 
 class GeminiProvider:
+    """Serve Gemini embedding and generation through their distinct model endpoints."""
+
     def __init__(
         self,
         client: httpx.AsyncClient,
@@ -36,6 +48,20 @@ class GeminiProvider:
         retry_factory: RetryFactory = DEFAULT_RETRY_FACTORY,
         max_response_bytes: int = DEFAULT_PROVIDER_MAX_RESPONSE_BYTES,
     ) -> None:
+        """Capture Gemini settings and strip an optional ``models/`` model prefix.
+
+        Args:
+            client: Application-owned async HTTP client.
+            api_key: Credential sent in ``x-goog-api-key``.
+            base_url: Validated API root, normally including its version path.
+            embedding_model: Bare or ``models/``-prefixed model, or ``None``.
+            generation_model: Bare or ``models/``-prefixed model, or ``None``.
+            embedding_dimensions: Requested and expected vector length, or ``None``.
+            max_new_tokens: Generation budget sent as ``maxOutputTokens``.
+            retry_factory: Per-request policy; the default retries eligible
+                transport failures for up to three attempts.
+            max_response_bytes: Shared transport's buffered response byte limit.
+        """
         self._client = client
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
@@ -54,6 +80,21 @@ class GeminiProvider:
         self,
         text: str,
     ) -> Sequence[float]:
+        """POST text parts to the URL-encoded model's ``:embedContent`` endpoint.
+
+        Sends ``model="models/..."``, ``content.parts`` and top-level
+        ``outputDimensionality``. Extract ``embedding.values`` as finite numeric
+        components excluding booleans, with exactly the configured dimensions.
+        No padding, truncation or local normalization is performed; the service
+        subsequently checks magnitude and normalizes the vector.
+
+        Returns:
+            The model vector at its returned scale.
+
+        Raises:
+            RuntimeError: Embedding model or dimensions are not configured.
+            InvalidProviderResponseError: Embedding shape or dimensions are invalid.
+        """
         if self._embedding_model is None or self._embedding_dimensions is None:
             raise RuntimeError("Gemini embedding provider is not configured")
         model_path = quote(
@@ -102,6 +143,22 @@ class GeminiProvider:
         return vector
 
     async def generate(self, prompt: str) -> str:
+        """POST user text parts to the encoded model's ``:generateContent`` endpoint.
+
+        Sets ``generationConfig.maxOutputTokens``. Require a first candidate with
+        content and a parts list, then collect its nonblank string text parts.
+        Malformed/nontext parts are skipped. This server decoder does not check
+        ``finishReason``, exclude thought-marked text or reject function-call parts;
+        the embedded Gemini completion parser has separate, stricter checks.
+
+        Returns:
+            Trimmed text parts from the first candidate, joined with newlines.
+
+        Raises:
+            RuntimeError: A generation model is not configured.
+            InvalidProviderResponseError: Candidate/content/parts are invalid or
+                contain no nonblank text.
+        """
         if self._generation_model is None:
             raise RuntimeError("Gemini generation provider is not configured")
         model_path = quote(

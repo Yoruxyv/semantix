@@ -1,3 +1,11 @@
+"""Validate decoded imported datasets without providers or storage access.
+
+Schema validation, ordered-reference checks and configured import/workload bounds
+precede domain conversion. Structured issues use fixed messages and selected
+location context instead of raw Pydantic input/error messages. Digests use
+``app.benchmark.domain.datasets``; previews report estimates, not executed work.
+"""
+
 import json
 from dataclasses import dataclass
 from typing import cast
@@ -21,6 +29,12 @@ MAX_VALIDATION_ISSUES = 100
 
 
 class EvaluationDatasetValidationError(AppError):
+    """Expose a stable 422 import error with at most 100 public issues.
+
+    The public slice bounds the response, not internal issue collection. Issue
+    pointers and permitted case IDs still contain caller-chosen identifiers.
+    """
+
     status_code = 422
     error_code = "evaluation_dataset_invalid"
     public_detail = "The imported evaluation dataset is invalid."
@@ -41,6 +55,8 @@ class EvaluationDatasetValidationError(AppError):
 
 @dataclass(frozen=True, slots=True)
 class ValidatedImportedDataset:
+    """Pair ordered converted cases with the provider-free validation preview."""
+
     dataset: BenchmarkDataset
     preview: EvaluationDatasetPreview
 
@@ -56,6 +72,11 @@ def _safe_case_context(
     raw: object,
     location: tuple[int | str, ...],
 ) -> tuple[str | None, int | None]:
+    """Select a zero-based index and bounded identifier-like case ID for an issue.
+
+    Return no prompt or note contents; character filtering does not guarantee
+    that a caller-chosen identifier contains no private information.
+    """
     if len(location) < 2 or location[0] != "cases" or not isinstance(location[1], int):
         return None, None
     case_index = location[1]
@@ -81,6 +102,11 @@ def _pydantic_issue(
     raw: object,
     error: dict[str, object],
 ) -> EvaluationDatasetValidationIssue:
+    """Map error type/location to fixed issue text without copying raw input.
+
+    JSON pointers escape path components; unknown-field names can remain in the
+    pointer. This deliberately avoids Pydantic's input and free-form message.
+    """
     raw_location = error.get("loc")
     location = (
         tuple(
@@ -130,6 +156,12 @@ def _pydantic_issue(
 
 
 def _decoded_size(raw: object) -> int:
+    """Measure compact sorted-key decoded JSON in UTF-8, including metadata.
+
+    This is canonical decoded size, not wire bytes or upload length. JSON
+    serialization TypeError/ValueError become invalid_document issues; UTF-8
+    encoding occurs afterward, outside that exception mapping.
+    """
     try:
         canonical = json.dumps(
             raw,
@@ -153,6 +185,12 @@ def _decoded_size(raw: object) -> int:
 def _reference_issues(
     definition: ImportedEvaluationDatasetDefinition,
 ) -> list[EvaluationDatasetValidationIssue]:
+    """Reject duplicate IDs and contradictory, self, ambiguous or forward references.
+
+    A declared expected-match ID must identify a unique earlier case and appear
+    only on an expected hit. An expected hit without a reference is allowed and
+    becomes a preview warning instead.
+    """
     issues: list[EvaluationDatasetValidationIssue] = []
     positions: dict[str, int] = {}
     duplicate_ids: set[str] = set()
@@ -222,6 +260,36 @@ def validate_imported_dataset(
     max_decoded_bytes: int,
     max_workload_queries: int,
 ) -> ValidatedImportedDataset:
+    """Validate an import and describe its proposed workload without executing it.
+
+    Measure canonical decoded bytes before strict schema-version-1 validation;
+    reject unknown fields, invalid structure, excessive case count and invalid
+    ordered references. Bound query work as cases * repetitions. Threshold count
+    affects projection-work estimates, not that query cap. Repetition/threshold
+    count ranges are expected to have been checked by the calling request schema.
+
+    Convert validated cases in order, assigning missing categories to
+    uncategorized. Missing categories and expected hits without references produce
+    warnings, not rejection. The semantic digest excludes display metadata and
+    notes; its prefix supplies the custom ID. Preview provider calls are zero;
+    maximum possible calls and query/projection counts describe proposed work.
+
+    Args:
+        raw: Decoded untrusted JSON definition, including display metadata.
+        repetitions: Proposed repetition count for the query-work bound.
+        threshold_count: Proposed threshold-row count for projection-work estimates.
+        max_cases: Configured maximum number of imported cases.
+        max_decoded_bytes: Configured canonical decoded UTF-8 size limit.
+        max_workload_queries: Configured maximum cases-times-repetitions work.
+
+    Returns:
+        Converted dataset and a preview of identity, counts, limits and warnings.
+
+    Raises:
+        EvaluationDatasetValidationError: A mapped serialization, schema,
+            reference, size, case-count or query-work validation check fails.
+        UnicodeEncodeError: Canonical JSON cannot be represented as UTF-8.
+    """
     decoded_bytes = _decoded_size(raw)
     if decoded_bytes > max_decoded_bytes:
         raise EvaluationDatasetValidationError(

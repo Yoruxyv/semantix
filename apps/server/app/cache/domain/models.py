@@ -1,3 +1,17 @@
+"""Validate server cache entries, provisional candidates and lookup evidence.
+
+CacheEntry carries a cache key, namespace, prompt/response text, a nonempty finite
+vector and an aware created_at revision. These models do not enforce unit norm
+or provider dimensions; bound stores enforce vector compatibility. CacheCandidate
+adds bounded similarity and does not itself establish a reusable hit.
+
+CacheLookupResult retains the query embedding on hits and misses. A hit requires
+response, score at/above its threshold and complete matched-entry identity;
+misses exclude response/identity but may retain candidate scores. Matched times
+must be aware. All models reject extra fields. Authorization and revision-aware
+confirmation belong to the calling service/backend, not Pydantic validation.
+"""
+
 import math
 from datetime import datetime
 
@@ -69,6 +83,15 @@ class CacheLookupResult(CacheModel):
 
     @model_validator(mode="after")
     def validate_lookup(self) -> "CacheLookupResult":
+        """Require response and matched identity only for a threshold-qualified hit.
+
+        Returns:
+            Evidence with complete hit metadata or a miss carrying no reusable response.
+
+        Raises:
+            ValueError: Hit evidence is incomplete/below threshold, or a miss includes
+                response or matched identity. Candidate score alone remains valid on misses.
+        """
         matched_fields = (
             self.matched_prompt,
             self.matched_cache_key,

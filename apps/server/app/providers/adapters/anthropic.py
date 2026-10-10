@@ -1,3 +1,13 @@
+"""Server Anthropic Messages integration for generation only.
+
+Application lifespan owns the injected HTTP client; these adapters never close it.
+Constructors expect deployment-validated configuration. ``post_json`` applies the
+retry policy, byte limit and deadline derived from the client's read timeout;
+provider-specific parsing occurs after that transport call and is not retried.
+Cancellation propagates during HTTP waits without guaranteeing remote rollback.
+See ``app.providers.shared.transport`` and ``docs/guides/providers.md``.
+"""
+
 from typing import cast
 
 import httpx
@@ -22,6 +32,11 @@ ANTHROPIC_API_VERSION = "2023-06-01"
 
 
 class AnthropicProvider:
+    """Generation-only Anthropic Messages adapter; no embedding method is provided.
+
+    Pair this selection with a separate embedding-capable provider.
+    """
+
     def __init__(
         self,
         client: httpx.AsyncClient,
@@ -32,6 +47,18 @@ class AnthropicProvider:
         retry_factory: RetryFactory = DEFAULT_RETRY_FACTORY,
         max_response_bytes: int = DEFAULT_PROVIDER_MAX_RESPONSE_BYTES,
     ) -> None:
+        """Capture Messages API settings and application-owned transport.
+
+        Args:
+            client: Borrowed async HTTP client.
+            api_key: Credential sent in ``x-api-key``.
+            base_url: Validated API root preceding ``/v1/messages``.
+            generation_model: Explicit Messages model identifier.
+            max_new_tokens: Generation budget sent as ``max_tokens``.
+            retry_factory: Per-request policy; the default retries eligible
+                transport failures for up to three attempts.
+            max_response_bytes: Shared transport's buffered response byte limit.
+        """
         self._client = client
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
@@ -41,6 +68,21 @@ class AnthropicProvider:
         self._max_response_bytes = max_response_bytes
 
     async def generate(self, prompt: str) -> str:
+        """POST a user message to ``/v1/messages`` with version ``2023-06-01``.
+
+        Send the configured model and ``max_tokens`` with ``x-api-key`` and
+        ``anthropic-version`` headers. Extract nonblank text only from content
+        blocks whose type is ``text``; other blocks are skipped. This server
+        decoder does not validate ``stop_reason`` or reject a mixed tool-use
+        response. Shared server text validation follows in calling workflows.
+
+        Returns:
+            Trimmed text blocks joined with newlines.
+
+        Raises:
+            InvalidProviderResponseError: Content is missing/invalid or contains
+                no nonblank text blocks.
+        """
         payload = await post_json(
             self._client,
             f"{self._base_url}/v1/messages",

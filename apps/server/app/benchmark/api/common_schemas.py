@@ -1,3 +1,19 @@
+"""Share dataset, classification and reproducibility evidence across API groups.
+
+Dataset summaries identify content by digest and version, with expected hit
+and miss counts covering every query. Built-in sources have no import schema
+version; inline and persisted sources use version 1. Categories are bounded
+and unique. Metrics require query, provider-call and confusion-matrix totals
+to agree, with calls matching misses and avoided calls matching hits.
+
+Threshold rows label the execution threshold measured and other thresholds
+projected; their values derive from frozen observed candidates rather than
+replaying the workload at every threshold. Reproducibility metadata records
+provider categories, configuration fingerprints and run assumptions, not a
+promise of identical future provider output. Ordered unique threshold lists
+and related fields are cross-checked by the run/history response models.
+"""
+
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -105,6 +121,15 @@ class BenchmarkMetrics(StrictModel):
 
     @model_validator(mode="after")
     def validate_totals(self) -> "BenchmarkMetrics":
+        """Require cache, provider-call and confusion counts to cover the same workload.
+
+        Returns:
+            Metrics whose hit/miss and positive/negative partitions agree.
+
+        Raises:
+            ValueError: Any count partition or provider-call/cache relationship
+                contradicts the declared total.
+        """
         if self.cache_hits + self.cache_misses != self.total_queries:
             raise ValueError("Cache classifications must cover every query")
         if self.provider_calls + self.provider_calls_avoided != self.total_queries:

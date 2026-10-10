@@ -1,3 +1,11 @@
+"""Separate server legacy cache migrations/telemetry from the official store.
+
+Packaged server migration 0001 retains semantix legacy entries and namespace
+counters. PgVectorStore owns its marked schema/prefix and ledger independently;
+explicit setup never adopts legacy answers/vectors. Pool helpers delegate to
+``app.infrastructure.database`` with CacheStorageError; callers own the pool.
+"""
+
 from __future__ import annotations
 
 import asyncpg
@@ -71,6 +79,10 @@ async def create_pool(
 
 
 async def create_database_pool(settings: Settings) -> Pool:
+    """Create a caller-owned pool from runtime DSN, bounds and timeout settings.
+
+    No schema migration or official-store binding initialization occurs here.
+    """
     return await create_pool(
         settings.database_dsn,
         min_size=settings.database_pool_min_size,
@@ -84,6 +96,12 @@ async def _validate_legacy_migration(
     connection: Connection[asyncpg.Record] | PoolConnectionProxy[asyncpg.Record],
     migration: Migration,
 ) -> bool:
+    """Check only released 0001 relation presence and required column-name subsets.
+
+    Reject other versions. Existing extra columns are allowed; types, indexes,
+    constraints and data are not verified. Acceptance permits checksum backfill,
+    not complete schema equivalence or adoption into the official cache store.
+    """
     if migration.version != "0001":
         return False
 
@@ -122,6 +140,11 @@ async def _validate_legacy_migration(
 
 
 async def apply_migrations(pool: Pool) -> None:
+    """Apply server legacy resources with vector-extension bootstrap and 0001 validation.
+
+    Borrow the pool and use shared locking/checksum/per-migration rules. This does
+    not initialize PgVectorStore tables or convert legacy cache contents.
+    """
     await shared_database.apply_migrations(
         pool,
         load_migrations(),
@@ -133,6 +156,12 @@ async def apply_migrations(pool: Pool) -> None:
 
 
 async def grant_runtime_privileges(pool: Pool, runtime_role: str) -> None:
+    """Grant DML on both legacy cache tables through the shared validated allowlist.
+
+    This compatibility helper includes legacy entries and namespace counters.
+    initialize_official_schema instead grants only server counters plus official
+    runtime tables; neither path creates roles or revokes pre-existing permissions.
+    """
     await shared_database.grant_runtime_privileges(
         pool,
         runtime_role,
@@ -148,7 +177,26 @@ async def initialize_official_schema(
     table_prefix: str = "workbench_",
     runtime_role: str | None = None,
 ) -> None:
-    """Explicit operator setup. Never read or convert legacy cache entries."""
+    """Explicit operator setup. Never read or convert legacy cache entries.
+
+    Construct a borrowed-pool setup store, apply server legacy/extension migrations,
+    then initialize the official marked schema. The schema-setup/dimension-one
+    embedding space is a setup placeholder, not an adopted runtime vector binding.
+    If a role is supplied, grant server counter DML, official schema usage, SELECT
+    on the official migration ledger, and DML on binding_state/cache_entries.
+    Store/role validation precedes identifier interpolation.
+
+    Setup/grant groups are not one transaction. The finally block closes the setup
+    store, which does not own the pool. Expected errors inside the setup try become
+    CacheStorageError without a raw cause; constructor/close failures and cancellation
+    are not universally translated, and close failure may replace an earlier error.
+
+    Args:
+        pool: Borrowed pool with extension/schema/migration and optional grant authority.
+        schema: Official store schema validated by PgVectorStore.
+        table_prefix: Official store table prefix validated by PgVectorStore.
+        runtime_role: Optional existing role for the selected runtime grants.
+    """
     store = PgVectorStore(
         pool=pool,
         embedding_space=EmbeddingSpace(identity="schema-setup", dimensions=1),

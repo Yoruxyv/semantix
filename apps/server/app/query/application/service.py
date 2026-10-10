@@ -1,3 +1,13 @@
+"""Coordinate one authorized query using borrowed cache and generation services.
+
+The HTTP boundary validates/sanitizes prompts and authorizes namespaces before
+calling this service. Effective read/write policy and resolved TTL select shared
+in-flight work within this QueryService instance, including bypass policies.
+Matching normalization belongs to SemanticCache; generation receives the supplied
+application prompt. Shared ordering helpers do not make this the embedded
+AsyncSemanticCache facade or a conversation/session service.
+"""
+
 import logging
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -20,6 +30,13 @@ logger = logging.getLogger(__name__)
 
 
 class QueryEventRecorder(Protocol):
+    """Observe each caller separately from shared generation work.
+
+    Request completion receives latency and a failure flag, including exceptional
+    exits from execute. Provider events count attempts before generation; coalesced
+    deltas count active followers, not leaders. Callbacks are synchronous.
+    """
+
     def record_request_started(self) -> None: ...
 
     def record_request_completed(
@@ -40,6 +57,14 @@ class _QueryResolution:
 
 
 class QueryService:
+    """Orchestrate cache lookup, validated generation and policy-permitted writes.
+
+    The cache, provider and optional recorder are borrowed. This instance creates
+    its own server RequestCoalescer; it neither closes dependencies nor implements
+    authentication. Results distinguish a confirmed hit from generation avoided by
+    following another caller's work.
+    """
+
     def __init__(
         self,
         cache: SemanticCache,
@@ -47,6 +72,13 @@ class QueryService:
         *,
         metrics: QueryEventRecorder | None = None,
     ) -> None:
+        """Bind borrowed services and create an instance-local request coalescer.
+
+        Args:
+            cache: Application cache responsible for lookup confirmation, TTL and storage.
+            generation_provider: Provider called with the supplied prompt on a miss/bypass.
+            metrics: Optional synchronous request/provider/follower event recorder.
+        """
         self._cache = cache
         self._generation_provider = generation_provider
         self._metrics = metrics
@@ -60,6 +92,31 @@ class QueryService:
         *,
         policy: QueryCachePolicy = DEFAULT_QUERY_CACHE_POLICY,
     ) -> QueryResponse:
+        """Resolve one caller's query and report its actual hit/generation evidence.
+
+        Validate TTL policy and resolve a write TTL against the backend default before
+        selecting a coalescing key. Reads may return a confirmed hit; otherwise the
+        leader generates and validates text, then awaits any permitted write before
+        publishing a result. Provider, write and validation failures propagate.
+
+        Each caller records its own start and finally records completion with latency
+        and failure state. Shared generation records one provider attempt. A follower
+        can receive generated text with cache_hit=False, provider_called=False and
+        generation_skipped=True. Only a confirmed lookup provides matched identity;
+        a miss can still carry a candidate score. Cancelling a caller can leave the
+        shielded resolution running, so later store/provider effects remain possible.
+
+        Args:
+            prompt: Application prompt already validated by the HTTP caller, when used.
+            policy: Authorized namespace and independent read/write permissions with TTL.
+
+        Returns:
+            Validated response with this caller's latency and shared lookup evidence.
+
+        Raises:
+            ValueError: TTL is invalid or specified when writes are disabled.
+            InvalidProviderResponseError: Generated output fails the server text validator.
+        """
         started_at = perf_counter()
         failed = True
         if self._metrics is not None:
@@ -133,6 +190,13 @@ class QueryService:
         prompt: str,
         policy: QueryCachePolicy,
     ) -> _QueryResolution:
+        """Run shared lookup/generation/write ordering without per-caller metrics.
+
+        A hit must have a response. Generation is validated before writing, and a miss
+        embedding is reused when available. Lookup, provider and write failures escape;
+        the coalescer shares their outcome rather than inventing a successful response.
+        """
+
         async def lookup() -> CacheLookupResult:
             return await self._cache.lookup(
                 prompt,

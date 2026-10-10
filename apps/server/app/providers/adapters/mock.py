@@ -1,3 +1,9 @@
+"""Deterministic, network-free providers for development and test composition.
+
+Token hashing and synthetic responses exercise cache mechanics; they do not
+model a real provider's semantic quality. No HTTP client or model is needed.
+"""
+
 import asyncio
 import hashlib
 import logging
@@ -14,6 +20,14 @@ class MockEmbeddingProvider:
     """Deterministic local embedding provider for tests and demos."""
 
     def __init__(self, dimensions: int) -> None:
+        """Configure the output vector length.
+
+        Args:
+            dimensions: Positive number of hash buckets and vector components.
+
+        Raises:
+            ValueError: Dimensions are zero or negative.
+        """
         if dimensions <= 0:
             raise ValueError("Mock embedding dimensions must be positive")
         self._dimensions = dimensions
@@ -22,6 +36,15 @@ class MockEmbeddingProvider:
         self,
         text: str,
     ) -> Sequence[float]:
+        """Hash case-folded ASCII-alphanumeric tokens into signed vector buckets.
+
+        With no matching tokens, hash the entire case-folded text instead. SHA-256
+        fixes each token's bucket and sign; repeated tokens accumulate. Normalize
+        to unit length, or return the first basis vector if contributions cancel.
+
+        Returns:
+            A stable unit vector with the configured number of components.
+        """
         tokens = TOKEN_PATTERN.findall(text.casefold())
         if not tokens:
             tokens = [text.casefold()]
@@ -46,6 +69,12 @@ class MockGenerationProvider:
     _generation_delay_seconds = 0.0
 
     async def generate(self, prompt: str) -> str:
+        """Return the mock prefix followed by the original prompt.
+
+        An optional delay supplied by MockProvider uses cancellable asyncio sleep.
+        When delayed, static start/finish log messages omit prompt content, and
+        cancellation propagates through the sleep.
+        """
         if self._generation_delay_seconds:
             logger.info("Mock generation started")
             try:
@@ -59,5 +88,14 @@ class MockProvider(MockEmbeddingProvider, MockGenerationProvider):
     """Dual-capability deterministic provider used by startup composition."""
 
     def __init__(self, dimensions: int, *, delay_seconds: float = 0) -> None:
+        """Combine deterministic embedding and generation with optional latency.
+
+        Args:
+            dimensions: Positive embedding vector length.
+            delay_seconds: Artificial generation sleep duration; zero disables it.
+
+        Raises:
+            ValueError: Dimensions are zero or negative.
+        """
         super().__init__(dimensions)
         self._generation_delay_seconds = delay_seconds

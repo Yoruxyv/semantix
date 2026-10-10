@@ -1,3 +1,17 @@
+"""Borrow application-state dependencies established by successful startup.
+
+The lifespan publishes benchmark_service, semantic_cache, query_service,
+runtime_metrics, embedding_provider and generation_provider. The matching
+get_* functions retrieve those objects for FastAPI Depends; casts do not
+construct resources, validate state or add cleanup. Callers need the matching
+state initialized by the lifespan or an explicit dependency override.
+
+Services and adapters borrow the lifespan-managed HTTP client and optional
+database/cache resources. These getters do not transfer ownership or open a
+client, pool or service for each request; startup failure can leave state
+unavailable. Optional repositories are configured inside the shared services.
+"""
+
 from typing import cast
 
 from fastapi import Request

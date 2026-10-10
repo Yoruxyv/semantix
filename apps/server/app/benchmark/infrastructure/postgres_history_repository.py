@@ -1,3 +1,12 @@
+"""Retain terminal aggregates with bounded expiry cleanup and active-history pruning.
+
+``app.benchmark.infrastructure.postgres_history_queries`` owns SQL/column layouts;
+``app.benchmark.infrastructure.postgres_history_records`` maps values and rows.
+The existing migration cascades source-dataset deletion to runs, then thresholds.
+Expiry hides records from active reads; physical deletion occurs on later cleanup
+or explicit deletion, not by a background timer in this repository.
+"""
+
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
@@ -40,7 +49,14 @@ from app.core.exceptions import AppError, EvaluationRunHistoryStorageError
 
 
 class PostgresEvaluationRunHistoryRepository:
-    """Persist and query aggregate evaluation history in PostgreSQL."""
+    """Persist and query aggregate evaluation history in PostgreSQL.
+
+    Borrow the application pool; do not migrate, grant roles, create or close it.
+    Retain aggregate/configuration evidence and descriptive dataset metadata, not
+    per-query prompts/responses. Callers supply authenticated/authorized scopes
+    and resolved source identity/expiry. Pool/driver timeouts apply; this adapter
+    supplies no separate deadline or exactly-once retry protocol.
+    """
 
     def __init__(
         self,
@@ -50,6 +66,17 @@ class PostgresEvaluationRunHistoryRepository:
         max_per_namespace: int,
         cleanup_batch_size: int,
     ) -> None:
+        """Validate limits and borrow the pool without acquiring a connection.
+
+        Args:
+            pool: Application-owned shared PostgreSQL pool.
+            retention_days: Requested history lifetime from run completion.
+            max_per_namespace: Active history capacity enforced by oldest-record pruning.
+            cleanup_batch_size: Maximum expired parent rows selected per purge.
+
+        Raises:
+            ValueError: Any repository limit is not positive.
+        """
         if retention_days < 1 or max_per_namespace < 1 or cleanup_batch_size < 1:
             raise ValueError(
                 "Evaluation run history repository limits must be positive"
@@ -62,6 +89,12 @@ class PostgresEvaluationRunHistoryRepository:
 
     @asynccontextmanager
     async def _connection(self) -> AsyncGenerator[Connection[Record], None]:
+        """Borrow a connection, preserving AppError and cancellation.
+
+        Only OSError/asyncpg.PostgresError are translated to a generic history storage
+        error with a chained cause. Other exceptions and row-mapping failures are not
+        universally intercepted or sanitized by this context manager.
+        """
         try:
             async with self._pool.acquire() as connection:
                 yield cast(Connection, connection)
@@ -77,6 +110,10 @@ class PostgresEvaluationRunHistoryRepository:
         connection: Connection[Record],
         namespace: str | None,
     ) -> None:
+        """Purge one bounded expired-parent batch, optionally across all namespaces.
+
+        The parent-row limit does not bound cascaded threshold-row deletions.
+        """
         await connection.execute(
             PURGE_EXPIRED_HISTORY,
             namespace,
@@ -101,6 +138,11 @@ class PostgresEvaluationRunHistoryRepository:
         self,
         record: EvaluationRunHistoryRecord,
     ) -> UUID | None:
+        """Require built-in/no expiry or persisted/UUID plus supplied source expiry.
+
+        Inline sources cannot be retained. Source resolution/namespace authorization
+        belongs to the caller; the existing foreign key enforces source existence.
+        """
         dataset = record.context.dataset
 
         if dataset.dataset_source == "builtin":
@@ -128,6 +170,10 @@ class PostgresEvaluationRunHistoryRepository:
             ) from error
 
     def _expires_at(self, record: EvaluationRunHistoryRecord) -> datetime:
+        """Cap completion-plus-retention by source expiry and require expiry > completion.
+
+        This compares with completion time, not a fresh database/current-time probe.
+        """
         expires_at = record.completed_at + timedelta(days=self._retention_days)
         source_expires_at = record.context.source_dataset_expires_at
 
@@ -145,6 +191,26 @@ class PostgresEvaluationRunHistoryRepository:
         self,
         record: EvaluationRunHistoryRecord,
     ) -> None:
+        """Insert one terminal aggregate and its supplied ordered threshold evidence.
+
+        Require a history namespace, valid run UUID and supported resolved source.
+        In one transaction acquire the history-prefixed namespace advisory lock,
+        purge a bounded expired batch, count active runs and prune
+        max(0, active_count - capacity + 1) oldest active rows before insertion.
+        Oldest means completed_at then run_id ascending. Pruning and both inserts
+        commit together; completed records include threshold rows, failures omit them.
+        Expiry is completion plus retention capped by source expiry, strictly after
+        completion. Source deletion cascades this history and its thresholds.
+        The lock coordinates cooperating writes under that key, not all database
+        operations. Duplicate IDs are insert errors, not idempotent replacements.
+
+        Args:
+            record: Validated terminal aggregate with caller-resolved ownership/source.
+
+        Raises:
+            EvaluationRunHistoryStorageError: Identity/source/expiry is invalid,
+                value-layout validation fails, or a handled OS/PostgreSQL write fails.
+        """
         namespace = record.context.history_namespace
         if namespace is None:
             raise EvaluationRunHistoryStorageError(
@@ -207,6 +273,23 @@ class PostgresEvaluationRunHistoryRepository:
         offset: int,
         limit: int,
     ) -> RetainedEvaluationRunPage:
+        """Purge one expired batch, then count/page active aggregate summaries.
+
+        Statements share a default-isolation transaction, not a guaranteed stable
+        concurrent snapshot. Threshold rows are not loaded for summaries.
+
+        Args:
+            namespace: Authorized namespace filter, or None for authorized global listing.
+            offset: Caller-validated pagination offset.
+            limit: Caller-validated maximum page size.
+
+        Returns:
+            Active summaries ordered by completed_at descending, then run_id ascending.
+
+        Raises:
+            EvaluationRunHistoryStorageError: A mapped row or handled OS/PostgreSQL
+                operation is inconsistent/failed.
+        """
         async with self._connection() as connection, connection.transaction():
             await self._purge_expired(connection, namespace)
             total = int(
@@ -233,6 +316,25 @@ class PostgresEvaluationRunHistoryRepository:
         *,
         authorized_namespaces: AuthorizedNamespaceScope,
     ) -> RetainedEvaluationRun | None:
+        """Read an active scoped parent, then its sequence-ordered threshold rows.
+
+        Both reads share a connection but no explicit enclosing transaction. Concurrent
+        deletion/pruning can leave incomplete detail for mapper validation; this is not
+        a guaranteed atomic snapshot. No expired-row cleanup is performed here.
+
+        Args:
+            run_id: UUID string; invalid strings return None without SQL.
+            authorized_namespaces: Caller-authorized scope; None is unrestricted and
+                an empty set permits no namespace.
+
+        Returns:
+            Reconstructed retained detail, or None for invalid, expired, absent or
+            invisible parent identity without distinguishing those cases.
+
+        Raises:
+            EvaluationRunHistoryStorageError: A mapped row/detail is inconsistent
+                or a handled OS/PostgreSQL operation fails.
+        """
         try:
             resolved_id = UUID(run_id)
         except ValueError:
@@ -263,6 +365,18 @@ class PostgresEvaluationRunHistoryRepository:
         *,
         namespace: str,
     ) -> bool:
+        """Delete an active run in the concrete authorized namespace after bounded purge.
+
+        Threshold rows cascade through the existing foreign key. Purge and deletion
+        share a transaction, including when the requested deletion returns false.
+
+        Args:
+            run_id: UUID string; invalid strings return False without SQL.
+            namespace: Concrete namespace already authorized by the caller.
+
+        Returns:
+            Whether the requested active scoped parent was deleted.
+        """
         try:
             resolved_id = UUID(run_id)
         except ValueError:
@@ -279,5 +393,10 @@ class PostgresEvaluationRunHistoryRepository:
         return deleted is not None
 
     async def readiness(self) -> None:
+        """Check run-parent table read access without loading historical evidence.
+
+        This does not prove threshold-table/write availability or probe providers,
+        datasets or the top-level readiness endpoint's configured checks.
+        """
         async with self._connection() as connection:
             await connection.fetchval(READINESS_QUERY)

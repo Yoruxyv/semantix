@@ -1,3 +1,11 @@
+"""Assemble feature-owned routers into the application's HTTP surface.
+
+Query, cache, benchmark/evaluation and observability modules own their
+routes, models and authorization dependencies. This package owns auth and
+health routes; ``app.factory`` installs the assembled router, and
+``app.api.deps`` retrieves services created by the lifespan.
+"""
+
 from fastapi import APIRouter
 
 from app.api.auth import router as auth_router

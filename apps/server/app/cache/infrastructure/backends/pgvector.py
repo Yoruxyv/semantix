@@ -12,6 +12,8 @@ from semantix_cache.stores.pgvector import PgVectorStore
 
 
 class PgVectorCacheBackend(OfficialStoreBackend):
+    """Compose PgVectorStore with separately scoped server PostgreSQL telemetry."""
+
     store: PgVectorStore
 
     def __init__(
@@ -27,6 +29,24 @@ class PgVectorCacheBackend(OfficialStoreBackend):
         table_prefix: str = "workbench_",
         operation_timeout_seconds: float = 30.0,
     ) -> None:
+        """Bind a package store and counter adapter to the same borrowed pool.
+
+        Storage stays in the official schema/prefix; counters use the existing server
+        table with a scope hashed from space, dimensions, schema and prefix. Neither
+        construction nor ordinary operations install/adopt schemas. The caller owns
+        the pool; the composing lifespan closes the store and any pool it opened.
+
+        Args:
+            pool: Already-open pool borrowed by both storage and server telemetry.
+            max_size: Official binding-wide entry capacity across namespaces.
+            ttl_seconds: Default retention, or None for no default expiry.
+            dimensions: Required vector dimensions of the embedding space.
+            embedding_space: Compatible-provider/configuration identity.
+            events: Optional recorder; MemoryStore event forwarding does not apply here.
+            schema: Existing package-owned schema identifier.
+            table_prefix: Existing official table binding prefix.
+            operation_timeout_seconds: Deadline covering store work and counter waits.
+        """
         super().__init__(
             PgVectorStore(
                 pool=pool,

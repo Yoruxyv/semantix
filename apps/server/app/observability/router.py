@@ -1,3 +1,12 @@
+"""Expose quota-limited observations only to wildcard global administrators.
+
+/metrics combines one process's interactive-query counters with the current
+cache size; it is not a replica-wide metrics service. /diagnostics reports
+allowlisted runtime configuration and a cache-stats readiness observation,
+not a complete provider/database health check. Dependencies are borrowed from
+application state. Neither response is authoritative cache-entry storage.
+"""
+
 from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, Depends, Request
@@ -26,6 +35,11 @@ async def metrics(
     cache: CacheDependency,
     principal: GlobalAdminPrincipal,
 ) -> MetricsResponse:
+    """Observe process-local query metrics with a separately read global cache size.
+
+    The two observations are not one atomic snapshot. Cache-stat failures use
+    the normal public error handlers rather than returning a partial snapshot.
+    """
     cache_stats = await cache.stats()
     return MetricsResponse.from_snapshot(
         runtime_metrics.snapshot(cache_size=cache_stats.size)
@@ -40,6 +54,12 @@ async def diagnostics(
     benchmark: BenchmarkDependency,
     principal: GlobalAdminPrincipal,
 ) -> RuntimeDiagnosticsResponse:
+    """Report allowlisted runtime metadata and the observed cache-stats outcome.
+
+    CacheStorageError becomes ``unavailable`` in the HTTP 200 diagnostics body;
+    other failures propagate. Provider inference and evaluation storage are not
+    probed here. Raw settings, credentials, prompts and responses are not returned.
+    """
     cache_readiness: Literal["ready", "unavailable"]
     try:
         await cache.stats()

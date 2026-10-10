@@ -1,3 +1,11 @@
+"""Explicit privileged PostgreSQL setup command, separate from server runtime.
+
+MigrationSettings reads required MIGRATION_DATABASE_URL and DATABASE_RUNTIME_ROLE
+plus feature selections through BaseSettings environment sources. Its external
+mode and feature-presence validator do not select ordinary server startup mode.
+Fields/constraints remain in the model; runtime uses its separately supplied DSN.
+"""
+
 import asyncio
 from typing import Literal
 
@@ -46,6 +54,17 @@ class MigrationSettings(BaseSettings):
 
     @model_validator(mode="after")
     def require_database_feature(self) -> "MigrationSettings":
+        """Require at least one selected PostgreSQL feature before setup can run.
+
+        This validates feature selection only, without connecting, checking authority or
+        proving the required schema exists. Field defaults/constraints own other checks.
+
+        Returns:
+            The same settings object when a database feature is selected.
+
+        Raises:
+            ValueError: Cache, coordination, dataset and history selections need no PostgreSQL.
+        """
         if (
             self.cache_backend != "pgvector"
             and self.coordination_backend != "postgres"
@@ -61,6 +80,19 @@ class MigrationSettings(BaseSettings):
 
 async def run() -> None:
     # Required fields are supplied by BaseSettings environment sources.
+    """Own one migration pool and initialize only the selected PostgreSQL features.
+
+    Resolve MigrationSettings before I/O, then open a one-connection pool using
+    migration credentials. Initialize official cache schema when pgvector is chosen;
+    apply/grant coordination when enabled; apply evaluation resources if either
+    dataset/history storage is PostgreSQL and grant those table groups independently.
+    This command does not initialize Redis or construct providers.
+
+    Once pool creation succeeds, finally awaits pool.close without this command
+    adding a close deadline/termination fallback. Cleanup failure or cancellation
+    may replace setup failure. Earlier completed feature setup is not rolled back
+    as a single cross-feature transaction. Script execution uses asyncio.run.
+    """
     settings = MigrationSettings()  # pyright: ignore[reportCallIssue]
     pool = await create_pool(
         settings.migration_database_url.get_secret_value(),

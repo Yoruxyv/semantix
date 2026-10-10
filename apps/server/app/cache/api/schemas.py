@@ -1,3 +1,18 @@
+"""Define live-cache observations and explicit administration responses.
+
+CacheEntryMetadata contains sensitive prompt text and a response preview;
+detail reads can include the full response, while listings leave response
+null. The server substitutes an omission message for truncated previews.
+Vectors are absent. Hit counts, recency ranks and remaining TTL describe an
+observation, not a confirmed lookup hit, lease or stable cross-request snapshot.
+
+Metadata timestamps must be timezone-aware, and expires_at and remaining TTL
+must be present together or both null. Page length is bounded by limit and
+has_more must agree with offset, item count and total. Supported presentation
+orders are newest, oldest, most_hit and nearest_expiry. Threshold models bound
+one global similarity value; namespace authorization belongs to the router.
+"""
+
 from datetime import datetime
 from typing import Literal
 

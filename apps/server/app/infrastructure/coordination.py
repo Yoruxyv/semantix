@@ -1,3 +1,10 @@
+"""Persist admission counters and global threshold state, not cache entries.
+
+Replicas share this authority only when they use the same coordination
+tables and compatible address and quota settings. The lifespan lends the
+runtime pool; migrations belong to ``coordination_database``.
+"""
+
 import logging
 from datetime import datetime, timedelta
 from hashlib import sha256
@@ -38,9 +45,21 @@ def _key(*parts: str) -> str:
 
 
 class PostgresCoordination:
-    """One PostgreSQL authority for security counters and the global threshold."""
+    """One PostgreSQL authority for security counters and the global threshold.
+
+    The pool is borrowed. Client and bucket keys are SHA-256 digests, not an
+    encryption boundary. Expected OS and asyncpg storage failures become
+    CoordinationStorageError; timeout and cancellation are not translated here.
+    Expiry cleanup is opportunistic, with selected storage failures logged and
+    ignored; this is not a background retention worker.
+    """
 
     def __init__(self, pool: Pool) -> None:
+        """Bind coordination operations to an already-open runtime pool.
+
+        Args:
+            pool: Borrowed pool with migrated coordination tables and DML privileges.
+        """
         self._pool = pool
         self._last_cleanup = monotonic()
 
@@ -79,6 +98,22 @@ class PostgresCoordination:
     async def allow_request(
         self, address: str, route: str, quota: str, amount: int, seconds: int
     ) -> bool:
+        """Count an attempt in a shared, fixed-expiry rate bucket.
+
+        Args:
+            address: Trusted client address resolved at the HTTP boundary.
+            route: Route template used to separate endpoint quotas.
+            quota: Quota text included in the bucket identity.
+            amount: Maximum admitted attempts in a bucket window.
+            seconds: Window length, starting with the first attempt after expiry.
+
+        Returns:
+            Whether the incremented count is within the quota. Denied attempts are
+            counted too, without extending an unexpired window.
+
+        Raises:
+            CoordinationStorageError: An expected OS or asyncpg operation fails.
+        """
         try:
             async with self._pool.acquire() as connection:
                 hits = await connection.fetchval(
@@ -99,6 +134,23 @@ class PostgresCoordination:
     async def record_session_attempt(
         self, address: str, *, succeeded: bool
     ) -> int | None:
+        """Apply progressive session lockout under a row lock.
+
+        Each three new failures trigger 30, 60, then 3,600 seconds of lockout;
+        later stages remain at 3,600. Active locks reject even a valid token without
+        extending the lock. Success after expiry deletes the state, and one day of
+        inactivity resets escalation. Only the session endpoint records attempts.
+
+        Args:
+            address: Trusted client address shared across session attempts.
+            succeeded: Whether bearer-token verification succeeded.
+
+        Returns:
+            Retry delay in whole seconds, or None when the attempt is not locked.
+
+        Raises:
+            CoordinationStorageError: An expected OS or asyncpg operation fails.
+        """
         client_key = _key(address)
         try:
             async with self._pool.acquire() as connection, connection.transaction():
@@ -172,6 +224,14 @@ class PostgresCoordination:
             raise CoordinationStorageError from error
 
     async def initialize_threshold(self, default: float) -> None:
+        """Seed the singleton threshold without replacing an existing value.
+
+        Args:
+            default: Validated deployment threshold used only for a missing row.
+
+        Raises:
+            CoordinationStorageError: An expected OS or asyncpg operation fails.
+        """
         try:
             async with self._pool.acquire() as connection:
                 await connection.execute(
@@ -190,6 +250,15 @@ class PostgresCoordination:
             raise CoordinationStorageError from error
 
     async def read_threshold(self) -> float:
+        """Read the shared threshold without a process-local fallback.
+
+        Returns:
+            Persisted global similarity threshold.
+
+        Raises:
+            CoordinationStorageError: The row is absent or an expected OS or
+                asyncpg operation fails.
+        """
         try:
             async with self._pool.acquire() as connection:
                 value = await connection.fetchval(
@@ -206,6 +275,18 @@ class PostgresCoordination:
             raise CoordinationStorageError from error
 
     async def write_threshold(self, threshold: float) -> float:
+        """Upsert the global threshold after caller-side validation.
+
+        Args:
+            threshold: Similarity threshold already checked by the application;
+                this method does not implement authorization or range validation.
+
+        Returns:
+            Persisted threshold returned by PostgreSQL.
+
+        Raises:
+            CoordinationStorageError: An expected OS or asyncpg operation fails.
+        """
         try:
             async with self._pool.acquire() as connection:
                 value = await connection.fetchval(

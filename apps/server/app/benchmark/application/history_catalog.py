@@ -1,3 +1,12 @@
+"""Expose stored aggregate history through caller-authorized repository scopes.
+
+List summaries omit threshold rows; detail adds them without captured query-level
+prompts/responses. Conversion validates response shapes, not the authenticity or
+privacy of arbitrary repository values. Historical metadata describes the retained
+run, not current runtime configuration. Comparison delegates to
+``app.benchmark.application.comparison`` after both identifier reads succeed.
+"""
+
 from app.benchmark.api.comparison_schemas import (
     EvaluationRunComparisonRequest,
     EvaluationRunComparisonResponse,
@@ -24,6 +33,7 @@ from app.core.exceptions import (
 
 
 def _history_item(record: RetainedEvaluationRunSummary) -> EvaluationRunHistoryItem:
+    """Project retained aggregate fields and require a concrete history namespace."""
     context = record.context
     namespace = context.history_namespace
     if namespace is None:
@@ -58,6 +68,14 @@ def _history_detail(record: RetainedEvaluationRun) -> EvaluationRunHistoryDetail
 
 
 class EvaluationRunHistoryCatalog:
+    """Borrow optional history storage without authenticating or owning its lifecycle.
+
+    Disabled storage returns an explicit empty list, but detail/comparison/delete
+    require enabled storage. Enabled mode with no repository is a storage error.
+    The caller authorizes listing/mutation namespaces; identifier reads pass its
+    authorized scope to the repository. Construction opens no resources.
+    """
+
     def __init__(
         self,
         repository: EvaluationRunHistoryRepository | None,
@@ -83,6 +101,21 @@ class EvaluationRunHistoryCatalog:
         offset: int,
         limit: int,
     ) -> EvaluationRunHistoryListResponse:
+        """Return retained summaries and pagination, or an explicit disabled empty page.
+
+        Args:
+            namespace: Authorized namespace filter, or None for an authorized global list.
+            offset: Caller-validated number of matching records to skip.
+            limit: Caller-validated maximum page size.
+
+        Returns:
+            Summary page; has_more derives from offset, returned length and total.
+
+        Raises:
+            EvaluationRunHistoryStorageError: Enabled storage lacks a repository or
+                a retained summary has no namespace. Other repository/response
+                validation errors can propagate.
+        """
         if self._storage_mode == "disabled":
             return EvaluationRunHistoryListResponse(
                 storage_mode="disabled",
@@ -117,6 +150,21 @@ class EvaluationRunHistoryCatalog:
         *,
         authorized_namespaces: AuthorizedNamespaceScope,
     ) -> EvaluationRunHistoryDetail:
+        """Retrieve aggregate detail without distinguishing absent and invisible runs.
+
+        Args:
+            run_id: Retained run identity.
+            authorized_namespaces: Caller-authorized scope; None permits unrestricted
+                repository reads and an empty set permits none.
+
+        Returns:
+            Historical aggregate evidence plus retained threshold rows.
+
+        Raises:
+            EvaluationRunHistoryDisabledError: History storage is disabled.
+            EvaluationRunHistoryStorageError: Enabled storage is unavailable/inconsistent.
+            EvaluationRunHistoryNotFoundError: No visible retained record was returned.
+        """
         repository = self._require_repository()
         record = await repository.get_run(
             run_id,
@@ -132,6 +180,24 @@ class EvaluationRunHistoryCatalog:
         *,
         authorized_namespaces: AuthorizedNamespaceScope,
     ) -> EvaluationRunComparisonResponse:
+        """Read baseline then candidate with the same authorized scope and compare them.
+
+        Reads are sequential, not a shared repository snapshot. Either inaccessible
+        record fails before comparison. Permission to read both, including global
+        administrator access, does not bypass comparison's namespace/identity gates.
+
+        Args:
+            request: Validated distinct baseline/candidate run identities.
+            authorized_namespaces: Caller-authorized scope used for both lookups.
+
+        Returns:
+            Compatibility assessment and permitted candidate-minus-baseline deltas.
+
+        Raises:
+            EvaluationRunHistoryDisabledError: History storage is disabled.
+            EvaluationRunHistoryStorageError: Enabled storage is unavailable/inconsistent.
+            EvaluationRunHistoryNotFoundError: Either record is absent or invisible.
+        """
         baseline = await self.get_run(
             request.baseline_run_id,
             authorized_namespaces=authorized_namespaces,
@@ -148,6 +214,20 @@ class EvaluationRunHistoryCatalog:
         *,
         namespace: str,
     ) -> DeleteEvaluationRunHistoryResponse:
+        """Delete a retained run within a concrete caller-authorized namespace.
+
+        Args:
+            run_id: Retained record identity.
+            namespace: Concrete namespace already authorized for mutation.
+
+        Returns:
+            Deletion acknowledgment only after a scoped repository deletion succeeds.
+
+        Raises:
+            EvaluationRunHistoryDisabledError: History storage is disabled.
+            EvaluationRunHistoryStorageError: Enabled storage is unavailable.
+            EvaluationRunHistoryNotFoundError: No scoped deletion was reported.
+        """
         repository = self._require_repository()
         if not await repository.delete_run(run_id, namespace=namespace):
             raise EvaluationRunHistoryNotFoundError

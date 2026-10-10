@@ -1,3 +1,10 @@
+"""Compose the FastAPI application without opening its runtime resources.
+
+Provider selection and request policy belong here; ``app.lifecycle`` builds
+services at startup, and feature routers own their HTTP endpoints. Settings
+and provider registries can be injected without replacing those boundaries.
+"""
+
 import os
 from collections.abc import Callable
 from uuid import uuid4
@@ -42,6 +49,28 @@ def create_app(
     auth_attempt_clock: Callable[[], float] | None = None,
     provider_registry: ProviderRegistry | None = None,
 ) -> FastAPI:
+    """Build an application with resolved providers and request policies.
+
+    Resolving the registry freezes registrations and checks provider metadata;
+    builders run later in the lifespan. Construction also configures process
+    logging and creates per-application lockout state and a local rate-limit
+    scope. Services become available on application state only during startup.
+
+    Args:
+        settings: Validated deployment settings, or the cached environment
+            settings when omitted.
+        auth_attempt_clock: Optional clock for process-local session lockouts;
+            PostgreSQL coordination uses the database clock instead.
+        provider_registry: Registered provider builders and metadata, or the
+            default registry. Finish registrations before passing it here.
+
+    Returns:
+        FastAPI application with middleware, error handlers, routers and lifespan.
+
+    Raises:
+        ValueError: Settings or the provider selection fail validation.
+        TypeError: A selected embedding metadata resolver returns the wrong type.
+    """
     resolved_settings = settings or get_settings()
     resolved_registry = provider_registry or create_default_provider_registry(
         resolved_settings
@@ -88,6 +117,11 @@ def create_app(
 
 
 def _configure_middleware(application: FastAPI, settings: Settings) -> None:
+    """Install CORS and body limits, plus opt-in gateway tracing.
+
+    Tracing reads ``SEMANTIX_GATEWAY_TRACE`` directly from the environment;
+    CORS and body limits use the injected settings.
+    """
     application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,

@@ -70,10 +70,19 @@ Embedding dan respons inspector yang lengkap tidak pernah diekspos melalui kontr
 - `offset`: offset hasil berbasis nol (zero-based);
 - `limit`: ukuran halaman dari 1 hingga 100.
 
-Respons berisi `items`, `total`, `offset`, `limit`, dan `has_more`. Item mencakup prompt asli dan pratinjau (preview) respons yang dipotong, namun tidak menyertakan embedding maupun respons cache yang lengkap.
+Respons berisi `items`, `total`, `offset`, `limit`, dan `has_more`. Item
+mencakup prompt asli, `response_preview`, `response_preview_truncated`, dan
+`response` bernilai `null`; embedding tidak disertakan. Respons hingga 240
+karakter mempertahankan sumber Markdown lengkap. Respons yang lebih panjang
+memakai pesan pengganti netral, bukan potongan Markdown.
 
 `GET /api/v1/cache/stats?namespace=...` dan
-`DELETE /api/v1/cache?namespace=...` menyasar satu namespace. Mengabaikan parameter tersebut akan mengembalikan statistik global atau membersihkan embedding space yang aktif.
+`DELETE /api/v1/cache?namespace=...` menyasar namespace yang diizinkan. Jika
+parameter diabaikan, principal dengan cakupan wildcard dapat meminta statistik
+global atau membersihkan embedding space aktif. Principal terbatas dengan satu
+namespace hanya mengakses namespace tersebut; pengabaian parameter untuk
+principal terbatas dengan beberapa namespace ditolak. Penghapusan memerlukan
+kapabilitas Admin.
 
 ## Metrik runtime
 

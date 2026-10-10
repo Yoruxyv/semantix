@@ -1,3 +1,12 @@
+"""Apply server matching policy through borrowed embedding and backend ports.
+
+SemanticCache owns threshold decisions and revision-confirmed hit evidence;
+the backend owns entries, expiry, capacity and store hit effects. Namespace
+arguments are partition identities already authorized by HTTP callers, not
+authentication credentials. Inspection and management delegate through the
+server CacheBackend port rather than a second storage engine.
+"""
+
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 
@@ -24,6 +33,14 @@ def _preserve_prompt(prompt: str) -> str:
 
 
 class SemanticCache:
+    """Coordinate embedding lookup, confirmed reuse and explicit cache writes.
+
+    Dependencies are borrowed and are not closed here. Optional normalization
+    changes embedding text only; entries keep the application prompt. Local
+    threshold state is separate from an optional shared ThresholdStore. Global
+    threshold authorization belongs to the HTTP boundary, not this service.
+    """
+
     def __init__(
         self,
         embedding_service: EmbeddingGenerator,
@@ -34,6 +51,19 @@ class SemanticCache:
         events: CacheEventRecorder | None = None,
         threshold_store: ThresholdStore | None = None,
     ) -> None:
+        """Bind borrowed ports and validate the initial process-local threshold.
+
+        Args:
+            embedding_service: Provider/service used to embed matching text.
+            backend: Bound server storage, inspection and telemetry port.
+            similarity_threshold: Initial local value between zero and one.
+            prompt_normalizer: Synchronous matching-text transform, identity by default.
+            events: Optional process-level hit/miss recorder.
+            threshold_store: Optional shared authority used by async threshold operations.
+
+        Raises:
+            ValueError: The initial threshold is outside zero through one.
+        """
         if not 0 <= similarity_threshold <= 1:
             raise ValueError("similarity_threshold must be between 0 and 1")
 
@@ -46,9 +76,22 @@ class SemanticCache:
 
     @property
     def similarity_threshold(self) -> float:
+        """Read the local value without consulting an injected shared threshold store."""
         return self._similarity_threshold
 
     def resolve_ttl(self, requested_ttl_seconds: float | None) -> float | None:
+        """Validate an override and cap it by a finite backend default.
+
+        Args:
+            requested_ttl_seconds: Positive bounded TTL, or None to inherit the default.
+
+        Returns:
+            Effective TTL: the request capped by a finite default, the default when
+            omitted, or None only when neither request nor backend imposes expiry.
+
+        Raises:
+            ValueError: Requested or default TTL is outside the supported range.
+        """
         try:
             return resolve_ttl(requested_ttl_seconds, self._backend.default_ttl_seconds)
         except ValueError:
@@ -57,6 +100,11 @@ class SemanticCache:
             ) from None
 
     def update_similarity_threshold(self, threshold: float) -> float:
+        """Validate and replace only the process-local threshold.
+
+        This does not write an injected ThresholdStore; async reads still use that
+        store when present. Returns the local value or raises ValueError if invalid.
+        """
         if not 0 <= threshold <= 1:
             raise ValueError("threshold must be between 0 and 1")
 
@@ -64,11 +112,21 @@ class SemanticCache:
         return self._similarity_threshold
 
     async def read_similarity_threshold(self) -> float:
+        """Read the injected shared authority, falling back to local state.
+
+        The shared value is not copied into the synchronous local property. Storage
+        errors propagate; they are not replaced with a stale local fallback.
+        """
         if self._threshold_store is not None:
             return await self._threshold_store.read_threshold()
         return self._similarity_threshold
 
     async def write_similarity_threshold(self, threshold: float) -> float:
+        """Validate and write the shared authority, or update local state if absent.
+
+        Shared writes do not update the local property. ValueError rejects out-of-range
+        values; shared-store failures propagate. Callers enforce global-admin access.
+        """
         if not 0 <= threshold <= 1:
             raise ValueError("threshold must be between 0 and 1")
         if self._threshold_store is not None:
@@ -81,6 +139,25 @@ class SemanticCache:
         *,
         namespace: str = DEFAULT_CACHE_NAMESPACE,
     ) -> CacheLookupResult:
+        """Embed matching text and confirm a threshold-eligible live revision.
+
+        Read one effective threshold, normalize for embedding and request a nearest
+        candidate in the namespace. A qualifying score is only provisional: backend
+        record_hit must confirm the candidate's created_at revision before reuse.
+        Stale, expired, replaced or otherwise rejected candidates become misses,
+        retaining only their similarity score. Backend miss accounting precedes the
+        optional application miss event; confirmed backend hits precede hit events.
+        Provider, confirmation and telemetry failures propagate rather than becoming
+        successful hits or misses.
+
+        Args:
+            prompt: Application text; normalization changes only the embedding input.
+            namespace: Already-authorized partition for candidate search/confirmation.
+
+        Returns:
+            Lookup evidence with the computed embedding. Only confirmed hits include
+            response/matched identity; misses may still contain candidate similarity.
+        """
         similarity_threshold = await self.read_similarity_threshold()
         matching_prompt = self._prompt_normalizer(prompt)
         embedding = [
@@ -139,6 +216,25 @@ class SemanticCache:
         namespace: str = DEFAULT_CACHE_NAMESPACE,
         ttl_seconds: float | None = None,
     ) -> bool:
+        """Write a nonblank response under the namespace-aware prompt key.
+
+        Reuse a supplied embedding or embed normalized matching text. Store the
+        original application prompt with an aware timestamp; the package store may
+        advance that timestamp as revision identity. The backend enforces vector
+        compatibility, TTL, capacity and its storage semantics. Generation validation
+        belongs to QueryService; this method is not a substitute for that boundary.
+
+        Args:
+            prompt: Original application prompt retained as entry text and key input.
+            response: Response text; blank/whitespace-only content is ignored.
+            embedding: Optional vector from a preceding lookup, reused without embedding.
+            namespace: Already-authorized partition for the write.
+            ttl_seconds: Optional TTL passed to backend enforcement/default resolution.
+
+        Returns:
+            False for blank text; True after backend put returns successfully. This is
+            not a guarantee of durable persistence or indefinite retention.
+        """
         if not response.strip():
             return False
 
@@ -161,6 +257,10 @@ class SemanticCache:
         return True
 
     async def clear(self, namespace: str | None = None) -> None:
+        """Delegate scoped clearing; None clears all namespaces in the bound backend.
+
+        The caller must authorize the requested scope before invoking this method.
+        """
         await self._backend.clear(namespace)
 
     async def list_entries(
@@ -172,6 +272,7 @@ class SemanticCache:
         search: str | None,
         sort: CacheEntrySort,
     ) -> CacheEntryListResponse:
+        """Delegate an already-authorized observational page without confirming hits."""
         return await self._backend.list_entries(
             offset=offset,
             limit=limit,
@@ -186,6 +287,11 @@ class SemanticCache:
         *,
         authorized_namespaces: AuthorizedNamespaceScope,
     ) -> CacheEntryMetadata:
+        """Retrieve metadata within the caller-supplied authorized namespace set.
+
+        Raises:
+            CacheEntryNotFoundError: Storage returns no entry, including excluded scope.
+        """
         entry = await self._backend.get_entry(
             cache_key,
             authorized_namespaces=authorized_namespaces,
@@ -200,6 +306,11 @@ class SemanticCache:
         *,
         authorized_namespaces: AuthorizedNamespaceScope,
     ) -> None:
+        """Delegate key deletion within the caller-supplied authorized namespace set.
+
+        Raises:
+            CacheEntryNotFoundError: Storage reports no deletion, including excluded scope.
+        """
         if not await self._backend.delete_entry(
             cache_key,
             authorized_namespaces=authorized_namespaces,
@@ -210,4 +321,5 @@ class SemanticCache:
         self,
         namespace: str | None = None,
     ) -> CacheStatsResponse:
+        """Delegate scoped/global observations; these are not authoritative entry data."""
         return await self._backend.stats(namespace)

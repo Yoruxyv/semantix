@@ -58,19 +58,19 @@ writes enabled refreshes the entry from the provider; disabling writes still
 permits an eligible cached response.
 
 `cache_ttl_seconds` is optional and accepts an integer from `1` through
-`31,536,000`. Omission or `null` uses the server's configured
-`CACHE_TTL_SECONDS`; it never means unlimited retention. The server caps a
-requested value at a finite configured default, while a server configured
-without a default TTL uses the requested value directly. The field is valid
+`31,536,000`. Omission or `null` inherits the server's configured
+`CACHE_TTL_SECONDS`; it cannot disable a finite server default. With no
+configured default and no override, entries have no TTL expiry. The server
+caps a requested value at a finite configured default; without a default,
+it uses the requested value directly. The field is valid
 only when the effective policy permits writes (Normal or Refresh). Read only,
 Bypass, and Private requests that supply it are rejected with HTTP `422` before
 embedding or generation work. Query responses do not expose the effective TTL.
 
-The endpoint requires Operator capability. Namespace authorization remains
-server-side: a sole concrete namespace can be inferred for older clients, but
-the Monitor UI always sends its selected concrete namespace. Multiple-scope
-and wildcard principals must select or enter one authorized concrete value;
-`*` is never a query namespace.
+The endpoint requires Operator capability. If `namespace` is omitted, the
+request schema supplies `default`, which must be authorized; it does not infer
+a principal's sole namespace. Monitor always sends its selected concrete
+namespace. `*` is not a valid query namespace.
 
 See [Cache policies](../guides/cache-policies.md) for precedence and namespace
 rules.
@@ -355,8 +355,11 @@ embedding-space change can make a saved URL stop resolving. Missing and
 unauthorized keys use the same neutral browser state.
 
 `GET /api/v1/cache/stats?namespace=...` and
-`DELETE /api/v1/cache?namespace=...` target one namespace. Omitting the
-parameter returns global statistics or clears the active embedding space.
+`DELETE /api/v1/cache?namespace=...` target an authorized namespace. If the
+parameter is omitted, wildcard principals can request global statistics or
+clear the active embedding space; a restricted principal with one namespace
+is scoped to it, and omission with multiple restricted namespaces is rejected.
+Clearing requires Admin capability.
 
 ## Runtime metrics
 

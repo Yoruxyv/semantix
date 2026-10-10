@@ -1,3 +1,22 @@
+"""Validate isolated benchmark/evaluation options and completed-run evidence.
+
+Run options require explicit allow_external_provider_calls=true. Thresholds
+are bounded, sorted and unique; the measured value is inserted within the
+maximum count. reset_cache_before_run resets the isolated run cache for each
+repetition, not the interactive cache; false carries state between repetitions
+of that run. Cost inputs are assumptions used for estimates, not billing data.
+
+EvaluationRunRequest selects built-in, inline or persisted data and permits
+history_namespace only for built-in sources. A response contains per-query
+prompt/match evidence and measured metrics; threshold rows use frozen candidate
+projections, with exactly one row labeled measured at the requested threshold.
+Validators align workload size, outcomes, provider calls, ordered thresholds
+and reproducibility metadata. Start/completion timestamps are aware and ordered.
+history_retention reports not_retained, retained or retention_failed separately
+from successful execution. Failures use public error responses; completed-run
+payloads do not define a job-status or polling protocol.
+"""
+
 from datetime import datetime
 from typing import Literal
 
@@ -186,6 +205,17 @@ class BenchmarkRunResponse(StrictModel):
 
     @model_validator(mode="after")
     def validate_run(self) -> "BenchmarkRunResponse":
+        """Cross-check the completed workload, threshold rows and reproducibility.
+
+        Returns:
+            Run whose case/repetition count and aggregate classifications match
+            query evidence, with exactly one measured-threshold row and matching
+            dataset/options metadata. Other threshold rows are projections.
+
+        Raises:
+            ValueError: Timestamp ordering, workload counts, metrics, threshold
+                coverage or reproducibility relationships are inconsistent.
+        """
         if self.completed_at < self.started_at:
             raise ValueError("Benchmark completion cannot precede its start")
         if len(self.query_results) != self.dataset.query_count * self.repetitions:

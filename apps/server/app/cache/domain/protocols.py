@@ -1,3 +1,13 @@
+"""Define server application ports around authoritative package storage.
+
+CacheBackend includes HTTP inspection, management and server counters beyond
+the embedded CacheStore engine port. OfficialStoreBackend adapts package stores
+to it; the interfaces serve different boundaries without duplicating entry
+authority. CacheEventRecorder observes application events, and ThresholdStore
+optionally supplies shared global threshold state. Implementations are borrowed;
+these protocols define no resource construction, ownership transfer or cleanup.
+"""
+
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Protocol
@@ -16,6 +26,14 @@ class CacheBackend(Protocol):
     """Cache port for vectors produced by one model and dimension count.
 
     Persistent implementations must partition incompatible embedding spaces.
+
+    Nearest candidates are provisional until record_hit confirms namespace and
+    created_at revision; rejection returns False rather than successful reuse.
+    Inspection is observational and must not stand in for hit confirmation.
+    get_entry/delete_entry receive an already-authorized set: None is unrestricted,
+    an empty set grants no namespace. Callers authorize namespace/global listings,
+    clearing and stats before delegation. Aggregate counters and entry mutations
+    need not share an atomic transaction.
     """
 
     @property
@@ -70,6 +88,11 @@ class CacheBackend(Protocol):
 
 
 class CacheEventRecorder(Protocol):
+    """Observe hit/miss and eviction/expiration events, not authoritative entries.
+
+    Callbacks are synchronous; their scope/durability belongs to the recorder.
+    """
+
     def record_cache_hit(self) -> None: ...
     def record_cache_miss(self) -> None: ...
     def record_evictions(self, count: int) -> None: ...
@@ -77,5 +100,11 @@ class CacheEventRecorder(Protocol):
 
 
 class ThresholdStore(Protocol):
+    """Supply async shared global threshold reads/writes to SemanticCache.
+
+    The HTTP layer authorizes changes. Storage implementations own persistence and
+    failure behavior; this port does not synchronize the service's local property.
+    """
+
     async def read_threshold(self) -> float: ...
     async def write_threshold(self, threshold: float) -> float: ...

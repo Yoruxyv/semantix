@@ -1,3 +1,10 @@
+"""Execute ordered cases and summarize observed cache decisions.
+
+``app.benchmark.domain.metrics`` separates measured aggregates from frozen-score
+threshold projections. ``app.benchmark.application.history`` handles the optional
+terminal aggregate handoff; query evidence stays in the run response.
+"""
+
 import asyncio
 import math
 from collections.abc import Callable
@@ -44,11 +51,23 @@ def _classification(
 
 
 def estimate_tokens(text: str) -> int:
+    """Estimate tokens as ceil(characters / 4), with a minimum of one.
+
+    This heuristic is applied separately to prompt and response, without a tokenizer
+    or provider billing data.
+    """
     return max(1, math.ceil(len(text) / 4))
 
 
 class EvaluationRunExecutor:
-    """Execute one accepted evaluation and retain its terminal aggregate outcome."""
+    """Execute one accepted evaluation and retain its terminal aggregate outcome.
+
+    Retention is optional and best effort. One instance-local asyncio lock
+    serializes bounded execution, not dataset resolution or history writes.
+    Providers and the history repository are borrowed and are not closed here.
+    Each execution creates fresh bounded memory state, independent of the live
+    interactive cache; executions in other instances or processes are independent.
+    """
 
     def __init__(
         self,
@@ -61,6 +80,17 @@ class EvaluationRunExecutor:
         runtime_configuration: BenchmarkRuntimeConfiguration,
         history_repository: EvaluationRunHistoryRepository | None,
     ) -> None:
+        """Borrow dependencies and create a lock without performing I/O.
+
+        Args:
+            embedding_service: Shared embedding generator used by fresh run caches.
+            provider: Shared generator used on confirmed misses.
+            max_cache_size: Maximum entries in each fresh in-memory backend.
+            cache_ttl_seconds: Backend entry lifetime, or no expiry.
+            prompt_normalizer: Normalization shared by the run-cache operations.
+            runtime_configuration: Provider identities, dimensions and timeout.
+            history_repository: Optional borrowed aggregate-history destination.
+        """
         self._provider = provider
         self._embedding_service = embedding_service
         self._max_cache_size = max_cache_size
@@ -82,6 +112,30 @@ class EvaluationRunExecutor:
         dataset: BenchmarkDataset,
         accepted_run: AcceptedEvaluationRunContext,
     ) -> BenchmarkRunResponse:
+        """Measure an accepted run and attempt the eligible terminal handoff.
+
+        Reproducibility metadata is built before the bounded execution try block.
+        Recognized evaluation timeouts are classified as timed_out; ordinary
+        execution exceptions as failed, then re-raised after best-effort retention.
+        Success proceeds to completed-history handling, whose ordinary storage
+        failure is reflected in the response rather than replacing measured results.
+        Cancellation propagates without this failure-recording path. Process death
+        cannot guarantee a record. Metadata building and terminal-history awaits are
+        outside the execution deadline; history work is also outside the run lock.
+
+        Args:
+            request: Validated execution options and estimation assumptions.
+            dataset: Resolved ordered dataset; source gates belong to the catalog.
+            accepted_run: Identity and optional retention scope allocated by the facade.
+
+        Returns:
+            Measured evidence and projections, with the applicable retention outcome.
+
+        Raises:
+            EvaluationTimeoutError: A TimeoutError escapes bounded execution.
+            asyncio.CancelledError: The caller cancels execution or history handling.
+            Exception: An ordinary execution error, after its terminal handoff attempt.
+        """
         attempt_started_at = datetime.now(UTC)
         reproducibility = build_reproducibility_metadata(
             request,
@@ -130,6 +184,13 @@ class EvaluationRunExecutor:
         *,
         reproducibility: BenchmarkReproducibilityMetadata,
     ) -> BenchmarkRunResponse:
+        """Apply the timeout outside the lock, including lock-wait time.
+
+        Any escaping TimeoutError is translated to EvaluationTimeoutError. External
+        cancellation propagates. The asyncio deadline is cooperative: synchronous
+        work is not interrupted, and local cancellation does not guarantee that a
+        remote provider has stopped executing.
+        """
         try:
             async with asyncio.timeout(
                 self._runtime_configuration.evaluation_timeout_seconds
@@ -145,6 +206,11 @@ class EvaluationRunExecutor:
             raise EvaluationTimeoutError from exc
 
     def _create_run_cache(self, threshold: float) -> SemanticCache:
+        """Create a fresh bounded memory backend borrowing the embedding generator.
+
+        Use this run's threshold, configured TTL/dimensions and normalizer. The live
+        interactive backend and its entries are never supplied to this cache.
+        """
         return SemanticCache(
             self._embedding_service,
             InMemoryCacheBackend(
@@ -164,6 +230,17 @@ class EvaluationRunExecutor:
         sequence: int,
         repetition: int,
     ) -> tuple[BenchmarkQueryResult, BenchmarkObservation]:
+        """Measure lookup, miss generation/validation and its attempted cache write.
+
+        Only a confirmed lookup hit reuses a response. A miss generates, validates,
+        then awaits store with the lookup embedding; successful persistence is not
+        guaranteed. Latency ends before token estimation and result construction.
+        Correctness and confusion classification compare expected/actual hit booleans,
+        not response quality or expected-match identity. Expected-match IDs and notes
+        are query evidence. Observations omit prompt/response text and vectors.
+        Token savings estimate prompt plus response only on actual hits, including
+        false positives. Provider failures propagate before an observation is added.
+        """
         measured_at = perf_counter()
         lookup = await cache.lookup(case.prompt)
         if lookup.cache_hit:
@@ -218,6 +295,15 @@ class EvaluationRunExecutor:
         *,
         reproducibility: BenchmarkReproducibilityMetadata,
     ) -> BenchmarkRunResponse:
+        """Run ordered cases sequentially through one fresh cache per execution.
+
+        When reset is enabled, clear before each repetition, including the first;
+        otherwise carry entries across repetitions within this execution. Never
+        clear per case. Successful start time follows lock acquisition. Aggregate
+        all observations once, then project the frozen candidate scores without
+        rerunning providers or applying an interactive-cache threshold change.
+        This method has no explicit cache-close/drain step on exit.
+        """
         started_at = datetime.now(UTC)
         run_cache = self._create_run_cache(request.threshold)
 

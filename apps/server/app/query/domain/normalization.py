@@ -1,4 +1,11 @@
-"""Optional typo-aware normalization for embedding lookup prompts."""
+"""Optional typo-aware normalization for embedding lookup prompts.
+
+PromptNormalizer is a synchronous text-to-text callable. SemanticCache uses it
+for lookup and newly computed write embeddings; entries retain the application
+prompt. QueryService passes that supplied prompt to generation. Disabled
+normalization is the identity function; enabling it loads a bundled English
+dictionary during construction.
+"""
 
 from collections.abc import Callable
 from importlib.resources import as_file, files
@@ -18,6 +25,13 @@ PromptNormalizer = Callable[[str], str]
 
 
 class SymSpellPromptNormalizer:
+    """Apply configured compound spelling suggestions to matching text only.
+
+    Project terms receive high-frequency dictionary entries. Casing transfer and
+    nonword/digit options do not guarantee correct handling of arbitrary languages,
+    domain terms or proper nouns. Generation prompt preservation belongs to callers.
+    """
+
     def __init__(
         self,
         sym_spell: SymSpell,
@@ -29,6 +43,18 @@ class SymSpellPromptNormalizer:
 
     @classmethod
     def load(cls, *, max_edit_distance: int) -> "SymSpellPromptNormalizer":
+        """Load the packaged English frequency dictionary and project terms.
+
+        Args:
+            max_edit_distance: SymSpell dictionary and lookup edit-distance bound.
+
+        Returns:
+            Normalizer using the loaded dictionary and configured distance.
+
+        Raises:
+            RuntimeError: The required resource cannot load or load_dictionary returns
+                false. When enabled by application configuration, this aborts startup.
+        """
         sym_spell = SymSpell(
             max_dictionary_edit_distance=max_edit_distance,
         )
@@ -65,6 +91,14 @@ class SymSpellPromptNormalizer:
         )
 
     def normalize(self, prompt: str) -> str:
+        """Return the first compound suggestion, falling back to the supplied text.
+
+        Args:
+            prompt: Matching text; this method does not mutate a generation request.
+
+        Returns:
+            Stripped first suggestion, or the original prompt if absent or blank.
+        """
         suggestions = self._sym_spell.lookup_compound(
             prompt,
             max_edit_distance=self._max_edit_distance,
@@ -88,6 +122,18 @@ def create_prompt_normalizer(
     enabled: bool,
     max_edit_distance: int,
 ) -> PromptNormalizer:
+    """Select identity behavior or load a configured typo-normalization callable.
+
+    Args:
+        enabled: Whether to construct the dictionary-backed normalizer.
+        max_edit_distance: Distance used only when normalization is enabled.
+
+    Returns:
+        Synchronous callable; disabled mode performs no dictionary loading.
+
+    Raises:
+        RuntimeError: Enabled normalization cannot load its required dictionary.
+    """
     if not enabled:
         return preserve_prompt
 

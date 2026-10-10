@@ -1,3 +1,19 @@
+"""Describe retained terminal aggregates, not current runtime or per-case data.
+
+Items bind a run ID to concrete namespace, dataset digest and reproducibility
+metadata. Inline sources cannot appear in history. Persisted-source retention
+cannot outlive the source dataset; built-in history has no source expiry.
+Aware timestamps satisfy accepted <= started <= completed < expires.
+
+Completed items carry metrics without failure fields; failed/timed_out items
+have a failure code without metrics. Detail adds threshold aggregates for
+completed runs only and validates them against retained reproducibility.
+Neither form includes query_results, prompts or generated responses. Pages
+couple retention_enabled to storage mode and expose no items when disabled;
+page length and has_more agree with the current observation. Retrieval and
+deletion authorization is enforced outside these models.
+"""
+
 from datetime import datetime
 from typing import Literal
 

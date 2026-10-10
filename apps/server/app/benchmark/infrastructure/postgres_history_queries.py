@@ -1,4 +1,20 @@
-"""SQL statements for durable PostgreSQL evaluation run history."""
+"""SQL statements for durable PostgreSQL evaluation run history.
+
+RUN_COLUMNS fixes INSERT_RUN bind order and named select columns; keep it aligned
+with build_run_values in ``app.benchmark.infrastructure.postgres_history_records``.
+INSERT_THRESHOLD matches that module's ordered fourteen-value threshold rows.
+Interpolation uses only module-owned column definitions; runtime values are bound.
+
+List binds are namespace/limit/offset; None namespace means global. Parent detail
+binds UUID/authorized namespace array, where None is unrestricted and an empty
+array permits none. Threshold lookup binds the already-authorized run UUID.
+Deletion binds UUID/concrete namespace. Purge binds optional namespace/batch;
+pruning binds concrete namespace/count. Counts use their namespace filter and the
+lock binds the caller's history-prefixed key. Active reads/deletes filter by expiry.
+Listing is newest completion first; pruning is oldest first, with UUID tie breaks.
+Readiness checks only parent-table read access. Transactions, isolation and lock
+scope are supplied by the repository, not guaranteed by these constants alone.
+"""
 
 RUN_COLUMNS = (
     "run_id",

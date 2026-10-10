@@ -1,3 +1,10 @@
+"""Shared PostgreSQL pool, packaged migration ledger and selected runtime grants.
+
+Callers own returned pools and supply migration/grant authority. Feature wrappers
+choose resources, error types and table allowlists; ordinary repositories borrow
+pools. Checksums detect SQL-content changes, not signatures or schema authenticity.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -36,6 +43,12 @@ StorageErrorType = type[AppError]
 
 @dataclass(frozen=True, slots=True)
 class Migration:
+    """Packaged SQL text and version with a SHA-256 UTF-8 content checksum.
+
+    The checksum property hashes the supplied text on access. It identifies content,
+    not authorship, schema equivalence or successful database application.
+    """
+
     version: str
     sql: str
 
@@ -45,6 +58,13 @@ class Migration:
 
 
 class LegacyMigrationValidator(Protocol):
+    """Borrowed-connection check allowing one version's null-checksum backfill.
+
+    Return true only when that feature's implemented released-schema checks pass.
+    The runner supplies migration authority; this port neither owns connection
+    cleanup nor guarantees complete schema equivalence or data conversion.
+    """
+
     async def __call__(
         self,
         connection: (Connection[asyncpg.Record] | PoolConnectionProxy[asyncpg.Record]),
@@ -58,6 +78,23 @@ def load_packaged_migrations(
     label: str,
     error_type: StorageErrorType = DatabaseStorageError,
 ) -> tuple[Migration, ...]:
+    """Read matching immediate package resources and sort their four-digit versions.
+
+    Names use four digits, an underscore, a lowercase-letter/digit/underscore suffix
+    and .sql. Nonmatching resources are skipped. SQL is decoded as UTF-8 without execution;
+    resource/import/read errors are not universally translated.
+
+    Args:
+        packages: Importable resource packages to scan.
+        label: Feature label used in declared discovery errors.
+        error_type: Application error for an empty set or duplicate versions.
+
+    Returns:
+        Version-ordered migrations, with duplicate versions rejected across packages.
+
+    Raises:
+        AppError: The selected error_type reports no migrations or duplicate versions.
+    """
     migrations: list[Migration] = []
     for package in packages:
         for resource in files(package).iterdir():
@@ -89,6 +126,24 @@ async def create_pool(
     error_type: StorageErrorType = DatabaseStorageError,
     error_detail: str = "Could not connect to the configured PostgreSQL database",
 ) -> Pool:
+    """Create a caller-owned asyncpg pool with independent connect/command timeouts.
+
+    Forward supplied bounds without adding schema setup or a separate close policy.
+    OSError/PostgresError become the selected application error without a raw cause;
+    cancellation and other exceptions are not universally intercepted.
+
+    Args:
+        dsn: Private PostgreSQL connection string used only for pool creation.
+        min_size: Minimum pool size supplied by validated configuration.
+        max_size: Maximum pool size supplied by validated configuration.
+        connect_timeout: Driver connection timeout in seconds.
+        command_timeout: Driver command timeout in seconds.
+        error_type: Application error for handled connection failures.
+        error_detail: Caller-selected safe internal failure description.
+
+    Returns:
+        Pool whose successful lifetime and closure belong to the caller.
+    """
     try:
         return await asyncpg.create_pool(
             dsn=dsn,
@@ -110,6 +165,13 @@ async def _verify_applied_migration(
     error_type: StorageErrorType,
     legacy_validator: LegacyMigrationValidator | None,
 ) -> None:
+    """Accept matching SQL checksums or explicitly validate/backfill a legacy null.
+
+    A non-null mismatch fails. Missing checksums require the supplied validator to
+    accept this migration before an UPDATE fills only a still-null ledger value.
+    This path has no new explicit transaction and does not convert historical data.
+    Validator failures propagate; checksum equality is not a full schema audit.
+    """
     if recorded_checksum == migration.checksum:
         return
     if recorded_checksum is not None:
@@ -144,6 +206,30 @@ async def apply_migrations(
     bootstrap_statements: Sequence[str] = (),
     legacy_validators: Mapping[str, LegacyMigrationValidator] | None = None,
 ) -> None:
+    """Apply caller-ordered migrations while holding the shared session advisory lock.
+
+    Borrow one connection, acquire the common lock, bootstrap the ledger and execute
+    extra bootstrap statements before migration processing. Matching versions are
+    verified; eligible null checksums are backfilled. Each pending SQL resource and
+    ledger insert share one transaction. The entire batch/bootstrap/backfills are
+    not one atomic transaction; unrelated ledger versions are not audited here.
+
+    Attempt explicit unlock in finally. Cancellation, connection loss or unlock
+    failure can interrupt cleanup or replace an earlier error. Only cooperating
+    runners using this lock coordinate; the borrowed pool is never closed here.
+
+    Args:
+        pool: Caller-owned pool with migration privileges.
+        migrations: Resources already arranged in their intended application order.
+        label: Feature label used in logs and declared errors.
+        error_type: Application error for handled migration/database failures.
+        bootstrap_statements: Additional privileged SQL run outside pending transactions.
+        legacy_validators: Version-specific checks required for null-checksum backfill.
+
+    Raises:
+        AppError: Existing application errors propagate; handled OS/PostgreSQL
+            failures use error_type with a suppressed raw cause.
+    """
     validators = legacy_validators or {}
     try:
         async with pool.acquire() as connection:
@@ -208,6 +294,24 @@ async def grant_runtime_privileges(
     *,
     error_type: StorageErrorType = DatabaseStorageError,
 ) -> None:
+    """Grant schema usage and selected table DML through validated identifiers.
+
+    Require a 1-63-character ASCII role: letter/underscore first, then alphanumeric/
+    underscore. Require nonempty semantix table names with a lowercase-letter first
+    character and lowercase-letter/digit/underscore remainder. Quote the role and
+    apply both grants in one transaction on a borrowed connection. This neither
+    creates the role nor revokes privileges it already has.
+
+    Args:
+        pool: Borrowed pool with grant authority.
+        runtime_role: Existing PostgreSQL role receiving the selected grants.
+        tables: Feature-owned qualified table allowlist.
+        error_type: Application error for invalid identifiers or handled SQL failures.
+
+    Raises:
+        AppError: Identifier validation or handled OS/PostgreSQL work fails; other
+            application errors propagate and raw driver causes are suppressed.
+    """
     if ROLE_NAME.fullmatch(runtime_role) is None:
         raise error_type("DATABASE_RUNTIME_ROLE is not a valid PostgreSQL role")
     if not tables or any(TABLE_NAME.fullmatch(table) is None for table in tables):

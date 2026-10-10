@@ -1,3 +1,11 @@
+"""Define common auth, probe and basic public-error response models.
+
+Feature payloads live with their feature APIs. These models forbid extra
+fields and strip string whitespace. ErrorResponse describes the basic
+error/detail shape; handlers may also return structured issues and headers.
+Session responses expose permissions, never bearer tokens or their digests.
+"""
+
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field

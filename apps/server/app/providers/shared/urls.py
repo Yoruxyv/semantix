@@ -1,4 +1,8 @@
-"""URL normalization policies shared by provider configuration."""
+"""URL normalization policies shared by provider configuration.
+
+These are structural checks, not DNS/address filtering, SSRF protection,
+service authentication or reachability probes. Hosted and Ollama policies differ.
+"""
 
 from urllib.parse import urlparse
 
@@ -6,6 +10,21 @@ from urllib.parse import urlparse
 def normalize_hosted_provider_url(
     value: str | None,
 ) -> str | None:
+    """Normalize an optional absolute HTTPS base URL, allowing endpoint paths.
+
+    Strip surrounding whitespace and trailing slashes before parsing. Require a
+    hostname and valid parsed port; reject embedded credentials and nonempty query
+    or fragment content. Paths/path parameters are not otherwise rejected.
+
+    Args:
+        value: Optional configured URL; None or whitespace-only text becomes None.
+
+    Returns:
+        Normalized URL text, without DNS resolution or canonicalizing the hostname.
+
+    Raises:
+        ValueError: URL parsing, authority/port or the hosted policy is invalid.
+    """
     if value is None or not value.strip():
         return None
 
@@ -33,6 +52,22 @@ def normalize_hosted_provider_url(
 
 
 def normalize_ollama_url(value: str) -> str:
+    """Normalize a required HTTP/HTTPS origin for Ollama.
+
+    Strip surrounding whitespace and trailing slashes before parsing. Require a
+    hostname and valid parsed port, with no credentials, non-root path, path
+    parameters, query or fragment content. Blank text fails the origin policy.
+    HTTP is permitted; the origin need not resolve to a local/private address.
+
+    Args:
+        value: Configured Ollama origin.
+
+    Returns:
+        Normalized origin without probing the endpoint.
+
+    Raises:
+        ValueError: URL parsing, authority/port or the origin policy is invalid.
+    """
     normalized = value.strip().rstrip("/")
     parsed = urlparse(normalized)
     try:

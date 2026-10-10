@@ -1,3 +1,12 @@
+"""Carry evaluation execution evidence and repository records between layers.
+
+These frozen dataclasses prevent field rebinding, not deep mutation of nested
+schema objects. Most rely on validated builders/callers; only the history types
+with post-init checks enforce the stated terminal/time consistency invariants.
+Retained pages carry summaries; persisted dataset pages carry metadata. Repository
+implementations own storage, expiry and cleanup rather than these value objects.
+"""
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
@@ -31,6 +40,12 @@ EvaluationRunTerminalState = Literal["completed", "failed", "timed_out"]
 
 @dataclass(frozen=True, slots=True)
 class BenchmarkCase:
+    """Describe one ordered prompt and its expected cache decision.
+
+    Category, expected-match reference and note provide interpretation/evidence.
+    Execution correctness compares hit booleans, not the expected-match identity.
+    """
+
     case_id: str
     category: BenchmarkCategory
     prompt: str
@@ -41,12 +56,24 @@ class BenchmarkCase:
 
 @dataclass(frozen=True, slots=True)
 class BenchmarkDataset:
+    """Pair summary identity/counts with the cases in execution order.
+
+    Construction itself does not verify summary/case consistency or revalidate
+    imports; built-in/import/repository builders supply that evidence.
+    """
+
     summary: BenchmarkDatasetSummary
     cases: tuple[BenchmarkCase, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class BenchmarkObservation:
+    """Carry text-free per-case timing, decisions, score and savings estimates.
+
+    actual_cache_hit is a confirmed measured decision; similarity_score can also
+    describe a miss candidate. It supports projection without replaying a run.
+    """
+
     expected_cache_hit: bool
     actual_cache_hit: bool
     latency_ms: float
@@ -57,6 +84,13 @@ class BenchmarkObservation:
 
 @dataclass(frozen=True, slots=True)
 class BenchmarkRuntimeConfiguration:
+    """Carry runtime identities, evaluation limits and optional storage settings.
+
+    Provider/normalization fingerprints are precomputed during composition, not
+    credentials or clients. Storage mode fields describe configuration, not
+    repository availability. This dataclass does not validate settings by itself.
+    """
+
     application_version: str
     embedding_provider_category: ProviderCategory
     generation_provider_category: ProviderCategory
@@ -92,6 +126,13 @@ class BenchmarkRuntimeConfiguration:
 
 @dataclass(frozen=True, slots=True)
 class AcceptedEvaluationRunContext:
+    """Identify a run accepted after dataset/source gates, before lock acquisition.
+
+    The facade supplies the run ID, UTC acceptance time and resolved summary.
+    Optional history scope and source expiry describe eligibility, not a durable
+    acceptance record or a promise that terminal history will be retained.
+    """
+
     run_id: str
     accepted_at: datetime
     dataset: BenchmarkDatasetSummary
@@ -101,6 +142,15 @@ class AcceptedEvaluationRunContext:
 
 @dataclass(frozen=True, slots=True)
 class EvaluationRunHistoryRecord:
+    """Carry a terminal aggregate for repository handoff, excluding query evidence.
+
+    Post-init requires a history namespace and completion >= start. Completed
+    records require metrics/nonempty threshold rows and forbid failure fields;
+    failed/timed-out records require a failure code and omit metrics/rows.
+    Failure code/detail lengths are bounded. These checks do not sanitize text,
+    authenticate scope, verify timezone awareness or perform persistence.
+    """
+
     context: AcceptedEvaluationRunContext
     terminal_state: EvaluationRunTerminalState
     started_at: datetime
@@ -140,6 +190,12 @@ class EvaluationRunHistoryRecord:
 
 @dataclass(frozen=True, slots=True)
 class RetainedEvaluationRunSummary:
+    """Describe retained aggregate evidence without threshold rows or query text.
+
+    Post-init enforces a history namespace, accepted <= started <= completed <
+    expires, bounded failure metadata and terminal-state/metrics consistency.
+    """
+
     context: AcceptedEvaluationRunContext
     terminal_state: EvaluationRunTerminalState
     started_at: datetime
@@ -178,6 +234,12 @@ class RetainedEvaluationRunSummary:
 
 @dataclass(frozen=True, slots=True)
 class RetainedEvaluationRun:
+    """Pair a terminal aggregate with expiry strictly after completion.
+
+    Accessing summary projects it through the retained-summary consistency checks;
+    this wrapper does not create storage or schedule cleanup.
+    """
+
     record: EvaluationRunHistoryRecord
     expires_at: datetime
 
@@ -209,6 +271,12 @@ class RetainedEvaluationRunPage:
 
 @dataclass(frozen=True, slots=True)
 class PersistedEvaluationDatasetMetadata:
+    """Describe repository identity, namespace, import counts and retention times.
+
+    Display metadata and repository identity are separate from the semantic digest.
+    Namespace/expiry enforcement belongs to repository operations, not this type.
+    """
+
     dataset_id: str
     namespace: str
     name: str
@@ -223,6 +291,12 @@ class PersistedEvaluationDatasetMetadata:
 
 @dataclass(frozen=True, slots=True)
 class PersistedEvaluationDataset:
+    """Pair stored metadata with ordered cases, including imported private text.
+
+    Callers must authorize access to these contents. This value object performs
+    neither authentication nor independent import validation.
+    """
+
     metadata: PersistedEvaluationDatasetMetadata
     dataset: BenchmarkDataset
 

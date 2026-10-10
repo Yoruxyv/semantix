@@ -1,3 +1,9 @@
+"""Own the optional PostgreSQL pool shared by independent server features.
+
+Cache persistence, evaluation persistence and coordination select PostgreSQL
+independently. Their consumers borrow this pool and do not close it.
+"""
+
 import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -21,6 +27,22 @@ from app.infrastructure.database import create_pool
 async def database_pool_lifespan(
     settings: Settings,
 ) -> AsyncGenerator[Pool | None, None]:
+    """Open one pool when any enabled feature requires PostgreSQL.
+
+    ``auto`` migration mode applies enabled coordination and evaluation
+    migrations before yielding. ``external`` leaves migrations to deployment
+    tooling using its separate migration credentials. Neither mode initializes
+    the official cache schema here; cache startup validates explicit setup.
+
+    Closing is bounded by the command timeout. If close fails or is cancelled,
+    terminate the pool and re-raise rather than suppressing the failure.
+
+    Args:
+        settings: Runtime DSN, pool bounds, timeouts and feature selections.
+
+    Yields:
+        Shared pool, or None when no configured feature requires PostgreSQL.
+    """
     if not settings.database_required:
         yield None
         return

@@ -1,4 +1,11 @@
-"""Persistence value builders and row mappers for evaluation run history."""
+"""Persistence value builders and row mappers for evaluation run history.
+
+Keep positional builders synchronized with RUN_COLUMNS and INSERT_THRESHOLD in
+``app.benchmark.infrastructure.postgres_history_queries``. Read mappers use named
+columns and validate schema/domain consistency, not authenticity, authorization,
+arbitrary text privacy or reproducibility of historical evidence. Driver datetime
+values are carried through, and stored UUIDs become public UUID-hex run identities.
+"""
 
 from __future__ import annotations
 
@@ -27,6 +34,7 @@ from app.core.exceptions import EvaluationRunHistoryStorageError
 
 
 def _metrics_values(metrics: BenchmarkMetrics | None) -> tuple[object, ...]:
+    """Supply twenty-one aggregate positions, all NULL when metrics are absent."""
     if metrics is None:
         return (None,) * 21
 
@@ -62,7 +70,24 @@ def build_run_values(
     source_dataset_id: UUID | None,
     expires_at: datetime,
 ) -> tuple[object, ...]:
-    """Build values matching the durable ``evaluation_runs`` column order."""
+    """Build values matching the durable ``evaluation_runs`` column order.
+
+    Include dataset/reproducibility snapshots, terminal fields and the fixed metrics
+    block; failures contribute NULL metrics. The length guard checks shape, not
+    semantic column order, which must stay synchronized with RUN_COLUMNS.
+
+    Args:
+        record: Validated terminal record whose snapshot values will be stored.
+        run_id: Validated PostgreSQL UUID for the accepted run.
+        source_dataset_id: Persisted-source UUID, or None for a built-in source.
+        expires_at: Repository-computed retention expiry.
+
+    Returns:
+        Bind tuple for INSERT_RUN in the declared column order.
+
+    Raises:
+        EvaluationRunHistoryStorageError: Tuple length differs from RUN_COLUMN_COUNT.
+    """
 
     context = record.context
     dataset = context.dataset
@@ -124,7 +149,16 @@ def build_threshold_values(
     run_id: UUID,
     evaluations: tuple[ThresholdEvaluation, ...],
 ) -> list[tuple[object, ...]]:
-    """Build ordered threshold rows for ``evaluation_run_thresholds``."""
+    """Build ordered threshold rows for ``evaluation_run_thresholds``.
+
+    Args:
+        run_id: Parent run UUID.
+        evaluations: Retained threshold evidence in its supplied order.
+
+    Returns:
+        Fourteen-value bind rows matching INSERT_THRESHOLD, with one-based
+        sequence numbers and each measured/projected kind preserved. No rerun.
+    """
 
     return [
         (
@@ -199,6 +233,7 @@ def _reproducibility_from_record(
 
 
 def _metrics_from_record(row: Record) -> BenchmarkMetrics | None:
+    """Treat NULL total_queries as absent metrics; otherwise validate aggregates."""
     if row["total_queries"] is None:
         return None
 
@@ -232,7 +267,22 @@ def _metrics_from_record(row: Record) -> BenchmarkMetrics | None:
 
 
 def summary_from_record(row: Record) -> RetainedEvaluationRunSummary:
-    """Reconstruct one aggregate retained-run summary from a database row."""
+    """Reconstruct one aggregate retained-run summary from a database row.
+
+    Convert the driver UUID to hex, carry datetime values and validate nested
+    dataset/configuration/metrics plus retained terminal/time invariants. This
+    does not verify the recorded fingerprints or sanitize arbitrary stored text.
+
+    Args:
+        row: Driver record containing named RUN_COLUMNS values, without thresholds.
+
+    Returns:
+        Retained aggregate summary describing the historical execution.
+
+    Raises:
+        EvaluationRunHistoryStorageError: KeyError, TypeError or ValueError occurs
+            during mapping, including nested schema/domain validation.
+    """
 
     try:
         context = AcceptedEvaluationRunContext(
@@ -294,7 +344,23 @@ def retained_run_from_records(
     row: Record,
     threshold_rows: list[Record],
 ) -> RetainedEvaluationRun:
-    """Reconstruct a retained-run detail and its ordered threshold evidence."""
+    """Reconstruct a retained-run detail and its ordered threshold evidence.
+
+    Preserve caller-supplied row order; the repository's query orders by sequence.
+    Individual threshold schemas and terminal-record/expiry invariants validate
+    consistency without recomputing metrics or authenticating evidence.
+
+    Args:
+        row: Named aggregate run columns, including threshold projection mode.
+        threshold_rows: Threshold records already ordered by stored sequence.
+
+    Returns:
+        Retained aggregate and expiry with threshold rows, without per-query history.
+
+    Raises:
+        EvaluationRunHistoryStorageError: Summary mapping fails or KeyError,
+            TypeError or ValueError occurs while reconstructing detail.
+    """
 
     summary = summary_from_record(row)
     try:

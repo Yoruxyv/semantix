@@ -1,3 +1,13 @@
+"""Server Hugging Face feature-extraction and chat wire contracts.
+
+Application lifespan owns the injected HTTP client; these adapters never close it.
+Constructors expect deployment-validated configuration. ``post_json`` applies the
+retry policy, byte limit and deadline derived from the client's read timeout;
+provider-specific parsing occurs after that transport call and is not retried.
+Cancellation propagates during HTTP waits without guaranteeing remote rollback.
+See ``app.providers.shared.transport`` and ``docs/guides/providers.md``.
+"""
+
 from collections.abc import Sequence
 from typing import cast
 from urllib.parse import quote
@@ -29,6 +39,13 @@ def _rows(
     *,
     dimensions: int,
 ) -> list[list[float]] | None:
+    """Decode a vector, row matrix or recursively singleton-wrapped rows.
+
+    Try a complete dimension-matched vector first; otherwise unwrap a single
+    nested item or require every matrix row to pass numeric vector validation.
+    Zero rows are allowed here. Pooling and final service normalization happen
+    later; malformed shapes return ``None``.
+    """
     direct = parse_vector(value, dimensions=dimensions)
     if direct is not None:
         return [direct]
@@ -59,6 +76,8 @@ def _rows(
 
 
 class HuggingFaceProvider:
+    """Use independent Hugging Face feature-extraction and chat configurations."""
+
     def __init__(
         self,
         client: httpx.AsyncClient,
@@ -72,6 +91,22 @@ class HuggingFaceProvider:
         retry_factory: RetryFactory = DEFAULT_RETRY_FACTORY,
         max_response_bytes: int = DEFAULT_PROVIDER_MAX_RESPONSE_BYTES,
     ) -> None:
+        """Capture feature-extraction and chat settings with a borrowed client.
+
+        Args:
+            client: Application-owned async HTTP client.
+            api_key: Bearer credential for both API paths.
+            inference_base_url: Validated root preceding the encoded model path,
+                or ``None`` when embedding is not configured.
+            chat_base_url: Validated chat API root, or ``None`` when unconfigured.
+            embedding_model: Model path for feature extraction, or ``None``.
+            generation_model: Chat payload's model identifier, or ``None``.
+            embedding_dimensions: Expected row and pooled-vector length, or ``None``.
+            max_new_tokens: Generation budget sent as ``max_tokens``.
+            retry_factory: Per-request policy; the default retries eligible
+                transport failures for up to three attempts.
+            max_response_bytes: Shared transport's buffered response byte limit.
+        """
         self._client = client
         self._api_key = api_key
         self._inference_base_url = (
@@ -91,6 +126,23 @@ class HuggingFaceProvider:
         self,
         text: str,
     ) -> Sequence[float]:
+        """Request feature extraction and mean-pool validated rows in float64.
+
+        POST to ``/{model}/pipeline/feature-extraction`` under the inference root,
+        quoting the model while preserving slashes. Send ``inputs=[text]`` and
+        ``normalize=True``. Accept a flat vector, matrix of dimension-matched rows
+        or singleton wrappers understood by ``_rows``; average rows along axis 0.
+        Reject a wrong-size or nonfinite pooled result. The request's normalization
+        flag does not locally normalize the mean: EmbeddingService does that and
+        rejects invalid magnitude before cache use.
+
+        Returns:
+            The pooled float vector, without local unit-length normalization.
+
+        Raises:
+            RuntimeError: Inference URL, embedding model or dimensions are absent.
+            InvalidProviderResponseError: Rows or the pooled vector are invalid.
+        """
         if (
             self._inference_base_url is None
             or self._embedding_model is None
@@ -138,6 +190,20 @@ class HuggingFaceProvider:
         return [float(component) for component in vector]
 
     async def generate(self, prompt: str) -> str:
+        """POST a user message to the chat root's ``/chat/completions`` endpoint.
+
+        Sends ``max_tokens`` and ``stream=False``. Decode only the first choice's
+        message content, requiring nonblank text. This provider owns its decoder
+        independently of OpenAI and does not check finish reasons, tool calls or
+        refusals here. Server workflows validate returned text afterward.
+
+        Returns:
+            The first choice's text with surrounding whitespace removed.
+
+        Raises:
+            RuntimeError: Chat URL or generation model is not configured.
+            InvalidProviderResponseError: Choices, message or text are invalid.
+        """
         if self._chat_base_url is None or self._generation_model is None:
             raise RuntimeError("Hugging Face generation provider is not configured")
         payload = await post_json(

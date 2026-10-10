@@ -2,9 +2,11 @@
 
 The server exposes semantic-cache queries, cache inspection/administration,
 controlled evaluations and operational health/observability APIs for the web
-workbench and HTTP clients. The separate ``semantix_cache`` library supplies
-in-process caching; this server owns its HTTP contracts, authentication, metrics
-and request orchestration while reusing shared private semantic primitives.
+workbench and HTTP clients. The separate ``semantix_cache`` library supplies the
+authoritative MemoryStore, PgVectorStore and RedisStore. The server composes those
+stores and owns HTTP contracts, authentication, namespace authorization, telemetry
+and request orchestration while reusing shared private semantic primitives. The
+embedded library does not provide server authentication.
 
 Composition and resource ownership
 ----------------------------------
@@ -26,7 +28,9 @@ Subsystem map
     per-process request coalescing and lookup/generation orchestration.
 ``cache``
     Semantic lookup, keys/namespaces, threshold behavior, inspection/mutation
-    routes, storage protocols, memory/pgvector adapters and cache migrations.
+    routes, backend protocols, official-store adapters, request telemetry and
+    explicit storage setup. Cache entries and store-specific persistence belong
+    to ``semantix_cache``; legacy server cache SQL remains here.
 ``providers`` and ``embedding``
     Provider protocols, explicit configuration/selection and external HTTP
     adapters; embedding validation before cache use. Provider-specific wire
@@ -58,12 +62,23 @@ The HTTP response carries cache and provider-call evidence.
 
 Persistence and configuration boundaries
 ---------------------------------------
-Cache storage is configured as memory or PostgreSQL/pgvector. Enabled persistent
-evaluation and coordination features reuse the shared pool. The server owns its
-migrations and schema; embedded PgVectorStore tables have a separate ownership
-contract. Development may initialize enabled schemas automatically; hardened
-operation separates migration authority from the runtime role. Routes do not own
-DDL. See the infrastructure lifecycle and migration runner before changing setup.
+``cache.infrastructure.factory.cache_backend_lifespan`` selects memory, pgvector
+or Redis. Memory and pgvector constructors extend OfficialStoreBackend; RedisStore
+is wrapped directly. Stores own entries, revisions, expiry and LRU; the server
+adapter translates inspection results and maintains separate request counters.
+PgVectorStore borrows the lifespan's shared PostgreSQL pool, also used by enabled
+evaluation and coordination features. RedisStore.connect owns its client/pool;
+cache lifespan closes the selected store before shared resources exit.
+
+Persistent cache setup is explicit. Ordinary startup validates PostgreSQL/Redis
+bindings rather than creating or adopting them. PgVectorStore owns its marked
+schema/prefix and package migration ledger; server migration history and telemetry
+remain separate. Legacy ``semantix.cache_entries`` rows stay preserved and are
+neither served nor converted. Development ``auto`` migrations apply only to other
+enabled PostgreSQL features. Hardened setup uses separate migration/runtime roles.
+Routes do not own DDL. Consult the infrastructure lifecycle and migration runner
+before changing setup; store-specific transaction and cancellation contracts
+remain with the owning store.
 
 ``core.config.Settings`` and the application factory define configuration and
 startup selection. ``security`` enforces authorization on the server; UI checks
@@ -83,5 +98,7 @@ layout rather than introducing new layers.
 
 Repository navigation: ``ARCHITECTURE.md``, ``apps/server/AGENTS.md``,
 ``docs/reference/api.md`` and ``docs/guides/development.md``. Deployment/resource
-ownership details live in ``docs/operations/deployment.md``.
+ownership details live in ``docs/operations/deployment.md`` and
+``docs/guides/platform-storage.md``; embedded store contracts live in
+``docs/embedded-storage.md`` and ``docs/embedded-redis.md``.
 """

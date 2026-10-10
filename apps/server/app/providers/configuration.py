@@ -1,3 +1,19 @@
+"""Built-in provider requirements and model-based selection metadata.
+
+ProviderName defines stripped, case-preserving names shared with registration;
+name validity does not establish that a provider exists or supports a capability.
+``app.providers.registry`` owns custom registration and metadata resolution.
+Built-in selectors here reject custom names rather than resolving the registry.
+
+Required fields are checked only for recognized selected built-in capabilities.
+Settings owns numeric bounds and URL normalization; these checks do no network
+I/O. Hugging Face/OpenAI/Gemini embedding needs its key, base URL, model and
+dimensions; hosted generation also supports Anthropic and needs key/URL/model.
+Ollama needs URL and selected model/dimensions without a required API key. Mock
+needs embedding dimensions, uses stable-token-hash-v1/mock-prefix-v1 model IDs
+and requires no credentials. Configuration strings do not prove model behavior.
+"""
+
 from __future__ import annotations
 
 import re
@@ -25,6 +41,20 @@ MOCK_GENERATION_MODEL_ID = "mock-prefix-v1"
 
 
 def validate_provider_name(value: str) -> str:
+    """Strip whitespace and validate a case-preserving registration name.
+
+    The first character is ASCII alphanumeric; the remaining characters may also
+    include dot, underscore, hyphen or colon, up to 50 characters total.
+
+    Args:
+        value: Provider name to normalize, without a registry lookup.
+
+    Returns:
+        Stripped name with its original case.
+
+    Raises:
+        ValueError: The stripped name does not match the shared name pattern.
+    """
     normalized = value.strip()
     if re.fullmatch(PROVIDER_NAME_PATTERN, normalized) is None:
         raise ValueError(
@@ -35,11 +65,36 @@ def validate_provider_name(value: str) -> str:
 
 
 def validate_provider_configuration(settings: Settings) -> None:
+    """Check required fields for the selected recognized built-in capabilities.
+
+    Embedding checks precede generation checks; the first missing/blank requirement
+    raises. Unknown/custom names are left to registry selection, not rejected here.
+    Settings field validation owns positive numeric bounds and URL policies; the
+    dimension helper here checks presence only. This does not probe credentials,
+    remote models or connectivity, or validate custom metadata.
+
+    Args:
+        settings: Parsed server settings with independent provider selections.
+
+    Raises:
+        ValueError: A recognized selected built-in lacks a required field.
+    """
     _validate_embedding_provider(settings)
     _validate_generation_provider(settings)
 
 
 def selected_embedding_dimensions(settings: Settings) -> int:
+    """Select the configured dimension of a recognized built-in embedding provider.
+
+    Args:
+        settings: Settings whose selected built-in configuration was validated.
+
+    Returns:
+        Configured component count, without inspecting an actual embedding.
+
+    Raises:
+        RuntimeError: The provider is custom or its dimension is missing.
+    """
     match settings.embedding_provider:
         case "huggingface":
             value = settings.hf_embedding_dimensions
@@ -62,6 +117,21 @@ def selected_embedding_dimensions(settings: Settings) -> int:
 
 
 def selected_embedding_space(settings: Settings) -> str:
+    """Build the built-in cache space identity as provider:model.
+
+    Mock uses its fixed embedding model ID. Dimensions are a separate binding input;
+    endpoint, credentials and external model revisions are not included in this
+    string. Equal identities alone do not verify semantic compatibility.
+
+    Args:
+        settings: Settings whose selected built-in model was validated.
+
+    Returns:
+        Provider/model identity; custom spaces come from registry metadata.
+
+    Raises:
+        RuntimeError: The provider is custom or its model is missing.
+    """
     match settings.embedding_provider:
         case "huggingface":
             model = settings.hf_embedding_model
@@ -84,6 +154,22 @@ def selected_embedding_space(settings: Settings) -> str:
 
 
 def selected_generation_configuration(settings: Settings) -> dict[str, object]:
+    """Select built-in fields consumed by generation configuration fingerprinting.
+
+    The mapping contains provider, model, max_new_tokens and max_response_bytes in
+    that order. Mock uses its fixed generation model ID. API keys and base URLs are
+    excluded, but caller-supplied model text is not sanitized for arbitrary logging.
+    This mapping is not inherently secret-safe or proof of actual provider behavior.
+
+    Args:
+        settings: Settings whose selected built-in generation model was validated.
+
+    Returns:
+        A new dictionary of the four existing configuration fields.
+
+    Raises:
+        RuntimeError: The provider is custom or its model is missing.
+    """
     match settings.generation_provider:
         case "huggingface":
             model = settings.hf_generation_model

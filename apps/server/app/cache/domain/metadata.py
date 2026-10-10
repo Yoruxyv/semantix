@@ -1,4 +1,11 @@
-"""Cache response metadata helpers."""
+"""Cache response metadata helpers.
+
+Responses within the character limit are returned intact; longer responses use
+the fixed omission message rather than a partial substring. The truncation flag
+describes that limit, not response validity or completeness of other metadata.
+Prompts, previews and complete responses can expose sensitive user content;
+these helpers neither redact it nor authorize access.
+"""
 
 from app.core.limits import MAX_RESPONSE_PREVIEW_LENGTH
 

@@ -1,4 +1,8 @@
-"""Explicit Redis binding initialization; ordinary startup only validates."""
+"""Explicit Redis binding initialization; ordinary startup only validates.
+
+The command owns a separate initialization client; RedisStore borrows it.
+Metadata resolution does not construct providers, download models or run inference.
+"""
 
 import asyncio
 import os
@@ -17,6 +21,11 @@ from semantix_cache.stores.redis import RedisStore
 
 
 def _public_setup_failure(error: BaseException, *, cleanup: bool) -> BaseException:
+    """Map declared package/Redis/OS/ValueError failures to fixed setup/cleanup errors.
+
+    Return cancellation, programming errors and other BaseException values unchanged.
+    This selector does not sanitize arbitrary exceptions or recursively rewrite groups.
+    """
     if isinstance(error, (SemantixCacheError, RedisError, OSError, ValueError)):
         return CacheStorageError(
             "Redis setup cleanup failed"
@@ -29,6 +38,16 @@ def _public_setup_failure(error: BaseException, *, cleanup: bool) -> BaseExcepti
 async def _close_setup_client(
     client: Redis, *, timeout_seconds: float, failure: BaseException | None
 ) -> BaseException | None:
+    """Await one bounded owned-client close task while recording caller cancellation.
+
+    Shield that task rather than creating a new close per cancellation. A cancelled
+    close task is terminal. Caller cancellation replaces the pending failure value;
+    expected close failure is selected only if none is pending. Unexpected close
+    failure propagates alone or joins a pending failure in BaseExceptionGroup.
+    Shielding is not a guarantee of successful cleanup or a fixed final error under
+    repeated cancellation. The caller interprets the returned failure.
+    """
+
     async def close() -> None:
         async with asyncio.timeout(timeout_seconds):
             await client.aclose(close_connection_pool=True)
@@ -59,6 +78,26 @@ async def _close_setup_client(
 
 
 async def initialize_redis(settings: Settings, *, initialization_url: str) -> None:
+    """Initialize the configured binding with a separately authorized, owned client.
+
+    Resolve built-in registry selection metadata without building providers; both
+    selected capabilities must resolve. Use the embedding identity/dimensions to
+    construct a borrowed-client RedisStore with configured prefix, capacity, TTL and
+    deadlines. The client uses binary responses, protocol 2 and zero retries.
+    The supplied initialization URL must target the intended runtime binding.
+
+    Finally close any constructed store, then its owned client even after partial
+    initialization. Store closure does not close this borrowed client. Expected
+    cleanup errors preserve a pending failure; unexpected cleanup errors can form
+    BaseExceptionGroup. Client-close cancellation can take priority over setup errors.
+    Declared final failures are translated outside handlers with suppressed cause;
+    cancellation/programming/group errors are not all converted to CacheStorageError.
+    Cleanup does not roll back remote initialization or guarantee resource release.
+
+    Args:
+        settings: Validated Redis binding and built-in provider-selection settings.
+        initialization_url: Private setup connection URL with initialization authority.
+    """
     active: Redis | None = None
     store: RedisStore | None = None
     failure: BaseException | None = None
@@ -130,6 +169,12 @@ async def initialize_redis(settings: Settings, *, initialization_url: str) -> No
 
 
 async def run() -> None:
+    """Read setup configuration and require Redis plus REDIS_INITIALIZATION_URL.
+
+    Settings validation happens first. This entrypoint then rejects a non-Redis
+    backend or missing/empty initialization URL and delegates owned cleanup to
+    initialize_redis. Running this module invokes the coroutine with asyncio.run.
+    """
     settings = Settings()  # pyright: ignore[reportCallIssue] - environment supplies required fields
     if settings.cache_backend != "redis":
         raise CacheStorageError("Redis setup requires CACHE_BACKEND=redis")

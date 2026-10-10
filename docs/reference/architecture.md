@@ -5,6 +5,12 @@ orchestration, domain rules, and infrastructure only where those
 responsibilities exist. Shared packages contain cross-feature composition and
 utilities rather than feature behavior.
 
+The independently installable `semantix-cache` library owns authoritative cache
+entries, revisions, expiration, LRU and store-specific persistence. The optional
+FastAPI server composes its official stores and owns HTTP contracts,
+authentication, namespace authorization, request orchestration and telemetry.
+The embedded library does not provide server authentication.
+
 ## Runtime flow
 
 ```mermaid
@@ -12,29 +18,46 @@ sequenceDiagram
     participant UI as React client
     participant API as Query API
     participant Query as QueryService
-    participant Embed as EmbeddingProvider
-    participant Cache as CacheBackend
+    participant Cache as SemanticCache
+    participant Embed as EmbeddingService
+    participant Backend as OfficialStoreBackend
+    participant Store as MemoryStore / PgVectorStore / RedisStore
     participant Generate as GenerationProvider
 
     UI->>API: POST /api/v1/query
-    API->>Query: validated query
-    Query->>Embed: create embedding
-    Embed-->>Query: validated vector
-    Query->>Cache: nearest lookup
-    alt score meets threshold
-        Cache-->>Query: cached response
+    API->>Query: validated query and authorized namespace
+    Query->>Cache: lookup prompt in namespace
+    Cache->>Embed: create embedding
+    Embed-->>Cache: validated vector
+    Cache->>Backend: nearest lookup in namespace
+    Backend->>Store: find_nearest
+    Store-->>Backend: candidate or none
+    Backend-->>Cache: candidate or none
+    opt candidate meets threshold
+        Cache->>Backend: record_hit
+        Backend->>Store: confirm candidate freshness
+        Store-->>Backend: confirmation
+        Backend-->>Cache: confirmation
+    end
+    Cache-->>Query: confirmed hit or miss, embedding
+    alt confirmed hit
+        Query->>Query: reuse cached response
     else cache miss
         Query->>Generate: generate original prompt
         Generate-->>Query: response
         Query->>Cache: store vector and response
+        Cache->>Backend: put
+        Backend->>Store: put
     end
     Query-->>API: response and decision evidence
     API-->>UI: stable JSON contract
 ```
 
-Identical in-flight requests are coalesced before repeated provider work.
-Runtime counters observe the query path without storing prompt or response
-content.
+The diagram shows the normal read/write-enabled path; a hit requires both threshold
+eligibility and store confirmation. Private/bypass requests skip live-cache reads
+and writes. Identical in-flight requests are coalesced within one process before
+repeated provider work. Runtime counters observe the query path without storing
+prompt or response content.
 
 ## Backend ownership
 
@@ -48,14 +71,17 @@ content.
 - `app/cache/application` exposes semantic lookup and storage behavior.
 - `app/cache/domain` owns keys, namespaces, metadata, vector validation, models,
   and backend ports.
-- `app/cache/infrastructure` owns memory and pgvector adapters plus cache-table
-  migrations.
+- `app/cache/infrastructure` composes official stores through server adapters,
+  translates inspection models, records request telemetry, and provides explicit
+  storage setup. Authoritative cache persistence belongs to `semantix_cache`;
+  legacy server cache migrations remain here.
 - `app/benchmark` mirrors API, application, and domain responsibilities for the
   isolated evaluation laboratory; its infrastructure adapter owns persistent
-  evaluation-dataset tables and repository behavior.
-- `app/infrastructure` owns only the narrowly shared PostgreSQL pool,
-  checksum/advisory-lock migration runner, runtime grants, and lifecycle
-  composition used by cache and evaluation storage.
+  evaluation-dataset and optional aggregate run-history tables and repositories.
+- `app/infrastructure` owns the shared PostgreSQL pool, checksum/advisory-lock
+  migration runner, runtime grants, and lifecycle composition used by enabled
+  database features. It also owns PostgreSQL coordination for rate buckets,
+  authentication lockouts, and the global threshold.
 - `app/providers` owns application-facing protocols, startup composition, and
   concrete external adapters.
 - `app/observability` stays flat because it is a small cohesive feature with
@@ -87,9 +113,36 @@ This permits combinations such as OpenAI embeddings with Anthropic generation.
 The selected embedding dimensions flow into validation and cache composition;
 vectors are never padded or truncated.
 
-The cache application layer uses one backend port implemented by memory and
-pgvector adapters. Both enforce compatible lookup, TTL, LRU, namespaces,
-inspection, and statistics behavior.
+Provider adapters own their wire payloads and response validation independently.
+`app/providers/shared` supplies transport and common helpers; sharing an HTTPX
+client does not make provider request/response contracts interchangeable.
+
+The cache application layer uses the server's `CacheBackend` port. Its adapters
+delegate authoritative operations to official stores:
+
+| `CACHE_BACKEND` | Server adapter | Authoritative store | Server resource boundary |
+|---|---|---|---|
+| `memory` | `InMemoryCacheBackend` | `MemoryStore` | Process-local store |
+| `pgvector` | `PgVectorCacheBackend` | `PgVectorStore` | Borrows the shared PostgreSQL pool |
+| `redis` | `OfficialStoreBackend` | `RedisStore` | Connected store owns its Redis client/pool |
+
+`InMemoryCacheBackend` and `PgVectorCacheBackend` extend `OfficialStoreBackend`.
+`cache_backend_lifespan` constructs the selected store, validates persistent
+bindings, and closes the store on exit. A supplied PostgreSQL pool stays borrowed;
+when called without one, the pgvector factory fallback owns and closes the pool
+it creates. The normal application lifespan supplies one shared pool.
+
+The adapter maps store inspection to HTTP models and keeps separate request
+hit/miss counters. Memory/Redis counters are process-local; pgvector counters use
+`semantix.cache_namespace_counters`, scoped to the active embedding identity,
+dimensions, schema and prefix. Entry hit metadata, revisions, expiry and LRU
+remain authoritative in the official store. Process-local
+`app/observability` metrics are another aggregate view, not a cache index.
+
+Store-specific persistence, inspection, transaction, timeout and cancellation
+contracts remain independently owned. See [server storage setup](../guides/platform-storage.md),
+[embedded storage](../embedded-storage.md) and [Redis storage](../embedded-redis.md)
+for the supported boundaries.
 
 ## Frontend ownership
 
@@ -147,22 +200,44 @@ compatible.
 
 ## PostgreSQL lifecycle and migration ownership
 
-The cache and persistent evaluation catalog share one pool only when either
-feature needs PostgreSQL:
+One server pool serves all enabled PostgreSQL features. These requirements combine;
+turning on another database feature reuses the pool rather than creating another:
 
-| Cache | Evaluation datasets | PostgreSQL lifecycle |
-|---|---|---|
-| `memory` | `session` | No pool and no database requirement |
-| `memory` | `postgres` | One pool; apply evaluation migration `0002` |
-| `pgvector` | `session` | One pool; apply cache migration `0001` |
-| `pgvector` | `postgres` | One reused pool; apply `0001`, then `0002` |
+| Configuration | PostgreSQL lifecycle and setup |
+|---|---|
+| `memory` or `redis` cache, session datasets, disabled run history, memory coordination | No PostgreSQL pool or requirement |
+| `CACHE_BACKEND=pgvector` | Explicit official cache setup plus server legacy/telemetry migration `0001` |
+| Dataset or run-history storage set to `postgres` | Server evaluation migrations `0002` and `0003` |
+| `COORDINATION_BACKEND=postgres` | Server coordination migration `0004` |
 
-The shared bootstrap creates only the `semantix` schema and checksum-protected
-migration ledger. The cache migration remains responsible for the vector
-extension and cache tables; the evaluation migration remains responsible for
-dataset and case tables. Both use the existing advisory lock and deterministic
-SHA-256 checksums. This keeps feature SQL feature-owned while avoiding two
-independent pools, ledgers, or startup lifecycles.
+With `CACHE_BACKEND=pgvector`, `python -m app.infrastructure.migrate` uses
+operator authority to enable pgvector, apply server legacy/telemetry setup,
+initialize marked PgVectorStore tables, and grant runtime access. With the server
+defaults, the active relations are:
+
+- `semantix_cache.workbench_cache_entries`: official cache entries and metadata;
+- `semantix_cache.workbench_binding_state`: embedding-space revision/access state;
+- `semantix_cache.workbench_schema_migrations`: package migration version/checksum ledger.
+
+`CACHE_PGVECTOR_SCHEMA` and `CACHE_PGVECTOR_TABLE_PREFIX` configure these names.
+The package's `0001_cache.sql` and ledger are independent of server migration
+`0001_pgvector_cache.sql` and `semantix.schema_migrations`. Server migration `0001`
+retains the legacy `semantix.cache_entries` layout and server telemetry table.
+Legacy answer/vector rows stay preserved; the official store neither serves,
+converts nor adopts them. A new official binding starts empty.
+
+The server runner protects its feature-owned migration batches with ordered
+resources, an advisory lock, transactions and SHA-256 checksums. Evaluation
+migrations own datasets/cases and terminal aggregate history; coordination owns
+rate, lockout and global-threshold tables. Package migrations retain their own
+ownership markers, locking and checksum validation.
+
+Ordinary PostgreSQL/Redis cache startup validates the selected binding and never
+initializes it. Development `DATABASE_MIGRATION_MODE=auto` applies only to other
+enabled PostgreSQL features. Hardened Compose runs explicit PostgreSQL setup in
+its one-shot migration service before backends, with separate migration/runtime
+roles. Redis initialization uses its own explicit setup command and authority;
+see [server storage setup](../guides/platform-storage.md).
 
 ## Project structure
 
@@ -172,9 +247,10 @@ semantix/
 │   ├── server/
 │   │   ├── app/
 │   │   │   ├── api/
-│   │   │   ├── benchmark/{api,application,domain}/
+│   │   │   ├── benchmark/{api,application,domain,infrastructure}/
 │   │   │   ├── cache/{api,application,domain,infrastructure}/
 │   │   │   ├── embedding/
+│   │   │   ├── infrastructure/
 │   │   │   ├── observability/
 │   │   │   ├── providers/{adapters,shared}/
 │   │   │   ├── query/{api,application,domain}/
@@ -216,7 +292,7 @@ The development deployment is local-first; production Compose runs two backends 
 - authentication can be disabled for trusted local development or configured
   with namespace-scoped token principals;
 - CORS is configured for known local frontend origins;
-- no distributed lock, message bus, or external metrics platform is included.
+- no distributed request coalescer, message bus, or external metrics platform is included.
 
 Production exposure requires authentication, secret management, TLS, provider
 capacity planning, and an explicit data-retention model.

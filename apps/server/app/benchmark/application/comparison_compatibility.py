@@ -1,3 +1,10 @@
+"""Keep comparison hard gates separate from displayable historical differences.
+
+Only explicit checks below define current compatibility. Equal opaque fingerprints
+do not bypass them, and unequal fingerprints alone do not introduce a blocker or
+warning. Retained aggregates lack case/response evidence for stronger equivalence.
+"""
+
 from typing import cast
 
 from app.benchmark.api.comparison_schemas import (
@@ -11,6 +18,21 @@ def comparison_blockers(
     baseline: EvaluationRunHistoryDetail,
     candidate: EvaluationRunHistoryDetail,
 ) -> list[EvaluationComparisonBlocker]:
+    """Collect current hard gates without requiring identical generation settings.
+
+    Require equal namespace, completed terminal states, dataset schema/digest,
+    embedding dimensions/space, normalization mode/fingerprint, repetitions/reset
+    policy, comparison-contract version and threshold projection mode. The mode
+    check also guards values produced by validation-bypassing model construction.
+    Measured-threshold differences and opaque configuration hashes are not gates.
+
+    Args:
+        baseline: Retained reference detail.
+        candidate: Retained detail to compare against it.
+
+    Returns:
+        All detected blockers, in check order; the coordinator suppresses deltas.
+    """
     blockers: list[EvaluationComparisonBlocker] = []
 
     if baseline.namespace != candidate.namespace:
@@ -137,6 +159,20 @@ def comparison_warnings(
     baseline: EvaluationRunHistoryDetail,
     candidate: EvaluationRunHistoryDetail,
 ) -> list[EvaluationComparisonWarning]:
+    """Collect advisory differences without independently blocking deltas.
+
+    Check generation category/fingerprint, application version, cost assumptions,
+    timeout and threshold lists. Also warn about different persisted IDs/versions
+    only when both sources are persisted and schema/digest match. These warnings
+    do not verify generated-response identity or statistical significance.
+
+    Args:
+        baseline: Retained reference detail.
+        candidate: Retained detail to compare against it.
+
+    Returns:
+        All detected warnings in check order, even if separate blockers also exist.
+    """
     warnings: list[EvaluationComparisonWarning] = []
     baseline_metadata = baseline.reproducibility
     candidate_metadata = candidate.reproducibility

@@ -1,3 +1,11 @@
+"""Explicit provider registration and metadata selection before construction.
+
+Registration declares capabilities and deferred builders. Resolution freezes
+the registry and evaluates selected metadata without constructing adapters;
+``factory`` later invokes builders with application-owned transport. This
+registry configures server providers, independently of embedded integrations.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -14,21 +22,40 @@ from app.providers.protocols import EmbeddingProvider, GenerationProvider
 
 ProviderCapability = Literal["embedding", "generation"]
 ProviderInstance: TypeAlias = EmbeddingProvider | GenerationProvider
+# Generation metadata accepts these scalars; resolution rejects nonfinite floats.
 SafeMetadataValue: TypeAlias = str | int | float | bool | None
 
 
 @dataclass(frozen=True, slots=True)
 class ProviderBuildContext:
+    """Borrowed HTTP client and configured limits supplied to a provider builder.
+
+    Application lifespan owns ``client`` and closes it on exit, including failed
+    startup. Adapters must not close it. The timeout and response-size fields are
+    settings inputs; shared ``post_json`` takes its operation deadline from the
+    supplied client's read timeout, rather than consulting this context field.
+    Additional adapter resources require deployment-owned cleanup.
+    """
+
     client: httpx.AsyncClient
     provider_timeout_seconds: float
     provider_max_response_bytes: int
 
 
+# Synchronous construction callback; registration and metadata resolution do not run it.
 ProviderBuilder: TypeAlias = Callable[[ProviderBuildContext], ProviderInstance]
 
 
 @dataclass(frozen=True, slots=True)
 class EmbeddingMetadata:
+    """Vector dimensions and semantic space identity used to configure the cache.
+
+    Construction rejects dimensions below one and a blank ``space``. Keep the
+    identity stable for compatible vectors; change it when model or preprocessing
+    changes make stored vectors incompatible. Validation checks presence, not
+    semantic compatibility. Secret checks occur during registration resolution.
+    """
+
     dimensions: int
     space: str
 
@@ -46,6 +73,19 @@ GenerationMetadataResolver: TypeAlias = Callable[[], GenerationMetadata]
 
 @dataclass(frozen=True, slots=True)
 class ProviderRegistration:
+    """One named provider's declared capabilities, builder and metadata sources.
+
+    Construction validates the name, nonempty supported capabilities and the
+    presence of metadata for exactly those capabilities. It invokes neither
+    the builder nor callable metadata sources. Metadata resolvers run when
+    selected and should describe stable configuration without provider calls.
+
+    ``secrets`` supplies known credentials for server logging redaction. Each
+    resolution rejects this registration's nonempty secret strings appearing
+    as substrings in embedding ``space`` or string generation metadata values.
+    Keys and other output are not covered; this is not universal redaction.
+    """
+
     name: ProviderName
     capabilities: frozenset[ProviderCapability]
     builder: ProviderBuilder
@@ -72,6 +112,19 @@ class ProviderRegistration:
             raise ValueError("Generation metadata requires the generation capability")
 
     def resolve_embedding_metadata(self) -> EmbeddingMetadata:
+        """Evaluate embedding metadata and check its type and registered secrets.
+
+        Exceptions raised by a custom resolver propagate unchanged.
+
+        Returns:
+            The supplied or resolved ``EmbeddingMetadata``, without construction
+            of a provider or caching of a callable result.
+
+        Raises:
+            ValueError: Embedding metadata is absent or its space contains a
+                nonempty secret registered on this provider.
+            TypeError: A resolver returns something other than ``EmbeddingMetadata``.
+        """
         value = self.embedding_metadata
         if value is None:
             raise ValueError(f"Provider {self.name!r} does not support embedding")
@@ -82,6 +135,23 @@ class ProviderRegistration:
         return resolved
 
     def resolve_generation_metadata(self) -> GenerationMetadata:
+        """Evaluate, validate and copy generation configuration for selection.
+
+        Metadata must be nonempty, with nonempty string keys and values limited
+        to strings, integers, finite floats, booleans or ``None``. String values
+        must not contain this registration's nonempty secrets. Use stable values:
+        server benchmark configuration derives its fingerprint from this mapping.
+
+        Invalid mapping results and custom resolver exceptions propagate.
+
+        Returns:
+            A read-only copy of the resolved mapping. Callable results are not
+            cached between resolutions.
+
+        Raises:
+            ValueError: Metadata is absent, empty, violates scalar/key constraints
+                or contains a registered secret in a string value.
+        """
         value = self.generation_metadata
         if value is None:
             raise ValueError(f"Provider {self.name!r} does not support generation")
@@ -103,6 +173,7 @@ class ProviderRegistration:
         return MappingProxyType(metadata)
 
     def configured_secrets(self) -> tuple[str, ...]:
+        """Return nonempty credential values for the server's redaction setup."""
         return tuple(
             value for secret in self.secrets if (value := secret.get_secret_value())
         )
@@ -116,6 +187,14 @@ class ProviderRegistration:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedProviderSelection:
+    """Selected registrations and resolved metadata passed into adapter construction.
+
+    This contains configuration, not provider instances. The factory uses the
+    selected names and metadata for its bundle; metadata resolvers are not run
+    again when this selection is supplied. Both capabilities may refer to the
+    same registration.
+    """
+
     embedding: ProviderRegistration
     generation: ProviderRegistration
     embedding_metadata: EmbeddingMetadata
@@ -131,6 +210,14 @@ class ResolvedProviderSelection:
 
 
 class ProviderRegistry:
+    """Explicit name-to-registration catalog frozen by selection.
+
+    Add providers before ``resolve`` or ``freeze``. Freezing prevents further
+    registration even if selection fails. Later calls to ``resolve`` remain
+    allowed; mutable state captured by builders and resolvers is not frozen.
+    Builders execute only in the factory's construction phase.
+    """
+
     def __init__(self) -> None:
         self._registrations: dict[ProviderName, ProviderRegistration] = {}
         self._frozen = False
@@ -140,6 +227,16 @@ class ProviderRegistry:
         return self._frozen
 
     def register(self, registration: ProviderRegistration) -> None:
+        """Add a registration without invoking its builder or metadata resolvers.
+
+        Args:
+            registration: Provider whose name and capability declarations have
+                already been validated by ``ProviderRegistration``.
+
+        Raises:
+            RuntimeError: The registry is frozen.
+            ValueError: The provider name is already registered.
+        """
         if self._frozen:
             raise RuntimeError("Provider registry is frozen")
         if registration.name in self._registrations:
@@ -147,6 +244,7 @@ class ProviderRegistry:
         self._registrations[registration.name] = registration
 
     def freeze(self) -> None:
+        """Prevent further registration; repeated calls have no additional effect."""
         self._frozen = True
 
     def resolve(
@@ -154,6 +252,26 @@ class ProviderRegistry:
         embedding_name: ProviderName,
         generation_name: ProviderName,
     ) -> ResolvedProviderSelection:
+        """Freeze registration, check capabilities and evaluate selected metadata.
+
+        Freezing happens before lookup and remains in effect on failure. Each call
+        resolves metadata afresh; it never invokes provider builders.
+
+        Other metadata resolver or mapping conversion errors propagate unchanged.
+
+        Args:
+            embedding_name: Registered name supporting embedding.
+            generation_name: Registered name supporting generation; may match
+                ``embedding_name`` for a provider declaring both capabilities.
+
+        Returns:
+            Registrations and validated metadata for subsequent construction.
+
+        Raises:
+            ValueError: A name is unknown, a capability is unsupported or selected
+                metadata fails its validation.
+            TypeError: An embedding resolver returns the wrong metadata type.
+        """
         self.freeze()
         embedding = self._resolve_capability(embedding_name, "embedding")
         generation = self._resolve_capability(generation_name, "generation")
@@ -165,6 +283,7 @@ class ProviderRegistry:
         )
 
     def configured_secrets(self) -> tuple[str, ...]:
+        """Collect nonempty secrets from all registrations for logging redaction."""
         return tuple(
             secret
             for registration in self._registrations.values()

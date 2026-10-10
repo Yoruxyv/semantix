@@ -1,3 +1,21 @@
+"""Separate imported-data validation from dataset identity and persistence.
+
+EvaluationDatasetSource discriminates built-in identifiers, inline definitions
+and persisted UUID references by kind. Opaque dataset/definition payloads are
+validated by the application/domain import rules, including case references
+and workload limits; parsing the outer request is not completed validation.
+Strict version-1 import models reject extra fields and unsupported types.
+
+Previews report bounded workload estimates, warnings and zero provider calls;
+validation issues locate invalid data without returning prompt/response content.
+A preview does not persist a dataset or authorize a later execution. Explicit
+persistence supplies an authorized concrete namespace and retention request;
+stored metadata has aware timestamps with expiry after creation, and detail
+case counts must match metadata. Catalog pages report capability separately
+from content: session mode has no stored items. Page size and has_more agree
+with the observation, without a stable snapshot across separate requests.
+"""
+
 from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID

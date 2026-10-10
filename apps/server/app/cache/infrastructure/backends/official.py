@@ -2,6 +2,14 @@
 
 Only request counters are server-owned telemetry. No entry, vector, revision,
 expiry or access-order index is retained here.
+
+The store owns hit confirmation and entry lifecycle. This adapter converts
+models, delegates already-authorized inspection/deletion and translates expected
+storage failures. Counters use process memory unless a counter pool is supplied;
+PostgreSQL telemetry uses its own server table/scope. Entry effects and counter
+updates are separate operations, not one transaction or a rollback guarantee.
+Memory eviction/expiration deltas are forwarded to the optional event recorder;
+the same mechanism is not supplied for PostgreSQL or Redis stores.
 """
 
 import asyncio
@@ -38,11 +46,24 @@ OfficialStore: TypeAlias = "MemoryStore | PgVectorStore | RedisStore"
 
 @dataclass(slots=True)
 class CacheCounters:
+    """Process-local server hit/miss totals for one namespace.
+
+    These counters do not own entries, expiry, LRU or authoritative store hit metadata.
+    """
+
     hits: int = 0
     misses: int = 0
 
 
 class OfficialStoreBackend:
+    """Adapt a borrowed concrete package store to the server CacheBackend port.
+
+    The composing lifespan closes the store; this wrapper has no separate storage
+    engine or resource close API. Inspection stays separate from revision-aware
+    hit confirmation. Callers provide authorized namespaces; the adapter does not
+    authenticate principals or make telemetry an entry-storage authority.
+    """
+
     def __init__(
         self,
         store: OfficialStore,
@@ -52,6 +73,15 @@ class OfficialStoreBackend:
         counter_scope: str | None = None,
         operation_timeout_seconds: float | None = None,
     ) -> None:
+        """Bind borrowed storage, optional telemetry pool and operation deadline.
+
+        Args:
+            store: Authoritative MemoryStore, PgVectorStore or RedisStore to delegate to.
+            events: Optional synchronous recorder for observed MemoryStore event deltas.
+            counter_pool: Borrowed PostgreSQL pool for server counters, or None for local.
+            counter_scope: Telemetry partition; defaults to the store embedding identity.
+            operation_timeout_seconds: Shared operation/telemetry deadline, or None.
+        """
         self.store = store
         self._events = events
         self._counter_pool = counter_pool
@@ -66,6 +96,13 @@ class OfficialStoreBackend:
 
     @asynccontextmanager
     async def _operation(self) -> AsyncGenerator[None, None]:
+        """Cover native storage and server telemetry with one optional deadline.
+
+        Expected package, OS (including deadline timeout) and asyncpg failures become
+        CacheStorageError without raw cause text. Cancellation propagates. Finally
+        forwards newly observed MemoryStore eviction/expiration deltas when configured;
+        it does not make the store mutation and telemetry update atomic.
+        """
         try:
             # The same deadline covers native storage and shared-pool telemetry.
             async with asyncio.timeout(self._operation_timeout_seconds):
@@ -88,6 +125,10 @@ class OfficialStoreBackend:
     async def find_nearest(
         self, embedding: Sequence[float], *, namespace: str
     ) -> CacheCandidate | None:
+        """Convert a package candidate into validated server models without a hit.
+
+        Store selection alone does not confirm the revision or increment server hits.
+        """
         async with self._operation():
             match = await self.store.find_nearest(embedding, namespace=namespace)
             if match is None:
@@ -98,6 +139,11 @@ class OfficialStoreBackend:
             )
 
     async def put(self, entry: CacheEntry, *, ttl_seconds: float | None = None) -> None:
+        """Validate/convert a server entry and delegate TTL/capacity/expiry to storage.
+
+        The store owns revision allocation and persistence semantics; no parallel copy
+        of the entry is retained by this adapter.
+        """
         async with self._operation():
             await self.store.put(
                 OfficialEntry.model_validate(entry.model_dump()),
@@ -130,6 +176,18 @@ class OfficialStoreBackend:
     async def record_hit(
         self, cache_key: str, *, namespace: str, expected_created_at: datetime
     ) -> bool:
+        """Delegate atomic store revision confirmation, then count a confirmed hit.
+
+        Args:
+            cache_key: Selected candidate key in the bound store.
+            namespace: Exact authorized namespace for confirmation.
+            expected_created_at: Revision timestamp from the candidate entry.
+
+        Returns:
+            True only if the store confirms and subsequent server counting succeeds;
+            False when confirmation rejects the candidate. Telemetry failure can raise
+            after the store has already applied hit/LRU effects; no rollback is promised.
+        """
         async with self._operation():
             confirmed = await self.store.record_hit(
                 cache_key,
@@ -141,6 +199,7 @@ class OfficialStoreBackend:
             return confirmed is True
 
     async def record_miss(self, namespace: str) -> None:
+        """Count one server miss without mutating authoritative entry/hit state."""
         async with self._operation():
             await self._count(namespace, hit=False)
 
@@ -153,6 +212,11 @@ class OfficialStoreBackend:
         search: str | None,
         sort: CacheEntrySort,
     ) -> CacheEntryListResponse:
+        """Delegate observational pagination and convert previews to server metadata.
+
+        The caller authorizes scope; results neither confirm hits nor guarantee stable
+        cross-request pages. Truncated previews use the server omission message.
+        """
         async with self._operation():
             page = await self.store.inspect_entries(
                 offset=offset,
@@ -179,6 +243,11 @@ class OfficialStoreBackend:
     async def get_entry(
         self, cache_key: str, *, authorized_namespaces: AuthorizedNamespaceScope
     ) -> CacheEntryMetadata | None:
+        """Inspect a key within authorized scope without recording a hit.
+
+        None scope permits all namespaces, an empty set none. Storage returns no entry
+        for excluded/absent keys; the service maps that result to its safe not-found error.
+        """
         async with self._operation():
             entry = await self.store.inspect_entry(
                 cache_key,
@@ -191,6 +260,11 @@ class OfficialStoreBackend:
     async def delete_entry(
         self, cache_key: str, *, authorized_namespaces: AuthorizedNamespaceScope
     ) -> bool:
+        """Resolve an authorized key observation, then delete in its observed namespace.
+
+        Inspection and deletion are separate calls, not a revision-conditional delete
+        transaction. False covers an absent/excluded observation or unsuccessful delete.
+        """
         async with self._operation():
             entry = await self.store.inspect_entry(
                 cache_key,
@@ -203,6 +277,11 @@ class OfficialStoreBackend:
             return await self.store.delete_entry(cache_key, namespace=entry.namespace)
 
     async def clear(self, namespace: str | None) -> None:
+        """Clear namespace/all store entries, then reset matching server counters.
+
+        The caller authorizes scope. A telemetry failure may follow a completed clear;
+        counter reset and entry clearing do not form one atomic transaction.
+        """
         async with self._operation():
             if namespace is None:
                 await self.store.clear_all()
@@ -222,6 +301,12 @@ class OfficialStoreBackend:
                 self._counters.pop(namespace, None)
 
     async def stats(self, namespace: str | None) -> CacheStatsResponse:
+        """Combine observed live-entry count with separately read server counters.
+
+        None aggregates namespaces within this binding/counter scope. Local totals are
+        process-owned; PostgreSQL totals use the server telemetry table. Size and counts
+        are not one atomic snapshot and do not expose authoritative entry contents.
+        """
         async with self._operation():
             page = await self.store.inspect_entries(namespace=namespace, limit=1)
             if self._counter_pool is not None:

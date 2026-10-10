@@ -1,3 +1,11 @@
+"""Validate imported data and resolve sources before run acceptance.
+
+Pure import rules live in ``app.benchmark.domain.validation``; built-in definitions
+live in ``app.benchmark.domain.datasets``. Explicit persistence delegates to the
+optional borrowed repository. Authentication and namespace authorization belong
+to the caller; repository scopes enforce visibility again on identifier reads.
+"""
+
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -35,6 +43,12 @@ from app.core.exceptions import (
 
 @dataclass(frozen=True, slots=True)
 class ResolvedEvaluationDataset:
+    """Carry resolved cases and optional history eligibility into acceptance.
+
+    A persisted source's expiry is forwarded even when history is disabled. The
+    recorder/repository use it to constrain eligible history, not to own datasets.
+    """
+
     dataset: BenchmarkDataset
     history_namespace: str | None
     source_dataset_expires_at: datetime | None
@@ -80,7 +94,14 @@ def _persisted_detail(
 
 
 class EvaluationDatasetCatalog:
-    """Own imported-dataset validation, persistence, and run-time resolution."""
+    """Own imported-dataset validation, persistence, and run-time resolution.
+
+    Borrow the optional repository without opening or closing it. Inline preview
+    and built-in lookup work without persistence; omitted storage intentionally
+    yields a disabled empty catalog, while explicit persisted operations fail.
+    Listing's optional namespace and mutation's concrete namespace must already
+    be authorized by the caller; this class does not authenticate principals.
+    """
 
     def __init__(
         self,
@@ -103,6 +124,7 @@ class EvaluationDatasetCatalog:
         self,
         request: EvaluationDatasetValidationRequest,
     ) -> EvaluationDatasetPreview:
+        """Return a provider-free preview using the proposed workload counts."""
         return self.validate_inline(
             request.dataset,
             repetitions=request.repetitions,
@@ -116,6 +138,19 @@ class EvaluationDatasetCatalog:
         repetitions: int,
         threshold_count: int,
     ) -> ValidatedImportedDataset:
+        """Apply configured import size, case and query-workload limits.
+
+        Args:
+            definition: Decoded untrusted definition accepted by the import validator.
+            repetitions: Proposed repetition count for the cases-times-repetitions cap.
+            threshold_count: Threshold-row count for preview projection-work estimates.
+
+        Returns:
+            Ordered validated cases and a preview, without repository/provider I/O.
+
+        Raises:
+            EvaluationDatasetValidationError: Definition or import limits are invalid.
+        """
         runtime = self._runtime_configuration
         return validate_imported_dataset(
             definition,
@@ -136,6 +171,33 @@ class EvaluationDatasetCatalog:
         history_enabled: bool,
         builtin_history_namespace: str | None,
     ) -> ResolvedEvaluationDataset:
+        """Resolve cases and history eligibility without accepting or executing a run.
+
+        Inline data is validated at the requested workload and remains unpersisted
+        and unretained. Persisted lookup requires a repository and authorized scope;
+        its namespace is used for enabled history and its expiry is always forwarded.
+        Built-ins use the local catalog and require an already resolved history
+        namespace when history is enabled. Built-in and persisted branches do not
+        reapply imported-dataset workload validation at the requested repetitions.
+
+        Args:
+            source: Validated built-in, inline or persisted source selection.
+            repetitions: Inline workload repetition count.
+            threshold_count: Inline preview's threshold projection count.
+            authorized_namespaces: Authorized persisted-read scope, including None
+                for unrestricted reads or an empty set for no permitted namespace.
+            history_enabled: Configured history flag, not a storage readiness result.
+            builtin_history_namespace: Caller-authorized concrete built-in history scope.
+
+        Returns:
+            Resolved dataset and optional retention scope/source expiry.
+
+        Raises:
+            EvaluationDatasetValidationError: An inline definition fails validation.
+            EvaluationDatasetPersistenceDisabledError: A persisted source has no repo.
+            EvaluationDatasetNotFoundError: A persisted source is absent or invisible.
+            ValueError: Enabled built-in history has no resolved namespace.
+        """
         if isinstance(source, InlineEvaluationDatasetSource):
             dataset = self.validate_inline(
                 source.definition,
@@ -185,6 +247,12 @@ class EvaluationDatasetCatalog:
         offset: int,
         limit: int,
     ) -> PersistedEvaluationDatasetListResponse:
+        """List scoped repository metadata, or a disabled empty session catalog.
+
+        Pagination and namespace authorization are supplied by the caller. None
+        selects the repository's global listing. Presence of a repository enables
+        this path; the response's storage label is not an independent durability probe.
+        """
         runtime = self._runtime_configuration
         limits = PersistedEvaluationDatasetCatalogLimits(
             default_retention_days=runtime.evaluation_dataset_default_retention_days,
@@ -244,6 +312,19 @@ class EvaluationDatasetCatalog:
         *,
         authorized_namespaces: AuthorizedNamespaceScope,
     ) -> PersistedEvaluationDatasetDetail:
+        """Read persisted metadata and cases through an authorized namespace scope.
+
+        Args:
+            dataset_id: Persisted record identity.
+            authorized_namespaces: Caller-authorized identifier-read scope.
+
+        Returns:
+            Detail including imported prompts and notes, for the authorized caller.
+
+        Raises:
+            EvaluationDatasetPersistenceDisabledError: No repository is configured.
+            EvaluationDatasetNotFoundError: The record is absent or invisible.
+        """
         repository = self._require_repository()
         record = await repository.get_dataset(
             dataset_id,
@@ -259,6 +340,25 @@ class EvaluationDatasetCatalog:
         *,
         namespace: str,
     ) -> PersistedEvaluationDatasetDetail:
+        """Explicitly validate and store an import in a concrete authorized namespace.
+
+        Use default retention when omitted and reject retention above the configured
+        maximum. The request schema supplies lower bounds. Import validation uses
+        one repetition and two threshold rows, not a future run's requested workload.
+        Repository capacity/storage failures propagate; preview alone never writes.
+
+        Args:
+            request: Validated import/persistence request.
+            namespace: Concrete namespace already authorized for mutation.
+
+        Returns:
+            Repository-assigned identity, expiry and imported-case detail.
+
+        Raises:
+            EvaluationDatasetPersistenceDisabledError: No repository is configured.
+            EvaluationDatasetRetentionError: Retention exceeds the configured maximum.
+            EvaluationDatasetValidationError: Definition or import limits are invalid.
+        """
         repository = self._require_repository()
         runtime = self._runtime_configuration
         retention_days = (
@@ -287,11 +387,21 @@ class EvaluationDatasetCatalog:
         *,
         namespace: str,
     ) -> None:
+        """Delete by identity within a concrete caller-authorized namespace.
+
+        Raises:
+            EvaluationDatasetPersistenceDisabledError: No repository is configured.
+            EvaluationDatasetNotFoundError: The repository reports no scoped deletion.
+        """
         repository = self._require_repository()
         if not await repository.delete_dataset(dataset_id, namespace=namespace):
             raise EvaluationDatasetNotFoundError
 
     async def readiness(self) -> None:
+        """Probe only the configured dataset repository; no repository is a no-op.
+
+        Repository failures propagate. History storage and providers are not probed.
+        """
         if self._repository is not None:
             await self._repository.readiness()
 

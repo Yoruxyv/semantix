@@ -1,3 +1,10 @@
+"""Summarize measured observations and project alternative frozen-score decisions.
+
+Quality measures compare expected and actual cache-hit booleans, not response
+quality or matched-case identity. Savings depend on the supplied observations and
+cost assumptions; they are neither billing measurements nor guaranteed benefits.
+"""
+
 import math
 import statistics
 from collections.abc import Sequence
@@ -12,6 +19,7 @@ def _safe_ratio(numerator: int, denominator: int) -> float:
 
 
 def _percentile(values: Sequence[float], percentile: float) -> float:
+    """Interpolate sorted nonempty values at rank (n - 1) * percentile."""
     ordered = sorted(values)
     if len(ordered) == 1:
         return ordered[0]
@@ -27,6 +35,11 @@ def _percentile(values: Sequence[float], percentile: float) -> float:
 def _quality_metrics(
     observations: Sequence[BenchmarkObservation],
 ) -> tuple[int, int, int, int, float, float, float]:
+    """Return TP, TN, FP, FN, precision, recall and F1 for hit decisions.
+
+    Precision is TP/(TP+FP), recall TP/(TP+FN), and F1 their harmonic mean.
+    A zero denominator yields zero, including F1 when precision + recall is zero.
+    """
     false_positives = sum(
         result.actual_cache_hit and not result.expected_cache_hit
         for result in observations
@@ -66,6 +79,27 @@ def calculate_metrics(
     estimated_cost_per_request_usd: float,
     estimated_cost_per_1k_tokens_usd: float,
 ) -> BenchmarkMetrics:
+    """Aggregate actual hit decisions, provider flags and measured latencies.
+
+    For N observations, H actual hits and P provider-called flags, misses are N-H,
+    hit rate H/N and calls avoided N-P. Latency uses all-observation mean/median
+    and linearly interpolated p95; an absent hit/miss group has mean None.
+    Estimated latency saved is max(0, mean_miss * H - sum(hit latencies)), or zero
+    without misses. Tokens sum supplied estimates on actual hits, including false
+    positives. Estimated cost saved is (N-P) * cost/request + tokens/1000 * cost/1k.
+    Confusion counts and precision/recall/F1 use expected versus actual hits.
+
+    Args:
+        observations: Nonempty measured evidence, with consistent flags and values.
+        estimated_cost_per_request_usd: Assumed cost of one avoided generation call.
+        estimated_cost_per_1k_tokens_usd: Assumed cost per thousand estimated tokens.
+
+    Returns:
+        Validated measured aggregates and assumption-based savings.
+
+    Raises:
+        ValueError: Observations are empty or aggregate model validation fails.
+    """
     if not observations:
         raise ValueError("At least one benchmark observation is required")
 
@@ -139,6 +173,31 @@ def evaluate_frozen_candidate_thresholds(
     *,
     measured_threshold: float,
 ) -> list[ThresholdEvaluation]:
+    """Reclassify frozen candidate scores without replaying cache or provider work.
+
+    For each sorted unique threshold, a non-None score >= threshold is a projected
+    hit; a missing score is always a miss. Recompute confusion counts and quality
+    from those decisions. Projected calls avoided equal projected hits. Estimate
+    latency as (hits * measured_hit_mean + misses * measured_miss_mean) / N,
+    substituting the overall mean for either absent measured group.
+
+    The measured_threshold only labels its matching row as measured: every row
+    uses the same score projection. A candidate that failed hit confirmation can
+    therefore project as a hit, even at that threshold. These rows need not match
+    measured aggregates or reproduce the entries/candidates of a fresh live run.
+    Inputs are not mutated and no production threshold is applied.
+
+    Args:
+        observations: Nonempty measured decisions, latencies and candidate scores.
+        thresholds: Alternative score cutoffs, deduplicated and sorted here.
+        measured_threshold: Cutoff whose row receives the measured label.
+
+    Returns:
+        Frozen-candidate classification and latency estimates for each cutoff.
+
+    Raises:
+        ValueError: Observations are empty or threshold-row model validation fails.
+    """
     if not observations:
         raise ValueError("At least one benchmark observation is required")
 

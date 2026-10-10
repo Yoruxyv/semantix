@@ -1,3 +1,10 @@
+"""Subtract retained historical evidence in candidate-minus-baseline direction.
+
+The coordinator establishes compatibility first. These helpers perform arithmetic,
+not significance testing, workload replay or billing verification. Estimated
+savings remain estimates, and threshold rows retain their evidence-kind labels.
+"""
+
 from app.benchmark.api.comparison_schemas import (
     EvaluationComparisonMetricDeltas,
     EvaluationThresholdComparisonDelta,
@@ -9,6 +16,7 @@ def _optional_delta(
     baseline: float | None,
     candidate: float | None,
 ) -> float | None:
+    """Return None if either group measure is unavailable; never substitute zero."""
     if baseline is None or candidate is None:
         return None
     return candidate - baseline
@@ -18,6 +26,19 @@ def metric_deltas(
     baseline: EvaluationRunHistoryDetail,
     candidate: EvaluationRunHistoryDetail,
 ) -> EvaluationComparisonMetricDeltas:
+    """Subtract recorded measured aggregates and selected thresholds without normalization.
+
+    Args:
+        baseline: Compatible historical reference with completed metrics.
+        candidate: Compatible historical result with completed metrics.
+
+    Returns:
+        Candidate minus baseline for each aggregate; optional group-latency deltas
+        are None if either input is None. Signs have measure-specific meanings.
+
+    Raises:
+        ValueError: Either detail lacks aggregate metrics.
+    """
     baseline_metrics = baseline.metrics
     candidate_metrics = candidate.metrics
     if baseline_metrics is None or candidate_metrics is None:
@@ -91,6 +112,20 @@ def threshold_deltas(
     baseline: EvaluationRunHistoryDetail,
     candidate: EvaluationRunHistoryDetail,
 ) -> list[EvaluationThresholdComparisonDelta]:
+    """Subtract rows only at sorted, exactly shared threshold values.
+
+    Preserve both measured/projected labels rather than requiring equal kinds.
+    Frozen-candidate rows are not independent executions at each threshold; their
+    differences do not establish how a new live cache history would behave.
+
+    Args:
+        baseline: Compatible retained reference with threshold evidence.
+        candidate: Compatible retained result with threshold evidence.
+
+    Returns:
+        Candidate-minus-baseline rows at the intersection of threshold keys, or
+        an empty list when no values match. Unmatched rows are omitted.
+    """
     baseline_by_threshold = {
         evaluation.threshold: evaluation
         for evaluation in baseline.threshold_evaluations

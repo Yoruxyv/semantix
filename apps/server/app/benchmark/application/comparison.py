@@ -1,3 +1,10 @@
+"""Coordinate compatibility and arithmetic over retained historical aggregates.
+
+``app.benchmark.application.comparison_compatibility`` owns blockers/warnings;
+``app.benchmark.application.comparison_deltas`` owns subtraction and shared-cutoff
+rows. No provider work, workload replay or live threshold mutation occurs here.
+"""
+
 from app.benchmark.api.comparison_schemas import (
     EvaluationComparisonCompatibility,
     EvaluationComparisonStatus,
@@ -18,7 +25,23 @@ def compare_evaluation_runs(
     baseline: EvaluationRunHistoryDetail,
     candidate: EvaluationRunHistoryDetail,
 ) -> EvaluationRunComparisonResponse:
-    """Assess compatibility and calculate candidate-minus-baseline deltas."""
+    """Assess compatibility and calculate candidate-minus-baseline deltas.
+
+    Blockers produce incompatible status and suppress metric/threshold deltas.
+    Without blockers, warnings produce warning status; otherwise status is compatible.
+    Warnings are still reported alongside blockers. Opaque configuration-fingerprint
+    equality is reported separately and is not a scientific-equivalence gate. Case
+    evidence is not retained, so aggregates cannot establish per-case equivalence or
+    reproduce generated responses. This assessment uses the existing versioned contract.
+
+    Args:
+        baseline: Authorized retained reference detail.
+        candidate: Authorized retained comparison detail; deltas subtract the baseline
+            from this candidate.
+
+    Returns:
+        Both historical details, compatibility, and deltas permitted by the blockers.
+    """
 
     incompatibilities = comparison_blockers(baseline, candidate)
     warnings = comparison_warnings(baseline, candidate)

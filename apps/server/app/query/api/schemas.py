@@ -1,3 +1,20 @@
+"""Validate interactive query policy and response evidence at the HTTP boundary.
+
+QueryRequest replaces control characters and repeated whitespace, then checks
+prompt bounds; this is text cleanup, not generation or a content-security
+guarantee. Matching may normalize text separately; generation receives the
+sanitized request prompt. Its namespace defaults to ``default`` and is authorized
+by the router. Disabling cache or setting private disables both reads and writes;
+otherwise read/write flags independently permit read-only or refresh behavior.
+A non-null TTL must be a bounded integer under a write-permitted policy;
+null or omission leaves default-TTL resolution to the service.
+
+QueryResponse requires a hit score meeting the threshold and complete matched
+entry metadata only for hits. Misses may carry a candidate score without a
+confirmed hit. A coalesced follower can skip generation while remaining a miss;
+generation_skipped alone is not hit evidence. Entry creation times are aware.
+"""
+
 from datetime import datetime
 
 from pydantic import Field, field_validator, model_validator
@@ -36,6 +53,15 @@ class QueryRequest(StrictModel):
 
     @model_validator(mode="after")
     def validate_cache_ttl_policy(self) -> "QueryRequest":
+        """Reject TTL overrides when the effective request policy cannot write.
+
+        Returns:
+            The validated request, including an unchanged optional TTL.
+
+        Raises:
+            ValueError: A non-null TTL accompanies private, disabled or non-writing
+                cache policy.
+        """
         cache_write_allowed = (
             self.cache_enabled and self.cache_write_enabled and not self.private
         )
@@ -47,6 +73,12 @@ class QueryRequest(StrictModel):
 
     @property
     def cache_policy(self) -> QueryCachePolicy:
+        """Translate request flags into independent cache read/write permissions.
+
+        Returns:
+            Policy carrying the request namespace and TTL. The router still must
+            authorize that namespace before the application service uses it.
+        """
         cache_allowed = self.cache_enabled and not self.private
         return QueryCachePolicy(
             namespace=self.namespace,
@@ -71,6 +103,17 @@ class QueryResponse(StrictModel):
 
     @model_validator(mode="after")
     def validate_explainability(self) -> "QueryResponse":
+        """Keep hit identity, threshold evidence and generation flags consistent.
+
+        Returns:
+            Response with matched-entry fields only for a hit. On misses, exactly
+            one of provider_called and generation_skipped is true; a waiting
+            coalesced follower uses the latter without becoming a cache hit.
+
+        Raises:
+            ValueError: Hit evidence is incomplete/below threshold, a miss includes
+                matched identity, or generation flags contradict the decision.
+        """
         matched_fields = (
             self.matched_prompt,
             self.matched_cache_key,

@@ -1,3 +1,19 @@
+"""Represent compatibility and aggregate deltas between retained runs.
+
+Requests identify distinct run IDs. The service applies the route's
+authorized namespace scope to both storage reads.
+Blockers make a comparison incompatible and suppress all deltas. Warnings
+alone permit comparison with warning status; neither means historical runs
+reproduce current provider behavior. Namespace, dataset/embedding identity,
+workload and evidence-mode blockers differ from configuration/cost warnings.
+
+Metric deltas are candidate minus baseline. Threshold deltas include only
+shared threshold values and preserve each side's measured/projected kind.
+Opaque fingerprint equality is reported separately, not used as the sole
+compatibility rule. Case evidence is not retained; comparisons do not rerun
+providers, replay changed candidate caches or update the live threshold.
+"""
+
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -64,6 +80,14 @@ class EvaluationComparisonCompatibility(StrictModel):
 
     @model_validator(mode="after")
     def validate_compatibility(self) -> "EvaluationComparisonCompatibility":
+        """Derive allowed comparison state from blockers before warnings.
+
+        Returns:
+            Compatibility where can_compare means no blockers, regardless of warnings.
+
+        Raises:
+            ValueError: The declared status or can_compare contradicts those lists.
+        """
         expected_status: EvaluationComparisonStatus
         if self.incompatibilities:
             expected_status = "incompatible"

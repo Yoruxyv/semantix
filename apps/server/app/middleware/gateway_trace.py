@@ -10,6 +10,20 @@ logger = logging.getLogger(__name__)
 
 
 class GatewayTraceMiddleware:
+    """Log start/end evidence for opted-in HTTP /api/v1/query requests only.
+
+    Accept the first supplied request ID only as 32 ASCII lowercase hex bytes;
+    otherwise log "-". It is correlation text, not authenticated or guaranteed
+    unique/server-generated. Logs contain ID, status, completion and outcome, not
+    request bodies or exception messages.
+
+    Update status/final-body completion only after the wrapped send succeeds.
+    Defaults are status=0, complete=False, outcome=returned. CancelledError sets
+    cancelled; ordinary Exception sets exception; both re-raise and log end in
+    finally. Other BaseException values are not explicitly classified. Completion
+    does not prove client receipt, every disconnect or provider fault diagnosis.
+    """
+
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
