@@ -398,7 +398,7 @@ test('cache mode dropdown preserves keyboard focus, selection, and compact layou
   await page.keyboard.press('Tab');
   await expect(list).toBeHidden();
   await expect(
-    page.getByRole('button', { name: 'Explain semantic caching in simple terms' }),
+    page.getByRole('button', { name: 'Run query', exact: true }),
   ).toBeFocused();
   await trigger.click();
   await page.keyboard.press('Shift+Tab');
