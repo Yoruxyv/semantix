@@ -366,20 +366,19 @@ Copy-Item apps\server\.env.example apps\server\.env
 
 #### 2. Konfigurasi development lokal
 
-Untuk konfigurasi persisten dengan provider mock tanpa API key, gunakan nilai
-berikut di `apps/server/.env`. Ganti placeholder URL database dengan role runtime
-terpisah yang dikonfigurasi di bawah; lakukan URL-encoding pada kredensial bila perlu:
+Untuk percobaan pertama yang paling sederhana, gunakan provider mock dan
+MemoryStore. Atur nilai berikut di `apps/server/.env`; API key provider dan setup
+database tidak diperlukan:
 
 ```env
 EMBEDDING_PROVIDER=mock
 GENERATION_PROVIDER=mock
 MOCK_EMBEDDING_DIMENSIONS=384
 
-CACHE_BACKEND=pgvector
-DATABASE_URL=postgresql://replace-runtime-user:replace-runtime-password@postgres:5432/semantix
-DATABASE_MIGRATION_MODE=external
-EVALUATION_DATASET_STORAGE=postgres
-EVALUATION_DATASET_DEFAULT_RETENTION_DAYS=30
+CACHE_BACKEND=memory
+EVALUATION_DATASET_STORAGE=session
+EVALUATION_RUN_HISTORY_STORAGE=disabled
+COORDINATION_BACKEND=memory
 
 AUTH_MODE=disabled
 AUTH_PRINCIPALS=[]
@@ -387,11 +386,67 @@ TRUSTED_PROXY_CIDRS=[]
 MAX_REQUEST_BODY_BYTES=65536
 ```
 
+Entri cache dan dataset sesi berada di memori dan hilang ketika backend dimulai
+ulang. Untuk entri cache dan dataset tersimpan yang persisten, ikuti prosedur
+PostgreSQL opsional di bawah.
+
 Nilai autentikasi dan proxy ini sengaja dikosongkan atau dinonaktifkan untuk development lokal yang tepercaya. Jangan gunakan konfigurasi development ini untuk deployment publik.
 
 Untuk menggunakan Hugging Face, OpenAI, Anthropic, Gemini, atau Ollama, lihat [Providers](guides/providers.md). Untuk setiap opsi environment, lihat [Getting started](guides/getting-started.md) dan `apps/server/.env.example`.
 
 #### 3. Jalankan stack development lengkap
+
+Gunakan perintah yang sama di PowerShell, Bash, atau terminal lain:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build -d --wait --wait-timeout 120 backend frontend
+```
+
+Perintah ini menjalankan FastAPI dan frontend Vite dengan hot reload. Konfigurasi
+memory tidak memerlukan profil `pgvector` maupun `redis`. Jika startup gagal,
+periksa log backend sebelum mengirim query; `/ready` harus mengembalikan HTTP 200.
+
+#### 4. Buka aplikasi
+
+| Layanan | Alamat |
+|---|---|
+| Frontend | <http://localhost:4173> |
+| Backend | <http://localhost:8000> |
+| Dokumentasi API | <http://localhost:8000/docs> |
+| Liveness | <http://localhost:8000/health> |
+| Readiness | <http://localhost:8000/ready> |
+| Metrik runtime | <http://localhost:8000/api/v1/metrics> |
+| Diagnostik runtime | <http://localhost:8000/api/v1/diagnostics> |
+| PostgreSQL dari host (hanya profil persisten) | `127.0.0.1:5433` |
+
+Kirim prompt Monitor unik dua kali: harapkan miss diikuti hit yang terkonfirmasi.
+Respons mock adalah contoh deterministik, bukan keluaran model yang di-host.
+
+Perintah yang berguna:
+
+```bash
+docker compose -f docker-compose.dev.yml ps
+docker compose -f docker-compose.dev.yml logs -f backend
+docker compose -f docker-compose.dev.yml down
+```
+
+`down` tetap mempertahankan named volume. Menambahkan `--volumes` akan menghapus data PostgreSQL lokal.
+
+#### Opsional: persistensi PostgreSQL
+
+Untuk entri cache dan dataset evaluasi tersimpan yang persisten, pertahankan
+pengaturan provider mock di atas dan ubah nilai berikut di `apps/server/.env`.
+Ganti placeholder URL dengan login runtime terpisah yang dibuat di bawah;
+lakukan URL-encoding pada kredensial bila perlu. Pertahankan volume yang ada dan
+backup database yang sudah ada sebelum setup.
+
+```env
+CACHE_BACKEND=pgvector
+DATABASE_URL=postgresql://replace-runtime-user:replace-runtime-password@postgres:5432/semantix
+DATABASE_MIGRATION_MODE=external
+EVALUATION_DATASET_STORAGE=postgres
+EVALUATION_DATASET_DEFAULT_RETENTION_DAYS=30
+```
 
 Jalankan hanya PostgreSQL dan tunggu health check-nya:
 
@@ -415,6 +470,22 @@ Di dalam container, kedua URL menggunakan `postgres:5432/semantix`. Tool pada ho
 menggunakan `127.0.0.1:5433` secara default (`POSTGRES_PORT` dapat mengubah port
 publikasi). Untuk volume yang sudah ada, gunakan kredensial aktual dan lakukan
 backup sebelum setup.
+
+Di PowerShell, masukkan secret operator melalui prompt tanpa menampilkannya.
+Password runtime harus cocok dengan URL di `apps/server/.env`; masukkan URL
+bootstrap lengkap hanya pada prompt migration yang disamarkan:
+
+```powershell
+$env:SEMANTIX_RUNTIME_USER = 'semantix_runtime'
+$env:DATABASE_RUNTIME_ROLE = $env:SEMANTIX_RUNTIME_USER
+$env:SEMANTIX_RUNTIME_PASSWORD = [pscredential]::new(
+    $env:SEMANTIX_RUNTIME_USER,
+    (Read-Host 'Password runtime yang cocok dengan DATABASE_URL' -AsSecureString)
+).GetNetworkCredential().Password
+$env:MIGRATION_DATABASE_URL = [pscredential]::new(
+    'migration', (Read-Host 'URL database migration' -AsSecureString)
+).GetNetworkCredential().Password
+```
 
 Untuk login runtime baru, gunakan kembali
 [provisioner role runtime](../../../ops/postgres/init-runtime-role.sh) yang sudah ada:
@@ -443,33 +514,12 @@ dari shell hanya ke job ini. Bersihkan variabel operator setelahnya.
 
 Startup cache biasa memvalidasi schema resmi dan tidak pernah menginisialisasinya.
 `DATABASE_MIGRATION_MODE=auto` hanya berlaku untuk fitur PostgreSQL lain yang aktif,
-termasuk penyimpanan evaluasi. Compose development memaksakan `auto` di atas nilai
-`.env`, sehingga override eksplisit diperlukan untuk job di atas dan runtime di
-bawah agar role runtime tidak menjalankan DDL.
-
-Jalankan backend/frontend dengan override environment Compose standar melalui
-stdin. Gunakan override yang sama setiap kali membuat ulang backend.
-
-Linux atau macOS:
+termasuk penyimpanan evaluasi. Compose development membaca mode dari
+`apps/server/.env`; pertahankan nilai `external` untuk role runtime terbatas.
+Setelah setup berhasil, jalankan stack persisten dengan satu perintah pada kedua OS:
 
 ```bash
-docker compose -f docker-compose.dev.yml -f - --profile pgvector up --build -d backend frontend <<'YAML'
-services:
-  backend:
-    environment:
-      DATABASE_MIGRATION_MODE: external
-YAML
-```
-
-Windows PowerShell:
-
-```powershell
-@"
-services:
-  backend:
-    environment:
-      DATABASE_MIGRATION_MODE: external
-"@ | docker compose -f docker-compose.dev.yml -f - --profile pgvector up --build -d backend frontend
+docker compose -f docker-compose.dev.yml --profile pgvector up --build -d --wait --wait-timeout 120 postgres backend frontend
 ```
 
 Ini menjalankan frontend React dengan Vite hot reload dan FastAPI dengan Uvicorn
@@ -480,29 +530,6 @@ setup adalah valid; setup tidak menyalin baris cache legacy yang dipertahankan.
 Lihat [setup storage server](../../guides/platform-storage.md) untuk kepemilikan dan
 validasi schema. Prosedur ini tetap untuk development lokal yang tepercaya; gunakan
 [deployment yang diperkeras](operations/deployment.md) sebelum berbagi dengan pengguna tak tepercaya.
-
-#### 4. Buka aplikasi
-
-| Layanan | Alamat |
-|---|---|
-| Frontend | <http://localhost:4173> |
-| Backend | <http://localhost:8000> |
-| Dokumentasi API | <http://localhost:8000/docs> |
-| Liveness | <http://localhost:8000/health> |
-| Readiness | <http://localhost:8000/ready> |
-| Metrik runtime | <http://localhost:8000/api/v1/metrics> |
-| Diagnostik runtime | <http://localhost:8000/api/v1/diagnostics> |
-| PostgreSQL dari host | `127.0.0.1:5433` |
-
-Perintah yang berguna:
-
-```bash
-docker compose -f docker-compose.dev.yml --profile pgvector ps
-docker compose -f docker-compose.dev.yml --profile pgvector logs -f backend
-docker compose -f docker-compose.dev.yml --profile pgvector down
-```
-
-`down` tetap mempertahankan named volume. Menambahkan `--volumes` akan menghapus data PostgreSQL lokal.
 
 ### 🔌 Provider
 

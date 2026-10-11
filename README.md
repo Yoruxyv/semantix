@@ -379,26 +379,28 @@ Copy-Item apps\server\.env.example apps\server\.env
 
 #### 2. Configure local development
 
-For a persistent setup with mock providers and no API keys, use these values in
-`apps/server/.env`. Replace the database URL placeholders with the separate
-runtime role configured below; URL-encode credentials when necessary:
+For the simplest first run, use mock providers and MemoryStore. Set these values
+in `apps/server/.env`; no provider API key or database setup is required:
 
 ```env
 EMBEDDING_PROVIDER=mock
 GENERATION_PROVIDER=mock
 MOCK_EMBEDDING_DIMENSIONS=384
 
-CACHE_BACKEND=pgvector
-DATABASE_URL=postgresql://replace-runtime-user:replace-runtime-password@postgres:5432/semantix
-DATABASE_MIGRATION_MODE=external
-EVALUATION_DATASET_STORAGE=postgres
-EVALUATION_DATASET_DEFAULT_RETENTION_DAYS=30
+CACHE_BACKEND=memory
+EVALUATION_DATASET_STORAGE=session
+EVALUATION_RUN_HISTORY_STORAGE=disabled
+COORDINATION_BACKEND=memory
 
 AUTH_MODE=disabled
 AUTH_PRINCIPALS=[]
 TRUSTED_PROXY_CIDRS=[]
 MAX_REQUEST_BODY_BYTES=65536
 ```
+
+Cache entries and session datasets live in memory and disappear when the backend
+restarts. For persistent cache entries and saved datasets, follow the optional
+PostgreSQL procedure below.
 
 These authentication and proxy values are intentionally empty or disabled for
 trusted local development. Do not use the development configuration for a
@@ -409,6 +411,59 @@ To use Hugging Face, OpenAI, Anthropic, Gemini, or Ollama, see
 [Getting started](docs/guides/getting-started.md) and `apps/server/.env.example`.
 
 #### 3. Start the complete development stack
+
+Run the same command in PowerShell, Bash, or another terminal:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build -d --wait --wait-timeout 120 backend frontend
+```
+
+This starts FastAPI and the Vite frontend with hot reload. The memory setup needs
+neither the `pgvector` nor the `redis` profile. If startup fails, inspect backend
+logs before sending queries; `/ready` must return HTTP 200.
+
+#### 4. Open the application
+
+| Service | Address |
+|---|---|
+| Frontend | <http://localhost:4173> |
+| Backend | <http://localhost:8000> |
+| API documentation | <http://localhost:8000/docs> |
+| Liveness | <http://localhost:8000/health> |
+| Readiness | <http://localhost:8000/ready> |
+| Runtime metrics | <http://localhost:8000/api/v1/metrics> |
+| Runtime diagnostics | <http://localhost:8000/api/v1/diagnostics> |
+| PostgreSQL from the host (persistent profile only) | `127.0.0.1:5433` |
+
+Submit a unique Monitor prompt twice: expect a miss followed by a confirmed hit.
+Mock responses are deterministic examples, not hosted model output.
+
+Useful commands:
+
+```bash
+docker compose -f docker-compose.dev.yml ps
+docker compose -f docker-compose.dev.yml logs -f backend
+docker compose -f docker-compose.dev.yml down
+```
+
+`down` keeps named volumes. Adding `--volumes` deletes the local PostgreSQL
+data.
+
+#### Optional: PostgreSQL persistence
+
+For persistent cache entries and saved evaluation datasets, keep the mock-provider
+settings above and change these values in `apps/server/.env`. Replace the URL
+placeholders with the separate runtime login provisioned below; URL-encode its
+credentials when necessary. Keep the existing volume and back up any existing
+database before setup.
+
+```env
+CACHE_BACKEND=pgvector
+DATABASE_URL=postgresql://replace-runtime-user:replace-runtime-password@postgres:5432/semantix
+DATABASE_MIGRATION_MODE=external
+EVALUATION_DATASET_STORAGE=postgres
+EVALUATION_DATASET_DEFAULT_RETENTION_DAYS=30
+```
 
 Start only PostgreSQL and wait for its health check:
 
@@ -431,6 +486,22 @@ in `apps/server/.env`, tracked files, shell history, or logs:
 Inside containers, both URLs use `postgres:5432/semantix`. A host tool instead
 uses `127.0.0.1:5433` by default (`POSTGRES_PORT` can change the published port).
 For an existing volume, use its actual credentials and back it up before setup.
+
+In PowerShell, prompt for the operator secrets without echoing them. The runtime
+password must match the URL in `apps/server/.env`; enter the full bootstrap URL
+only at the masked migration prompt:
+
+```powershell
+$env:SEMANTIX_RUNTIME_USER = 'semantix_runtime'
+$env:DATABASE_RUNTIME_ROLE = $env:SEMANTIX_RUNTIME_USER
+$env:SEMANTIX_RUNTIME_PASSWORD = [pscredential]::new(
+    $env:SEMANTIX_RUNTIME_USER,
+    (Read-Host 'Runtime password matching DATABASE_URL' -AsSecureString)
+).GetNetworkCredential().Password
+$env:MIGRATION_DATABASE_URL = [pscredential]::new(
+    'migration', (Read-Host 'Migration database URL' -AsSecureString)
+).GetNetworkCredential().Password
+```
 
 For a fresh runtime login, reuse the existing
 [runtime-role provisioner](ops/postgres/init-runtime-role.sh):
@@ -459,33 +530,12 @@ variables from your shell only to this job. Clear the operator variables afterwa
 
 Ordinary cache startup validates the official schema and never initializes it.
 `DATABASE_MIGRATION_MODE=auto` applies only to other enabled PostgreSQL features,
-including evaluation storage. Development Compose forces `auto` even over the
-`.env` value, so explicitly override it for both the job above and the runtime
-below to keep DDL away from the runtime role.
-
-Start backend/frontend with the standard Compose environment override supplied
-on stdin. Use this same override whenever recreating the backend.
-
-Linux or macOS:
+including evaluation storage. Development Compose reads the mode from
+`apps/server/.env`; keep it `external` when using the restricted runtime role.
+After successful setup, start the persistent stack with one command on either OS:
 
 ```bash
-docker compose -f docker-compose.dev.yml -f - --profile pgvector up --build -d backend frontend <<'YAML'
-services:
-  backend:
-    environment:
-      DATABASE_MIGRATION_MODE: external
-YAML
-```
-
-Windows PowerShell:
-
-```powershell
-@"
-services:
-  backend:
-    environment:
-      DATABASE_MIGRATION_MODE: external
-"@ | docker compose -f docker-compose.dev.yml -f - --profile pgvector up --build -d backend frontend
+docker compose -f docker-compose.dev.yml --profile pgvector up --build -d --wait --wait-timeout 120 postgres backend frontend
 ```
 
 This starts the React frontend with Vite hot reload and FastAPI with Uvicorn
@@ -496,30 +546,6 @@ setup are valid; setup does not copy preserved legacy cache rows. See
 [server storage setup](docs/guides/platform-storage.md) for ownership and schema
 validation. This procedure remains for trusted local development; use
 [hardened deployment](docs/operations/deployment.md) before sharing with untrusted users.
-
-#### 4. Open the application
-
-| Service | Address |
-|---|---|
-| Frontend | <http://localhost:4173> |
-| Backend | <http://localhost:8000> |
-| API documentation | <http://localhost:8000/docs> |
-| Liveness | <http://localhost:8000/health> |
-| Readiness | <http://localhost:8000/ready> |
-| Runtime metrics | <http://localhost:8000/api/v1/metrics> |
-| Runtime diagnostics | <http://localhost:8000/api/v1/diagnostics> |
-| PostgreSQL from the host | `127.0.0.1:5433` |
-
-Useful commands:
-
-```bash
-docker compose -f docker-compose.dev.yml --profile pgvector ps
-docker compose -f docker-compose.dev.yml --profile pgvector logs -f backend
-docker compose -f docker-compose.dev.yml --profile pgvector down
-```
-
-`down` keeps named volumes. Adding `--volumes` deletes the local PostgreSQL
-data.
 
 ### 🔌 Providers
 
