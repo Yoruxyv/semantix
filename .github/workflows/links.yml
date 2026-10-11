@@ -44,6 +44,7 @@ jobs:
             --cache-exclude-status '429,500..=599'
             --no-progress
             --root-dir '${{ github.workspace }}'
+            --remap '^https://github\.com/${{ github.repository }}/(blob|tree)/main/ https://github.com/${{ github.repository }}/$1/${{ github.sha }}/'
             --exclude-loopback
             --exclude-private
             --exclude '^file://.*/favicon\.svg$'
