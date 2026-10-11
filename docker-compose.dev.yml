@@ -41,7 +41,6 @@ services:
     env_file:
       - ./apps/server/.env
     environment:
-      DATABASE_MIGRATION_MODE: auto
       TRUSTED_PROXY_CIDRS: "[]"
       WATCHFILES_FORCE_POLLING: "true"
       WATCHFILES_POLL_DELAY_MS: "1000"
