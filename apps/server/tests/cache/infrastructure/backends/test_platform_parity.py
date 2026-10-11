@@ -209,14 +209,6 @@ async def test_pg_telemetry_pool_contention_respects_deadline(
     url = os.environ.get("PGVECTOR_TEST_DATABASE_URL")
     if not url:
         pytest.skip("Disposable PostgreSQL is not configured")
-    settings = Settings(
-        embedding_provider="mock",
-        generation_provider="mock",
-        cache_backend="pgvector",
-        database_url=url,
-        database_command_timeout_seconds=0.1 if failure == "timeout" else 1,
-        allowed_origins=["http://localhost:5173"],
-    )
     pool = await asyncpg.create_pool(url, min_size=1, max_size=1, command_timeout=2)
     backend = PgVectorCacheBackend(
         pool,
@@ -224,7 +216,7 @@ async def test_pg_telemetry_pool_contention_respects_deadline(
         None,
         dimensions=4,
         embedding_space="telemetry-deadline-" + uuid4().hex,
-        operation_timeout_seconds=settings.database_command_timeout_seconds,
+        operation_timeout_seconds=2,
     )
     held: PoolConnectionProxy[asyncpg.Record] | None = None
     acquired = asyncio.Event()
@@ -238,8 +230,22 @@ async def test_pg_telemetry_pool_contention_respects_deadline(
         await backend.put(
             cache_entry("deadline entry", "complete answer", vector_index=0)
         )
-        await backend.record_miss("default")
+        original_count = backend._count
+
+        async def slow_seed(namespace: str, *, hit: bool) -> None:
+            # Setup may legitimately take longer than the intentional 100 ms probe.
+            await asyncio.sleep(0.15)
+            await original_count(namespace, hit=hit)
+
+        with monkeypatch.context() as setup:
+            setup.setattr(backend, "_count", slow_seed)
+            await backend.record_miss("default")
         with monkeypatch.context() as stage:
+            stage.setattr(
+                backend,
+                "_operation_timeout_seconds",
+                0.1 if failure == "timeout" else 1,
+            )
             if operation == "clear":
                 original_clear = backend.store.clear_all
 
@@ -325,7 +331,9 @@ async def test_pg_telemetry_pool_contention_respects_deadline(
 
 
 @pytest.mark.pgvector
-async def test_pg_telemetry_sql_timeout_releases_connection_without_counting() -> None:
+async def test_pg_telemetry_sql_timeout_releases_connection_without_counting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     url = os.environ.get("PGVECTOR_TEST_DATABASE_URL")
     if not url:
         pytest.skip("Disposable PostgreSQL is not configured")
@@ -336,18 +344,20 @@ async def test_pg_telemetry_sql_timeout_releases_connection_without_counting() -
         None,
         dimensions=4,
         embedding_space="telemetry-sql-deadline-" + uuid4().hex,
-        operation_timeout_seconds=0.1,
+        operation_timeout_seconds=2,
     )
     try:
         await backend.record_miss("default")
-        async with pool.acquire() as blocker, blocker.transaction():
-            await blocker.execute(
-                "LOCK TABLE semantix.cache_namespace_counters IN ACCESS EXCLUSIVE MODE"
-            )
-            with pytest.raises(
-                CacheStorageError, match=r"^Official cache operation failed$"
-            ):
-                await asyncio.wait_for(backend.record_miss("default"), timeout=1)
+        with monkeypatch.context() as stage:
+            stage.setattr(backend, "_operation_timeout_seconds", 0.1)
+            async with pool.acquire() as blocker, blocker.transaction():
+                await blocker.execute(
+                    "LOCK TABLE semantix.cache_namespace_counters IN ACCESS EXCLUSIVE MODE"
+                )
+                with pytest.raises(
+                    CacheStorageError, match=r"^Official cache operation failed$"
+                ):
+                    await asyncio.wait_for(backend.record_miss("default"), timeout=1)
         # The statement was cancelled, not allowed to count later when unlocked.
         assert pool.get_idle_size() == 2
         assert (await backend.stats(None)).misses == 1

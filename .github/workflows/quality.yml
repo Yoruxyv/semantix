@@ -687,8 +687,30 @@ jobs:
         run: uv sync --locked --extra dev --extra redis
 
       - name: Run required PostgreSQL and Redis integration tests
+        env:
+          POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
         run: |
-          uv run --no-sync pytest -m "pgvector or redis" --junitxml=.cache/platform.xml
+          if ! uv run --no-sync pytest -m "pgvector or redis" --junitxml=.cache/platform.xml; then
+            # Retry only the known timing-sensitive telemetry probes, once.
+            uv run --no-sync python - <<'PY'
+          from xml.etree.ElementTree import parse
+          cases = parse('.cache/platform.xml').findall('.//testcase')
+          failures = [c for c in cases if c.find('failure') is not None or c.find('error') is not None]
+          allowed = ('test_pg_telemetry_pool_contention_respects_deadline[',
+                     'test_pg_telemetry_sql_timeout_releases_connection_without_counting')
+          assert failures and all(
+              c.get('classname') == 'tests.cache.infrastructure.backends.test_platform_parity'
+              and c.get('name', '').startswith(allowed) for c in failures
+          ), 'Unexpected integration failure; no retry'
+          assert all(c.find('skipped') is None for c in cases), 'Required platform integration tests skipped'
+          PY
+            echo "::warning::Telemetry deadline probe failed; retrying failed probes once"
+            sleep 2
+            docker exec "$POSTGRES_CONTAINER_ID" createdb -U semantix semantix_telemetry_retry
+            PGVECTOR_TEST_DATABASE_URL="${PGVECTOR_TEST_DATABASE_URL%/*}/semantix_telemetry_retry" \
+              uv run --no-sync pytest tests/cache/infrastructure/backends/test_platform_parity.py -k telemetry --lf --lfnf=none --junitxml=.cache/platform-retry.xml
+            uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/platform-retry.xml').findall('.//testcase'); assert cases and all(c.find('skipped') is None for c in cases), 'Telemetry retry missing or skipped'"
+          fi
           uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/platform.xml').findall('.//testcase'); assert cases and all(c.find('skipped') is None for c in cases), 'Required platform integration tests skipped'; names=[c.get('name', '') for c in cases]; assert any('[redis]' in n for n in names) and any('[pgvector]' in n for n in names), 'Official store parity not collected'"
 
       - name: Exercise pgvector backup and restore

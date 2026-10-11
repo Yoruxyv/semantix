@@ -10,10 +10,10 @@ The default install requires NumPy and Pydantic. Optional adapters use HTTPX;
 they do not install OpenAI, Anthropic, Google, Hugging Face or Ollama SDKs. Importing
 `semantix_cache`, `MemoryStore` or `semantix_cache.adapters` does not load HTTPX.
 
-After publication, install an optional extra with
-`python -m pip install 'semantix-cache[openai]'`. The extras `huggingface`, `gemini`,
+**0.1.0 is not yet published to PyPI.** The extras `openai`, `huggingface`, `gemini`,
 `ollama`, `anthropic` and `providers` use the same bounded HTTP dependency.
-Publication is a separate release action. For a local build, from `packages/cache/`:
+Build locally from `packages/cache/`, then install the wheel with only the extra
+you need in your application's Python environment:
 
 ~~~text
 uv sync --locked --extra dev
