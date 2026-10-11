@@ -4,16 +4,81 @@ Async semantic caching in your Python process. No Semantix server is required.
 The runtime supports Python 3.11–3.14 and depends on NumPy and Pydantic.
 
 The distribution name is **semantix-cache** and its import is **semantix_cache**.
-**0.1.0 is not yet published.** After publication, install the minimal package with:
+**0.1.0 is not yet published to PyPI.** Use local source or a locally built wheel.
+Only `packages/cache` is the intended first public distribution. The optional
+backend/dashboard and the separate HTTP client are not required for embedded use.
 
-~~~bash
-python -m pip install semantix-cache
+## Run from source
+
+Install Git, Python 3.11–3.14 and [uv](https://docs.astral.sh/uv/getting-started/installation/).
+From the repository root, these commands work in Bash and PowerShell:
+
+~~~text
+cd packages/cache
+uv sync --locked
+uv run --no-sync python -m examples.custom_integration
 ~~~
 
-Before publication, install a built local wheel with
-`python -m pip install dist/semantix_cache-0.1.0-py3-none-any.whl`.
-See the contributor commands below to build it from this directory.
-Publication is a separate release action.
+The maintained [custom integration example](https://github.com/Yoruxyv/semantix/blob/main/packages/cache/examples/custom_integration.py)
+uses `AsyncSemanticCache`, `EmbeddingSpace` and `MemoryStore`. It exits silently on
+success and raises unless the first resolve generates/writes and the second
+confirms a hit and skips generation. No credentials, provider API calls, Docker,
+server or database are needed. Setup downloads dependencies; execution is offline.
+The deterministic two-dimensional embeddings verify integration behavior, **not
+semantic understanding or match quality**. `provider_called` reports execution of
+the application's local generation callable here.
+
+## Use in another Python project
+
+Keep the checkout at a reviewed commit (`git checkout <commit-sha>` in a dedicated
+clone) and record its SHA with `git rev-parse HEAD`. An editable install uses that
+checkout directly, so later edits change what the consumer imports.
+
+From the directory containing the `semantix` checkout, create a separate consumer
+environment and install only the local cache package:
+
+Windows PowerShell:
+
+~~~powershell
+python -m venv my-app/.venv
+./my-app/.venv/Scripts/python.exe -m pip install -e ./semantix/packages/cache
+~~~
+
+Bash (Linux/macOS):
+
+~~~bash
+python -m venv my-app/.venv
+./my-app/.venv/bin/python -m pip install -e ./semantix/packages/cache
+~~~
+
+Run your application's scripts with that environment's Python and import from
+`semantix_cache`, as below. No backend modules or development extras are required.
+Local installation still resolves NumPy/Pydantic from a package index unless
+dependencies are already available locally.
+
+For a non-editable wheel, build from `semantix/packages/cache`:
+
+~~~text
+uv sync --locked --extra dev
+uv run --no-sync python -m build
+~~~
+
+Then, from the directory containing the checkout, replace the editable install
+command with the corresponding local wheel command:
+
+~~~powershell
+./my-app/.venv/Scripts/python.exe -m pip install ./semantix/packages/cache/dist/semantix_cache-0.1.0-py3-none-any.whl
+~~~
+
+~~~bash
+./my-app/.venv/bin/python -m pip install ./semantix/packages/cache/dist/semantix_cache-0.1.0-py3-none-any.whl
+~~~
+
+Use a fresh consumer environment when checking the wheel independently of an
+editable install. These paths install local Semantix source/artifacts; they do not
+fetch an unpublished Semantix distribution from PyPI. Optional provider/store
+extras require their own dependencies and setup; see the [provider](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/providers.md)
+and [storage](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md) guides.
 
 ## Use your own embedding and generation
 
@@ -300,6 +365,9 @@ Explicit model serialization contains its documented data and must be handled by
 application with appropriate care.
 
 ## Provider verification
+
+Hosted provider examples are optional, require your own credentials and may incur
+charges. The source quick start above makes no provider API calls.
 
 The maintained OpenAI, Gemini, and Hugging Face adapters and independent custom
 integrations passed live MemoryStore miss → generate → write → confirmed-hit

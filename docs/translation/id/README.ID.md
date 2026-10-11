@@ -30,21 +30,47 @@ memerlukan server Semantix, web UI, Docker, atau PostgreSQL.
 ## Instalasi dan contoh awal
 
 > [!NOTE]
-> **0.1.0 belum diterbitkan.** Perintah instalasi publik berikut berlaku setelah publikasi.
+> **0.1.0 belum diterbitkan di PyPI.** Gunakan source GitHub atau wheel yang dibangun
+> secara lokal. Nama distribusinya **semantix-cache**; impor Python-nya **semantix_cache**.
+
+Instal Git, Python 3.11–3.14, dan [uv](https://docs.astral.sh/uv/getting-started/installation/).
+Mulai dari checkout baru, atau gunakan checkout yang sudah ada dan masuk ke `packages/cache`.
+
+Bash (Linux/macOS):
 
 ```bash
-python -m pip install semantix-cache
+git clone https://github.com/Yoruxyv/semantix.git
+cd semantix/packages/cache
 ```
 
-Sebelum publikasi, instal wheel kandidat yang sudah dibangun dari direktori yang memuatnya:
+Windows PowerShell:
+
+```powershell
+git clone https://github.com/Yoruxyv/semantix.git
+Set-Location semantix/packages/cache
+```
+
+Lalu jalankan perintah berikut pada salah satu shell tersebut:
 
 ```bash
-python -m pip install semantix_cache-0.1.0-py3-none-any.whl
+uv sync --locked
+uv run --no-sync python -m examples.custom_integration
 ```
 
-Lihat [panduan paket](../../../packages/cache/README.md) untuk build lokal dan kontrak
-lengkap. Paket minimal bergantung pada NumPy dan Pydantic; dependensi jaringan
-provider serta driver PostgreSQL bersifat opsional.
+[Contoh integrasi kustom](../../../packages/cache/examples/custom_integration.py) yang
+dipelihara memakai `AsyncSemanticCache`, `EmbeddingSpace`, dan `MemoryStore` tanpa
+API key, Docker, server, atau database. Contoh selesai tanpa output jika berhasil
+dan memunculkan error jika resolve pertama tidak menjalankan generation/write
+atau resolve kedua tidak mengonfirmasi hit dan melewati generation. Vektor
+deterministik dua dimensinya memverifikasi integrasi API, **bukan pemahaman semantik
+atau kualitas pencocokan**. `provider_called` berarti callable generation lokal
+milik aplikasi dijalankan; contoh ini tidak memanggil API provider.
+Setup mengunduh dependensi Python; contoh itu sendiri berjalan offline.
+
+Untuk proyek Python terpisah, lihat [instalasi source lokal dan wheel](../../../packages/cache/README.md#use-in-another-python-project).
+Paket minimal bergantung pada NumPy dan Pydantic; dependensi jaringan provider serta
+driver storage persisten bersifat opsional. Backend/dashboard adalah aplikasi
+opsional terpisah; penggunaan embedded tidak melewatinya.
 
 Contoh tanpa kredensial berikut dapat dijalankan sebagai skrip. Vektor sederhana
 hanya menunjukkan cara integrasi, bukan pemahaman bahasa atau kualitas pencocokan
@@ -204,6 +230,9 @@ Penggunaan `AsyncSemanticCache` yang terdokumentasi dicakup oleh
 [kebijakan kompatibilitas 0.1.x paket](../../../packages/cache/README.md#01x-compatibility).
 
 ## Provider AI terverifikasi
+
+Contoh hosted provider bersifat opsional, memerlukan kredensial Anda sendiri, dan
+dapat menimbulkan biaya. Mulai dengan workflow MemoryStore tanpa kredensial di atas.
 
 Adapter OpenAI, Gemini, dan Hugging Face yang dipelihara diuji melalui API nyata
 pada **2026-10-05**,
@@ -627,7 +656,7 @@ print(result.response, result.cache_hit)
 
 ## Berkontribusi
 
-Lihat [CONTRIBUTING](CONTRIBUTING.md), [pemeriksaan contributor cache](../../../packages/cache/README.md#separate-products),
+Lihat [CONTRIBUTING](CONTRIBUTING.md), [pemeriksaan contributor cache](../../../packages/cache/README.md#contributor-checks),
 dan [development server/web](guides/development.md).
 
 <details>

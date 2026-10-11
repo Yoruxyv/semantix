@@ -31,21 +31,46 @@ Docker or PostgreSQL is required.
 ## Install and run
 
 > [!NOTE]
-> **0.1.0 is not yet published.** The public install command below applies after publication.
+> **0.1.0 is not yet published to PyPI.** Use the GitHub source or a locally built
+> wheel. The distribution is named **semantix-cache**; Python imports **semantix_cache**.
+
+Install Git, Python 3.11–3.14 and [uv](https://docs.astral.sh/uv/getting-started/installation/).
+Start from a new checkout, or use your existing checkout and enter `packages/cache`.
+
+Bash (Linux/macOS):
 
 ```bash
-python -m pip install semantix-cache
+git clone https://github.com/Yoruxyv/semantix.git
+cd semantix/packages/cache
 ```
 
-Before publication, install a built candidate wheel from the directory containing it:
+Windows PowerShell:
+
+```powershell
+git clone https://github.com/Yoruxyv/semantix.git
+Set-Location semantix/packages/cache
+```
+
+Then run these commands in either shell:
 
 ```bash
-python -m pip install semantix_cache-0.1.0-py3-none-any.whl
+uv sync --locked
+uv run --no-sync python -m examples.custom_integration
 ```
 
-See the [package guide](packages/cache/README.md) for local builds and the full
-contract. The minimal package depends on NumPy and Pydantic; provider networking
-and PostgreSQL drivers are optional.
+The maintained [custom integration example](packages/cache/examples/custom_integration.py)
+uses `AsyncSemanticCache`, `EmbeddingSpace` and `MemoryStore` with no API key,
+Docker, server or database. It exits silently on success and raises if the first
+resolve does not generate/write or the second does not confirm a hit and skip
+generation. Its deterministic two-dimensional vectors verify API wiring, **not
+semantic understanding or match quality**. `provider_called` means the local
+application generation callable ran; this example makes no provider API calls.
+Setup downloads Python dependencies; the example itself runs offline.
+
+For an independent Python project, see [local source and wheel installation](packages/cache/README.md#use-in-another-python-project).
+The minimal package depends on NumPy and Pydantic; provider networking and persistent
+store drivers are optional. The backend/dashboard is a separate optional application;
+embedded usage does not pass through it.
 
 This credential-free example runs as a script. The toy vectors demonstrate the
 integration, not language understanding or semantic-match quality. Replace the
@@ -204,6 +229,9 @@ Documented `AsyncSemanticCache` usage is covered by the package's
 [0.1.x compatibility policy](packages/cache/README.md#01x-compatibility).
 
 ## Verified AI Providers
+
+Hosted provider examples are optional, require your own credentials and may incur
+charges. Start with the credential-free MemoryStore workflow above.
 
 The maintained OpenAI, Gemini, and Hugging Face adapters were exercised against
 real provider APIs on **2026-10-05**, including embedding, generation, and an
@@ -678,7 +706,7 @@ The [documentation index](docs/README.md) separates embedded and server guides.
 
 ## Contributing
 
-See [CONTRIBUTING](CONTRIBUTING.md), [cache contributor checks](packages/cache/README.md#separate-products)
+See [CONTRIBUTING](CONTRIBUTING.md), [cache contributor checks](packages/cache/README.md#contributor-checks)
 and [server/web development](docs/guides/development.md).
 
 <details>

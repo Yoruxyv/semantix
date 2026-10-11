@@ -45,8 +45,15 @@ with a demonstration embedder. The
 [custom integration example](../../packages/cache/examples/custom_integration.py)
 runs offline and supplies its own async embedding/generation.
 
-Install the PostgreSQL extra with `python -m pip install 'semantix-cache[pgvector]'`
-when published, or install the built local wheel with its `[pgvector]` extra.
+**0.1.0 is not yet published to PyPI.** [Build a local wheel](../../packages/cache/README.md#use-in-another-python-project),
+then install its `[pgvector]` extra in your application's Python environment:
+
+```bash
+python -m pip install './dist/semantix_cache-0.1.0-py3-none-any.whl[pgvector]'
+```
+
+This relative wheel path assumes you are in `packages/cache`; adjust it for your
+consumer project.
 Import the adapter explicitly:
 
 ```python
