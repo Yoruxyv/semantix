@@ -87,20 +87,16 @@ def child(path: str, pipe: Channel, crash: str | None = None) -> None:
                     break
                 started = perf_counter()
                 if command == "put":
-                    for _ in range(8):
-                        await store.put(entry("shared", created_at=REVISION))
-                    result: object = 8
+                    await store.put(entry("shared", created_at=REVISION))
+                    result: object = 1
                 elif command == "hit":
                     candidate = await store.find_nearest((1, 0), namespace="default")
                     assert candidate
-                    result = [
-                        await store.record_hit(
-                            candidate.entry.cache_key,
-                            namespace="default",
-                            expected_created_at=candidate.entry.created_at,
-                        )
-                        for _ in range(8)
-                    ]
+                    result = await store.record_hit(
+                        candidate.entry.cache_key,
+                        namespace="default",
+                        expected_created_at=candidate.entry.created_at,
+                    )
                 elif command == "replace":
                     await store.put(
                         entry(
@@ -179,17 +175,21 @@ async def test_process_revision_and_hit_serialization(
     children = [spawn(path) for _ in range(count)]
     try:
         assert [receive(pipe) for _, pipe in children] == ["ready"] * count
-        for _, pipe in children:
-            pipe.send("put")
-        assert [receive(pipe)[0] for _, pipe in children] == [8] * count
+        # Barrier each round: SQLite's bounded busy wait does not promise fairness
+        # across repeated writers; lock-budget exhaustion is tested separately.
+        for _ in range(8):
+            for _, pipe in children:
+                pipe.send("put")
+            assert [receive(pipe)[0] for _, pipe in children] == [1] * count
         with connection(path) as db:
             assert db.execute(
                 "SELECT last_revision_us,access_counter FROM binding_state"
             ).fetchone() == (micros(REVISION) + count * 8 - 1, count * 8)
             assert db.execute("SELECT count(*) FROM cache_entries").fetchone() == (1,)
-        for _, pipe in children:
-            pipe.send("hit")
-        assert [receive(pipe)[0] for _, pipe in children] == [[True] * 8] * count
+        for _ in range(8):
+            for _, pipe in children:
+                pipe.send("hit")
+            assert [receive(pipe)[0] for _, pipe in children] == [True] * count
         with connection(path) as db:
             assert db.execute("SELECT hit_count FROM cache_entries").fetchone() == (
                 count * 8,
