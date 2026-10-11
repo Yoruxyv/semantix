@@ -9,6 +9,7 @@ import { canApplyGlobalThreshold } from '@/features/auth/permissions';
 import { useCacheControl } from '@/features/cache/hooks/useCacheControl';
 import { useMonitor } from '../hooks/useMonitor';
 import { Alert } from '@/shared/components/ui';
+import type { ApiError } from '@/shared/api/types';
 
 import { lazy, Suspense, type JSX } from 'react';
 
@@ -17,6 +18,32 @@ const ResponseCard = lazy(() =>
     default: module.ResponseCard,
   })),
 );
+
+function queryErrorMessage(error: ApiError): string {
+  switch (error.code) {
+    case 'upstream_error':
+    case 'invalid_upstream_response':
+    case 'embedding_error':
+    case 'service_unavailable':
+    case 'service_configuration_error':
+      return "The AI provider couldn't complete your request. Check its availability, configuration, or billing status, then try again.";
+    case 'network_error':
+      return "Couldn't reach the server. Check your connection and try again.";
+  }
+
+  switch (error.status) {
+    case 401:
+      return 'Your session is no longer authorized. Sign in and try again.';
+    case 403:
+      return 'This request is not permitted. Check your access and selected namespace.';
+    case 422:
+      return 'The query was not accepted. Check the prompt, namespace, and cache policy, then try again.';
+    case 429:
+      return 'Too many requests. Wait a moment, then try again.';
+    default:
+      return "Your query couldn't be completed. Check your request and try again.";
+  }
+}
 
 export function MonitorPage(): JSX.Element {
   const { session, status } = useAuth();
@@ -65,7 +92,7 @@ export function MonitorPage(): JSX.Element {
             tone="error"
           >
             <p className="font-data mt-1 text-[11px]/5 text-(--text-soft)">
-              {queryState.error.detail ?? 'The provider returned no detail.'}
+              {queryErrorMessage(queryState.error)}
             </p>
           </Alert>
         )}

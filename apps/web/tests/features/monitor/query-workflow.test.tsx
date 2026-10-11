@@ -133,6 +133,85 @@ describe('dashboard correctness', () => {
     vi.unstubAllGlobals();
   });
 
+  it.each([
+    [
+      'upstream_error',
+      502,
+      "The AI provider couldn't complete your request. Check its availability, configuration, or billing status, then try again.",
+    ],
+    [
+      'invalid_upstream_response',
+      502,
+      "The AI provider couldn't complete your request. Check its availability, configuration, or billing status, then try again.",
+    ],
+    [
+      'embedding_error',
+      502,
+      "The AI provider couldn't complete your request. Check its availability, configuration, or billing status, then try again.",
+    ],
+    [
+      'service_unavailable',
+      503,
+      "The AI provider couldn't complete your request. Check its availability, configuration, or billing status, then try again.",
+    ],
+    [
+      'service_configuration_error',
+      503,
+      "The AI provider couldn't complete your request. Check its availability, configuration, or billing status, then try again.",
+    ],
+    [
+      'network_error',
+      null,
+      "Couldn't reach the server. Check your connection and try again.",
+    ],
+    [
+      'http_error',
+      502,
+      "Your query couldn't be completed. Check your request and try again.",
+    ],
+    [
+      'http_error',
+      504,
+      "Your query couldn't be completed. Check your request and try again.",
+    ],
+    [
+      'authentication_required',
+      401,
+      'Your session is no longer authorized. Sign in and try again.',
+    ],
+    [
+      'permission_denied',
+      403,
+      'This request is not permitted. Check your access and selected namespace.',
+    ],
+    [
+      'validation_error',
+      422,
+      'The query was not accepted. Check the prompt, namespace, and cache policy, then try again.',
+    ],
+    ['rate_limit_exceeded', 429, 'Too many requests. Wait a moment, then try again.'],
+  ] as const)(
+    'shows safe recovery advice for %s (%s)',
+    async (code, status, message) => {
+      const sensitiveDetail = 'SENSITIVE_PROVIDER_DETAIL_DO_NOT_RENDER';
+      vi.mocked(useQuery).mockReturnValue({
+        state: { status: 'error', error: { code, status, detail: sensitiveDetail } },
+        submit: vi.fn().mockResolvedValue(null),
+      });
+      render(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByText(message)).toBeTruthy();
+      expect(screen.getByRole('alert').textContent).toContain('Query failed');
+      expect(screen.queryByText(sensitiveDetail)).toBeNull();
+      expect(screen.queryByRole('heading', { name: 'Latest response' })).toBeNull();
+      expect(screen.queryByLabelText('Loading query response')).toBeNull();
+      expect(await screen.findByText('0 of 0 traces plotted')).toBeTruthy();
+    },
+  );
+
   it('starts without simulated radar traces', async () => {
     const { container } = render(
       <MemoryRouter initialEntries={['/']}>

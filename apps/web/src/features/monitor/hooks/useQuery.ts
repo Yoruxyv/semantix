@@ -15,8 +15,8 @@ export interface UseQueryResult {
  * The local request ID suppresses stale success/error updates even if abort loses
  * the race. Aborting does not guarantee cancellation of server-side work.
  *
- * Current handled failures become error state. Unexpected promise rejections
- * propagate without resetting loading; this hook adds no retry or timeout.
+ * Current handled failures and unexpected request rejections become error state.
+ * Unexpected exception details stay private; this hook adds no retry or timeout.
  */
 export function useQuery(): UseQueryResult {
   const [state, setState] = useState<QueryState>({ status: 'idle' });
@@ -41,7 +41,12 @@ export function useQuery(): UseQueryResult {
 
       setState({ status: 'loading' });
 
-      const result = await submitQuery(request, controller.current.signal);
+      const result = await submitQuery(request, controller.current.signal).catch(
+        () => ({
+          ok: false as const,
+          error: { code: 'query_failed', detail: null, status: null },
+        }),
+      );
 
       if (currentRequestId !== requestId.current) {
         return null;

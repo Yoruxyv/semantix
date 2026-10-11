@@ -27,6 +27,14 @@ Evaluation subviews use native links with `aria-current` and URL state:
 `?view=reuse-quality`. Refresh, sharing, and browser history preserve the view;
 unknown values display Runs. The `/benchmarks` redirect preserves search and hash.
 
+Monitor sample probes sit beneath the query text as wrapping native buttons. Enter,
+Space, or clicking a sample fills the prompt and returns focus to it for editing;
+selection never submits a query. Query failures use an alert with fixed recovery
+advice, retain the prompt, namespace and policy, and re-enable submission. Failed
+queries do not add successful traces or display a current cache-hit response.
+Provider guidance uses structured provider error codes, never HTTP 502 alone;
+raw error details and billing/account information are not displayed.
+
 Monitor namespace controls remain outside Advanced cache policy. A required
 missing or invalid selection has visible guidance associated with the disabled
 submit button and the namespace input. Selection never silently chooses a tenant.

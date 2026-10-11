@@ -1,4 +1,4 @@
-import { useState, type JSX, type SubmitEvent } from 'react';
+import { useRef, useState, type JSX, type SubmitEvent } from 'react';
 
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { canSubmitQueries } from '@/features/auth/permissions';
@@ -97,6 +97,7 @@ export function QueryForm({
   } else if (explicitNamespaces.length === 1) {
     defaultNamespace = explicitNamespaces[0] ?? '';
   }
+  const promptInput = useRef<HTMLTextAreaElement>(null);
   const [prompt, setPrompt] = useState('');
   const [namespace, setNamespace] = useState(defaultNamespace);
   const [policyMode, setPolicyMode] = useState<QueryPolicyMode>('normal');
@@ -180,6 +181,7 @@ export function QueryForm({
         </label>
 
         <textarea
+          ref={promptInput}
           id="prompt"
           aria-describedby={
             promptError === null ? 'prompt-note' : 'prompt-note prompt-error'
@@ -217,6 +219,27 @@ export function QueryForm({
             {promptError}
           </p>
         )}
+
+        <fieldset className="mt-4 min-w-0">
+          <legend className="ui-label mb-2 text-(--text-faint)">Sample probes</legend>
+          <div className="flex flex-wrap gap-2">
+            {EXAMPLE_PROMPTS.map((example) => (
+              <Button
+                key={example}
+                className="max-w-full border-(--hairline) text-left text-(--teal) hover:border-(--teal) hover:text-(--text) focus-visible:outline-(--teal) disabled:opacity-50"
+                disabled={isLoading}
+                size="compact"
+                onClick={() => {
+                  setPrompt(example);
+                  setPromptError(null);
+                  promptInput.current?.focus();
+                }}
+              >
+                {example}
+              </Button>
+            ))}
+          </div>
+        </fieldset>
 
         <div className="mt-5 border-t border-(--hairline) pt-5">
           <p className="ui-label text-(--text-muted)">Cache namespace</p>
@@ -330,25 +353,7 @@ export function QueryForm({
           </p>
         )}
 
-        <div className="mt-6 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="ui-label mb-2 text-(--text-faint)">Sample probes</p>
-
-            <div className="flex flex-col items-start gap-1.5">
-              {EXAMPLE_PROMPTS.map((example) => (
-                <button
-                  key={example}
-                  className="min-h-8 text-left text-xs text-(--teal) underline decoration-[rgba(91,156,148,0.35)] underline-offset-4 transition-colors hover:text-(--text) focus-visible:outline-1 focus-visible:outline-offset-3 focus-visible:outline-(--teal) active:translate-y-px disabled:opacity-50"
-                  disabled={isLoading}
-                  type="button"
-                  onClick={() => setPrompt(example)}
-                >
-                  {example}
-                </button>
-              ))}
-            </div>
-          </div>
-
+        <div className="mt-6 flex justify-end">
           <Button
             aria-describedby={submitDescription}
             className="w-full disabled:opacity-55 lg:w-auto"
