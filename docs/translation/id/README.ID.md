@@ -4,7 +4,7 @@
 
 <p><strong>Semantic caching asinkron untuk Python.</strong></p>
 
-<p>Penyimpanan memory atau PostgreSQL. Alur generation tetap Anda kendalikan.</p>
+<p>Penyimpanan memory, SQLite, PostgreSQL, atau Redis. Alur generation tetap Anda kendalikan.</p>
 
 <p>
   <img src="https://img.shields.io/badge/Python-3.11%E2%80%933.14-555555?logo=python&amp;logoColor=FFD43B&amp;labelColor=3776AB" alt="Python 3.11–3.14" />
@@ -113,7 +113,7 @@ Context manager menutup facade dan store; resource lain yang diinjeksi tetap dim
 | Aspek | Ringkasan |
 | --- | --- |
 | **Runtime** | Python asinkron, in-process |
-| **Storage** | MemoryStore atau PostgreSQL/pgvector opsional |
+| **Storage** | MemoryStore, SQLite lokal, PostgreSQL/pgvector atau Redis opsional |
 | **Generation** | Callable asinkron milik Anda |
 
 ## Mengapa Semantix?
@@ -141,7 +141,7 @@ Kandidat yang memenuhi syarat harus lolos validasi dan konfirmasi TTL/revisi
 secara atomik sebelum hit dikembalikan.
 
 Aplikasi memiliki masa hidup embedder, generator, dan store. CacheStore dapat berupa
-MemoryStore, PgVectorStore opsional, atau implementasi Anda. Kebijakan lain mengatur
+MemoryStore, SQLiteStore, PgVectorStore/RedisStore opsional, atau implementasi Anda. Kebijakan lain mengatur
 read/generation/write; coalescing opt-in menambahkan penantian dan lookup terkonfirmasi
 milik setiap follower. Lihat [kontrak cache](../../../packages/cache/README.md#contract).
 
@@ -275,6 +275,26 @@ direproduksi dan perbaikan terfokus sangat diterima. Jangan sertakan API key,
 kredensial, atau respons provider mentah dalam issue, commit, log, atau fixture.
 
 ## Storage embedded
+
+Untuk persistensi lokal, `semantix_cache.stores.sqlite.SQLiteStore` memiliki file
+khusus dan worker sendiri. Inisialisasi harus eksplisit; `connect()` tidak membuat
+atau mengadopsi file. Diperlukan **SQLite >=3.51.3, kecuali 3.52.0**, yang ditautkan ke Python
+dan mendukung thread; versi Python saja tidak cukup. Tidak ada
+extra SQLite atau dependensi runtime tambahan. Dari `packages/cache`, jalankan:
+
+```text
+uv run --no-sync python -m examples.sqlite_cache
+```
+
+Contoh tanpa kredensial ini memakai ulang embedder/generation deterministik,
+memverifikasi miss → generation → write → hit terkonfirmasi, lalu reuse setelah
+file dibuka ulang. Vektornya menguji integrasi, bukan pemahaman semantik.
+Pencarian float64 lengkap dibatasi 5.000 entri, 16.000 dimensi, dan
+`capacity * dimensions * 8 <= 64 MiB`; RSS total lebih besar. Setiap hit menulis
+melalui lock writer seluruh file. Gunakan disk lokal privat, hentikan pekerjaan
+aktif sebelum menutup store, dan baca [setup serta batas SQLite (Inggris)](../../embedded/storage.md#sqlite-local-file-persistence)
+untuk TTL jam host, pembatalan di sekitar COMMIT, pemulihan, dan durabilitas.
+SQLite hanya untuk paket embedded; backend/dashboard dan inspector belum memakainya.
 
 Mulai dengan MemoryStore untuk state process-local yang terbatas. Opsional
 `semantix_cache.stores.pgvector.PgVectorStore` mempertahankan data antarproses/restart

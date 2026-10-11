@@ -53,6 +53,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 semantix_cache = ["py.typed"]
 "semantix_cache.stores.migrations" = ["*.sql"]
+"semantix_cache.stores.sqlite_migrations" = ["*.sql"]
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
