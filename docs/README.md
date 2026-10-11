@@ -24,7 +24,7 @@ live in [reference/](reference/), and procedures/evidence workflows in
 | [Embedded providers](embedded/providers.md) | Maintained adapters, optional extras and custom embedding/generation |
 | [Provider live verification](operations/provider-live-verification.md) | Opt-in embedded-provider receipts, exact model/source scope, cleanup and evidence limits |
 | [Context identity and migration](embedded/context-identity-and-migration.md) | Explicit scopes, embedding revisions, offline recipes and safe migration |
-| [Embedded storage](embedded/storage.md) | Memory, PostgreSQL/pgvector, Redis and application-owned databases |
+| [Embedded storage](embedded/storage.md) | Memory, SQLite, PostgreSQL/pgvector, Redis and application-owned databases |
 | [Embedded Redis](embedded/redis.md) | Optional RedisStore setup, exact scan, TTL/LRU, ownership and recovery |
 | [Embedded coalescing evidence](embedded/observability.md) | Opt-in numeric snapshots, privacy and application-owned instrumentation |
 | [Custom integration](../packages/cache/examples/custom_integration.py) | Existing async embedding and generation flow |

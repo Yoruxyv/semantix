@@ -25,7 +25,7 @@ di [operations/](../../operations/).
 | [Provider embedded](../../embedded/providers.md) | Adapter yang dipelihara, extra opsional, dan embedding/generation kustom |
 | [Verifikasi provider live (Inggris)](../../operations/provider-live-verification.md) | Receipt provider embedded opt-in, scope model/source yang tepat, cleanup, dan batas bukti |
 | [Identitas konteks dan migrasi](../../embedded/context-identity-and-migration.md) | Scope eksplisit, revisi embedding, contoh offline, dan migrasi aman |
-| [Storage embedded](../../embedded/storage.md) | Memory, PostgreSQL/pgvector, Redis, dan database milik aplikasi |
+| [Storage embedded](../../embedded/storage.md) | Memory, SQLite, PostgreSQL/pgvector, Redis, dan database milik aplikasi |
 | [Redis embedded (Inggris)](../../embedded/redis.md) | Setup RedisStore opsional, pencarian eksak, TTL/LRU, ownership, dan pemulihan |
 | [Bukti coalescing embedded](../../embedded/observability.md) | Snapshot numerik opt-in, privasi, dan instrumentasi milik aplikasi |
 | [Integrasi kustom](../../../packages/cache/examples/custom_integration.py) | Alur embedding dan generation asinkron yang sudah ada |

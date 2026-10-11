@@ -3,13 +3,13 @@
 `semantix-cache` runs in your Python process. It does not require the Semantix
 FastAPI server. Its async engine consumes the structural
 [`CacheStore` protocol](../../packages/cache/src/semantix_cache/protocols.py), not SQL.
-The maintained stores are `MemoryStore`, optional `PgVectorStore` and optional `RedisStore`.
+The maintained stores are `MemoryStore`, file-backed `SQLiteStore`, optional `PgVectorStore` and optional `RedisStore`.
 The separate `semantix_client` package is the optional/reference HTTP client.
 
-The server/workbench also delegates to these official stores. See
+The server/workbench delegates to MemoryStore, PgVectorStore and RedisStore. See
 [server storage configuration](../guides/platform-storage.md) for selection and setup.
 
-Concrete maintained stores additionally offer optional `inspect_entries` and
+MemoryStore, PgVectorStore and RedisStore additionally offer optional `inspect_entries` and
 `inspect_entry` observations. They exclude expired entries without purging them,
 recording hits, extending TTL or changing LRU. Lists contain prompts, identifiers
 and bounded response previews (at most 240 characters), never vectors or complete
@@ -35,6 +35,7 @@ for authorization, search costs and pagination limitations.
 | Store | Persistence | Dependency | Ownership |
 | --- | --- | --- | --- |
 | `MemoryStore` | Process-local, non-durable | Default NumPy/Pydantic core | Owns its state and workers |
+| `SQLiteStore` | Local dedicated WAL file | stdlib sqlite3 with a patched linked runtime | Owns one connection and worker |
 | `PgVectorStore` | PostgreSQL/pgvector | `semantix-cache[pgvector]` adds asyncpg | Borrows `pool=`; `connect()` creates an owned pool |
 | `RedisStore` | Redis primary; operator-managed persistence | `semantix-cache[redis]` adds redis-py | Borrows `client=`; `connect()` creates an owned client/pool |
 | Your `CacheStore` | Your implementation | Your application chooses | Your implementation documents ownership |
@@ -65,6 +66,111 @@ exports from `semantix_cache` are unchanged by adding persistent storage.
 
 See [Redis storage](redis.md) for its supported versions, exact scan,
 explicit setup, TTL/LRU, failure handling and persistence boundary.
+
+## SQLite: local file persistence
+
+`from semantix_cache.stores.sqlite import SQLiteStore` provides embedded persistence
+without a database service or an extra dependency. It is **package-only**: the
+server/dashboard does not accept `CACHE_BACKEND=sqlite`, and SQLiteStore does not
+implement the optional inspector or `clear_all` APIs.
+
+Check the **linked** runtime, then run the offline example from `packages/cache`:
+
+```text
+uv run --no-sync python -c "import sqlite3; print(sqlite3.sqlite_version, sqlite3.threadsafety)"
+uv run --no-sync python -m examples.sqlite_cache
+```
+
+The example reuses the existing deterministic embedder/generation flow, verifies
+miss → generation → write → confirmed hit, closes the store, and verifies reuse
+after reopening its disposable file. It exits silently on success. Its embeddings
+verify integration behavior, not semantic understanding. No provider calls occur.
+
+SQLiteStore requires thread-capable SQLite **>=3.51.3, excluding withdrawn 3.52.0**.
+This gate addresses the documented [WAL-reset corruption bug](https://sqlite.org/wal.html#walreset).
+Named older backports (3.44.6 and 3.50.7) and vendor-specific backports remain
+unsupported until tested. A supported Python version alone is insufficient; an
+older linked runtime raises `CacheConfigurationError` before file access. A Python
+build without sqlite3 gives an actionable import error for this adapter. Core,
+MemoryStore, RedisStore and PgVectorStore imports do not load SQLite.
+
+The adapter has been exercised on Windows and Linux; macOS is not yet verified.
+For a fresh checked-out source environment with a managed patched Python, use
+`uv sync --locked --extra dev --managed-python --python 3.14`, then repeat the
+linked-runtime check above. This changes the project environment, not a system DLL.
+
+For an application-owned embedder, explicit setup and runtime ownership look like:
+
+```python
+from pathlib import Path
+from semantix_cache import AsyncSemanticCache
+from semantix_cache.stores.sqlite import SQLiteStore
+
+# Inside async application startup; use a trusted private directory that exists.
+path = Path("cache.db")
+await SQLiteStore.initialize_schema(path, embedding_space=embedder.embedding_space)
+async with (
+    await SQLiteStore.connect(path, embedding_space=embedder.embedding_space) as store,
+    AsyncSemanticCache(embedder=embedder, store=store) as cache,
+):
+    hit = await cache.get("an application-approved query", namespace="support")
+```
+
+Initialization exclusively creates an absent dedicated regular file, or validates
+an existing Semantix file and registers its binding. It never adopts an empty,
+foreign or partially initialized file. Failed new setup preserves its partial
+file for diagnosis. `connect()` uses existing-file mode and performs no DDL,
+migration or binding registration. Schema v1 has four STRICT tables, a frozen
+packaged migration/checksum and checked ownership/structure. All connections to
+one identity/dimension binding must agree on capacity and exact default TTL.
+Supply matching `max_size`/`default_ttl_seconds` to both setup and connect.
+
+Capacity defaults to 500, permits 1–5,000 entries across namespaces, and dimensions
+are 1–16,000. Additionally, `max_size * dimensions * 8 <= 64 MiB`; for example,
+500 × 16,000 and 5,000 × 1,536 fit, while 5,000 × 16,000 is rejected. Searches
+read **every** eligible normalized float64 vector and use the shared cosine
+kernel with revision/key tie ordering. No ANN, top-k truncation or float32
+conversion is used. The detached matrix and numerical temporaries make total RSS
+substantially larger than 64 MiB. Entry capacity is not a disk quota; large valid
+responses, WAL and free pages can dominate file size. Prefer the default capacity
+and measure your workload before selecting the upper bounds.
+
+Each store owns one connection and one single-thread worker. One complete
+operation occupies that worker through rollback/cleanup, with at most 32 admitted
+operations including waiters. Mutations acquire `BEGIN IMMEDIATE`; revision,
+payload, expiry, hit counters, LRU and eviction commit together. Binding revision
+history survives delete, clear, expiry, eviction and reopen. Confirmation checks
+the current binding, namespace, key, exact revision and a fresh statement clock;
+false confirmation changes no hit/LRU state. Every confirmed hit is a write.
+All bindings in one file share SQLite's single writer, so this suits small,
+low-contention local workloads rather than a distributed cache service.
+
+TTL inherits/caps the configured default, starts from the host UTC wall clock at
+write, floors fractional durations to microseconds, and expires inclusively.
+Both TTL values `None` permit immortality; hits never slide expiry. Downtime
+counts toward TTL. A clock rollback can extend retention or re-expose expired
+rows that have not been purged. The confirmation clock is its linearization point,
+not a retention lease through COMMIT or subsequent response use.
+
+Operation/connect/close deadlines are finite positive seconds up to 86,400
+(default 30/10/30). Lock waits are capped at one second and remaining operation
+budget. Cancellation/timeout propagates while underlying work remains owned;
+close is busy until it drains. Work near COMMIT can succeed without delivering
+its result. **No mutation is automatically replayed.** Uncertain transaction
+cleanup faults the store; close and reopen it. Concurrent/repeated close shares
+one shielded cleanup task. A timed-out close leaves the wrapper sealed and cleanup
+tracked; Python cannot kill a native thread stuck in OS I/O.
+
+Use a single host and trusted **local disk** with private permissions/ACLs.
+Memory databases, borrowed connections, caller-supplied URIs, detectable network
+paths and symlink/reparse paths are rejected. Network/cloud-sync filesystems,
+live file replacement and hostile filesystem substitution are unsupported.
+WAL uses `synchronous=FULL`; durability still depends on correct filesystem and
+hardware flushing. Process-termination tests do not certify power-loss safety.
+Files, WAL, backups and freed pages may retain plaintext; clear is not secure erase.
+Do not copy an active `.db` alone or delete its sidecars. Restoring an older file
+requires a **new embedding identity/cache generation** and invalidating old
+candidates, because whole-file rollback also rewinds revision history.
 
 ## MemoryStore sizing: entries are not a byte budget
 

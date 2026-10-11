@@ -69,8 +69,20 @@ def main(artifact_dir: Path = Path("dist")) -> None:
         assert "semantix_cache/stores/redis.py" in names
         assert "semantix_cache/stores/_redis_scripts.py" in names
         migration = "semantix_cache/stores/migrations/0001_cache.sql"
-        assert [name for name in names if name.endswith(".sql")] == [migration]
-        assert archive.read(migration) == Path("src").joinpath(migration).read_bytes()
+        sqlite_migration = "semantix_cache/stores/sqlite_migrations/0001_cache.sql"
+        assert {name for name in names if name.endswith(".sql")} == {
+            migration,
+            sqlite_migration,
+        }
+        for resource in (migration, sqlite_migration):
+            assert archive.read(resource) == Path("src").joinpath(resource).read_bytes()
+        for module in (
+            "sqlite",
+            "_sqlite_format",
+            "_sqlite_worker",
+            "_sqlite_database",
+        ):
+            assert f"semantix_cache/stores/{module}.py" in names
         for module in (
             "__init__",
             "_http",
@@ -146,6 +158,18 @@ def main(artifact_dir: Path = Path("dist")) -> None:
         )
         for module in ("observability", "_coalescing_metrics"):
             assert f"{root}/src/semantix_cache/{module}.py" in archive.getnames()
+        sqlite_resource = (
+            f"{root}/src/semantix_cache/stores/sqlite_migrations/0001_cache.sql"
+        )
+        assert sqlite_resource in archive.getnames()
+        resource_file = archive.extractfile(sqlite_resource)
+        assert resource_file is not None
+        assert (
+            resource_file.read()
+            == Path(
+                "src/semantix_cache/stores/sqlite_migrations/0001_cache.sql"
+            ).read_bytes()
+        )
         assert f"{root}/examples/custom_integration.py" in archive.getnames()
         assert f"{root}/examples/custom_store.py" in archive.getnames()
         assert f"{root}/examples/test_custom_store_conformance.py" in archive.getnames()

@@ -131,6 +131,26 @@ asyncio.run(main())
 Create one store/cache and reuse them across requests. MemoryStore is bounded
 process memory; recreating it loses the cache. It is not persistent storage.
 
+## Local persistence with SQLite
+
+Use `from semantix_cache.stores.sqlite import SQLiteStore` for a dedicated local
+file without a database service or additional dependency. It requires
+thread-capable **linked SQLite >=3.51.3, except withdrawn 3.52.0**; Python's version
+alone does not establish this. From this directory, the credential-free example
+reuses the integration flow above and verifies persistence after closing/reopening:
+
+~~~text
+uv run --no-sync python -m examples.sqlite_cache
+~~~
+
+Setup is explicit (`initialize_schema`); `connect` never creates/adopts a file or
+performs DDL. Each store owns its connection/worker; drain operations before close.
+Complete float64 scans are bounded to 5,000 entries, 16,000 dimensions and
+`capacity * dimensions * 8 <= 64 MiB`, with larger total RSS. Every confirmed hit
+writes under the file-wide writer lock. See [SQLite setup and restrictions](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md#sqlite-local-file-persistence)
+for runtime/file safety, TTL, cancellation, restore and durability limits.
+SQLite is embedded-only; server/dashboard configuration and inspection do not use it.
+
 ## Optional cold-miss coalescing
 
 Opt-in cold-miss coalescing can substantially reduce duplicate generation during
