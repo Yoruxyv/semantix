@@ -123,9 +123,9 @@ Use ``help(AsyncSemanticCache)`` or inspect ``engine``, ``models``, ``policies``
 ``protocols`` for signatures and typed contracts. Repository guides:
 
 - https://github.com/Yoruxyv/semantix/blob/main/packages/cache/README.md
-- https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-providers.md
-- https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-storage.md
-- https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-redis.md
+- https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/providers.md
+- https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md
+- https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/redis.md
 """
 
 from .engine import AsyncSemanticCache

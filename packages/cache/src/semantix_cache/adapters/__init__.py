@@ -54,5 +54,5 @@ change independently. The core does not promise permanent provider behavior.
 
 Consult the guide for model/URL configuration, supported payloads, lifecycle,
 error handling and executable integration examples:
-https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-providers.md.
+https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/providers.md.
 """

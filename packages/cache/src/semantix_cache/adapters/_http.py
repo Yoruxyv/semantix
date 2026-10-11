@@ -15,7 +15,7 @@ except ModuleNotFoundError as exc:
     raise ImportError(
         "Provider adapters require HTTP support: install 'semantix-cache[providers]'. "
         "Custom integrations need no extra: "
-        "https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-providers.md"
+        "https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/providers.md"
     ) from None
 
 from .._lifecycle import Lifecycle

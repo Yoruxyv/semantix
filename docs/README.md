@@ -14,18 +14,22 @@ Choose a path: [embed Python caching](#embedded-python-library),
 
 ## Embedded Python library
 
+Embedded manuals are grouped in [embedded/](embedded/); cross-product explanations
+live in [reference/](reference/), and procedures/evidence workflows in
+[operations/](operations/).
+
 | Guide | Use it for |
 | --- | --- |
 | [Cache package](../packages/cache/README.md) | First use, policies, results, lifecycle and canonical 0.1.x compatibility |
-| [Embedded providers](embedded-providers.md) | Maintained adapters, optional extras and custom embedding/generation |
-| [Provider live verification](provider-live-verification.md) | Opt-in embedded-provider receipts, exact model/source scope, cleanup and evidence limits |
-| [Context identity and migration](context-identity-and-migration.md) | Explicit scopes, embedding revisions, offline recipes and safe migration |
-| [Embedded storage](embedded-storage.md) | Memory, PostgreSQL/pgvector, Redis and application-owned databases |
-| [Embedded Redis](embedded-redis.md) | Optional RedisStore setup, exact scan, TTL/LRU, ownership and recovery |
-| [Embedded coalescing evidence](embedded-observability.md) | Opt-in numeric snapshots, privacy and application-owned instrumentation |
+| [Embedded providers](embedded/providers.md) | Maintained adapters, optional extras and custom embedding/generation |
+| [Provider live verification](operations/provider-live-verification.md) | Opt-in embedded-provider receipts, exact model/source scope, cleanup and evidence limits |
+| [Context identity and migration](embedded/context-identity-and-migration.md) | Explicit scopes, embedding revisions, offline recipes and safe migration |
+| [Embedded storage](embedded/storage.md) | Memory, PostgreSQL/pgvector, Redis and application-owned databases |
+| [Embedded Redis](embedded/redis.md) | Optional RedisStore setup, exact scan, TTL/LRU, ownership and recovery |
+| [Embedded coalescing evidence](embedded/observability.md) | Opt-in numeric snapshots, privacy and application-owned instrumentation |
 | [Custom integration](../packages/cache/examples/custom_integration.py) | Existing async embedding and generation flow |
 | [Custom store](../packages/cache/examples/custom_store.py) | Structural CacheStore example |
-| [CacheStore conformance](cache-store-conformance.md) | Reusable developer tests, fixtures and backend evidence boundaries |
+| [CacheStore conformance](embedded/cache-store-conformance.md) | Reusable developer tests, fixtures and backend evidence boundaries |
 | [Persistent support example](../packages/cache/examples/persistent_support.py) | Explicit initialization and durable customer-support caching |
 | [Reviewed reuse quality](../packages/cache/benchmarks/reuse_quality/README.md) | Static semantic evidence, lexical controls, calibration/held-out split and limitations |
 | [Runtime benchmarks](../packages/cache/benchmarks/README.md) | Reproducible workloads, profiling and measurement limits |
@@ -52,8 +56,8 @@ Choose a path: [embed Python caching](#embedded-python-library),
 
 | Reference | Use it for |
 | --- | --- |
-| [Engineering decisions](engineering-decisions.md) | Worked failure sequences, ownership, alternatives, storage/replica trade-offs and evidence limits |
-| [Semantic-answer accuracy limitations](semantic-accuracy-limitations.md) | Similarity, answer compatibility, frozen exploratory findings and safe reuse choices |
+| [Engineering decisions](reference/engineering-decisions.md) | Worked failure sequences, ownership, alternatives, storage/replica trade-offs and evidence limits |
+| [Semantic-answer accuracy limitations](reference/semantic-accuracy-limitations.md) | Similarity, answer compatibility, frozen exploratory findings and safe reuse choices |
 | [Architecture](reference/architecture.md) | Runtime flow, feature ownership, boundaries, and deployment constraints |
 
 ## Reference

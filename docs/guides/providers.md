@@ -83,7 +83,7 @@ OPENAI_EMBEDDING_DIMENSIONS=
 Anthropic generation is implemented and covered by deterministic contract and
 regression tests, but first-party live verification remains pending for 0.1.0.
 It has no native embedding API; choose any supported embedding provider separately.
-See the [verification scope and contribution note](../embedded-providers.md#010-verification).
+See the [verification scope and contribution note](../embedded/providers.md#010-verification).
 Claude on other hosts does not verify the first-party Anthropic adapter.
 
 Configure generation with:
@@ -113,7 +113,7 @@ GEMINI_EMBEDDING_DIMENSIONS=
 
 Previously exercised locally; current release-verification evidence is incomplete.
 The following setup examples are not a record of verified models. See the
-[provider verification scope](../embedded-providers.md#010-verification).
+[provider verification scope](../embedded/providers.md#010-verification).
 
 Hugging Face is the recommended default for most users because it avoids local
 model downloads and inference hardware requirements. Choose Ollama when local

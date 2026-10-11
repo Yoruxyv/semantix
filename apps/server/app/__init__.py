@@ -100,5 +100,5 @@ Repository navigation: ``ARCHITECTURE.md``, ``apps/server/AGENTS.md``,
 ``docs/reference/api.md`` and ``docs/guides/development.md``. Deployment/resource
 ownership details live in ``docs/operations/deployment.md`` and
 ``docs/guides/platform-storage.md``; embedded store contracts live in
-``docs/embedded-storage.md`` and ``docs/embedded-redis.md``.
+``docs/embedded/storage.md`` and ``docs/embedded/redis.md``.
 """

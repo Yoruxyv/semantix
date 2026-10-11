@@ -27,7 +27,7 @@ except ModuleNotFoundError as exc:
     raise ImportError(
         "PostgreSQL storage requires 'semantix-cache[pgvector]'. "
         "Custom CacheStore implementations need no database extra: "
-        "https://github.com/Yoruxyv/semantix/blob/main/docs/embedded-storage.md"
+        "https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md"
     ) from None
 
 from .._lifecycle import Lifecycle

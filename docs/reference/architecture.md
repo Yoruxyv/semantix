@@ -141,7 +141,7 @@ remain authoritative in the official store. Process-local
 
 Store-specific persistence, inspection, transaction, timeout and cancellation
 contracts remain independently owned. See [server storage setup](../guides/platform-storage.md),
-[embedded storage](../embedded-storage.md) and [Redis storage](../embedded-redis.md)
+[embedded storage](../embedded/storage.md) and [Redis storage](../embedded/redis.md)
 for the supported boundaries.
 
 ## Frontend ownership

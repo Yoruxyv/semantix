@@ -134,7 +134,7 @@ preprocessing combination. Matching dimensions alone do not establish compatibil
 TTL starts at the write and does not extend on hits. See
 [policies, TTL and matching](packages/cache/README.md#contract).
 
-See [context identity and migration](docs/context-identity-and-migration.md) for
+See [context identity and migration](docs/embedded/context-identity-and-migration.md) for
 model/tenant/knowledge/output scopes, embedding revisions and safe migration recipes.
 
 ## Key capabilities
@@ -197,7 +197,7 @@ ContextVars/closures or coordinate across processes. Followers confirm their own
 hits. Changing that key alone does not invalidate stored answers. Read the
 [coalescing safety rules](packages/cache/README.md#optional-cold-miss-coalescing).
 
-Optional [numeric coalescing evidence](docs/embedded-observability.md) is collected
+Optional [numeric coalescing evidence](docs/embedded/observability.md) is collected
 only with `collect_coalescing_metrics=True`. General instrumentation remains application-owned.
 
 Documented `AsyncSemanticCache` usage is covered by the package's
@@ -209,7 +209,7 @@ The maintained OpenAI, Gemini, and Hugging Face adapters were exercised against
 real provider APIs on **2026-10-05**, including embedding, generation, and an
 `AsyncSemanticCache` + MemoryStore miss → generate → write → confirmed-hit flow.
 Generation was skipped on the repeated-prompt hit; the checks cover the models
-listed in the [provider guide](docs/embedded-providers.md#010-verification).
+listed in the [provider guide](docs/embedded/providers.md#010-verification).
 
 | Provider | Embeddings | Generation | Verification |
 | --- | --- | --- | --- |
@@ -234,7 +234,7 @@ Each completed a live miss → generate → write → confirmed-hit flow.
 Built-in adapters live in `semantix_cache.adapters`, outside minimal root imports.
 Choose models and embedding-space identity explicitly and supply a borrowed HTTPX
 client. The optional HTTP extras do not install provider SDKs. See
-[embedded providers and custom integrations](docs/embedded-providers.md) for
+[embedded providers and custom integrations](docs/embedded/providers.md) for
 configuration and the custom-provider path.
 
 Provider APIs evolve independently of Semantix. I intend to keep the maintained
@@ -251,7 +251,7 @@ and initialize its separate marked cache schema explicitly; normal cache operati
 perform no DDL. Runtime operations enforce ownership markers, version and migration
 checksums, not a complete catalog fingerprint. Protect out-of-band schema changes.
 
-See [embedded storage and user databases](docs/embedded-storage.md) for least-privileged
+See [embedded storage and user databases](docs/embedded/storage.md) for least-privileged
 runtime access, pool ownership, migrations and custom stores. pgvector stores float32
 vectors; near-threshold scores can differ from MemoryStore's float64 scoring.
 
@@ -265,7 +265,7 @@ around their final approved text; Semantix does not run those application workfl
 ## Examples
 
 - [Custom embedding and generation](packages/cache/examples/custom_integration.py).
-- [Custom CacheStore](packages/cache/examples/custom_store.py) and the [developer conformance kit](docs/cache-store-conformance.md).
+- [Custom CacheStore](packages/cache/examples/custom_store.py) and the [developer conformance kit](docs/embedded/cache-store-conformance.md).
 - [Persistent customer support](packages/cache/examples/persistent_support.py).
 - [Public API and source layout](packages/cache/src/README.md).
 
@@ -639,9 +639,9 @@ The [documentation index](docs/README.md) separates embedded and server guides.
 | Start here | Use it for |
 | --- | --- |
 | [Cache package guide](packages/cache/README.md) | Embedded quick start, policies, ownership and canonical compatibility |
-| [Embedded providers](docs/embedded-providers.md) | Maintained adapters and custom embedding/generation |
-| [Context identity and migration](docs/context-identity-and-migration.md) | Explicit scopes, embedding revisions and safe migration |
-| [Embedded storage](docs/embedded-storage.md) | Memory, optional PostgreSQL and user-owned databases |
+| [Embedded providers](docs/embedded/providers.md) | Maintained adapters and custom embedding/generation |
+| [Context identity and migration](docs/embedded/context-identity-and-migration.md) | Explicit scopes, embedding revisions and safe migration |
+| [Embedded storage](docs/embedded/storage.md) | Memory, optional PostgreSQL and user-owned databases |
 | [Examples](packages/cache/examples/) | Application-controlled generation and stores |
 | [Reviewed reuse quality](packages/cache/benchmarks/reuse_quality/README.md) | Semantic baseline, lexical controls, calibration/held-out split and evidence limitations |
 | [Benchmark methodology](packages/cache/benchmarks/README.md) | Reproducible local runtime workloads and limitations |
@@ -820,7 +820,7 @@ rules, and contribution steps.
 Applications own authorization, generation context, credentials, transport security
 and provider data handling. Namespace separation is not authorization. See
 [SECURITY](SECURITY.md) for reporting and server deployment boundaries, plus the
-[embedded provider](docs/embedded-providers.md) and [storage](docs/embedded-storage.md)
+[embedded provider](docs/embedded/providers.md) and [storage](docs/embedded/storage.md)
 guides for caller-owned resource and database responsibilities.
 
 ## 📄 License

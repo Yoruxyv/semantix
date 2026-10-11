@@ -2,12 +2,12 @@
 
 `semantix-cache` runs in your Python process. It does not require the Semantix
 FastAPI server. Its async engine consumes the structural
-[`CacheStore` protocol](../packages/cache/src/semantix_cache/protocols.py), not SQL.
+[`CacheStore` protocol](../../packages/cache/src/semantix_cache/protocols.py), not SQL.
 The maintained stores are `MemoryStore`, optional `PgVectorStore` and optional `RedisStore`.
 The separate `semantix_client` package is the optional/reference HTTP client.
 
 The server/workbench also delegates to these official stores. See
-[server storage configuration](guides/platform-storage.md) for selection and setup.
+[server storage configuration](../guides/platform-storage.md) for selection and setup.
 
 Concrete maintained stores additionally offer optional `inspect_entries` and
 `inspect_entry` observations. They exclude expired entries without purging them,
@@ -27,7 +27,7 @@ Redis scans scalar metadata and decodes only the selected page. Redis prompt
 search must scan its existing payload fields in batches of at most 100, under one
 operation deadline and the existing binding capacity ceiling. No new index or
 metadata keys are introduced. Concurrent changes can shift live offsets and Redis
-search totals. See [server storage](guides/platform-storage.md#inspector-and-diagnostics)
+search totals. See [server storage](../guides/platform-storage.md#inspector-and-diagnostics)
 for authorization, search costs and pagination limitations.
 
 ## Choose a store
@@ -40,9 +40,9 @@ for authorization, search costs and pagination limitations.
 | Your `CacheStore` | Your implementation | Your application chooses | Your implementation documents ownership |
 
 MemoryStore is bounded and appropriate for tests, local use and small ephemeral
-workloads. The [package quick start](../packages/cache/README.md) is executable
+workloads. The [package quick start](../../packages/cache/README.md) is executable
 with a demonstration embedder. The
-[custom integration example](../packages/cache/examples/custom_integration.py)
+[custom integration example](../../packages/cache/examples/custom_integration.py)
 runs offline and supplies its own async embedding/generation.
 
 Install the PostgreSQL extra with `python -m pip install 'semantix-cache[pgvector]'`
@@ -56,7 +56,7 @@ from semantix_cache.stores.pgvector import PgVectorStore
 Root imports load neither asyncpg nor provider HTTP dependencies. Imports and
 exports from `semantix_cache` are unchanged by adding persistent storage.
 
-See [Redis storage](embedded-redis.md) for its supported versions, exact scan,
+See [Redis storage](redis.md) for its supported versions, exact scan,
 explicit setup, TTL/LRU, failure handling and persistence boundary.
 
 ## MemoryStore sizing: entries are not a byte budget
@@ -191,7 +191,7 @@ your deployment tooling; do not grant access to unrelated application tables.
 
 ## Persistent customer-support example
 
-The [executable example](../packages/cache/examples/persistent_support.py) uses
+The [executable example](../../packages/cache/examples/persistent_support.py) uses
 application-owned async embedding/generation and an owned persistent pool. Its
 small deterministic embedder demonstrates wiring; substitute a language model
 with a stable identity before real use. No Semantix server process is involved.
@@ -303,7 +303,7 @@ class CompanyCacheStore:
 ```
 
 This is an interface sketch, not a functional backend. The independent
-[company-store example](../packages/cache/examples/custom_store.py) implements
+[company-store example](../../packages/cache/examples/custom_store.py) implements
 it without wrapping/subclassing either built-in store. It is process-local demo
 storage; replace its dictionary with your own infrastructure. Run it with
 `uv run --no-sync python -m examples.custom_store`, and inject it into
@@ -340,10 +340,10 @@ available for providers/versions whose external APIs change independently.
 
 The [developer conformance kit](cache-store-conformance.md) runs against
 MemoryStore, PgVectorStore and the independent example through the maintained
-[store suite](../packages/cache/tests/test_store_conformance.py). It covers empty/exact/similar
+[store suite](../../packages/cache/tests/test_store_conformance.py). It covers empty/exact/similar
 search, threshold misses, isolation, dimensional validation, expiry, revisions, scoped
 mutation, LRU, concurrency and close. PostgreSQL-specific
-[tests](../packages/cache/tests/test_pgvector.py) exercise persistence, existing
+[tests](../../packages/cache/tests/test_pgvector.py) exercise persistence, existing
 application data, runtime roles without DDL, migrations/checksums, rollback,
 resource ownership, cancellation and deadlines.
 

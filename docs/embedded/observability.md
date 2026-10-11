@@ -22,7 +22,7 @@ evidence: CoalescingSnapshot | None = cache.coalescing_snapshot()
 ```
 
 Use application-owned embedder/store instances as in the
-[package quick start](../packages/cache/README.md#use-your-own-embedding-and-generation).
+[package quick start](../../packages/cache/README.md#use-your-own-embedding-and-generation).
 The constructor flag is keyword-only, strictly bool and defaults to False.
 Disabled collection allocates no statistics ledger and returns None. An enabled,
 unused cache returns a zero-valued frozen slots dataclass. Import the model from
@@ -67,7 +67,7 @@ cache instance starts a new lifetime.
 
 Warm hits, missing coalescing keys, non-NORMAL policies and requests rejected before
 admission do not increment admission counters. A declined request does not become
-a follower. See [coalescing safety](../packages/cache/README.md#optional-cold-miss-coalescing)
+a follower. See [coalescing safety](../../packages/cache/README.md#optional-cold-miss-coalescing)
 for eligibility, bounds and application equivalence attestation.
 
 **follower_hits means joined followers served without generation.** It is not a
@@ -118,8 +118,8 @@ enabled or disabled. Opt-in cold followers pay for bounded numeric updates and t
 monotonic clock reads; snapshot readers pay for coherent copying and construction.
 No samples, worker, exporter or per-request metrics object is allocated.
 
-Measure with the [existing runtime methodology](../packages/cache/benchmarks/README.md)
-and the [observability driver](../packages/cache/benchmarks/observability.py).
+Measure with the [existing runtime methodology](../../packages/cache/benchmarks/README.md)
+and the [observability driver](../../packages/cache/benchmarks/observability.py).
 Use complete archived accepted source for controls, fresh processes, identical
 cases and at least three alternating pairs. Cover fixture and MemoryStore hits,
 keys omitted/supplied, collection disabled/enabled, cold bursts and concurrent

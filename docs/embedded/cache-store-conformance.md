@@ -9,7 +9,7 @@ actually exercised, not certification of a production deployment.
 ## Location and contract version
 
 The kit lives in
-[`packages/cache/examples/store_conformance/`](../packages/cache/examples/store_conformance/__init__.py).
+[`packages/cache/examples/store_conformance/`](../../packages/cache/examples/store_conformance/__init__.py).
 It is source-based pytest development tooling, outside the installed runtime
 namespace. Consume it from a pinned Semantix checkout, with `packages/cache` on
 your Python path. Existing source-archive rules include examples; the wheel
@@ -35,9 +35,9 @@ does not recertify an adapter for a changed runtime/contract.
 
 ## Minimal consumer
 
-The [standalone consumer](../packages/cache/examples/test_custom_store_conformance.py)
+The [standalone consumer](../../packages/cache/examples/test_custom_store_conformance.py)
 runs the existing independent
-[`CompanyCacheStore`](../packages/cache/examples/custom_store.py).
+[`CompanyCacheStore`](../../packages/cache/examples/custom_store.py).
 That small dictionary adapter uses public types and stdlib arithmetic; it neither
 subclasses nor wraps a built-in store. It is deliberately process-local and
 non-durable. Reusing it avoids introducing a second demonstration of the same
@@ -110,9 +110,9 @@ Two optional probes describe real differences, not different core semantics:
 Missing probes produce explicit skips. Do not call a backend fully verified for
 those capabilities on the basis of a skipped test. Counters and worker controls
 are fixture-owned observations, never new CacheStore methods. The built-in
-[factories](../packages/cache/tests/test_store_conformance.py) use known disposable
+[factories](../../packages/cache/tests/test_store_conformance.py) use known disposable
 tables and worker/pool instrumentation. The separate
-[Redis consumer](../packages/cache/tests/test_redis.py) supplies its own disposable
+[Redis consumer](../../packages/cache/tests/test_redis.py) supplies its own disposable
 keyspace and metadata/blocking probes. The reusable kit imports no private
 Semantix module.
 
@@ -166,10 +166,10 @@ PostgreSQL's blocked acquisition are tested by backend probes, not simulated sto
 No cancellation is converted into a miss. Backend failures and vendor timeouts
 still need fault-injection tests; the generic kit cannot create those portably.
 
-Keep [MemoryStore tests](../packages/cache/tests/test_memory.py),
-[snapshot tests](../packages/cache/tests/test_memory_snapshots.py),
-[PgVectorStore tests](../packages/cache/tests/test_pgvector.py) and
-[projection tests](../packages/cache/tests/test_pgvector_projection.py).
+Keep [MemoryStore tests](../../packages/cache/tests/test_memory.py),
+[snapshot tests](../../packages/cache/tests/test_memory_snapshots.py),
+[PgVectorStore tests](../../packages/cache/tests/test_pgvector.py) and
+[projection tests](../../packages/cache/tests/test_pgvector_projection.py).
 They supplement the one shared contract rather than redefine it. A new adapter
 must add equivalent evidence for its I/O, persistence, failures and cleanup.
 

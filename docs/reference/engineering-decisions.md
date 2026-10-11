@@ -3,9 +3,11 @@
 This is a present-day explanation of the implementation reviewed at
 [`0fa24a1`](https://github.com/Yoruxyv/semantix/commit/0fa24a190cd511a079daf5e27f0d456c5c6a1f80),
 whose executable contracts are unchanged from `b35246a`.
+The initialization and lifetime analysis also inspects the same contracts at
+[`ff7322b`](https://github.com/Yoruxyv/semantix/commit/ff7322b36922207f579a4dad64fed9167af73157).
 It does not reconstruct an author's unrecorded intent. Read
-[architecture](../ARCHITECTURE.md) for wiring and
-[product principles](../PRODUCT_PRINCIPLES.md) for durable goals. Recheck the
+[architecture](../../ARCHITECTURE.md) for wiring and
+[product principles](../../PRODUCT_PRINCIPLES.md) for durable goals. Recheck the
 linked contracts when implementation changes.
 
 **Implemented** means present in the reviewed source. **Evaluated and not
@@ -31,6 +33,7 @@ source-derived consequences, not new measurements or reproduced incidents.
 | [Local coalescing](#local-coalescing-with-distinct-caller-contracts) | Share work without distributed leases | Cross-replica duplicates; distinct cancellation | Implemented; server/embedded contracts differ |
 | [Identity and policy](#explicit-context-policy-and-authorization-boundaries) | Separate compatibility, scope and permissions | Scope management reduces reuse | Implemented checks; trusted context is application-owned |
 | [Storage](#storage-selection-and-persistent-ownership) | One port, explicit backends | Precision, clocks, setup and recovery differ | Implemented stores; deployment guarantees are conditional |
+| [Deployment authority](#deployment-authority-and-recoverable-lifetimes) | Explicit setup and resource ownership | Operator grants and failure cleanup remain consequential | Implemented; inspected failure assertions, not a fresh integration run |
 | [Similarity and verification](#similarity-reuse-without-a-production-answer-verifier) | Avoid treating proximity as correctness | False hits and retrieval misses remain possible | Implemented retrieval; bounded experiment explains verifier non-adoption |
 | [Thresholds and evaluation](#human-controlled-thresholds-and-isolated-evaluation) | Inspect trade-offs outside live entries | Frozen projections cannot replay evolving state | Implemented; estimates are not bills |
 | [Replica authorities](#shared-replica-authorities-with-local-execution) | Consistent abuse controls and threshold | Shared database availability is consequential | Supported two-backend Compose boundary; broader HA unverified |
@@ -86,11 +89,11 @@ Similar-looking orchestration alone is insufficient evidence to merge owners.
 A change would need package compatibility review, server/embedded parity cases
 and explicit lifetime/failure tests before existing consumers migrate.
 
-Evidence: [Public extension/ownership contract](../packages/cache/README.md#extension-and-ownership),
-[server path dependency](../apps/server/pyproject.toml),
-[store delegation](../apps/server/app/cache/infrastructure/backends/official.py),
-[backend/package parity tests](../apps/server/tests/cache/infrastructure/backends/test_platform_parity.py),
-and [generation/write failure boundary](context-identity-and-migration.md#generation-succeeds-but-persistence-fails).
+Evidence: [Public extension/ownership contract](../../packages/cache/README.md#extension-and-ownership),
+[server path dependency](../../apps/server/pyproject.toml),
+[store delegation](../../apps/server/app/cache/infrastructure/backends/official.py),
+[backend/package parity tests](../../apps/server/tests/cache/infrastructure/backends/test_platform_parity.py),
+and [generation/write failure boundary](../embedded/context-identity-and-migration.md#generation-succeeds-but-persistence-fails).
 
 ## Local coalescing with distinct caller contracts
 
@@ -148,12 +151,12 @@ leader loss, retained-response rules, multi-process partition/cancellation tests
 and a mixed-version rollout plan. A common database supplies no such orchestration
 by itself.
 
-Evidence: [Embedded eligibility and cancellation](../packages/cache/README.md#optional-cold-miss-coalescing),
-[embedded implementation](../packages/cache/src/semantix_cache/engine.py),
-[embedded cancellation tests](../packages/cache/tests/test_coalescing.py),
-[server coalescer](../apps/server/app/query/application/coalescing.py),
-[server accounting tests](../apps/server/tests/query/application/test_service.py),
-and [two-replica evidence](operations/multi-replica-readiness.md#two-replica-verification).
+Evidence: [Embedded eligibility and cancellation](../../packages/cache/README.md#optional-cold-miss-coalescing),
+[embedded implementation](../../packages/cache/src/semantix_cache/engine.py),
+[embedded cancellation tests](../../packages/cache/tests/test_coalescing.py),
+[server coalescer](../../apps/server/app/query/application/coalescing.py),
+[server accounting tests](../../apps/server/tests/query/application/test_service.py),
+and [two-replica evidence](../operations/multi-replica-readiness.md#two-replica-verification).
 
 ## Explicit context, policy and authorization boundaries
 
@@ -213,11 +216,11 @@ can preserve the required isolation.
 Migration needs explicit invalidation, restricted-principal and cross-space cases,
 and rollback freshness review. Isolation cannot prove compatibility within a scope.
 
-Evidence: [Identity responsibilities](context-identity-and-migration.md#choose-the-two-identities),
-[policy contract](../packages/cache/README.md#contract),
-[lookup validation/confirmation](../packages/cache/src/semantix_cache/engine.py),
-[isolation tests](../packages/cache/tests/test_engine.py),
-and [server namespace resolution](../apps/server/app/security/auth.py).
+Evidence: [Identity responsibilities](../embedded/context-identity-and-migration.md#choose-the-two-identities),
+[policy contract](../../packages/cache/README.md#contract),
+[lookup validation/confirmation](../../packages/cache/src/semantix_cache/engine.py),
+[isolation tests](../../packages/cache/tests/test_engine.py),
+and [server namespace resolution](../../apps/server/app/security/auth.py).
 
 ## Storage selection and persistent ownership
 
@@ -242,13 +245,8 @@ numerical worker running and retaining admission; busy close is an error, not
 proof that cancellation stopped computation. MemoryStore operations have no
 internal deadline; the facade or caller supplies one.
 
-Explicit initialization separates deployment authority from runtime use.
-PgVectorStore has its own marked schema/prefix and checksum-tracked migrations;
-ordinary operations run no DDL and do not adopt legacy server cache rows. Redis
-validates a marked binding and fails closed on a dirty mutation marker. Its
-scripts do not provide SQL rollback semantics. Operators own persistence, backup
-and recovery; a Redis endpoint alone is no durability promise. Version, capacity
-and connection bounds remain in the owning guides.
+See [deployment authority and lifetimes](#deployment-authority-and-recoverable-lifetimes)
+for setup privileges, partial initialization and recovery ownership.
 
 **Illustrative race/acknowledgement sequence:** search finds revision R; another
 writer replaces it; confirmation of R returns false, preventing a stale hit
@@ -266,14 +264,61 @@ durability requirement. Migration needs threshold-edge and stale-revision cases,
 trusted space/context handling, capacity/expiry validation and recovery planning;
 port conformance alone cannot establish workload or availability equivalence.
 
-Evidence: [storage mechanics](embedded-storage.md), [Redis support/recovery](embedded-redis.md),
-[conformance limits](cache-store-conformance.md),
-[MemoryStore](../packages/cache/src/semantix_cache/memory.py),
-[PgVectorStore](../packages/cache/src/semantix_cache/stores/pgvector.py),
-[RedisStore](../packages/cache/src/semantix_cache/stores/redis.py),
-[revision/worker assertions](../packages/cache/tests/test_memory.py),
-[rollback assertions](../packages/cache/tests/test_pgvector.py),
-and [lost-acknowledgement assertions](../packages/cache/tests/test_redis_faults.py).
+Evidence: [storage mechanics](../embedded/storage.md), [Redis support/recovery](../embedded/redis.md),
+[conformance limits](../embedded/cache-store-conformance.md),
+[MemoryStore](../../packages/cache/src/semantix_cache/memory.py),
+[PgVectorStore](../../packages/cache/src/semantix_cache/stores/pgvector.py),
+[RedisStore](../../packages/cache/src/semantix_cache/stores/redis.py),
+[revision/worker assertions](../../packages/cache/tests/test_memory.py),
+[rollback assertions](../../packages/cache/tests/test_pgvector.py),
+and [lost-acknowledgement assertions](../../packages/cache/tests/test_redis_faults.py).
+
+## Deployment authority and recoverable lifetimes
+
+Successful connectivity is insufficient authority to create storage or adopt an
+existing layout. Separating setup from ordinary use lets a deployment grant DDL
+to a bounded migration job while keeping application credentials narrower. This
+also makes an incompatible binding a visible deployment failure instead of an
+implicit empty cache or opportunistic conversion of another application's data.
+
+Explicit initialization separates deployment authority from runtime use.
+PgVectorStore has its own marked schema/prefix and checksum-tracked migrations;
+ordinary operations run no DDL and do not adopt legacy server cache rows. Redis
+validates a marked binding and fails closed on a dirty mutation marker. Its
+scripts do not provide SQL rollback semantics. Operators own persistence, backup
+and recovery; a Redis endpoint alone is no durability promise. Version, capacity
+and connection bounds remain in the owning guides.
+
+The pool/client arguments express ownership, not proof of separate privileges.
+A separately supplied migration pool can still use the runtime role; operators
+must actually configure grants. Redis setup checks server policy and commands,
+but runtime ACLs are not an enforced separation of fields inside its metadata
+hash. Borrowed resources stay with their owner; closing the facade does not
+close a shared pool or client.
+
+**Illustrative partial-startup sequence:** an owned PostgreSQL pool opens one
+connection, then its next prewarm fails. The factory terminates its pool and
+propagates the classified failure rather than handing back a partially usable
+store. A supplied pool has a different owner. Redis instead retains bounded,
+shielded cleanup of its owned client after startup cancellation. These distinct
+paths cannot be reduced to a universal promise that cancelling an await stops
+remote work. Drain admitted work before closing resources that other users need.
+
+Automatic setup at every startup would reduce deployment steps but require
+broader runtime privilege and mix schema failures with request availability.
+Opening a connection per query avoids a long-lived owner but adds connection
+latency and repeated cleanup obligations. Explicit setup plus reused resources
+fits the current privilege and lifetime contracts; its cost is operator-owned
+provisioning and recovery. Revisit after documented deployment failures expose
+a missing setup contract. Require least-privilege, concurrent initialization,
+checksum/collision, partial-startup and cancelled-close evidence before changing
+that boundary; preserve the old binding until rollback freshness is reviewed.
+
+Evidence: [setup and grants](../embedded/storage.md#new-postgresql-database),
+[PostgreSQL initialization/cleanup](../../packages/cache/src/semantix_cache/stores/pgvector.py),
+[rollback, role and partial-startup assertions](../../packages/cache/tests/test_pgvector.py),
+[Redis ownership](../embedded/redis.md#explicit-setup-and-ownership),
+and [startup-cancellation assertions](../../packages/cache/tests/test_redis_faults.py).
 
 ## Similarity reuse without a production answer verifier
 
@@ -317,8 +362,8 @@ uncertain labels, latency, privacy and cost. Do not relabel a consumed explorato
 split as untouched confirmation.
 
 Evidence: [Recorded findings and limits](semantic-accuracy-limitations.md),
-[implemented threshold/ordering](../packages/cache/src/semantix_cache/_semantics.py),
-and [separate static benchmark limits](../packages/cache/benchmarks/reuse_quality/README.md#interpretation-limits).
+[implemented threshold/ordering](../../packages/cache/src/semantix_cache/_semantics.py),
+and [separate static benchmark limits](../../packages/cache/benchmarks/reuse_quality/README.md#interpretation-limits).
 The exploratory summary does not claim public access to its underlying run.
 A changed retriever/verifier would require new candidate-selection and failure
 tests, an explicit provider/data boundary and fresh validation; separate static
@@ -371,13 +416,13 @@ Revisit when representative replay evidence shows projections mislead the
 intended decisions, or users require different threshold scope. Evaluate public
 contracts, authorization and reproducibility before changing either boundary.
 
-Evidence: [Threshold permissions](../apps/server/app/cache/api/router.py),
-[isolated executor](../apps/server/app/benchmark/application/run_executor.py),
-[projection formula](../apps/server/app/benchmark/domain/metrics.py),
-[projection/replay counterexample](../apps/server/tests/benchmark/domain/test_metrics.py),
-[isolation tests](../apps/server/tests/benchmark/application/test_service.py),
-[benchmark interpretation](guides/benchmarking.md#metric-interpretation),
-and [history limits](guides/evaluation-history.md#what-becomes-durable).
+Evidence: [Threshold permissions](../../apps/server/app/cache/api/router.py),
+[isolated executor](../../apps/server/app/benchmark/application/run_executor.py),
+[projection formula](../../apps/server/app/benchmark/domain/metrics.py),
+[projection/replay counterexample](../../apps/server/tests/benchmark/domain/test_metrics.py),
+[isolation tests](../../apps/server/tests/benchmark/application/test_service.py),
+[benchmark interpretation](../guides/benchmarking.md#metric-interpretation),
+and [history limits](../guides/evaluation-history.md#what-becomes-durable).
 
 ## Shared replica authorities with local execution
 
@@ -422,13 +467,13 @@ Migration needs shared identity/configuration rules, outage/partition and mixed
 rollout tests, schema/runtime-role planning, drain ownership and capacity evidence
 for the new topology.
 
-Evidence: [coordination transactions](../apps/server/app/infrastructure/coordination.py),
-[admission authority](../apps/server/app/middleware/rate_limit.py),
-[threshold reads](../apps/server/app/cache/application/service.py),
-[shared/outage assertions](../apps/server/tests/security/test_shared_coordination.py),
-[two-replica verification](operations/multi-replica-readiness.md#two-replica-verification),
-[deployment/drain contract](operations/deployment.md#two-replica-operation),
-and [audit limits](operations/production-runtime-audit.md#limits-and-no-action-observations).
+Evidence: [coordination transactions](../../apps/server/app/infrastructure/coordination.py),
+[admission authority](../../apps/server/app/middleware/rate_limit.py),
+[threshold reads](../../apps/server/app/cache/application/service.py),
+[shared/outage assertions](../../apps/server/tests/security/test_shared_coordination.py),
+[two-replica verification](../operations/multi-replica-readiness.md#two-replica-verification),
+[deployment/drain contract](../operations/deployment.md#two-replica-operation),
+and [audit limits](../operations/production-runtime-audit.md#limits-and-no-action-observations).
 
 ## Observability, accounting and evidence provenance
 
@@ -478,19 +523,19 @@ Migration needs event ownership, failure/cancellation pairing, reset/window and
 retention definitions, plus privacy/multi-replica tests before presenting new
 derived quantities as measured.
 
-Evidence: [query accounting](../apps/server/app/query/application/service.py),
-[runtime collector](../apps/server/app/observability/metrics.py),
-[counter assertions](../apps/server/tests/observability/test_metrics.py),
-[embedded reconciliation](embedded-observability.md#fields-and-reconciliation),
-[Monitor ownership](../apps/web/src/features/monitor/context/MonitorContext.tsx),
-[private-trace assertions](../apps/web/tests/features/monitor/query-workflow.test.tsx),
-and [provider receipt limits](provider-live-verification.md#bounds-and-receipt-interpretation).
+Evidence: [query accounting](../../apps/server/app/query/application/service.py),
+[runtime collector](../../apps/server/app/observability/metrics.py),
+[counter assertions](../../apps/server/tests/observability/test_metrics.py),
+[embedded reconciliation](../embedded/observability.md#fields-and-reconciliation),
+[Monitor ownership](../../apps/web/src/features/monitor/context/MonitorContext.tsx),
+[private-trace assertions](../../apps/web/tests/features/monitor/query-workflow.test.tsx),
+and [provider receipt limits](../operations/provider-live-verification.md#bounds-and-receipt-interpretation).
 
 ## Detailed contracts kept in their owning guides
 
-Use [storage setup/lifetimes](embedded-storage.md#connections-cancellation-and-failures),
-[provider configuration/ownership](embedded-providers.md#configuration-and-ownership),
-and [conformance](cache-store-conformance.md) for implementation procedures.
+Use [storage setup/lifetimes](../embedded/storage.md#connections-cancellation-and-failures),
+[provider configuration/ownership](../embedded/providers.md#configuration-and-ownership),
+and [conformance](../embedded/cache-store-conformance.md) for implementation procedures.
 This reference explains cross-component costs; those guides remain the maintained
 authorities for adapter details, limits and recovery commands. Passing conformance
 does not certify a deployment.

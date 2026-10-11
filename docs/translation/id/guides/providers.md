@@ -67,7 +67,7 @@ Generation Anthropic telah diimplementasikan dan dicakup pengujian kontrak serta
 regresi deterministik, tetapi verifikasi langsung API pihak pertama masih tertunda
 untuk 0.1.0. Anthropic tidak menyediakan API embedding native; pilih provider
 embedding mana pun yang didukung secara terpisah. Lihat
-[cakupan verifikasi dan catatan kontribusi](../../../embedded-providers.md#010-verification).
+[cakupan verifikasi dan catatan kontribusi](../../../embedded/providers.md#010-verification).
 Claude melalui host lain tidak memverifikasi adapter Anthropic pihak pertama.
 
 Konfigurasikan generation dengan:
@@ -97,7 +97,7 @@ GEMINI_EMBEDDING_DIMENSIONS=
 
 Pernah diuji secara lokal; bukti verifikasi rilis saat ini belum lengkap. Contoh
 konfigurasi berikut bukan catatan model yang telah diverifikasi. Lihat
-[cakupan verifikasi provider](../../../embedded-providers.md#010-verification).
+[cakupan verifikasi provider](../../../embedded/providers.md#010-verification).
 
 Hugging Face merupakan default yang direkomendasikan untuk sebagian besar pengguna karena tidak memerlukan download model lokal dan hardware inference. Pilih Ollama ketika local inference memang diperlukan dan mesin memiliki kapasitas disk, memory, dan compute yang memadai.
 

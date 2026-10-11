@@ -5,7 +5,7 @@ package. `CACHE_BACKEND` accepts `memory`, `pgvector` or `redis`. Qdrant is not
 selectable. Monitor queries and Cache Inspector use the active official store;
 the server keeps no parallel cache entries, vectors, revisions, expiry or LRU
 index. Evaluations create a separate run-local MemoryStore and never use this live
-store. Similarity matching is unchanged; see [accuracy limitations](../semantic-accuracy-limitations.md).
+store. Similarity matching is unchanged; see [accuracy limitations](../reference/semantic-accuracy-limitations.md).
 
 ## Choose and configure
 
@@ -73,13 +73,13 @@ expiry, revisions or answer reuse. Rolling back binaries returns to the preserve
 legacy cache and can expose older answers; review freshness/context before rollback.
 Do not delete the legacy table as part of this transition.
 
-See [PostgreSQL setup](pgvector.md) and [embedded storage](../embedded-storage.md)
+See [PostgreSQL setup](pgvector.md) and [embedded storage](../embedded/storage.md)
 for ownership and maintenance details.
 
 ## Redis: setup, permissions and recovery
 
 Use direct standalone Redis 8.10.2 with `noeviction`; hosted/cluster/replica
-support is not inferred from a URL. Read the [Redis store contract](../embedded-redis.md)
+support is not inferred from a URL. Read the [Redis store contract](../embedded/redis.md)
 for the supported version range, exact scan ceiling and ACL commands.
 
 Configure the same provider metadata, dimensions, prefix, capacity and TTL as the
