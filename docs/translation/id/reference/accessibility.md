@@ -43,6 +43,15 @@ Subview evaluasi memakai tautan native dengan `aria-current` dan state URL:
 subview; nilai tidak dikenal menampilkan Runs. Redirect `/benchmarks`
 mempertahankan search dan hash.
 
+Sample probes Monitor berada di bawah teks query sebagai tombol native yang dapat
+membungkus. Enter, Space, atau klik mengisi prompt dan mengembalikan fokus ke input
+agar dapat diedit; memilih sampel tidak mengirim query. Kegagalan query diumumkan
+melalui alert dengan panduan pemulihan tetap, mempertahankan prompt, namespace,
+dan policy, serta mengaktifkan kembali submit. Query gagal tidak menambah trace
+berhasil atau menampilkan respons cache-hit saat ini. Panduan provider memakai
+kode error provider terstruktur, bukan HTTP 502 saja; detail error mentah serta
+informasi billing atau akun tidak ditampilkan.
+
 Kontrol namespace Monitor berada di luar Advanced cache policy. Pilihan wajib
 yang kosong atau tidak valid memiliki penjelasan terlihat yang terhubung ke tombol
 submit nonaktif dan input namespace. Tenant tidak dipilih diam-diam. Workspace

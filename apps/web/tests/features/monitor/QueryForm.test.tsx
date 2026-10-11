@@ -38,6 +38,57 @@ describe('QueryForm', () => {
     vi.clearAllMocks();
   });
 
+  it('fills samples for editing without submitting or changing request policy', async () => {
+    const onSubmit = vi.fn(async () => undefined);
+    render(<QueryForm isLoading={false} onSubmit={onSubmit} />);
+    const prompt = screen.getByLabelText<HTMLTextAreaElement>('Query text');
+    const namespace = screen.getByLabelText('Explicit namespace');
+    fireEvent.change(namespace, { target: { value: 'sample-probes' } });
+    fireEvent.click(screen.getByRole('button', { name: /Request cache mode/ }));
+    fireEvent.click(screen.getByRole('option', { name: 'Read only' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run query' }));
+    expect(screen.getByRole('alert').textContent).toContain('A blank prompt');
+
+    for (const example of [
+      'Explain semantic caching in simple terms',
+      'How does cosine similarity work?',
+    ]) {
+      fireEvent.click(screen.getByRole('button', { name: example }));
+      expect(prompt.value).toBe(example);
+      expect(document.activeElement).toBe(prompt);
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(onSubmit).not.toHaveBeenCalled();
+    }
+    expect(screen.getAllByRole('group', { name: 'Sample probes' })).toHaveLength(1);
+    fireEvent.change(prompt, { target: { value: 'Edited sample probe' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run query' }));
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({
+        policyMode: 'read-only',
+        request: {
+          prompt: 'Edited sample probe',
+          namespace: 'sample-probes',
+          cache_enabled: true,
+          cache_read_enabled: true,
+          cache_write_enabled: false,
+          private: false,
+        },
+      }),
+    );
+  });
+
+  it('disables sample selection while a query is running', () => {
+    const onSubmit = vi.fn();
+    render(<QueryForm isLoading onSubmit={onSubmit} />);
+    const sample = screen.getByRole<HTMLButtonElement>('button', {
+      name: 'Explain semantic caching in simple terms',
+    });
+    expect(sample.disabled).toBe(true);
+    fireEvent.click(sample);
+    expect(screen.getByLabelText<HTMLTextAreaElement>('Query text').value).toBe('');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it('uses the same namespace alphabet in native HTML and request validation', () => {
     const nativePattern = new RegExp(`^${CACHE_NAMESPACE_PATTERN_SOURCE}$`, 'v');
     for (const [value, valid] of [
