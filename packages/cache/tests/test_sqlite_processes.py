@@ -4,6 +4,7 @@ import asyncio
 import multiprocessing
 import sqlite3
 from collections.abc import Sequence
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from multiprocessing.process import BaseProcess
 from pathlib import Path
@@ -32,11 +33,33 @@ class Channel(Protocol):
 REVISION = datetime(2020, 1, 1, tzinfo=UTC)
 
 
+def capture_sqlite_failures(pipe: Channel) -> None:
+    original_rows = Job.rows
+
+    def reported_rows(
+        job: Job, sql: str, parameters: Sequence[object] = ()
+    ) -> list[Row]:
+        try:
+            return original_rows(job, sql, parameters)
+        except sqlite3.Error as error:
+            pipe.send(
+                {
+                    "sqlite_failure": error.sqlite_errorname,
+                    "statement": sql.split(maxsplit=1)[0],
+                }
+            )
+            raise
+
+    diagnostics = pytest.MonkeyPatch()
+    diagnostics.setattr(Job, "rows", reported_rows)
+
+
 def child(path: str, pipe: Channel, crash: str | None = None) -> None:
     async def run() -> None:
         store = await SQLiteStore.connect(
             path, embedding_space=SPACE, default_ttl_seconds=None
         )
+        capture_sqlite_failures(pipe)
         if crash is not None:
             original = Job.rows
 
@@ -117,7 +140,9 @@ def child(path: str, pipe: Channel, crash: str | None = None) -> None:
 
 def receive(pipe: Channel, seconds: float = 20) -> Any:
     assert pipe.poll(seconds), "Child did not reach expected IPC barrier"
-    return pipe.recv()
+    result = pipe.recv()
+    assert not isinstance(result, dict), f"Child storage failure: {result}"
+    return result
 
 
 def spawn(path: Path, crash: str | None = None) -> tuple[BaseProcess, Channel]:
@@ -131,7 +156,9 @@ def spawn(path: Path, crash: str | None = None) -> tuple[BaseProcess, Channel]:
 
 def stop(process: BaseProcess, pipe: Channel) -> None:
     if process.is_alive():
-        pipe.send("stop")
+        # Preserve the primary child failure while its owned cleanup/traceback ends.
+        with suppress(BrokenPipeError, EOFError):
+            pipe.send("stop")
         process.join(10)
     if process.is_alive():
         process.terminate()
