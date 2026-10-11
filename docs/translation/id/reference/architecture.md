@@ -134,8 +134,8 @@ process-local `app/observability` merupakan tampilan agregat lain, bukan indeks 
 Kontrak persistensi, inspection, transaction, timeout, dan cancellation tetap
 dimiliki masing-masing store secara independen. Lihat
 [setup storage server](../../../guides/platform-storage.md),
-[storage embedded](../../../embedded-storage.md), dan
-[storage Redis](../../../embedded-redis.md) untuk batas dukungannya.
+[storage embedded](../../../embedded/storage.md), dan
+[storage Redis](../../../embedded/redis.md) untuk batas dukungannya.
 
 ## Kepemilikan Frontend
 

@@ -44,6 +44,7 @@ jobs:
             --cache-exclude-status '429,500..=599'
             --no-progress
             --root-dir '${{ github.workspace }}'
+            --remap '^https://github\.com/${{ github.repository }}/(blob|tree)/main/ file://${{ github.workspace }}/'
             --exclude-loopback
             --exclude-private
             --exclude '^file://.*/favicon\.svg$'
@@ -58,3 +59,9 @@ jobs:
           format: markdown
           jobSummary: true
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Lychee supplies parsing/anchors; this guard also enforces Git path case and blob/tree type.
+      - name: Validate current-tree repository links and regression controls
+        run: |
+          python3 -B -m unittest discover -s ops/ci -p 'test_repository_links.py'
+          python3 -B ops/ci/validate_repository_links.py

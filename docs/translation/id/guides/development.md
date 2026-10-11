@@ -19,8 +19,8 @@ CI Python 3.11-3.14 dan target analisis lengkap. Kasus PostgreSQL memerlukan
 `PGVECTOR_TEST_DATABASE_URL` yang secara eksplisit menunjuk database disposable;
 tanpa itu kasus tersebut dilewati. Test provider normal deterministik dan offline.
 
-- Penulis store: [conformance CacheStore](../../../cache-store-conformance.md).
-- Contributor provider: [tool live-verification](../../../provider-live-verification.md).
+- Penulis store: [conformance CacheStore](../../../embedded/cache-store-conformance.md).
+- Contributor provider: [tool live-verification](../../../operations/provider-live-verification.md).
   Request/biaya live memerlukan izin terpisah; test biasa tidak memerlukan key.
 - Maintainer evidence: [metodologi reuse-quality dan workflow penggantian](../../../../packages/cache/benchmarks/reuse_quality/README.md#automatic-validation-and-explicit-evidence-replacement).
 

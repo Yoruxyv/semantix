@@ -59,7 +59,7 @@ async def main() -> None:
         importlib.import_module("semantix_cache.stores.pgvector")
     except ImportError as exc:
         assert "semantix-cache[pgvector]" in str(exc)
-        assert "docs/embedded-storage.md" in str(exc)
+        assert "docs/embedded/storage.md" in str(exc)
     else:
         raise AssertionError("PostgreSQL store imported without its optional driver")
 
@@ -75,7 +75,7 @@ async def main() -> None:
             importlib.import_module("semantix_cache.adapters." + provider)
         except ImportError as exc:
             assert "semantix-cache[providers]" in str(exc)
-            assert "docs/embedded-providers.md" in str(exc)
+            assert "docs/embedded/providers.md" in str(exc)
         else:
             raise AssertionError("Optional adapter imported without HTTP dependencies")
     print("Minimal wheel and actionable optional-dependency errors verified")

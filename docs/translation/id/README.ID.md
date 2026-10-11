@@ -132,7 +132,7 @@ preprocessing yang sama. Dimensi yang sama saja tidak membuktikan kompatibilitas
 TTL dimulai saat write dan tidak diperpanjang oleh hit. Lihat
 [kebijakan, TTL, dan pencocokan](../../../packages/cache/README.md#contract).
 
-Lihat [identitas konteks dan migrasi](../../context-identity-and-migration.md)
+Lihat [identitas konteks dan migrasi](../../embedded/context-identity-and-migration.md)
 untuk contoh scope model/tenant/knowledge/output, revisi embedding, dan migrasi aman.
 
 ## Kapabilitas utama
@@ -197,7 +197,7 @@ menyimpulkan kesetaraan ContextVars/closure atau berkoordinasi antarproses. Foll
 mengonfirmasi hit masing-masing. Mengubah key itu saja tidak membatalkan jawaban
 tersimpan. Baca [aturan keamanan coalescing](../../../packages/cache/README.md#optional-cold-miss-coalescing).
 
-[Bukti numerik coalescing](../../embedded-observability.md) bersifat opsional melalui
+[Bukti numerik coalescing](../../embedded/observability.md) bersifat opsional melalui
 `collect_coalescing_metrics=True`. Instrumentasi umum tetap dimiliki aplikasi.
 
 Penggunaan `AsyncSemanticCache` yang terdokumentasi dicakup oleh
@@ -210,7 +210,7 @@ pada **2026-10-05**,
 mencakup embedding, generation, serta alur `AsyncSemanticCache` + MemoryStore
 miss → generate → write → confirmed hit. Generation dilewati pada hit untuk
 prompt yang diulang; pemeriksaan ini mencakup model yang tercantum dalam
-[panduan provider](../../embedded-providers.md#010-verification).
+[panduan provider](../../embedded/providers.md#010-verification).
 
 | Provider | Embeddings | Generation | Verifikasi |
 | --- | --- | --- | --- |
@@ -237,7 +237,7 @@ confirmed hit.
 Adapter bawaan berada di `semantix_cache.adapters`, di luar impor root minimal.
 Pilih model dan identitas embedding-space secara eksplisit, serta berikan HTTPX
 client yang dipinjam. Extra HTTP opsional tidak memasang SDK provider. Lihat
-[provider embedded dan integrasi kustom](../../embedded-providers.md) untuk
+[provider embedded dan integrasi kustom](../../embedded/providers.md) untuk
 konfigurasi dan jalur provider kustom.
 
 API provider berkembang secara independen dari Semantix. Saya berniat menjaga
@@ -254,7 +254,7 @@ inisialisasi schema cache terpisah yang bertanda secara eksplisit; operasi cache
 normal tidak menjalankan DDL. Runtime memeriksa penanda kepemilikan, versi, dan
 checksum migrasi, bukan fingerprint katalog lengkap. Lindungi perubahan schema di luar migrasi.
 
-Lihat [storage embedded dan database pengguna](../../embedded-storage.md) untuk akses
+Lihat [storage embedded dan database pengguna](../../embedded/storage.md) untuk akses
 runtime dengan izin minimum, kepemilikan pool, migrasi, dan store kustom. pgvector
 menyimpan vektor float32; skor dekat threshold dapat berbeda dari scoring float64 MemoryStore.
 
@@ -269,7 +269,7 @@ menjalankan workflow aplikasi tersebut.
 ## Contoh
 
 - [Embedding dan generation kustom](../../../packages/cache/examples/custom_integration.py).
-- [CacheStore kustom](../../../packages/cache/examples/custom_store.py) dan [kit conformance untuk pengembang](../../cache-store-conformance.md).
+- [CacheStore kustom](../../../packages/cache/examples/custom_store.py) dan [kit conformance untuk pengembang](../../embedded/cache-store-conformance.md).
 - [Customer support persisten](../../../packages/cache/examples/persistent_support.py).
 - [API publik dan struktur source](../../../packages/cache/src/README.md).
 
@@ -587,9 +587,9 @@ print(result.response, result.cache_hit)
 | Mulai di sini | Gunakan untuk |
 | --- | --- |
 | [Panduan paket cache](../../../packages/cache/README.md) | Quick start embedded, kebijakan, kepemilikan, dan kompatibilitas kanonis |
-| [Provider embedded](../../embedded-providers.md) | Adapter yang dipelihara dan embedding/generation kustom |
-| [Identitas konteks dan migrasi](../../context-identity-and-migration.md) | Scope eksplisit, revisi embedding, dan migrasi aman |
-| [Storage embedded](../../embedded-storage.md) | Memory, PostgreSQL opsional, dan database aplikasi |
+| [Provider embedded](../../embedded/providers.md) | Adapter yang dipelihara dan embedding/generation kustom |
+| [Identitas konteks dan migrasi](../../embedded/context-identity-and-migration.md) | Scope eksplisit, revisi embedding, dan migrasi aman |
+| [Storage embedded](../../embedded/storage.md) | Memory, PostgreSQL opsional, dan database aplikasi |
 | [Contoh](../../../packages/cache/examples/) | Generation dan store yang dikendalikan aplikasi |
 | [Kualitas reuse yang ditinjau](../../../packages/cache/benchmarks/reuse_quality/README.md) | Baseline semantik, kontrol leksikal, pemisahan calibration/held-out, dan batas bukti |
 | [Metodologi benchmark](../../../packages/cache/benchmarks/README.md) | Workload runtime lokal yang reproducible beserta batasannya |
@@ -754,8 +754,8 @@ Lihat [Development](guides/development.md) untuk toolchain lokal, aturan arsitek
 Aplikasi memiliki tanggung jawab atas otorisasi, konteks generation, kredensial,
 keamanan transport, dan penanganan data provider. Pemisahan namespace bukan otorisasi.
 Lihat [SECURITY](SECURITY.md) untuk pelaporan dan batas deployment server,
-serta panduan [provider embedded](../../embedded-providers.md) dan
-[storage](../../embedded-storage.md) untuk tanggung jawab resource dan database pemanggil.
+serta panduan [provider embedded](../../embedded/providers.md) dan
+[storage](../../embedded/storage.md) untuk tanggung jawab resource dan database pemanggil.
 
 ## 📄 Lisensi
 

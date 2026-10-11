@@ -15,19 +15,22 @@ Pilih jalur: [caching Python embedded](#library-python-embedded),
 ## Library Python embedded
 
 Panduan embedded berikut tersedia dalam bahasa Inggris.
+Panduan ini dikelompokkan dalam [embedded/](../../embedded/); penjelasan lintas
+produk berada di [reference/](../../reference/), dan prosedur serta workflow bukti
+di [operations/](../../operations/).
 
 | Panduan | Gunakan untuk |
 | --- | --- |
 | [Paket cache](../../../packages/cache/README.md) | Penggunaan awal, kebijakan, hasil, lifecycle, dan kompatibilitas 0.1.x kanonis |
-| [Provider embedded](../../embedded-providers.md) | Adapter yang dipelihara, extra opsional, dan embedding/generation kustom |
-| [Verifikasi provider live (Inggris)](../../provider-live-verification.md) | Receipt provider embedded opt-in, scope model/source yang tepat, cleanup, dan batas bukti |
-| [Identitas konteks dan migrasi](../../context-identity-and-migration.md) | Scope eksplisit, revisi embedding, contoh offline, dan migrasi aman |
-| [Storage embedded](../../embedded-storage.md) | Memory, PostgreSQL/pgvector, Redis, dan database milik aplikasi |
-| [Redis embedded (Inggris)](../../embedded-redis.md) | Setup RedisStore opsional, pencarian eksak, TTL/LRU, ownership, dan pemulihan |
-| [Bukti coalescing embedded](../../embedded-observability.md) | Snapshot numerik opt-in, privasi, dan instrumentasi milik aplikasi |
+| [Provider embedded](../../embedded/providers.md) | Adapter yang dipelihara, extra opsional, dan embedding/generation kustom |
+| [Verifikasi provider live (Inggris)](../../operations/provider-live-verification.md) | Receipt provider embedded opt-in, scope model/source yang tepat, cleanup, dan batas bukti |
+| [Identitas konteks dan migrasi](../../embedded/context-identity-and-migration.md) | Scope eksplisit, revisi embedding, contoh offline, dan migrasi aman |
+| [Storage embedded](../../embedded/storage.md) | Memory, PostgreSQL/pgvector, Redis, dan database milik aplikasi |
+| [Redis embedded (Inggris)](../../embedded/redis.md) | Setup RedisStore opsional, pencarian eksak, TTL/LRU, ownership, dan pemulihan |
+| [Bukti coalescing embedded](../../embedded/observability.md) | Snapshot numerik opt-in, privasi, dan instrumentasi milik aplikasi |
 | [Integrasi kustom](../../../packages/cache/examples/custom_integration.py) | Alur embedding dan generation asinkron yang sudah ada |
 | [Store kustom](../../../packages/cache/examples/custom_store.py) | Contoh CacheStore struktural |
-| [Conformance CacheStore](../../cache-store-conformance.md) | Pengujian pengembang yang dapat digunakan ulang, fixture, dan batas bukti backend |
+| [Conformance CacheStore](../../embedded/cache-store-conformance.md) | Pengujian pengembang yang dapat digunakan ulang, fixture, dan batas bukti backend |
 | [Contoh support persisten](../../../packages/cache/examples/persistent_support.py) | Inisialisasi eksplisit dan cache customer-support yang bertahan antarproses |
 | [Kualitas reuse yang ditinjau](../../../packages/cache/benchmarks/reuse_quality/README.md) | Bukti semantik statis, kontrol leksikal, pemisahan calibration/held-out, dan batasannya |
 | [Benchmark runtime](../../../packages/cache/benchmarks/README.md) | Workload reproducible, profiling, dan batas pengukuran |
@@ -53,8 +56,8 @@ Panduan embedded berikut tersedia dalam bahasa Inggris.
 
 | Reference | Gunakan untuk |
 | --- | --- |
-| [Keputusan rekayasa (Inggris)](../../engineering-decisions.md) | Urutan kegagalan, ownership, alternatif, trade-off storage/replika, dan batas bukti |
-| [Batas akurasi jawaban semantik (Inggris)](../../semantic-accuracy-limitations.md) | Similarity, kompatibilitas jawaban, temuan eksplorasi yang dibekukan, dan pilihan reuse |
+| [Keputusan rekayasa (Inggris)](../../reference/engineering-decisions.md) | Urutan kegagalan, ownership, alternatif, trade-off storage/replika, dan batas bukti |
+| [Batas akurasi jawaban semantik (Inggris)](../../reference/semantic-accuracy-limitations.md) | Similarity, kompatibilitas jawaban, temuan eksplorasi yang dibekukan, dan pilihan reuse |
 | [Architecture](reference/architecture.md)   | Runtime flow, feature ownership, boundary, dan deployment constraint |
 
 ## Reference

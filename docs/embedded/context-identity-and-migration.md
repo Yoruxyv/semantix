@@ -34,12 +34,12 @@ MemoryStore binds one space. Use a separate matching store/cache for a new space
 PgVectorStore can use separate bound instances over shared tables and filters by
 identity and dimension. A `CacheEntry` has no space tag: custom stores and direct
 `put` callers must preserve the declared space. Keys alone do not identify a
-space or prove vector compatibility. See the [store contract](embedded-storage.md#custom-database-or-vector-service).
+space or prove vector compatibility. See the [store contract](storage.md#custom-database-or-vector-service).
 
 ## Run the offline recipes
 
-The [complete example](../packages/cache/examples/context_identity.py) reuses the
-[public custom-embedding wrapper](../packages/cache/examples/custom_integration.py)
+The [complete example](../../packages/cache/examples/context_identity.py) reuses the
+[public custom-embedding wrapper](../../packages/cache/examples/custom_integration.py)
 and imports only public cache types. From `packages/cache/`, with the existing
 local development environment:
 
@@ -151,27 +151,27 @@ generation and writes validated completed text before returning a successful
 `CacheResult`. A lookup error propagates instead of generating through the failure.
 Generation exceptions propagate unchanged; invalid completed output is not cached.
 `READ_ONLY`, `REFRESH`, `BYPASS` and `PRIVATE` have distinct read/write behavior;
-see the [policy table](../packages/cache/README.md#contract).
+see the [policy table](../../packages/cache/README.md#contract).
 
 The example uses `CustomEmbedding` with explicit metadata and an async embedding
 callable. A bare embedding function needs this metadata wrapper. No subclass,
 provider registry or maintained generation adapter is required. Replace the toy
 callable with your application integration without importing private cache helpers.
 For an independent structural `CacheStore`, use the existing
-[company-store example](../packages/cache/examples/custom_store.py) and
-[conformance requirements](embedded-storage.md#custom-database-or-vector-service).
+[company-store example](../../packages/cache/examples/custom_store.py) and
+[conformance requirements](storage.md#custom-database-or-vector-service).
 Expected integration failures should use safe typed cache errors.
 
 The facade borrows the embedder, store and generator and closes only itself.
 The example separately enters/exits MemoryStore to close its owned state/workers.
 Applications own provider clients and other resources; drain/cancel active work
 before closing them. Preserve finite deadlines and propagate cancellation in
-custom integrations. See [ownership](../packages/cache/README.md#extension-and-ownership).
+custom integrations. See [ownership](../../packages/cache/README.md#extension-and-ownership).
 
 Optional `coalescing_key` attests to compatible concurrent generation inputs;
 changing it alone does not partition persisted answers. These sequential recipes
 leave coalescing disabled. Read the existing
-[coalescing rules](../packages/cache/README.md#optional-cold-miss-coalescing) before
+[coalescing rules](../../packages/cache/README.md#optional-cold-miss-coalescing) before
 using it with model, tenant or knowledge context.
 
 ## Low-level get and set
@@ -225,7 +225,7 @@ Foreign internal IDs, namespaces, sessions, metadata, TTLs, hit counters and
 revision state do not automatically map to Semantix. Let `set` create canonical
 keys/new revisions; do not pretend foreign hit counts or timestamps are Semantix
 confirmation evidence. Persistent schema provisioning is a separate explicit step:
-see [storage initialization](embedded-storage.md#new-postgresql-database).
+see [storage initialization](storage.md#new-postgresql-database).
 
 ## Generation succeeds but persistence fails
 
@@ -245,7 +245,7 @@ failure explicitly; this changes who holds the answer, not transactional guarant
 
 ## Executable contract evidence
 
-The [recipe tests](../packages/cache/tests/test_context_identity_example.py) execute
+The [recipe tests](../../packages/cache/tests/test_context_identity_example.py) execute
 both offline recipes and inject a public `put` failure after successful generation,
 asserting one completed generation effect and no replay. Existing regression tests
 already cover the required negative isolation cases:
@@ -258,9 +258,9 @@ already cover the required negative isolation cases:
 | Expired candidate cannot confirm; hits do not extend TTL | `test_store_conformance.py::TestBuiltInStores::test_expiry_retention_cap_and_non_sliding_hit` |
 | MemoryStore expiry is exact and authoritative | `test_memory.py::test_ttl_exact_boundary_cap_and_overwrite` |
 
-See [engine tests](../packages/cache/tests/test_engine.py),
-[shared store tests](../packages/cache/tests/test_store_conformance.py) and
-[MemoryStore tests](../packages/cache/tests/test_memory.py). Run those files alongside
+See [engine tests](../../packages/cache/tests/test_engine.py),
+[shared store tests](../../packages/cache/tests/test_store_conformance.py) and
+[MemoryStore tests](../../packages/cache/tests/test_memory.py). Run those files alongside
 the recipe tests with `uv run --no-sync --offline pytest`. PostgreSQL variants
 require an explicitly disposable test database and otherwise skip; the core
 recipes and MemoryStore/company-store checks remain offline.

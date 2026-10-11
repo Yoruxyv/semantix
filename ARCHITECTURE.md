@@ -27,8 +27,8 @@ Optional embedded adapters live in `semantix_cache.adapters`, with borrowed HTTP
 clients and explicit model/space configuration. Root imports retain the minimal
 NumPy/Pydantic boundary. Backend/embedded parity tests protect common provider wire
 contracts; generation still enters the cache as an application-owned async callable.
-See the [provider guide](docs/embedded-providers.md) and
-[storage guide](docs/embedded-storage.md). The optional PgVectorStore lives under
+See the [provider guide](docs/embedded/providers.md) and
+[storage guide](docs/embedded/storage.md). The optional PgVectorStore lives under
 `semantix_cache.stores.pgvector` and uses an independently owned schema/prefix,
 explicit checksum-tracked migrations and application-owned or store-owned pools.
 Normal cache operations perform no DDL. Its SQL and ledger do not reuse the server's
@@ -38,7 +38,7 @@ The optional RedisStore lives in `semantix_cache.stores.redis`, binds three
 marked keys to an EmbeddingSpace, performs bounded exact client-side float64
 search and uses fixed Lua scripts for revision confirmation, TTL and LRU.
 Initialization is explicit; borrowed clients remain caller-owned. See the
-[Redis storage guide](docs/embedded-redis.md) for its single-primary support boundary.
+[Redis storage guide](docs/embedded/redis.md) for its single-primary support boundary.
 
 In the hardened Compose deployment, the browser and other HTTP clients reach the
 frontend Nginx gateway, which serves the browser assets and balances API requests across

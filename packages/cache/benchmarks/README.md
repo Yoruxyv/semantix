@@ -4,7 +4,7 @@ This harness measures the async `semantix-cache` runtime directly, without the
 FastAPI server, HTTP client, web app, hosted providers or billable API calls. It
 collects baselines and diagnostic experiments; it does not certify performance or
 change the package's implementation. Use the [cache contract](../README.md#contract)
-and [storage guide](../../../docs/embedded-storage.md) for supported semantics.
+and [storage guide](../../../docs/embedded/storage.md) for supported semantics.
 
 ## Run
 
@@ -188,5 +188,5 @@ benchmark tooling, not a runtime telemetry worker. It records read counts; no
 individual snapshot samples are retained. Output is restricted to ignored paths;
 failed runs are retained and exit nonzero. Keep controls/treatments' configurations,
 dataset hashes, source hashes, raw latencies and failures together. Apply the review
-gates in the [coalescing evidence guide](../../../docs/embedded-observability.md#performance-and-verification)
+gates in the [coalescing evidence guide](../../../docs/embedded/observability.md#performance-and-verification)
 without discarding noisy or failing runs.

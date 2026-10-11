@@ -31,8 +31,8 @@ OPENAI_API_KEY, GEMINI_API_KEY, HF_API_KEY or ANTHROPIC_API_KEY. It does not rea
 
 The stdout output is one JSON receipt; stderr contains a short safe summary.
 The authoritative model and checked-in structural JSON Schema are in
-[models.py](../scripts/provider_live_verification/models.py) and
-[provider_live_receipt.schema.json](../scripts/provider_live_receipt.schema.json).
+[models.py](../../scripts/provider_live_verification/models.py) and
+[provider_live_receipt.schema.json](../../scripts/provider_live_receipt.schema.json).
 The Python validator also checks cross-field PASS invariants. No response text,
 prompt, HTTP body/header, credential, account/project identifier or exception detail
 is written. The verifier writes no receipt file; inspect only its sanitized output
@@ -57,7 +57,7 @@ initializer exposes no runtime API.
 | Anthropic | Explicit --model required | deterministic-local-v1 (2), not Anthropic embeddings |
 
 The first three defaults match the existing dated configurations in the
-[provider guide](embedded-providers.md#010-verification); they are not promises
+[provider guide](../embedded/providers.md#010-verification); they are not promises
 that a model remains available to every account. --model records an explicit
 generation override. An embedding override requires both --embedding-model and
 --embedding-dimensions. Dimensions remain validated; vectors are never padded or

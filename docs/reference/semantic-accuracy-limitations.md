@@ -94,13 +94,13 @@ integration does not resolve semantic-answer accuracy.
 
 ## Policies, namespaces and trusted context
 
-The embedded API's [CachePolicy members](../packages/cache/README.md#contract)
+The embedded API's [CachePolicy members](../../packages/cache/README.md#contract)
 control reads and writes. `CachePolicy.NORMAL` permits reuse;
 `CachePolicy.READ_ONLY` can still reuse an incompatible answer;
 `CachePolicy.REFRESH` skips reads but can store the newly generated response.
 `CachePolicy.BYPASS` and `CachePolicy.PRIVATE` skip both cache reads and writes.
 The server HTTP API expresses these choices through
-[read, write and private flags](guides/cache-policies.md#read-write-and-private-policies).
+[read, write and private flags](../guides/cache-policies.md#read-write-and-private-policies).
 PRIVATE is not authentication, authorization, encryption or a guarantee that a
 generation provider will not receive the request. Apply your application's
 privacy and access controls separately.
@@ -110,7 +110,7 @@ caller. The embedded application's owner must authenticate and authorize
 access before selecting a namespace or returning data. The official server
 applies configured role and namespace checks with token authentication enabled;
 its local development mode with authentication disabled grants implicit admin
-access. Follow the [server authorization guide](operations/deployment.md#namespace-authorization)
+access. Follow the [server authorization guide](../operations/deployment.md#namespace-authorization)
 when exposing it to other users. Choosing a namespace is not a substitute for
 these controls.
 
@@ -120,7 +120,7 @@ contract and freshness requirements, as applicable. Do not derive trusted
 permissions or revision claims solely from untrusted prompt text. Semantix does
 not infer changes inside generation callables or automatically decide which
 context changes invalidate an answer. See
-[context identity and migration](context-identity-and-migration.md) for namespace
+[context identity and migration](../embedded/context-identity-and-migration.md) for namespace
 and embedding-space responsibilities. Context isolation reduces inappropriate
 cross-scope reuse but does not prove compatibility within a scope.
 
@@ -142,7 +142,7 @@ cross-scope reuse but does not prove compatibility within a scope.
 Assess useful correct reuse rather than raw hit rate. Include missed compatible
 answers, false rejections, uncertain references, latency and actual costs.
 Preserve negative results and distinguish calibration from untouched validation.
-The [reuse-quality benchmark guide](../packages/cache/benchmarks/reuse_quality/README.md)
+The [reuse-quality benchmark guide](../../packages/cache/benchmarks/reuse_quality/README.md)
 describes separate static benchmark evidence and its limits; it does not turn
 this exploratory result into a universal model ranking or validated safeguard.
 

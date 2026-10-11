@@ -6,7 +6,7 @@ of server settings and its registry. Each request uses the finite adapter deadli
 and byte limit, with no automatic retries or redirects. Cancellation propagates.
 Inherited async context management and ``aclose`` seal only the adapter, refuse
 active operations and leave the caller's HTTP client open. Caller transport hooks
-and remote processing remain outside these guarantees. See ``docs/embedded-providers.md``.
+and remote processing remain outside these guarantees. See ``docs/embedded/providers.md``.
 """
 
 from collections.abc import Sequence

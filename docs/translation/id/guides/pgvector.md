@@ -61,6 +61,6 @@ pgvector tanpa algoritma similarity baru.
 Periksa `/ready`, ulangi prompt di Monitor, lalu inspect/delete/clear entri aktif.
 Perubahan identitas/dimensi embedding menyembunyikan vektor lama yang tidak kompatibel.
 Gunakan database sekali pakai untuk `PGVECTOR_TEST_DATABASE_URL`; job CI wajib gagal
-jika test PostgreSQL dilewati tanpa sengaja. Lihat [embedded storage](../../../embedded-storage.md)
+jika test PostgreSQL dilewati tanpa sengaja. Lihat [embedded storage](../../../embedded/storage.md)
 untuk kontrak schema/resource dan [deployment](../operations/deployment.md)
 untuk batas production dua replika yang didukung.

@@ -2,7 +2,7 @@
 
 The in-process **semantix-cache** package imports as **semantix_cache**. It is
 independent of **semantix-client**, the HTTP client for a Semantix server. The
-[embedded core guide](../packages/cache/README.md) describes cache semantics and ownership.
+[embedded core guide](../../packages/cache/README.md) describes cache semantics and ownership.
 
 ## Install and import
 
@@ -72,7 +72,7 @@ after a defect is reproduced. Never share credentials or commit raw provider
 responses. Provider APIs can evolve independently; custom integrations remain the
 escape hatch for unsupported versions.
 
-Use the [local provider verifier](provider-live-verification.md) to produce a
+Use the [local provider verifier](../operations/provider-live-verification.md) to produce a
 fresh sanitized receipt from privately entered credentials. The tool itself does
 not promote or demote the evidence above; live runs remain optional and explicit.
 
@@ -190,7 +190,7 @@ Any unsupported provider can be integrated structurally: supply the existing
 `embedding_space` property and `async embed(text) -> Sequence[float]`. No subclass,
 registration, extra dependency or request to add a built-in is required. A bare
 embedding callable has no space metadata and is insufficient. Wrap it explicitly;
-the complete [custom integration example](../packages/cache/examples/custom_integration.py)
+the complete [custom integration example](../../packages/cache/examples/custom_integration.py)
 shows this and an object-based async generation flow. The demo is deterministic,
 not a production embedding model. From `packages/cache/`, execute and type-check it with:
 

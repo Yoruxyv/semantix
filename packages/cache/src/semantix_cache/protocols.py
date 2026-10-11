@@ -66,7 +66,7 @@ class CacheStore(Protocol):
     backend-specific. Failures must stay errors rather than becoming misses.
 
     Optional inspection, clear_all and backend diagnostics are not members of
-    this protocol. See docs/cache-store-conformance.md for the source-based kit
+    this protocol. See docs/embedded/cache-store-conformance.md for the source-based kit
     and the limits of its evidence.
     """
 

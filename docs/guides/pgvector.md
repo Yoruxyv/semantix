@@ -61,6 +61,6 @@ lookup remains exact pgvector cosine search. There is no new similarity algorith
 Check `/ready`, then repeat a prompt through Monitor and inspect/delete/clear the
 active entry. Changing embedding identity/dimensions hides incompatible old vectors.
 Use only a disposable database for `PGVECTOR_TEST_DATABASE_URL`; required CI tests
-fail if PostgreSQL cases unexpectedly skip. See [embedded storage](../embedded-storage.md)
+fail if PostgreSQL cases unexpectedly skip. See [embedded storage](../embedded/storage.md)
 for the package schema and resource contract, and [deployment](../operations/deployment.md)
 for the supported two-replica production boundary.

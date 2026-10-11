@@ -37,8 +37,8 @@ state/workers. PgVectorStore borrows `pool=` and owns the pool it creates throug
 creates database schemas, installs extensions, or adopts existing tables.
 
 Start with the [package README](../README.md), then the
-[provider guide](../../../docs/embedded-providers.md) and
-[storage/custom database guide](../../../docs/embedded-storage.md).
+[provider guide](../../../docs/embedded/providers.md) and
+[storage/custom database guide](../../../docs/embedded/storage.md).
 Working examples are in [`../examples`](../examples/custom_integration.py), including
 [`custom_store.py`](../examples/custom_store.py) and
 [`persistent_support.py`](../examples/persistent_support.py).
@@ -61,6 +61,6 @@ URL those cases skip. For custom-store development, use the source-based kit in
 its [standalone consumer](../examples/test_custom_store_conformance.py). The
 repository's [built-in store tests](../tests/test_store_conformance.py) supply
 MemoryStore/PgVectorStore fixtures and collect that custom consumer; they are not
-the reusable kit. See the [conformance guide](../../../docs/cache-store-conformance.md)
+the reusable kit. See the [conformance guide](../../../docs/embedded/cache-store-conformance.md)
 for setup and evidence boundaries. Examples ship in the source archive, not the
 wheel; the kit requires development pytest tooling, never a runtime dependency.

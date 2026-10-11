@@ -20,8 +20,8 @@ Python 3.11-3.14 CI matrix and analysis targets. PostgreSQL cases require an
 explicitly disposable `PGVECTOR_TEST_DATABASE_URL`; without it they skip.
 Normal provider tests are deterministic and offline.
 
-- Store authors: [CacheStore conformance](../cache-store-conformance.md).
-- Provider contributors: [live-verification tooling](../provider-live-verification.md).
+- Store authors: [CacheStore conformance](../embedded/cache-store-conformance.md).
+- Provider contributors: [live-verification tooling](../operations/provider-live-verification.md).
   Live requests/cost require separate authorization; ordinary tests need no keys.
 - Evidence maintainers: [reuse-quality methodology and replacement workflow](../../packages/cache/benchmarks/reuse_quality/README.md#automatic-validation-and-explicit-evidence-replacement).
 
