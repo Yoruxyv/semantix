@@ -102,9 +102,8 @@ def checked_path(value: str | os.PathLike[str]) -> Path:
             raise ValueError("Linked paths are unsupported")
         if part == path and not stat.S_ISREG(info.st_mode):
             raise ValueError("Database must be a regular file")
-    if os.path.normcase(str(path.resolve())) != os.path.normcase(str(path)):
-        raise ValueError("Path identity changed")
-    return path
+    # Reparse checks precede canonicalization; ordinary Windows 8.3 aliases are safe.
+    return path.resolve()
 
 
 @dataclass(frozen=True)

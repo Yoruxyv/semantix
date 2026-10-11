@@ -58,15 +58,24 @@ class Database:
                     created = True
             except FileExistsError:
                 pass
-        options = {"autocommit": True} if sys.version_info >= (3, 12) else {}
-        connection = sqlite3.connect(
-            path.as_uri() + "?mode=rw",
-            uri=True,
-            timeout=0,
-            isolation_level=None,
-            check_same_thread=True,
-            **options,
-        )
+        uri = path.as_uri() + "?mode=rw"
+        if sys.version_info >= (3, 12):
+            connection = sqlite3.connect(
+                uri,
+                uri=True,
+                timeout=0,
+                isolation_level=None,
+                check_same_thread=True,
+                autocommit=True,
+            )
+        else:
+            connection = sqlite3.connect(
+                uri,
+                uri=True,
+                timeout=0,
+                isolation_level=None,
+                check_same_thread=True,
+            )
         job.owner.bind(connection)
         connection.set_progress_handler(
             lambda: int(job.stopped.is_set() or monotonic() >= job.deadline),
@@ -74,9 +83,8 @@ class Database:
         )
         connection.create_function("semantix_now_us", 0, now_us, deterministic=False)
         connection.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, MAX_PAYLOAD + 4096)
-        if hasattr(connection, "setconfig"):
-            defensive = "SQLITE_DBCONFIG_DEFENSIVE"
-            connection.setconfig(getattr(sqlite3, defensive), True)
+        if sys.version_info >= (3, 12):
+            connection.setconfig(sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True)
         for setting in (
             "trusted_schema=OFF",
             "foreign_keys=ON",

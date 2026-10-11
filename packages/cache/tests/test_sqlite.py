@@ -1,6 +1,7 @@
 """SQLite schema, codecs, exact numerics, TTL and durable authority regressions."""
 
 import asyncio
+import ctypes
 import sqlite3
 import sys
 import traceback
@@ -524,3 +525,40 @@ async def test_same_identity_different_dimensions_isolated(tmp_path: Path) -> No
             assert match is not None
             assert match.entry.response == str(space.dimensions)
             assert await store.clear(namespace="default") == 1
+
+
+async def test_owned_path_canonicalization_handles_relative_and_short_aliases(
+    tmp_path: Path,
+) -> None:
+    nested = tmp_path / "ordinary directory"
+    nested.mkdir()
+    path = nested / ".." / "canonical.db"
+    await SQLiteStore.initialize_schema(path, embedding_space=SPACE)
+    async with await SQLiteStore.connect(path, embedding_space=SPACE) as store:
+        assert (
+            store._config.path
+            == await asyncio.to_thread(tmp_path.resolve) / "canonical.db"
+        )
+        await store.put(entry("canonical path"))
+
+    if sys.platform == "win32":
+        buffer = ctypes.create_unicode_buffer(32768)
+        assert (
+            ctypes.windll.kernel32.GetShortPathNameW(str(tmp_path), buffer, len(buffer))
+            > 0
+        )
+        alias = Path(buffer.value) / "short.db"
+        await SQLiteStore.initialize_schema(alias, embedding_space=SPACE)
+        async with await SQLiteStore.connect(alias, embedding_space=SPACE) as store:
+            assert (
+                store._config.path
+                == await asyncio.to_thread(tmp_path.resolve) / "short.db"
+            )
+    else:
+        link = tmp_path / "linked-directory"
+        link.symlink_to(nested, target_is_directory=True)
+        with pytest.raises(CacheConfigurationError):
+            await SQLiteStore.initialize_schema(
+                link / "rejected.db", embedding_space=SPACE
+            )
+        assert not (nested / "rejected.db").exists()
