@@ -15,7 +15,7 @@ mock provider supports deterministic local use. The live cache delegates to the
 package-owned MemoryStore, PgVectorStore or RedisStore, according to settings.
 
 An independently installable [semantix-cache](packages/cache/README.md) supplies the async
-embedded facade, bounded MemoryStore and optional PostgreSQL/pgvector or Redis persistence
+embedded facade, bounded MemoryStore, local SQLite and optional MySQL, PostgreSQL/pgvector or Redis persistence
 for applications that do not run this server.
 It accepts structural embedding adapters and application-owned async generation.
 Its private semantic core owns canonicalization, keys, namespace rules, vector
@@ -39,6 +39,14 @@ marked keys to an EmbeddingSpace, performs bounded exact client-side float64
 search and uses fixed Lua scripts for revision confirmation, TTL and LRU.
 Initialization is explicit; borrowed clients remain caller-owned. See the
 [Redis storage guide](docs/embedded/redis.md) for its single-primary support boundary.
+
+The embedded-only MySQLStore lives in `semantix_cache.stores.mysql`, with pinned
+optional PyMySQL, one owned synchronous worker/connection, complete exact float64
+scoring and transactional revisions/TTL/LRU. Explicit setup installs immutable
+migrations and a fixed locked-definer schema verifier; runtime uses restricted
+table DML plus verifier EXECUTE. Failed construction has bounded process-local
+cleanup ownership and explicit recovery. It does not change the structural port
+or server backend selection. See [MySQL storage](docs/embedded/mysql.md).
 
 In the hardened Compose deployment, the browser and other HTTP clients reach the
 frontend Nginx gateway, which serves the browser assets and balances API requests across

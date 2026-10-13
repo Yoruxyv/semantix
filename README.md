@@ -4,7 +4,7 @@
 
 <p><strong>Async semantic caching for Python.</strong></p>
 
-<p>Memory, SQLite, PostgreSQL or Redis storage. Your generation flow stays yours.</p>
+<p>Memory, SQLite, MySQL, PostgreSQL or Redis storage. Your generation flow stays yours.</p>
 
 <p>
   <img src="https://img.shields.io/badge/Python-3.11%E2%80%933.14-555555?logo=python&amp;logoColor=FFD43B&amp;labelColor=3776AB" alt="Python 3.11–3.14" />
@@ -113,7 +113,7 @@ and store; the application owns any other injected resources.
 | Aspect | Summary |
 | --- | --- |
 | **Runtime** | Async, in-process Python |
-| **Storage** | MemoryStore, local SQLite, optional PostgreSQL/pgvector or Redis |
+| **Storage** | MemoryStore, local SQLite, optional MySQL, PostgreSQL/pgvector or Redis |
 | **Generation** | Your own async callable |
 
 ## Why Semantix?
@@ -141,7 +141,7 @@ Eligible candidates pass validation and atomic TTL/revision confirmation before
 a hit is returned.
 
 The application owns the embedder, generator and store lifetimes. A CacheStore can
-be MemoryStore, SQLiteStore, optional PgVectorStore/RedisStore or your custom implementation. Other policies
+be MemoryStore, SQLiteStore, optional MySQLStore/PgVectorStore/RedisStore or your custom implementation. Other policies
 control reads/generation/writes; opt-in coalescing adds waiting and each follower's
 own confirmed lookup. See the [cache contract](packages/cache/README.md#contract).
 
@@ -280,6 +280,16 @@ from `packages/cache` for a credential-free miss/write/hit and reopen check.
 See [SQLite setup and limits](docs/embedded/storage.md#sqlite-local-file-persistence)
 for the bounded complete float64 scan, file ownership and cancellation restrictions.
 SQLite is embedded-only; the optional backend/dashboard does not select it.
+
+Optional `semantix_cache.stores.mysql.MySQLStore` uses pinned PyMySQL 1.2.3 in an
+owned worker with verified TLS and explicit setup on a dedicated MySQL Community
+8.4.12 database. It preserves exact float64 search and the shared CacheStore contract.
+Use the local wheel's `[mysql]` extra; see [MySQL setup and limits](docs/embedded/mysql.md)
+for least-privileged grants, the locked schema verifier, deadlines, uncertain COMMIT
+and bounded failed-construction recovery. MySQL is embedded-only; no dashboard
+backend is added. Windows/Linux Python 3.11–3.14 clients have been exercised;
+the new workflow targets Linux, with hosted execution still pending and the
+Windows/MySQL hosted coverage gap disclosed.
 
 Optional
 `semantix_cache.stores.pgvector.PgVectorStore` persists across processes/restarts
@@ -704,7 +714,7 @@ The [documentation index](docs/README.md) separates embedded and server guides.
 | [Cache package guide](packages/cache/README.md) | Embedded quick start, policies, ownership and canonical compatibility |
 | [Embedded providers](docs/embedded/providers.md) | Maintained adapters and custom embedding/generation |
 | [Context identity and migration](docs/embedded/context-identity-and-migration.md) | Explicit scopes, embedding revisions and safe migration |
-| [Embedded storage](docs/embedded/storage.md) | Memory, SQLite, PostgreSQL, Redis and user-owned databases |
+| [Embedded storage](docs/embedded/storage.md) | Memory, SQLite, MySQL, PostgreSQL, Redis and user-owned databases |
 | [Examples](packages/cache/examples/) | Application-controlled generation and stores |
 | [Reviewed reuse quality](packages/cache/benchmarks/reuse_quality/README.md) | Semantic baseline, lexical controls, calibration/held-out split and evidence limitations |
 | [Benchmark methodology](packages/cache/benchmarks/README.md) | Reproducible local runtime workloads and limitations |

@@ -46,6 +46,7 @@ async def main() -> None:
         "starlette",
         "slowapi",
         "asyncpg",
+        "pymysql",
         "redis",
         "httpx",
         "pydantic_settings",
@@ -69,6 +70,13 @@ async def main() -> None:
         assert "semantix-cache[redis]" in str(exc)
     else:
         raise AssertionError("Redis store imported without its optional driver")
+
+    try:
+        importlib.import_module("semantix_cache.stores.mysql")
+    except ImportError as exc:
+        assert "semantix-cache[mysql]" in str(exc)
+    else:
+        raise AssertionError("MySQL store imported without its optional driver")
 
     for provider in ("openai", "huggingface", "gemini", "ollama", "anthropic"):
         try:

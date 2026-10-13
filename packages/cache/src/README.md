@@ -21,13 +21,17 @@ application; no Semantix FastAPI server is required. The separate
 | [`adapters/`](semantix_cache/adapters/__init__.py) | Maintained provider adapters, imported explicitly with optional HTTP dependencies |
 | [`stores/pgvector.py`](semantix_cache/stores/pgvector.py) | Optional application-database PostgreSQL/pgvector persistence |
 | [`stores/redis.py`](semantix_cache/stores/redis.py) | Optional bounded exact Redis storage with explicit schema and owned/borrowed clients |
+| [`stores/mysql.py`](semantix_cache/stores/mysql.py) | Optional verified-TLS MySQL storage, one owned worker and bounded cleanup recovery |
+| [`stores/mysql_migrations/`](semantix_cache/stores/mysql_migrations/0002_verifier.sql) | Immutable table/shape/verifier resources; explicit initialization only |
 | [`stores/migrations/`](semantix_cache/stores/migrations/0001_cache.sql) | Packaged, checksum-tracked SQL template applied only by explicit initialization |
 | [`py.typed`](semantix_cache/py.typed) | Installed-package typing marker |
 
 Root imports use only NumPy/Pydantic and the standard library. They do not import
-HTTPX, asyncpg, redis, FastAPI, provider SDKs, adapter modules or storage modules. Import
+HTTPX, PyMySQL, asyncpg, redis, FastAPI, provider SDKs, adapter modules or storage modules. Import
 `PgVectorStore` from `semantix_cache.stores.pgvector` with the `[pgvector]` extra.
 Import `RedisStore` from `semantix_cache.stores.redis` with `[redis]`.
+Import `MySQLStore` from `semantix_cache.stores.mysql` with `[mysql]`; it owns its
+connection and worker. See [MySQL setup and recovery](../../../docs/embedded/mysql.md).
 There is no server/remote mode in `AsyncSemanticCache`.
 
 Applications own injected embedders, generation callables and stores. The facade

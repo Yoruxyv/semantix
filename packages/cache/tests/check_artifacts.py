@@ -48,6 +48,7 @@ def main(artifact_dir: Path = Path("dist")) -> None:
             "dev",
             "pgvector",
             "redis",
+            "mysql",
         }
         for extra in extras:
             selected = [item for item in requirements if f'extra == "{extra}"' in item]
@@ -68,12 +69,32 @@ def main(artifact_dir: Path = Path("dist")) -> None:
         assert "<8.2" in redis[0]
         assert "semantix_cache/stores/redis.py" in names
         assert "semantix_cache/stores/_redis_scripts.py" in names
+        mysql = [item for item in requirements if 'extra == "mysql"' in item]
+        assert mysql == ['PyMySQL==1.2.3; extra == "mysql"']
+        for module in (
+            "mysql",
+            "_mysql_cleanup",
+            "_mysql_config",
+            "_mysql_database",
+            "_mysql_format",
+            "_mysql_schema",
+            "_mysql_transport",
+            "_mysql_worker",
+        ):
+            assert f"semantix_cache/stores/{module}.py" in names
+        mysql_resources = {
+            "semantix_cache/stores/mysql_migrations/0001_cache.sql",
+            "semantix_cache/stores/mysql_migrations/0001_shape.json",
+            "semantix_cache/stores/mysql_migrations/0002_verifier.sql",
+        }
+        for resource in mysql_resources:
+            assert archive.read(resource) == Path("src").joinpath(resource).read_bytes()
         migration = "semantix_cache/stores/migrations/0001_cache.sql"
         sqlite_migration = "semantix_cache/stores/sqlite_migrations/0001_cache.sql"
         assert {name for name in names if name.endswith(".sql")} == {
             migration,
             sqlite_migration,
-        }
+        } | {resource for resource in mysql_resources if resource.endswith(".sql")}
         for resource in (migration, sqlite_migration):
             assert archive.read(resource) == Path("src").joinpath(resource).read_bytes()
         for module in (
@@ -170,6 +191,10 @@ def main(artifact_dir: Path = Path("dist")) -> None:
                 "src/semantix_cache/stores/sqlite_migrations/0001_cache.sql"
             ).read_bytes()
         )
+        for resource in mysql_resources:
+            resource_file = archive.extractfile(f"{root}/src/{resource}")
+            assert resource_file is not None
+            assert resource_file.read() == Path("src").joinpath(resource).read_bytes()
         assert f"{root}/examples/custom_integration.py" in archive.getnames()
         assert f"{root}/examples/custom_store.py" in archive.getnames()
         assert f"{root}/examples/test_custom_store_conformance.py" in archive.getnames()

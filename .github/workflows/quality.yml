@@ -17,7 +17,66 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  mysql:
+    name: MySQL 8.4.12 (Linux Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: packages/cache
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    env:
+      COVERAGE_FILE: .cache/mysql-coverage/.coverage.mysql
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+          version: "0.11.32"
+      - name: Sync locked embedded dependencies
+        run: uv sync --locked --extra dev --managed-python --python "${{ matrix.python-version }}"
+      - name: Verify fixture secret handling and cleanup ownership
+        working-directory: .
+        run: |
+          uv run --project packages/cache --no-sync ruff check --config ruff.toml ops/ci/mysql_fixture.py ops/ci/tests/test_mysql_fixture.py
+          uv run --project packages/cache --no-sync ruff format --config ruff.toml --check ops/ci/mysql_fixture.py ops/ci/tests/test_mysql_fixture.py
+          uv run --project packages/cache --no-sync pytest -c packages/cache/pyproject.toml ops/ci/tests/test_mysql_fixture.py
+      - name: Verify pinned MySQL, mandatory cases and independent wheel
+        shell: bash
+        run: |
+          mkdir -p .cache/mysql-coverage
+          uv run --no-sync python ../../ops/ci/mysql_fixture.py -- bash -euc '
+            uv run --no-sync pytest tests/test_mysql*.py --cov=semantix_cache --cov-report= --cov-fail-under=0 --junitxml=.cache/mysql.xml
+            uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse(\".cache/mysql.xml\").findall(\".//testcase\"); assert len(cases) >= 200 and all(all(c.find(tag) is None for tag in (\"skipped\", \"failure\", \"error\")) for c in cases), \"Mandatory MySQL cases missing, skipped or failed\""
+            uv run --no-sync python -m build
+            uv venv --python .venv/bin/python "$RUNNER_TEMP/mysql-wheel"
+            wheel_python="$RUNNER_TEMP/mysql-wheel/bin/python"
+            uv pip install --python "$wheel_python" "dist/semantix_cache-0.1.0-py3-none-any.whl[mysql]"
+            cd "$RUNNER_TEMP"
+            "$wheel_python" -I "$GITHUB_WORKSPACE/packages/cache/tests/mysql_wheel_smoke.py"
+          '
+      # Coverage alone is not an independent low-threshold gate: embedded merges
+      # this exact Python version before enforcing the unchanged 90% full-package gate.
+      - name: Upload MySQL coverage for the existing package gate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mysql-coverage-${{ matrix.python-version }}
+          path: packages/cache/.cache/mysql-coverage/.coverage.mysql
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
   embedded:
+    needs: mysql
     name: Embedded cache (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -92,10 +151,17 @@ jobs:
         run: >-
           npx --yes pyright@1.1.414 --project ../../pyrightconfig.json
           --pythonpath .venv/bin/python src examples ../../scripts/provider_live_verify.py ../../scripts/provider_live_verification
+      - name: Download this Python version's MySQL coverage
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: mysql-coverage-${{ matrix.python-version }}
+          path: packages/cache/.cache/mysql-coverage
+      - name: Merge isolated MySQL evidence before the unchanged coverage gate
+        run: uv run --no-sync coverage combine --keep .cache/mysql-coverage/.coverage.mysql
       # The shared suite collects real MemoryStore/PgVectorStore and the standalone custom consumer.
       - name: Test store conformance, embedded behavior and coverage
         run: |
-          uv run --no-sync pytest --cov=semantix_cache --junitxml=.cache/embedded.xml
+          uv run --no-sync pytest -m "not mysql" --cov=semantix_cache --cov-append --junitxml=.cache/embedded.xml
           uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/embedded.xml').findall('.//testcase'); redis=[c for c in cases if c.get('classname', '').startswith('tests.test_redis')]; assert redis and all(c.find('skipped') is None for c in redis), 'Required Redis tests skipped'"
           uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/embedded.xml').findall('.//testcase'); pg=[c for c in cases if c.get('classname', '').startswith('tests.test_pgvector')]; assert pg and all(c.find('skipped') is None for c in pg), 'Required PostgreSQL tests skipped'"
           uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/embedded.xml').findall('.//testcase'); sqlite=[c for c in cases if c.get('classname', '').startswith('tests.test_sqlite')]; assert sqlite and all(c.find('skipped') is None for c in sqlite), 'Required SQLite tests skipped'"
@@ -135,7 +201,6 @@ jobs:
           "$wheel_python" tests/redis_wheel_smoke.py
           "$wheel_python" -m pip install --disable-pip-version-check ../client
           "$wheel_python" -c "import sys; import semantix_client; assert 'semantix_cache' not in sys.modules; import semantix_cache; assert semantix_client.CachePolicy is not semantix_cache.CachePolicy"
-
 
   sqlite-windows:
     name: SQLite Windows (Python ${{ matrix.python-version }})
@@ -299,11 +364,12 @@ jobs:
         run: uv run --no-sync ruff check --config ../../ruff.toml --output-format=github .
 
       - name: Run operational Ruff lint
+        working-directory: .
         run: >-
-          uv run --no-sync ruff check
-          --config ../../ruff.toml
+          uv run --project apps/server --no-sync ruff check
+          --config ruff.toml
           --output-format=github
-          ../../ops
+          ops
 
       - name: Check Ruff formatting
         run: uv run --no-sync ruff format --config ../../ruff.toml --check .
@@ -880,6 +946,7 @@ jobs:
     if: ${{ always() }}
     needs:
       - embedded
+      - mysql
       - sqlite-windows
       - sqlite-minimum
       - backend
@@ -905,6 +972,7 @@ jobs:
           CONTAINERS_RESULT: ${{ needs.containers.result }}
           CONTAINER_PLATFORMS_RESULT: ${{ needs.container-platforms.result }}
           DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
+          MYSQL_RESULT: ${{ needs.mysql.result }}
           EMBEDDED_RESULT: ${{ needs.embedded.result }}
           SQLITE_WINDOWS_RESULT: ${{ needs.sqlite-windows.result }}
           SQLITE_MINIMUM_RESULT: ${{ needs.sqlite-minimum.result }}
@@ -917,6 +985,7 @@ jobs:
           SDK_COMPATIBILITY_RESULT: ${{ needs.sdk-compatibility.result }}
           SDK_RESULT: ${{ needs.sdk.result }}
         run: |
+          test "$MYSQL_RESULT" = "success"
           test "$EMBEDDED_RESULT" = "success"
           test "$SQLITE_WINDOWS_RESULT" = "success"
           test "$SQLITE_MINIMUM_RESULT" = "success"

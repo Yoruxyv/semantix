@@ -8,6 +8,15 @@ FastAPI opsional menyusun store resminya dan memiliki kontrak HTTP, authenticati
 otorisasi namespace, orkestrasi request, dan telemetry. Library embedded tidak
 menyediakan authentication server.
 
+Store MySQL khusus embedded berada di `semantix_cache.stores.mysql`, memakai
+PyMySQL opsional yang dipin, satu worker/koneksi sinkron milik store, scoring
+float64 eksak, serta revision/TTL/LRU transaksional. Setup eksplisit memasang
+migrasi immutable dan verifier schema statis dengan definer terkunci; runtime
+hanya mendapat DML tabel yang diperlukan dan EXECUTE verifier. Konstruksi gagal
+memiliki pemilik cleanup process-local yang terbatas serta pemulihan eksplisit.
+Kontrak struktural dan pilihan backend server tetap sama. Lihat
+[storage MySQL (Inggris)](../../../embedded/mysql.md).
+
 ## Alur Runtime
 
 ```mermaid

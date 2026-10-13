@@ -25,6 +25,14 @@ def test_core_and_optional_provider_import_boundaries() -> None:
         "numpy",
         "pydantic",
     }
+    mysql_imports = {
+        "mysql.py": {"pathlib"},
+        "_mysql_cleanup.py": {"os", "uuid"},
+        "_mysql_config.py": {"ipaddress", "pathlib"},
+        "_mysql_format.py": {"struct"},
+        "_mysql_transport.py": {"socket", "ssl", "typing_extensions"},
+        "_mysql_worker.py": {"concurrent", "os", "pymysql", "socket"},
+    }
     for source in root.rglob("*.py"):
         allowed = permitted | (
             {"httpx", "json", "urllib"}
@@ -40,6 +48,7 @@ def test_core_and_optional_provider_import_boundaries() -> None:
             "_sqlite_database.py",
         }:
             allowed |= {"concurrent", "os", "pathlib", "sqlite3", "stat", "struct"}
+        allowed |= mysql_imports.get(source.name, set())
         for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
             if isinstance(node, ast.Import):
                 assert all(alias.name.split(".")[0] in allowed for alias in node.names)
