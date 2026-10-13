@@ -364,11 +364,12 @@ jobs:
         run: uv run --no-sync ruff check --config ../../ruff.toml --output-format=github .
 
       - name: Run operational Ruff lint
+        working-directory: .
         run: >-
-          uv run --no-sync ruff check
-          --config ../../ruff.toml
+          uv run --project apps/server --no-sync ruff check
+          --config ruff.toml
           --output-format=github
-          ../../ops
+          ops
 
       - name: Check Ruff formatting
         run: uv run --no-sync ruff format --config ../../ruff.toml --check .
