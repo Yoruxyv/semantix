@@ -1,4 +1,4 @@
-"""Real disposable MySQL controls; credentials come only from a private receipt."""
+"""Real disposable MySQL controls; non-secret receipt and child-environment credential."""
 
 from __future__ import annotations
 
@@ -33,6 +33,10 @@ def settings() -> dict[str, Any]:
     result: dict[str, Any] = json.loads(Path(receipt).read_text(encoding="utf8"))
     assert result["fixture_owner"] == "semantix-mysql-phase5"
     assert result["server_uuid"]
+    assert "password" not in result, "Fixture receipts must not persist credentials"
+    credential = os.environ.get("MYSQL_TEST_PASSWORD")
+    assert credential, "Launch tests through the owned fixture credential environment"
+    result["password"] = credential
     return result
 
 

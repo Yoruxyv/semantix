@@ -256,9 +256,26 @@ uv run --no-sync python ../../ops/ci/mysql_fixture.py -- uv run --no-sync pytest
 
 The helper uses the digest-pinned MySQL Community **8.4.12** artifact, generated
 credentials and CA/valid/expired certificates. It verifies fixture identity,
-executes mandatory conformance/security/lifecycle tests, then stops only its
-labelled containers and preserves their volumes/private evidence for diagnosis.
-Do not point tests at a developer or production database, publish private fixture
-receipts/keys, or prune Docker globally. Readiness retries are bounded probes;
-business operations and tests are not automatically retried. Full package
-coverage also requires the separate disposable PostgreSQL and Redis fixtures.
+executes mandatory conformance/security/lifecycle tests, then stops and removes
+only its ownership-verified containers. Database volumes, public certificates,
+non-secret connection receipts and sanitized logs remain for diagnosis; generated
+TLS private keys are removed after successful shutdown. Existing older fixtures
+are untouched. Do not point tests at a developer or production database or prune
+Docker globally.
+
+The helper passes the generated password through child environments, never an
+env file, connection receipt or command argument. `MYSQL_TEST_CONFIG` names the
+non-secret receipt; `MYSQL_TEST_PASSWORD` is available only to the trusted test
+child and its descendants. The pinned image's bootstrap password file uses a
+private tmpfs. Host files inherit a private directory ACL verified on Windows,
+or a mode-0700 directory on POSIX, before any keys are created.
+
+The current OS user and Docker administrators are trusted: Docker stores live
+container environments in privileged daemon metadata. Container removal bounds
+that retention; it does not promise forensic erasure from swap, disks or backups.
+Retained database volumes still contain sensitive data and authentication hashes.
+Do not upload fixture directories or volumes as CI artifacts. Cleanup failure is
+reported and retains owned resources for explicit recovery; it never prunes other
+fixtures. Readiness retries are bounded probes; business operations and tests are
+not automatically retried. Full package coverage also requires the separate
+disposable PostgreSQL and Redis fixtures.

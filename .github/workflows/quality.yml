@@ -44,6 +44,12 @@ jobs:
           version: "0.11.32"
       - name: Sync locked embedded dependencies
         run: uv sync --locked --extra dev --managed-python --python "${{ matrix.python-version }}"
+      - name: Verify fixture secret handling and cleanup ownership
+        working-directory: .
+        run: |
+          uv run --project packages/cache --no-sync ruff check --config ruff.toml ops/ci/mysql_fixture.py ops/ci/tests/test_mysql_fixture.py
+          uv run --project packages/cache --no-sync ruff format --config ruff.toml --check ops/ci/mysql_fixture.py ops/ci/tests/test_mysql_fixture.py
+          uv run --project packages/cache --no-sync pytest -c packages/cache/pyproject.toml ops/ci/tests/test_mysql_fixture.py
       - name: Verify pinned MySQL, mandatory cases and independent wheel
         shell: bash
         run: |

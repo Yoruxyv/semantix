@@ -34,13 +34,15 @@ async def main() -> None:
     )
     assert config["fixture_owner"] == "semantix-mysql-phase5"
     assert config["server_version"] == "8.4.12"
+    assert "password" not in config
+    credential = os.environ["MYSQL_TEST_PASSWORD"]
     name = "smx_wheel_" + uuid4().hex
     user, password = "wheel_" + uuid4().hex[:20], uuid4().hex
     admin = pymysql.Connection(
         host=config["tls_hostname"],
         port=config["port"],
         user=config["user"],
-        password=config["password"].encode("utf8"),
+        password=credential.encode("utf8"),
         ssl=ssl.create_default_context(cafile=config["ca_file"]),
         autocommit=True,
         connect_timeout=2,
@@ -75,10 +77,11 @@ async def main() -> None:
                 "tls_hostname",
                 "ca_file",
                 "user",
-                "password",
             )
         }
-        options.update(database=name, embedding_space=adapter.embedding_space)
+        options.update(
+            database=name, embedding_space=adapter.embedding_space, password=credential
+        )
         await MySQLStore.initialize_schema(**options)
         with admin.cursor() as cursor:
             for table, grants in (

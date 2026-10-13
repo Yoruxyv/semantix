@@ -1,7 +1,8 @@
 """Run one command against private, pinned disposable MySQL/TLS fixtures.
 
 This is test infrastructure, not an application launcher. Docker resources carry
-an unpredictable ownership label. Private credentials, keys, logs and data remain outside the repository.
+an unpredictable ownership label. Credentials travel through child environments;
+only sanitized diagnostics and database volumes are retained.
 """
 
 # ruff: noqa: T201
@@ -12,10 +13,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import secrets
 import shutil
 import socket
 import ssl
+import stat
 import subprocess
 import sys
 import tempfile
@@ -29,27 +32,146 @@ IMAGE = "container-registry.oracle.com/mysql/community-server@sha256:7dcc4add918
 OWNER = "semantix-mysql-phase5"
 
 
-def command(args: list[str], *, cwd: Path) -> str:
-    result = subprocess.run(  # noqa: S603 -- fixed tool argv and owned paths, no shell
-        args, cwd=cwd, capture_output=True, text=True, timeout=90, check=False
+def windows_acl(path: Path) -> dict[str, Any]:
+    program = (
+        Path(os.environ["SYSTEMROOT"])
+        / "System32/WindowsPowerShell/v1.0/powershell.exe"
     )
-    if result.returncode:
-        with (cwd / "command-failures.jsonl").open("a", encoding="utf8") as stream:
-            stream.write(
+    script = """$ErrorActionPreference = 'Stop'
+$acl = Get-Acl -LiteralPath $env:SEMANTIX_FIXTURE_ACL_PATH
+@{owner=$acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value;
+  protected=$acl.AreAccessRulesProtected;
+  rules=@($acl.GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier]) | ForEach-Object {
+    @{sid=$_.IdentityReference.Value; type=$_.AccessControlType.ToString()}
+  })} | ConvertTo-Json -Depth 4 -Compress
+"""
+    result = subprocess.run(  # noqa: S603 -- fixed Windows ACL inspection, no secret arguments
+        [str(program), "-NoProfile", "-NonInteractive", "-Command", script],
+        env=dict(
+            os.environ,
+            SEMANTIX_FIXTURE_ACL_PATH=str(path),
+            PSModulePath=str(program.parent / "Modules"),
+        ),
+        capture_output=True,
+        check=True,
+        timeout=10,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    acl: dict[str, Any] = json.loads(result.stdout)
+    return acl
+
+
+def private_directory() -> Path:
+    root = Path(tempfile.mkdtemp(prefix="semantix-mysql-p5-"))
+    if any((parent / ".git").exists() for parent in (root, *root.parents)):
+        raise RuntimeError("Fixture temporary directory must be outside Git worktrees")
+    if os.name == "nt":
+        system = Path(os.environ["SYSTEMROOT"]) / "System32"
+        who = subprocess.run(  # noqa: S603 -- fixed Windows identity query
+            [str(system / "whoami.exe"), "/user", "/fo", "csv", "/nh"],
+            capture_output=True,
+            check=True,
+            timeout=10,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        sid = who.stdout.rsplit(b",", 1)[-1].strip().strip(b'"').decode("ascii")
+        if re.fullmatch(r"S-\d+(?:-\d+)+", sid) is None:
+            raise RuntimeError("Cannot verify fixture Windows identity")
+        subprocess.run(  # noqa: S603 -- restrict only this new empty directory before creating keys
+            [
+                str(system / "icacls.exe"),
+                str(root),
+                "/inheritance:r",
+                "/grant:r",
+                f"*{sid}:(OI)(CI)F",
+                "*S-1-5-18:(OI)(CI)F",
+                "*S-1-5-32-544:(OI)(CI)F",
+            ],
+            capture_output=True,
+            check=True,
+            timeout=10,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        acl = windows_acl(root)
+        allowed = {sid, "S-1-5-18", "S-1-5-32-544"}
+        if (
+            not acl["protected"]
+            or acl["owner"] not in allowed
+            or any(
+                # OWNER RIGHTS applies only to the verified owner.
+                rule["type"] == "Allow" and rule["sid"] not in allowed | {"S-1-3-4"}
+                for rule in acl["rules"]
+            )
+        ):
+            raise RuntimeError("Fixture Windows directory ACL is not private")
+    else:
+        info = root.lstat()
+        if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o077:
+            raise RuntimeError("Fixture temporary directory is not private")
+    return root
+
+
+def private_write(path: Path, data: bytes, *, append: bool = False) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | (os.O_APPEND if append else os.O_EXCL)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags, 0o600)
+    with os.fdopen(descriptor, "ab" if append else "wb") as stream:
+        stream.write(data)
+
+
+def redact(output: str, credential: str | None) -> str:
+    return (
+        output.replace(credential, "[redacted fixture credential]")
+        if credential
+        else output
+    )
+
+
+def command(
+    args: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str] | None = None,
+    credential: str | None = None,
+    include_stderr: bool = False,
+) -> str:
+    if credential is None and env is not None:
+        credential = env.get("MYSQL_ROOT_PASSWORD")
+    try:
+        result = subprocess.run(  # noqa: S603 -- fixed tool argv and owned paths, no shell
+            args,
+            cwd=cwd,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=90,
+            check=False,
+        )
+        code, stdout, stderr = result.returncode, result.stdout, result.stderr
+    except subprocess.TimeoutExpired as failure:
+        code = None
+        stdout = (failure.stdout or b"").decode("utf8", errors="replace")
+        stderr = (failure.stderr or b"").decode("utf8", errors="replace")
+    if code != 0:
+        private_write(
+            cwd / "command-failures.jsonl",
+            (
                 json.dumps(
                     {
-                        "args": args,
-                        "code": result.returncode,
-                        "stdout": result.stdout,
-                        "stderr": result.stderr,
+                        "args": [redact(arg, credential) for arg in args],
+                        "code": code,
+                        "stdout": redact(stdout, credential),
+                        "stderr": redact(stderr, credential),
                     }
                 )
                 + "\n"
-            )
-        raise RuntimeError(
-            "Disposable fixture command failed; private output retained outside the repository"
+            ).encode("utf8"),
+            append=True,
         )
-    return result.stdout.strip()
+        raise RuntimeError(
+            "Disposable fixture command failed or timed out; sanitized output retained outside the repository"
+        ) from None
+    return (stdout + stderr if include_stderr else stdout).strip()
 
 
 def openssl_path() -> str:
@@ -179,13 +301,13 @@ def certificates(root: Path) -> Path:
     return tls
 
 
-def connection(config: dict[str, Any]) -> Any:
+def connection(config: dict[str, Any], credential: str) -> Any:
     context = ssl.create_default_context(cafile=config["ca_file"])
     result = pymysql.Connection(
         host="localhost",
         port=config["port"],
         user="root",
-        password=config["password"].encode("utf8"),
+        password=credential.encode("utf8"),
         ssl=context,
         autocommit=True,
         connect_timeout=2,
@@ -211,16 +333,36 @@ class Fixture:
         self.password = secrets.token_hex(32)
         self.containers: list[str] = []
         self.volumes: list[str] = []
-        self.tls = certificates(root)
+        info = root.lstat()
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or root.is_symlink()
+            or getattr(info, "st_file_attributes", 0)
+            & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+            or (root / "tls").exists()
+        ):
+            raise RuntimeError("Fixture requires a fresh owned temporary directory")
+        self.root_identity = (info.st_dev, info.st_ino)
+        self.tls = root / "tls"
+        self.prepared = False
+        private_write(
+            root / "fixture.json",
+            json.dumps({"owner": OWNER, "fixture_id": self.identifier}).encode("utf8"),
+        )
+
+    def prepare(self) -> None:
+        self.tls = certificates(self.root)
         if os.name != "nt":
             # Only this freshly created TLS directory is changed, never developer data.
+            permissions = f"semantix-mysql-p5-{self.identifier}-permissions"
+            self.containers.append(permissions)
             command(
                 [
                     "docker",
                     "run",
                     "--rm",
                     "--name",
-                    f"semantix-mysql-p5-{self.identifier}-permissions",
+                    permissions,
                     "--label",
                     f"semantix.fixture={self.identifier}",
                     "--label",
@@ -233,12 +375,16 @@ class Fixture:
                     "/bin/sh",
                     IMAGE,
                     "-c",
-                    "chown -R 27:27 /tls && chmod 755 /tls && chmod 600 /tls/server-key.pem && chmod 644 /tls/ca.pem /tls/server.pem /tls/expired.pem",
+                    "chown 27:27 /tls/server-key.pem && chmod 755 /tls && chmod 600 /tls/server-key.pem && chmod 644 /tls/ca.pem /tls/server.pem /tls/expired.pem",
                 ],
                 cwd=self.root,
             )
 
+        self.prepared = True
+
     def start(self, kind: str) -> dict[str, Any]:
+        if not self.prepared:
+            self.prepare()
         config: dict[str, Any] = {
             "fixture_owner": OWNER,
             "fixture_id": self.identifier,
@@ -247,7 +393,6 @@ class Fixture:
             "ca_file": str(self.tls / "ca.pem"),
             "untrusted_ca_file": str(self.tls / "untrusted-ca.pem"),
             "user": "root",
-            "password": self.password,
         }
         common = [
             "--innodb-flush-log-at-trx-commit=1",
@@ -272,12 +417,6 @@ class Fixture:
             cwd=self.root,
         )
         self.volumes.append(volume)
-        env = self.root / (kind + ".env")
-        env.write_text(
-            "MYSQL_ROOT_PASSWORD=" + self.password + "\nMYSQL_ROOT_HOST=%\n",
-            encoding="ascii",
-        )
-        env.chmod(0o600)
         tls = (
             ["--tls-version=", "--require-secure-transport=OFF"]
             if kind == "no_tls"
@@ -289,6 +428,7 @@ class Fixture:
                 "--ssl-key=/tls/server-key.pem",
             ]
         )
+        self.containers.append(name)
         command(
             [
                 "docker",
@@ -299,8 +439,12 @@ class Fixture:
                 f"semantix.fixture={self.identifier}",
                 "--label",
                 f"semantix.owner={OWNER}",
-                "--env-file",
-                str(env),
+                "--env",
+                "MYSQL_ROOT_PASSWORD",
+                "--env",
+                "MYSQL_ROOT_HOST=%",
+                "--tmpfs",
+                "/var/lib/mysql-files:rw,noexec,nosuid,nodev,mode=0700,uid=27,gid=27",
                 "--publish",
                 "127.0.0.1::3306",
                 "--mount",
@@ -312,8 +456,8 @@ class Fixture:
                 *tls,
             ],
             cwd=self.root,
+            env=dict(os.environ, MYSQL_ROOT_PASSWORD=self.password),
         )
-        self.containers.append(name)
         command(["docker", "start", name], cwd=self.root)
         config["port"] = int(
             command(["docker", "port", name, "3306/tcp"], cwd=self.root).rsplit(":", 1)[
@@ -332,7 +476,7 @@ class Fixture:
                         if probe.recv(128):
                             return config
                 else:
-                    database = connection(config)
+                    database = connection(config, self.password)
                     try:
                         with database.cursor() as cursor:
                             cursor.execute("SELECT @@server_uuid,@@version", ())
@@ -349,7 +493,33 @@ class Fixture:
         )
 
     def close(self) -> None:
+        info = self.root.lstat()
+        marker = json.loads((self.root / "fixture.json").read_text())
+        if (info.st_dev, info.st_ino) != self.root_identity or marker != {
+            "owner": OWNER,
+            "fixture_id": self.identifier,
+        }:
+            raise RuntimeError("Fixture directory ownership changed; refusing cleanup")
         for name in reversed(self.containers):
+            existing = command(
+                [
+                    "docker",
+                    "container",
+                    "ls",
+                    "--all",
+                    "--filter",
+                    f"name=^/{name}$",
+                    "--format",
+                    "{{.Names}}",
+                ],
+                cwd=self.root,
+            )
+            if not existing:
+                continue
+            if existing != name:
+                raise RuntimeError(
+                    "Unexpected fixture container identity; refusing cleanup"
+                )
             inspected = json.loads(command(["docker", "inspect", name], cwd=self.root))[
                 0
             ]
@@ -366,6 +536,35 @@ class Fixture:
             ):
                 raise RuntimeError("Fixture ownership changed; refusing cleanup")
             command(["docker", "stop", "--timeout", "5", name], cwd=self.root)
+            logs = command(
+                ["docker", "logs", name],
+                cwd=self.root,
+                credential=self.password,
+                include_stderr=True,
+            )
+            private_write(
+                self.root / (name + ".log"),
+                redact(logs, self.password).encode("utf8"),
+                append=True,
+            )
+            if not (self.root / (name + ".json")).exists():
+                private_write(
+                    self.root / (name + ".json"),
+                    json.dumps(
+                        {
+                            "name": name,
+                            "image": inspected["Image"],
+                            "labels": labels,
+                            "ports": inspected["HostConfig"]["PortBindings"],
+                            "volumes": [
+                                mount["Name"]
+                                for mount in inspected["Mounts"]
+                                if mount["Type"] == "volume"
+                            ],
+                        }
+                    ).encode("utf8"),
+                )
+            command(["docker", "rm", name], cwd=self.root)
         for volume in self.volumes:
             inspected = json.loads(
                 command(["docker", "volume", "inspect", volume], cwd=self.root)
@@ -375,6 +574,15 @@ class Fixture:
                 or inspected["Labels"].get("semantix.owner") != OWNER
             ):
                 raise RuntimeError("Fixture volume ownership changed; refusing cleanup")
+        if self.tls.exists():
+            if self.tls.is_symlink() or not self.tls.resolve().is_relative_to(
+                self.root.resolve()
+            ):
+                raise RuntimeError(
+                    "Fixture key directory ownership changed; refusing cleanup"
+                )
+            for filename in ("ca-key.pem", "untrusted-ca-key.pem", "server-key.pem"):
+                (self.tls / filename).unlink(missing_ok=True)
 
 
 def main() -> int:
@@ -384,35 +592,53 @@ def main() -> int:
     child = args.command[1:] if args.command[:1] == ["--"] else args.command
     if not child:
         parser.error("A test command is required after --")
-    root = Path(tempfile.mkdtemp(prefix="semantix-mysql-p5-"))
-    root.chmod(0o700)
+    root = private_directory()
     fixture = Fixture(root)
     try:
         valid = fixture.start("valid")
         valid["expired_port"] = fixture.start("expired")["port"]
         valid["no_tls_port"] = fixture.start("no_tls")["port"]
         receipt = root / "connection.json"
-        receipt.write_text(json.dumps(valid), encoding="utf8")
-        receipt.chmod(0o600)
-        env = dict(os.environ, MYSQL_TEST_CONFIG=str(receipt))
-        print("Disposable MySQL fixture ready: " + valid["server_version"], flush=True)
-        result = subprocess.run(  # noqa: S603 -- explicit operator-supplied test argv, no shell
-            child, env=env, capture_output=True, check=False, timeout=1800
+        private_write(receipt, json.dumps(valid).encode("utf8"))
+        env = dict(
+            os.environ,
+            MYSQL_TEST_CONFIG=str(receipt),
+            MYSQL_TEST_PASSWORD=fixture.password,
         )
-        (root / "child.stdout.log").write_bytes(result.stdout)
-        (root / "child.stderr.log").write_bytes(result.stderr)
-        for output in (result.stdout, result.stderr):
-            sys.stdout.write(
-                output.decode("utf8", errors="replace").replace(
-                    fixture.password, "[redacted fixture credential]"
-                )
+        print("Disposable MySQL fixture ready: " + valid["server_version"], flush=True)
+        try:
+            result = subprocess.run(  # noqa: S603 -- explicit operator-supplied test argv, no shell
+                child, env=env, capture_output=True, check=False, timeout=1800
             )
-        print("Fixture child exit: " + str(result.returncode), flush=True)
-        return result.returncode
+            code, stdout, stderr = result.returncode, result.stdout, result.stderr
+        except subprocess.TimeoutExpired as failure:
+            code, stdout, stderr = None, failure.stdout or b"", failure.stderr or b""
+        for name, output in (("stdout", stdout), ("stderr", stderr)):
+            safe_output = redact(
+                output.decode("utf8", errors="replace"), fixture.password
+            )
+            private_write(root / ("child." + name + ".log"), safe_output.encode("utf8"))
+            sys.stdout.write(safe_output)
+        if code is None:
+            raise RuntimeError(
+                "Fixture child timed out; sanitized partial output retained"
+            ) from None
+        print("Fixture child exit: " + str(code), flush=True)
+        return code
     finally:
-        fixture.close()
+        primary = sys.exception()
+        try:
+            fixture.close()
+        except Exception as cleanup:
+            if primary is not None:
+                raise BaseExceptionGroup(
+                    "Fixture failed and cleanup also failed", [primary, cleanup]
+                ) from None
+            raise
         print(
-            "Owned fixtures stopped; private data retained at " + str(root), flush=True
+            "Owned containers removed; public diagnostics/data volumes retained at "
+            + str(root),
+            flush=True,
         )
 
 
