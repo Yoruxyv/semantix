@@ -1,0 +1,1 @@
+"""Frozen MySQL schema resources."""

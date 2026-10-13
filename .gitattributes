@@ -1,3 +1,6 @@
 * text=auto eol=lf
 *.sh text eol=lf
 *.ps1 text eol=crlf
+
+# Preserve the accepted schema blueprint bytes across platform checkouts.
+packages/cache/src/semantix_cache/stores/mysql_migrations/0001_shape.json -text whitespace=cr-at-eol

@@ -16,6 +16,7 @@ dependencies = ["numpy>=2.4.6,<2.5", "pydantic>=2.13.4,<3"]
 Repository = "https://github.com/Yoruxyv/semantix"
 
 [project.optional-dependencies]
+mysql = ["PyMySQL==1.2.3"]
 pgvector = ["asyncpg>=0.31,<0.32"]
 redis = ["redis>=8.1.0,<8.2"]
 providers = ["httpx>=0.28.1,<0.29"]
@@ -25,6 +26,8 @@ gemini = ["httpx>=0.28.1,<0.29"]
 ollama = ["httpx>=0.28.1,<0.29"]
 anthropic = ["httpx>=0.28.1,<0.29"]
 dev = [
+  "PyMySQL==1.2.3",
+  "types-PyMySQL==1.2.0.20260923",
   "redis>=8.1.0,<8.2",
   "asyncpg>=0.31,<0.32",
   "asyncpg-stubs>=0.31.3,<0.32",
@@ -54,6 +57,7 @@ where = ["src"]
 semantix_cache = ["py.typed"]
 "semantix_cache.stores.migrations" = ["*.sql"]
 "semantix_cache.stores.sqlite_migrations" = ["*.sql"]
+"semantix_cache.stores.mysql_migrations" = ["*.sql", "*.json"]
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
@@ -61,7 +65,7 @@ pythonpath = ["."]
 asyncio_mode = "auto"
 cache_dir = ".cache/pytest"
 testpaths = ["tests"]
-markers = ["pgvector: requires a disposable PostgreSQL database with vector installed", "redis: requires disposable Redis 8.10.2"]
+markers = ["mysql: requires explicitly owned verified-TLS MySQL Community 8.4", "pgvector: requires a disposable PostgreSQL database with vector installed", "redis: requires disposable Redis 8.10.2"]
 
 [tool.coverage.run]
 branch = true

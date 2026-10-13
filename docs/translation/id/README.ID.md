@@ -4,7 +4,7 @@
 
 <p><strong>Semantic caching asinkron untuk Python.</strong></p>
 
-<p>Penyimpanan memory, SQLite, PostgreSQL, atau Redis. Alur generation tetap Anda kendalikan.</p>
+<p>Penyimpanan memory, SQLite, MySQL, PostgreSQL, atau Redis. Alur generation tetap Anda kendalikan.</p>
 
 <p>
   <img src="https://img.shields.io/badge/Python-3.11%E2%80%933.14-555555?logo=python&amp;logoColor=FFD43B&amp;labelColor=3776AB" alt="Python 3.11–3.14" />
@@ -113,7 +113,7 @@ Context manager menutup facade dan store; resource lain yang diinjeksi tetap dim
 | Aspek | Ringkasan |
 | --- | --- |
 | **Runtime** | Python asinkron, in-process |
-| **Storage** | MemoryStore, SQLite lokal, PostgreSQL/pgvector atau Redis opsional |
+| **Storage** | MemoryStore, SQLite lokal, MySQL, PostgreSQL/pgvector atau Redis opsional |
 | **Generation** | Callable asinkron milik Anda |
 
 ## Mengapa Semantix?
@@ -141,7 +141,7 @@ Kandidat yang memenuhi syarat harus lolos validasi dan konfirmasi TTL/revisi
 secara atomik sebelum hit dikembalikan.
 
 Aplikasi memiliki masa hidup embedder, generator, dan store. CacheStore dapat berupa
-MemoryStore, SQLiteStore, PgVectorStore/RedisStore opsional, atau implementasi Anda. Kebijakan lain mengatur
+MemoryStore, SQLiteStore, MySQLStore/PgVectorStore/RedisStore opsional, atau implementasi Anda. Kebijakan lain mengatur
 read/generation/write; coalescing opt-in menambahkan penantian dan lookup terkonfirmasi
 milik setiap follower. Lihat [kontrak cache](../../../packages/cache/README.md#contract).
 
@@ -295,6 +295,17 @@ melalui lock writer seluruh file. Gunakan disk lokal privat, hentikan pekerjaan
 aktif sebelum menutup store, dan baca [setup serta batas SQLite (Inggris)](../../embedded/storage.md#sqlite-local-file-persistence)
 untuk TTL jam host, pembatalan di sekitar COMMIT, pemulihan, dan durabilitas.
 SQLite hanya untuk paket embedded; backend/dashboard dan inspector belum memakainya.
+
+Opsional `semantix_cache.stores.mysql.MySQLStore` memakai PyMySQL 1.2.3 yang dipin,
+worker milik store, TLS terverifikasi, serta setup eksplisit pada database khusus
+MySQL Community 8.4.12. Pencarian float64 eksak dan kontrak CacheStore tetap sama.
+Pasang extra `[mysql]` dari wheel lokal; baca [setup dan batas MySQL (Inggris)](../../embedded/mysql.md)
+untuk grant runtime minimum, verifier schema dengan akun definer terkunci, deadline,
+ketidakpastian COMMIT, serta pemulihan konstruksi gagal dengan kepemilikan terbatas.
+MySQL hanya untuk paket embedded; backend dashboard tidak ditambahkan. Klien
+Windows/Linux Python 3.11–3.14 telah diuji; workflow baru menargetkan Linux,
+tetapi eksekusi hosted masih menunggu. Kesenjangan cakupan Windows/MySQL hosted
+dijelaskan secara terbuka.
 
 Mulai dengan MemoryStore untuk state process-local yang terbatas. Opsional
 `semantix_cache.stores.pgvector.PgVectorStore` mempertahankan data antarproses/restart
@@ -665,7 +676,7 @@ print(result.response, result.cache_hit)
 | [Panduan paket cache](../../../packages/cache/README.md) | Quick start embedded, kebijakan, kepemilikan, dan kompatibilitas kanonis |
 | [Provider embedded](../../embedded/providers.md) | Adapter yang dipelihara dan embedding/generation kustom |
 | [Identitas konteks dan migrasi](../../embedded/context-identity-and-migration.md) | Scope eksplisit, revisi embedding, dan migrasi aman |
-| [Storage embedded](../../embedded/storage.md) | Memory, PostgreSQL opsional, dan database aplikasi |
+| [Storage embedded](../../embedded/storage.md) | Memory, SQLite, MySQL, PostgreSQL/Redis opsional, dan database aplikasi |
 | [Contoh](../../../packages/cache/examples/) | Generation dan store yang dikendalikan aplikasi |
 | [Kualitas reuse yang ditinjau](../../../packages/cache/benchmarks/reuse_quality/README.md) | Baseline semantik, kontrol leksikal, pemisahan calibration/held-out, dan batas bukti |
 | [Metodologi benchmark](../../../packages/cache/benchmarks/README.md) | Workload runtime lokal yang reproducible beserta batasannya |

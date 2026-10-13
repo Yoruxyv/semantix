@@ -3,7 +3,7 @@
 `semantix-cache` runs in your Python process. It does not require the Semantix
 FastAPI server. Its async engine consumes the structural
 [`CacheStore` protocol](../../packages/cache/src/semantix_cache/protocols.py), not SQL.
-The maintained stores are `MemoryStore`, file-backed `SQLiteStore`, optional `PgVectorStore` and optional `RedisStore`.
+The maintained stores are `MemoryStore`, file-backed `SQLiteStore`, optional `MySQLStore`, `PgVectorStore` and `RedisStore`.
 The separate `semantix_client` package is the optional/reference HTTP client.
 
 The server/workbench delegates to MemoryStore, PgVectorStore and RedisStore. See
@@ -38,6 +38,7 @@ for authorization, search costs and pagination limitations.
 | `SQLiteStore` | Local dedicated WAL file | stdlib sqlite3 with a patched linked runtime | Owns one connection and worker |
 | `PgVectorStore` | PostgreSQL/pgvector | `semantix-cache[pgvector]` adds asyncpg | Borrows `pool=`; `connect()` creates an owned pool |
 | `RedisStore` | Redis primary; operator-managed persistence | `semantix-cache[redis]` adds redis-py | Borrows `client=`; `connect()` creates an owned client/pool |
+| `MySQLStore` | Dedicated MySQL Community 8.4.12 database | `[mysql]` adds pinned PyMySQL 1.2.3 | Owns one connection and worker; explicit setup |
 | Your `CacheStore` | Your implementation | Your application chooses | Your implementation documents ownership |
 
 MemoryStore is bounded and appropriate for tests, local use and small ephemeral
@@ -66,6 +67,10 @@ exports from `semantix_cache` are unchanged by adding persistent storage.
 
 See [Redis storage](redis.md) for its supported versions, exact scan,
 explicit setup, TTL/LRU, failure handling and persistence boundary.
+
+See [MySQL storage](mysql.md) for verified TLS, the locked schema verifier,
+explicit least-privileged setup, exact-search costs and failed-construction
+recovery. MySQLStore is embedded-only and has no optional inspection/clear_all API.
 
 ## SQLite: local file persistence
 
@@ -422,7 +427,7 @@ storage; replace its dictionary with your own infrastructure. Run it with
 `uv run --no-sync python -m examples.custom_store`, and inject it into
 `AsyncSemanticCache(embedder=my_embedder, store=my_store)`.
 
-For MySQL, Redis, Qdrant, Weaviate, Milvus, SQLite extensions or proprietary services,
+For additional backends such as Qdrant, Weaviate, Milvus, SQLite extensions or proprietary services,
 verify these ten requirements before choosing an implementation:
 
 1. **Representation:** bounded numeric vectors, finite components, exact dimensions,
@@ -444,7 +449,8 @@ verify these ten requirements before choosing an implementation:
 10. **Conformance:** run the [developer kit](cache-store-conformance.md) with your
     factory and authoritative expiry fixture; add connection/transaction failure cases.
 
-Only shipped, tested adapters are maintained. There is no first-party MySQL adapter.
+Only shipped, tested adapters are maintained. MySQLStore has its own verified-TLS,
+dedicated-database boundary described above.
 A deployment without suitable vector similarity cannot satisfy semantic lookup just
 because it supports SQL. Custom embedding adapters and generation callables remain
 available for providers/versions whose external APIs change independently.
