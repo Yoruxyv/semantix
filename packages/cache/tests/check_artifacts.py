@@ -62,6 +62,9 @@ def main(artifact_dir: Path = Path("dist")) -> None:
         assert ">=0.31" in postgres[0]
         assert "<0.32" in postgres[0]
         assert "semantix_cache/stores/pgvector.py" in names
+        for module in ("__init__", "config", "inspection"):
+            path = f"semantix_cache/stores/_backends/postgres/{module}.py"
+            assert archive.read(path) == Path("src").joinpath(path).read_bytes()
         redis = [item for item in requirements if 'extra == "redis"' in item]
         assert len(redis) == 1
         assert redis[0].startswith("redis")
