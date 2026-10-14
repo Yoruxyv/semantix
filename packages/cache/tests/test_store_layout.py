@@ -106,6 +106,7 @@ import semantix_cache.stores._backends
 import semantix_cache.stores._backends.mysql
 import semantix_cache.stores._backends.sqlite
 import semantix_cache.stores._backends.redis
+import semantix_cache.stores._backends.redis.format
 import semantix_cache.stores._backends.postgres
 assert not {'pymysql', 'asyncpg', 'redis', 'sqlite3'} & sys.modules.keys()
 """

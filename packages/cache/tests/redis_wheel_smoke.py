@@ -43,6 +43,17 @@ async def main() -> None:
                 await runtime.validate_schema()
                 match = await runtime.find_nearest((1, 0), namespace="default")
                 assert match and match.entry.response == "wheel response"
+                page = await runtime.inspect_entries()
+                assert page.total == 1 and len(page.items) == 1
+                assert page.items[0].response is None
+                assert page.items[0].hit_count == 0
+                assert (
+                    await runtime.inspect_entry(value.cache_key, namespaces=()) is None
+                )
+                detail = await runtime.inspect_entry(
+                    value.cache_key, namespaces=("default",)
+                )
+                assert detail is not None and detail.response == value.response
                 assert await runtime.record_hit(
                     value.cache_key,
                     namespace="default",

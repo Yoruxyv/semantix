@@ -75,6 +75,9 @@ def main(artifact_dir: Path = Path("dist")) -> None:
             archive.read("semantix_cache/stores/_backends/redis/scripts.py")
             == Path("src/semantix_cache/stores/_backends/redis/scripts.py").read_bytes()
         )
+        for module in ("config", "format", "inspection"):
+            path = f"semantix_cache/stores/_backends/redis/{module}.py"
+            assert archive.read(path) == Path("src").joinpath(path).read_bytes()
         mysql = [item for item in requirements if 'extra == "mysql"' in item]
         assert mysql == ['PyMySQL==1.2.3; extra == "mysql"']
         for module in (
