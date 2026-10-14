@@ -8,10 +8,10 @@ Neither construction nor ordinary cache operations create or adopt database obje
 from __future__ import annotations
 
 import asyncio
-import re
+import re as _re
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass as _dataclass
 from datetime import datetime
 from hashlib import sha256
 from importlib.resources import files
@@ -51,9 +51,18 @@ from ..inspection import (
     InspectionSort,
     inspection_arguments,
     inspection_namespaces,
-    remaining,
 )
+from ..inspection import remaining as _remaining
 from ..models import CacheEntry, CacheMatch, EmbeddingSpace
+from ._backends.postgres import config as _postgres_config
+from ._backends.postgres.config import _Configuration, _positive_timeout, _quote
+from ._backends.postgres.inspection import inspect_page as _inspect_page
+
+# Preserve the existing module bindings without moving their definitions back.
+re = _re
+dataclass = _dataclass
+remaining = _remaining
+_IDENTIFIER = _postgres_config._IDENTIFIER
 
 _MARKER = "semantix-cache:pgvector:v1"
 _MIGRATION = (
@@ -62,84 +71,6 @@ _MIGRATION = (
     .read_text(encoding="utf-8")
 )
 _CHECKSUM = sha256(_MIGRATION.encode("utf-8")).hexdigest()
-_IDENTIFIER = re.compile(r"[a-z_][a-z0-9_]{0,62}", re.ASCII)
-
-
-def _quote(name: str) -> str:
-    # Catalog-owned extension identifiers may use mixed case; escape every quote.
-    return '"' + name.replace('"', '""') + '"'
-
-
-def _positive_timeout(value: float) -> float:
-    result = finite_number(value, minimum=0.0, maximum=86400.0)
-    if result == 0:
-        raise ValueError("Timeout must be positive")
-    return result
-
-
-@dataclass(frozen=True)
-class _Configuration:
-    space: EmbeddingSpace
-    schema: str
-    prefix: str
-    capacity: int
-    ttl: float | None
-    timeout: float
-    close_timeout: float
-
-    def __post_init__(self) -> None:
-        try:
-            if not isinstance(self.space, EmbeddingSpace):
-                raise CacheConfigurationError("Invalid PostgreSQL embedding space")
-            space = EmbeddingSpace.model_validate(self.space.model_dump())
-            if (
-                space.dimensions > 16000
-                or len(space.identity) > 1024
-                or "\0" in space.identity
-            ):
-                raise ValueError("Space exceeds database limits")
-            if (
-                not isinstance(self.schema, str)
-                or _IDENTIFIER.fullmatch(self.schema) is None
-            ):
-                raise ValueError("Invalid schema")
-            if self.schema.startswith("pg_") or self.schema == "information_schema":
-                raise ValueError("Reserved schema")
-            if not isinstance(self.prefix, str) or (
-                self.prefix and _IDENTIFIER.fullmatch(self.prefix) is None
-            ):
-                raise ValueError("Invalid prefix")
-            for suffix in (
-                "cache_entries",
-                "binding_state",
-                "schema_migrations",
-                "scope_idx",
-            ):
-                if _IDENTIFIER.fullmatch(self.prefix + suffix) is None:
-                    raise ValueError("Identifier exceeds database limits")
-            if (
-                isinstance(self.capacity, bool)
-                or not isinstance(self.capacity, int)
-                or not 1 <= self.capacity <= 100000
-            ):
-                raise ValueError("Invalid capacity")
-            object.__setattr__(self, "space", space)
-            object.__setattr__(self, "ttl", resolve_ttl(None, self.ttl))
-            object.__setattr__(self, "timeout", _positive_timeout(self.timeout))
-            object.__setattr__(
-                self, "close_timeout", _positive_timeout(self.close_timeout)
-            )
-        except ValueError:
-            raise CacheConfigurationError(
-                "Invalid PostgreSQL store configuration"
-            ) from None
-
-    def relation(self, suffix: str) -> str:
-        return _quote(self.schema) + "." + _quote(self.prefix + suffix)
-
-    @property
-    def lock_key(self) -> str:
-        return "semantix-cache:" + self.schema + ":" + self.prefix
 
 
 class PgVectorStore:
@@ -813,12 +744,6 @@ class PgVectorStore:
                 cache_key = cache_key_value(cache_key)
             except ValueError:
                 raise CacheValidationError("Invalid inspection key") from None
-        order = {
-            "newest": "created_at DESC, cache_key, namespace",
-            "oldest": "created_at, cache_key, namespace",
-            "most_hit": "hit_count DESC, created_at DESC, cache_key, namespace",
-            "nearest_expiry": "expires_at ASC NULLS LAST, created_at DESC, cache_key, namespace",
-        }[sort]
         async with (
             self._connection() as connection,
             connection.transaction(isolation="repeatable_read", readonly=True),
@@ -832,61 +757,13 @@ class PgVectorStore:
                 cache_key,
                 None if search is None else search.strip(),
             )
-            eligible = f"""SELECT cache_key, namespace, prompt, created_at, expires_at, hit_count, last_accessed_at, access_order FROM {layout["entries"]} WHERE embedding_space=$1 AND embedding_dimensions=$2
-                AND (expires_at IS NULL OR expires_at>transaction_timestamp())
-                AND ($3::text IS NULL OR namespace=$3)
-                AND ($4::text[] IS NULL OR namespace=ANY($4))"""
-            filtered = "($5::text IS NULL OR cache_key=$5) AND ($6::text IS NULL OR POSITION(LOWER($6) IN LOWER(prompt))>0)"
-            total = await connection.fetchval(
-                f"SELECT count(*) FROM ({eligible}) eligible WHERE {filtered}", *scope
-            )
-            rows = await connection.fetch(
-                f"""WITH eligible AS MATERIALIZED ({eligible}), ranked AS (
-                SELECT *, row_number() OVER (ORDER BY access_order DESC, created_at DESC, cache_key, namespace) AS recency_rank
-                FROM eligible), page AS MATERIALIZED (
-                SELECT * FROM ranked WHERE {filtered} ORDER BY {order} OFFSET $7 LIMIT $8)
-                SELECT page.*, left(e.response,240) AS response_preview,
-                    length(e.response)>240 AS response_preview_truncated,
-                    CASE WHEN $5::text IS NULL THEN NULL ELSE e.response END AS response,
-                    transaction_timestamp() AS observed_at
-                FROM page JOIN {layout["entries"]} e
-                ON e.embedding_space=$1 AND e.embedding_dimensions=$2
-                    AND e.namespace=page.namespace AND e.cache_key=page.cache_key
-                ORDER BY {", ".join("page." + field.strip() for field in order.split(","))}""",
-                *scope,
-                offset,
-                limit,
-            )
-            try:
-                metadata = tuple(
-                    InspectionEntry(
-                        cache_key=row["cache_key"],
-                        namespace=row["namespace"],
-                        prompt=row["prompt"],
-                        response_preview=row["response_preview"],
-                        response_preview_truncated=row["response_preview_truncated"],
-                        response=row["response"],
-                        created_at=row["created_at"],
-                        expires_at=row["expires_at"],
-                        remaining_ttl_seconds=remaining(
-                            row["expires_at"], row["observed_at"]
-                        ),
-                        hit_count=row["hit_count"],
-                        last_accessed_at=row["last_accessed_at"],
-                        recency_rank=row["recency_rank"],
-                    )
-                    for row in rows
-                )
-            except ValueError:
-                raise CacheStoreError(
-                    "Invalid PostgreSQL inspection metadata"
-                ) from None
-            return InspectionPage(
-                items=metadata,
-                total=int(total),
+            return await _inspect_page(
+                connection,
+                layout=layout,
+                scope=scope,
                 offset=offset,
                 limit=limit,
-                has_more=offset + len(metadata) < int(total),
+                sort=sort,
             )
 
     async def inspect_entries(

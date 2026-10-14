@@ -54,7 +54,11 @@ lives in `semantix_cache.stores._backends.redis.scripts`; its public module keep
 the operation-time script bindings. Public store class definitions stay at their
 existing import paths. The MySQL cleanup diagnostic type retains its original
 qualified definition, while one private MySQL registry owns failed construction.
-Frozen migration resources remain in their existing backend-specific packages.
+PostgreSQL configuration and read-only inspection projection live under
+`semantix_cache.stores._backends.postgres`. PgVectorStore retains pool ownership,
+transactions, schema setup and dynamic hooks; inspection receives its already
+borrowed connection inside the same read-only transaction. Frozen migration
+resources remain in their existing backend-specific packages.
 
 In the hardened Compose deployment, the browser and other HTTP clients reach the
 frontend Nginx gateway, which serves the browser assets and balances API requests across
