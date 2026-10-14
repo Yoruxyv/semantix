@@ -12,9 +12,9 @@ from typing import Self
 from .._semantics import cache_key_value, namespace_value
 from ..errors import CacheConfigurationError, CacheStoreError, CacheValidationError
 from ..models import CacheEntry, CacheMatch, EmbeddingSpace
-from ._sqlite_database import Database
-from ._sqlite_format import Configuration, micros, safe, timeout
-from ._sqlite_worker import Worker
+from ._backends.sqlite.database import Database
+from ._backends.sqlite.format import Configuration, micros, safe, timeout
+from ._backends.sqlite.worker import Worker
 
 
 class SQLiteStore:

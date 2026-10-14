@@ -12,7 +12,7 @@ import pytest
 
 from examples.store_conformance import SPACE
 from examples.store_conformance.cases import entry
-from semantix_cache.stores._mysql_format import micros
+from semantix_cache.stores._backends.mysql.format import micros
 from semantix_cache.stores.mysql import MySQLStore
 
 from .mysql_helpers import admin, new_database, options

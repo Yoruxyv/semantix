@@ -10,9 +10,9 @@ from typing import NoReturn, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from .._semantics import normalized_vector
-from ..errors import CacheStoreError, SemantixCacheError
-from ..models import CacheEntry
+from ...._semantics import normalized_vector
+from ....errors import CacheStoreError, SemantixCacheError
+from ....models import CacheEntry
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 MIN_US = -62135596800000000

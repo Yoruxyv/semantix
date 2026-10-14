@@ -68,20 +68,35 @@ def main(artifact_dir: Path = Path("dist")) -> None:
         assert ">=8.1.0" in redis[0]
         assert "<8.2" in redis[0]
         assert "semantix_cache/stores/redis.py" in names
-        assert "semantix_cache/stores/_redis_scripts.py" in names
+        assert (
+            archive.read("semantix_cache/stores/_backends/redis/scripts.py")
+            == Path("src/semantix_cache/stores/_backends/redis/scripts.py").read_bytes()
+        )
         mysql = [item for item in requirements if 'extra == "mysql"' in item]
         assert mysql == ['PyMySQL==1.2.3; extra == "mysql"']
         for module in (
             "mysql",
             "_mysql_cleanup",
-            "_mysql_config",
-            "_mysql_database",
-            "_mysql_format",
-            "_mysql_schema",
-            "_mysql_transport",
-            "_mysql_worker",
+            "_backends/__init__",
+            "_backends/mysql/__init__",
+            "_backends/mysql/cleanup",
+            "_backends/mysql/config",
+            "_backends/mysql/database",
+            "_backends/mysql/format",
+            "_backends/mysql/schema",
+            "_backends/mysql/transport",
+            "_backends/mysql/worker",
+            "_backends/redis/__init__",
         ):
             assert f"semantix_cache/stores/{module}.py" in names
+        assert not any(
+            name.startswith(
+                ("semantix_cache/stores/_mysql_", "semantix_cache/stores/_sqlite_")
+            )
+            and name != "semantix_cache/stores/_mysql_cleanup.py"
+            for name in names
+        )
+        assert "semantix_cache/stores/_redis_scripts.py" not in names
         mysql_resources = {
             "semantix_cache/stores/mysql_migrations/0001_cache.sql",
             "semantix_cache/stores/mysql_migrations/0001_shape.json",
@@ -99,9 +114,10 @@ def main(artifact_dir: Path = Path("dist")) -> None:
             assert archive.read(resource) == Path("src").joinpath(resource).read_bytes()
         for module in (
             "sqlite",
-            "_sqlite_format",
-            "_sqlite_worker",
-            "_sqlite_database",
+            "_backends/sqlite/__init__",
+            "_backends/sqlite/format",
+            "_backends/sqlite/worker",
+            "_backends/sqlite/database",
         ):
             assert f"semantix_cache/stores/{module}.py" in names
         for module in (
@@ -175,7 +191,16 @@ def main(artifact_dir: Path = Path("dist")) -> None:
             ), relative
         assert f"{root}/src/semantix_cache/py.typed" in archive.getnames()
         assert (
-            f"{root}/src/semantix_cache/stores/_redis_scripts.py" in archive.getnames()
+            f"{root}/src/semantix_cache/stores/_backends/redis/scripts.py"
+            in archive.getnames()
+        )
+        script_file = archive.extractfile(
+            f"{root}/src/semantix_cache/stores/_backends/redis/scripts.py"
+        )
+        assert script_file is not None
+        assert (
+            script_file.read()
+            == Path("src/semantix_cache/stores/_backends/redis/scripts.py").read_bytes()
         )
         for module in ("observability", "_coalescing_metrics"):
             assert f"{root}/src/semantix_cache/{module}.py" in archive.getnames()

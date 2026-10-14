@@ -15,8 +15,13 @@ from examples.store_conformance import SPACE
 from examples.store_conformance.cases import entry
 from semantix_cache import CacheConfigurationError, CacheStoreError, EmbeddingSpace
 from semantix_cache._semantics import nearest_index, normalized_vector
-from semantix_cache.stores import _mysql_schema as schema
-from semantix_cache.stores._mysql_format import HEADER, MAX_INT, MAX_US, decode_vector
+from semantix_cache.stores._backends.mysql import schema
+from semantix_cache.stores._backends.mysql.format import (
+    HEADER,
+    MAX_INT,
+    MAX_US,
+    decode_vector,
+)
 from semantix_cache.stores.mysql import MySQLStore
 
 from .mysql_helpers import admin, new_database, options, store_factory

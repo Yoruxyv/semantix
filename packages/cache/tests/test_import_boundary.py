@@ -26,12 +26,12 @@ def test_core_and_optional_provider_import_boundaries() -> None:
         "pydantic",
     }
     mysql_imports = {
-        "mysql.py": {"pathlib"},
-        "_mysql_cleanup.py": {"os", "uuid"},
-        "_mysql_config.py": {"ipaddress", "pathlib"},
-        "_mysql_format.py": {"struct"},
-        "_mysql_transport.py": {"socket", "ssl", "typing_extensions"},
-        "_mysql_worker.py": {"concurrent", "os", "pymysql", "socket"},
+        "stores/mysql.py": {"pathlib"},
+        "stores/_backends/mysql/cleanup.py": {"os", "uuid"},
+        "stores/_backends/mysql/config.py": {"ipaddress", "pathlib"},
+        "stores/_backends/mysql/format.py": {"struct"},
+        "stores/_backends/mysql/transport.py": {"socket", "ssl", "typing_extensions"},
+        "stores/_backends/mysql/worker.py": {"concurrent", "os", "pymysql", "socket"},
     }
     for source in root.rglob("*.py"):
         allowed = permitted | (
@@ -41,14 +41,14 @@ def test_core_and_optional_provider_import_boundaries() -> None:
         )
         if "stores" in source.relative_to(root).parts:
             allowed |= {"asyncpg", "importlib", "__future__", "redis", "json", "urllib"}
-        if source.name in {
-            "sqlite.py",
-            "_sqlite_format.py",
-            "_sqlite_worker.py",
-            "_sqlite_database.py",
+        if source.relative_to(root).as_posix() in {
+            "stores/sqlite.py",
+            "stores/_backends/sqlite/format.py",
+            "stores/_backends/sqlite/worker.py",
+            "stores/_backends/sqlite/database.py",
         }:
             allowed |= {"concurrent", "os", "pathlib", "sqlite3", "stat", "struct"}
-        allowed |= mysql_imports.get(source.name, set())
+        allowed |= mysql_imports.get(source.relative_to(root).as_posix(), set())
         for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
             if isinstance(node, ast.Import):
                 assert all(alias.name.split(".")[0] in allowed for alias in node.names)

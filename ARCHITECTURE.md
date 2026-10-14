@@ -48,6 +48,14 @@ table DML plus verifier EXECUTE. Failed construction has bounded process-local
 cleanup ownership and explicit recovery. It does not change the structural port
 or server backend selection. See [MySQL storage](docs/embedded/mysql.md).
 
+Private MySQL and SQLite helpers live in their respective
+`semantix_cache.stores._backends.mysql` and `._backends.sqlite` packages. Redis Lua
+lives in `semantix_cache.stores._backends.redis.scripts`; its public module keeps
+the operation-time script bindings. Public store class definitions stay at their
+existing import paths. The MySQL cleanup diagnostic type retains its original
+qualified definition, while one private MySQL registry owns failed construction.
+Frozen migration resources remain in their existing backend-specific packages.
+
 In the hardened Compose deployment, the browser and other HTTP clients reach the
 frontend Nginx gateway, which serves the browser assets and balances API requests across
 backend-a and backend-b. A development browser uses Vite and can reach the backend

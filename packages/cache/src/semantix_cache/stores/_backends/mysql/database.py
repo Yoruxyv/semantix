@@ -10,18 +10,18 @@ from typing import cast
 
 import numpy as np
 
-from .._semantics import (
+from ...._semantics import (
     cache_key_value,
     namespace_value,
     nearest_index,
     normalized_vector,
     resolve_ttl,
 )
-from ..errors import CacheConfigurationError, CacheValidationError
-from ..models import CacheEntry, CacheMatch
-from . import _mysql_schema as schema
-from ._mysql_config import Configuration
-from ._mysql_format import (
+from ....errors import CacheConfigurationError, CacheValidationError
+from ....models import CacheEntry, CacheMatch
+from . import schema
+from .config import Configuration
+from .format import (
     MAX_INT,
     MAX_PAYLOAD,
     MAX_US,
@@ -31,7 +31,7 @@ from ._mysql_format import (
     micros,
     timestamp,
 )
-from ._mysql_worker import Job
+from .worker import Job
 
 
 class Database:

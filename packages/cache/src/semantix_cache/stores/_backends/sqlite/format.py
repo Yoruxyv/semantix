@@ -17,9 +17,9 @@ from typing import NoReturn, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from .._semantics import finite_number, normalized_vector, resolve_ttl
-from ..errors import CacheConfigurationError, CacheStoreError, SemantixCacheError
-from ..models import CacheEntry, EmbeddingSpace
+from ...._semantics import finite_number, normalized_vector, resolve_ttl
+from ....errors import CacheConfigurationError, CacheStoreError, SemantixCacheError
+from ....models import CacheEntry, EmbeddingSpace
 
 try:
     import sqlite3

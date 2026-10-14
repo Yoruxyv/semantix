@@ -10,8 +10,8 @@ from hashlib import sha256
 from importlib.resources import files
 from typing import Any
 
-from ..errors import CacheStoreError
-from ._mysql_worker import Job
+from ....errors import CacheStoreError
+from .worker import Job
 
 OWNER = b"semantix-cache:mysql:v1"
 MIGRATION = (

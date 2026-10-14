@@ -10,8 +10,8 @@ import pytest
 
 from examples.store_conformance import SPACE, StoreFactory
 from semantix_cache import CacheStoreError
-from semantix_cache.stores import _mysql_schema as schema
-from semantix_cache.stores._mysql_worker import Job
+from semantix_cache.stores._backends.mysql import schema
+from semantix_cache.stores._backends.mysql.worker import Job
 from semantix_cache.stores.mysql import MySQLStore
 
 from .mysql_helpers import admin, admin_connection, new_database, options, store_factory

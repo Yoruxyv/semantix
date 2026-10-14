@@ -23,22 +23,22 @@ except ModuleNotFoundError as error:
         "MySQLStore requires the optional semantix-cache[mysql] extra"
     ) from None
 
-from .._lifecycle import Lifecycle
-from ..errors import (
+from ...._lifecycle import Lifecycle
+from ....errors import (
     CacheConfigurationError,
     CacheStoreError,
     CacheTimeoutError,
     CacheValidationError,
     SemantixCacheError,
 )
-from ._mysql_config import (
+from .config import (
     CONNECT_TIMEOUT,
     IO_TIMEOUT,
     SETUP_READ_TIMEOUT,
     Configuration,
 )
-from ._mysql_format import safe
-from ._mysql_transport import Resources
+from .format import safe
+from .transport import Resources
 
 T = TypeVar("T")
 Row = tuple[Any, ...]

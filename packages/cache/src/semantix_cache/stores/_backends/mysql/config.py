@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 
-from .._semantics import finite_number, resolve_ttl
-from ..errors import CacheConfigurationError
-from ..models import EmbeddingSpace
-from ._mysql_format import safe
+from ...._semantics import finite_number, resolve_ttl
+from ....errors import CacheConfigurationError
+from ....models import EmbeddingSpace
+from .format import safe
 
 IO_TIMEOUT = 0.5
 # Durable provisioning can exceed a normal cache read stall.

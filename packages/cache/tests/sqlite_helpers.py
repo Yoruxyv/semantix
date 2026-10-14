@@ -16,8 +16,8 @@ from numpy.typing import NDArray
 from examples.store_conformance import SPACE, HitMetadata, StoreCase, StoreFactory
 from semantix_cache import EmbeddingSpace
 from semantix_cache._semantics import nearest_index
-from semantix_cache.stores import _sqlite_database as database
-from semantix_cache.stores._sqlite_format import timestamp
+from semantix_cache.stores._backends.sqlite import database
+from semantix_cache.stores._backends.sqlite.format import timestamp
 from semantix_cache.stores.sqlite import SQLiteStore
 
 
