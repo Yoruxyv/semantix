@@ -8,19 +8,25 @@ import re
 from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC as _UTC
+from datetime import datetime
+from datetime import timedelta as _timedelta
 from hashlib import sha256
-from importlib.metadata import version
+from importlib.metadata import version as _version
 from types import TracebackType
-from typing import NoReturn, Self, cast
+from typing import NoReturn as _NoReturn
+from typing import Self, cast
 from urllib.parse import urlsplit
 
 import numpy as np
 from numpy.typing import NDArray
 
 try:
-    from redis.asyncio import ConnectionPool, Redis
-    from redis.asyncio.connection import Connection, DefaultParser, SSLConnection
+    from redis.asyncio import ConnectionPool as _ConnectionPool
+    from redis.asyncio import Redis
+    from redis.asyncio.connection import Connection as _Connection
+    from redis.asyncio.connection import DefaultParser as _DefaultParser
+    from redis.asyncio.connection import SSLConnection as _SSLConnection
     from redis.asyncio.retry import Retry
     from redis.backoff import NoBackoff
     from redis.exceptions import ConnectionError as RedisConnectionError
@@ -34,12 +40,12 @@ except ModuleNotFoundError as exc:
 from .._lifecycle import Lifecycle
 from .._semantics import (
     cache_key_value,
-    finite_number,
     namespace_value,
-    nearest_index,
     normalized_vector,
     resolve_ttl,
 )
+from .._semantics import finite_number as _finite_number
+from .._semantics import nearest_index as _nearest_index
 from ..errors import (
     CacheConfigurationError,
     CacheStoreError,
@@ -53,81 +59,41 @@ from ..inspection import (
     InspectionSort,
     inspection_arguments,
     inspection_namespaces,
-    remaining,
 )
+from ..inspection import remaining as _remaining
 from ..models import CacheEntry, CacheMatch, EmbeddingSpace
+from ._backends.redis import config as _redis_config
+from ._backends.redis import format as _redis_format
 from ._backends.redis import scripts as _redis_scripts
+from ._backends.redis.inspection import inspect_page as _inspect_page
 
-_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+# Preserve existing module bindings from their canonical owners.
+UTC = _UTC
+timedelta = _timedelta
+version = _version
+NoReturn = _NoReturn
+ConnectionPool = _ConnectionPool
+Connection = _Connection
+DefaultParser = _DefaultParser
+SSLConnection = _SSLConnection
+finite_number = _finite_number
+nearest_index = _nearest_index
+remaining = _remaining
+_client = _redis_config._client
+_timeout = _redis_config._timeout
+_raise_safe = _redis_format._raise_safe
+_micros = _redis_format._micros
+_score: Callable[
+    [NDArray[np.float64], object, int, str], tuple[bytes, bytes, float] | None
+] = _redis_format._score
+_decode = _redis_format._decode
+_datetime = _redis_format._datetime
+_row = _redis_format._row
+_unique_object = _redis_format._unique_object
+
+_EPOCH = _redis_format._EPOCH
 _PREFIX = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", re.ASCII)
 _MARKER = "semantix-cache:redis:v1"
-
-
-def _raise_safe(error: SemantixCacheError) -> NoReturn:
-    # asynccontextmanager throws the raw body exception back into the generator.
-    # Clear implicit chaining after the raise; bare re-raise preserves this chain.
-    try:
-        raise error from RuntimeError(str(error))
-    except SemantixCacheError:
-        error.__context__ = None
-        raise
-
-
-def _micros(value: datetime) -> str:
-    if (
-        not isinstance(value, datetime)
-        or value.tzinfo is None
-        or value.utcoffset() is None
-    ):
-        raise ValueError("Expected an aware datetime")
-    delta = value.astimezone(UTC) - _EPOCH
-    return str((delta.days * 86400 + delta.seconds) * 1000000 + delta.microseconds)
-
-
-def _datetime(value: bytes) -> datetime:
-    return _EPOCH + timedelta(microseconds=int(value))
-
-
-def _timeout(value: float) -> float:
-    result = finite_number(value, minimum=0.0, maximum=86400.0)
-    if result == 0:
-        raise ValueError("Timeout must be positive")
-    return result
-
-
-def _client(value: Redis) -> None:
-    failure = False
-    try:
-        if (
-            type(value) is not Redis
-            or type(value.connection_pool) is not ConnectionPool
-        ):
-            raise ValueError("Unsupported client/pool")
-        if re.fullmatch(r"8\.1\.\d+", version("redis")) is None:
-            raise ValueError("Unsupported redis-py version")
-        pool = value.connection_pool
-        options = pool.connection_kwargs
-        if pool.connection_class not in (Connection, SSLConnection):
-            raise ValueError("Unsupported connection")
-        retry = value.get_retry()
-        if (
-            type(retry) is not Retry
-            or retry.get_retries() != 0
-            or options.get("decode_responses", False) is not False
-            or options.get("protocol", 2) != 2
-            or options.get("redis_connect_func") is not None
-            or options.get("parser_class", DefaultParser) is not DefaultParser
-        ):
-            raise ValueError("Unsupported client policy")
-        _timeout(options["socket_timeout"])
-        _timeout(options["socket_connect_timeout"])
-    except (ValueError, KeyError, TypeError):
-        failure = True
-    if failure:
-        raise CacheConfigurationError(
-            "Use a binary RESP2 redis.asyncio.Redis with a standard pool, "
-            "finite socket deadlines and redis.asyncio.retry.Retry(NoBackoff(), 0)"
-        )
 
 
 @dataclass(frozen=True)
@@ -196,109 +162,6 @@ _INITIALIZE = _redis_scripts._INITIALIZE
 _CHECKSUM = _redis_scripts._CHECKSUM
 _CLEAR_ALL = _redis_scripts._CLEAR_ALL
 _INSPECT = _redis_scripts._INSPECT
-
-
-def _row(raw: object) -> tuple[bytes, bytes, bytes, bytes]:
-    if not isinstance(raw, list):
-        raise TypeError("Invalid Redis response row")
-    parts = cast(list[object], raw)
-    if len(parts) != 4 or not all(isinstance(part, bytes) for part in parts):
-        raise ValueError("Invalid Redis response row")
-    return cast(tuple[bytes, bytes, bytes, bytes], tuple(parts))
-
-
-def _score(
-    query: NDArray[np.float64], rows: object, dimensions: int, namespace: str
-) -> tuple[bytes, bytes, float] | None:
-    try:
-        if not isinstance(rows, list):
-            raise TypeError("Invalid snapshot")
-        candidates: list[tuple[int, str, bytes, bytes, NDArray[np.float64]]] = []
-        for row in cast(list[object], rows):
-            member, revision, expiry, blob = _row(row)
-            scope, key = member.decode("ascii").split("|")
-            if namespace_value(scope) != namespace:
-                raise ValueError("Invalid snapshot scope")
-            cache_key_value(key)
-            _datetime(revision)
-            if expiry:
-                _datetime(expiry)
-            if len(blob) != dimensions * 8:
-                raise ValueError("Invalid stored vector")
-            vector = np.frombuffer(blob, dtype="<f8")
-            candidates.append((int(revision), key, member, revision, vector))
-        candidates.sort(key=lambda row: (row[0], row[1]))
-        if not candidates:
-            return None
-        vectors = cast(Sequence[Sequence[float]], [row[4] for row in candidates])
-        # Packed <f8 already guarantees numeric component types and dimensions.
-        # Validate finite magnitudes with NumPy, then reuse the shared cosine kernel.
-        matrix = np.asarray(vectors, dtype=np.float64)
-        with np.errstate(over="ignore", invalid="ignore"):
-            valid = (
-                np.isfinite(matrix).all()
-                and np.isfinite(np.linalg.norm(matrix, axis=1)).all()
-            )
-        if not valid:
-            raise ValueError("Invalid stored vector magnitude")
-        index, similarity = nearest_index(
-            query, cast(Sequence[Sequence[float]], matrix)
-        )
-        return candidates[index][2], candidates[index][3], similarity
-    except (ValueError, TypeError, OverflowError):
-        _raise_safe(CacheStoreError("Invalid stored Redis vector snapshot"))
-
-
-def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
-    result: dict[str, object] = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("Duplicate payload key")
-        result[key] = value
-    return result
-
-
-def _decode(
-    raw: object, member: bytes, dimensions: int, similarity: float
-) -> CacheMatch:
-    try:
-        payload, blob, revision, expiry = _row(raw)
-        try:
-            values: object = json.loads(
-                payload.decode("utf-8"), object_pairs_hook=_unique_object
-            )
-        except RecursionError:
-            _raise_safe(CacheStoreError("Invalid stored Redis winner"))
-        if not isinstance(values, dict):
-            raise TypeError("Invalid payload")
-        data = cast(dict[object, object], values)
-        if set(data) != {"cache_key", "namespace", "prompt", "response"} or not all(
-            isinstance(v, str) for v in data.values()
-        ):
-            raise ValueError("Invalid payload")
-        strings = cast(dict[str, str], data)
-        scope, key = member.decode("ascii").split("|")
-        if strings["namespace"] != scope or strings["cache_key"] != key:
-            raise ValueError("Invalid payload scope")
-        if len(blob) != dimensions * 8:
-            raise ValueError("Invalid stored vector")
-        vector = np.frombuffer(blob, dtype="<f8")
-        normalized_vector(cast(Sequence[float], vector), dimensions=dimensions)
-        entry = CacheEntry(
-            cache_key=strings["cache_key"],
-            namespace=strings["namespace"],
-            prompt=strings["prompt"],
-            response=strings["response"],
-            embedding=tuple(float(v) for v in vector),
-            created_at=_datetime(revision),
-        )
-        return CacheMatch(
-            entry=entry,
-            similarity_score=similarity,
-            expires_at=None if not expiry else _datetime(expiry),
-        )
-    except (ValueError, TypeError, OverflowError):
-        _raise_safe(CacheStoreError("Invalid stored Redis winner"))
 
 
 class RedisStore:
@@ -499,80 +362,18 @@ class RedisStore:
         limit: int,
         sort: InspectionSort,
     ) -> InspectionPage:
-        raw = await self._client.eval_ro(
-            _INSPECT,
-            3,
-            *self._config.keys,
-            *self._config.descriptor,
-            namespace or "",
-            cache_key or "",
-            json.dumps(namespaces),
-            offset,
-            limit,
-            sort,
+        return await _inspect_page(
+            self._client,
+            script=_INSPECT,
+            keys=self._config.keys,
+            descriptor=self._config.descriptor,
+            namespace=namespace,
+            namespaces=namespaces,
+            cache_key=cache_key,
+            offset=offset,
+            limit=limit,
+            sort=sort,
         )
-        try:
-            if not isinstance(raw, list):
-                raise TypeError
-            parts = cast(list[object], raw)
-            if len(parts) != 2:
-                raise ValueError
-            total, rows = parts
-            if type(total) is not int or total < 0 or not isinstance(rows, list):
-                raise ValueError
-            records = cast(list[object], rows)
-            if len(records) > limit:
-                raise ValueError
-            result: list[InspectionEntry] = []
-            for row in records:
-                if not isinstance(row, list):
-                    raise TypeError
-                fields = cast(list[object], row)
-                if len(fields) != 11 or not all(isinstance(x, bytes) for x in fields):
-                    raise ValueError
-                record = cast(list[bytes], fields)
-                if record[10] not in (b"0", b"1") or (cache_key is None and record[2]):
-                    raise ValueError
-                ns, key = record[0].decode("ascii").split("|")
-                if (
-                    (namespace is not None and ns != namespace)
-                    or (namespaces is not None and ns not in namespaces)
-                    or (cache_key is not None and key != cache_key)
-                ):
-                    raise ValueError
-                expiry = None if not record[5] else _datetime(record[5])
-                observed = _datetime(record[9])
-                if expiry is not None and expiry <= observed:
-                    raise ValueError
-                result.append(
-                    InspectionEntry(
-                        cache_key=key,
-                        namespace=ns,
-                        prompt=record[1].decode("utf-8"),
-                        response_preview=record[3].decode("utf-8"),
-                        response_preview_truncated=record[10] == b"1",
-                        response=record[2].decode("utf-8")
-                        if cache_key is not None
-                        else None,
-                        created_at=_datetime(record[4]),
-                        expires_at=expiry,
-                        remaining_ttl_seconds=remaining(expiry, observed),
-                        hit_count=int(record[6]),
-                        last_accessed_at=None
-                        if not record[7]
-                        else _datetime(record[7]),
-                        recency_rank=int(record[8]),
-                    )
-                )
-            return InspectionPage(
-                items=tuple(result),
-                total=total,
-                offset=offset,
-                limit=limit,
-                has_more=offset + len(result) < total,
-            )
-        except (ValueError, TypeError, OverflowError):
-            _raise_safe(CacheStoreError("Invalid Redis inspection metadata"))
 
     async def inspect_entries(
         self,

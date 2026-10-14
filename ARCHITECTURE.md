@@ -51,9 +51,13 @@ or server backend selection. See [MySQL storage](docs/embedded/mysql.md).
 Private MySQL and SQLite helpers live in their respective
 `semantix_cache.stores._backends.mysql` and `._backends.sqlite` packages. Redis Lua
 lives in `semantix_cache.stores._backends.redis.scripts`; its public module keeps
-the operation-time script bindings. Public store class definitions stay at their
-existing import paths. The MySQL cleanup diagnostic type retains its original
-qualified definition, while one private MySQL registry owns failed construction.
+the operation-time script bindings. Its stateless client policy, pure binary
+evidence/scoring and read-only inspection projection live in the same private
+Redis package. RedisStore retains its checksum-sensitive configuration class,
+operation deadline, numerical workers and client/pool lifecycle; inspection
+receives the borrowed client and current public script value. Public store class
+definitions stay at their existing import paths. The MySQL cleanup diagnostic
+type retains its original qualified definition, while one private MySQL registry owns failed construction.
 PostgreSQL configuration and read-only inspection projection live under
 `semantix_cache.stores._backends.postgres`. PgVectorStore retains pool ownership,
 transactions, schema setup and dynamic hooks; inspection receives its already
