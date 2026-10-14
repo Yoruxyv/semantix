@@ -13,14 +13,14 @@ from dataclasses import dataclass, field
 from time import monotonic
 from typing import Any, TypeVar, cast
 
-from .._lifecycle import Lifecycle
-from ..errors import (
+from ...._lifecycle import Lifecycle
+from ....errors import (
     CacheConfigurationError,
     CacheStoreError,
     CacheTimeoutError,
     CacheValidationError,
 )
-from ._sqlite_format import Configuration, safe, sqlite3
+from .format import Configuration, safe, sqlite3
 
 T = TypeVar("T")
 Row = tuple[Any, ...]

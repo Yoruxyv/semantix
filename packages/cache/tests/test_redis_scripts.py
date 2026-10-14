@@ -9,8 +9,8 @@ from redis.asyncio.retry import Retry
 from redis.backoff import NoBackoff
 
 from semantix_cache import EmbeddingSpace
-from semantix_cache.stores import _redis_scripts
 from semantix_cache.stores import redis as module
+from semantix_cache.stores._backends.redis import scripts as _redis_scripts
 from semantix_cache.stores.redis import RedisStore, _Configuration
 
 # Captured from immutable main 412025807965d457fc320219e31660396c929150 before moving.

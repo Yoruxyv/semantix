@@ -19,8 +19,8 @@ import pytest
 
 from examples.store_conformance import SPACE, HitMetadata, StoreCase, StoreFactory
 from semantix_cache import EmbeddingSpace
-from semantix_cache.stores import _mysql_database as database
-from semantix_cache.stores._mysql_format import timestamp
+from semantix_cache.stores._backends.mysql import database
+from semantix_cache.stores._backends.mysql.format import timestamp
 from semantix_cache.stores.mysql import MySQLStore
 
 

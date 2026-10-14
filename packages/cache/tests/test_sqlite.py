@@ -22,8 +22,8 @@ from semantix_cache import (
     EmbeddingSpace,
 )
 from semantix_cache._semantics import nearest_index, normalized_vector
-from semantix_cache.stores import _sqlite_database as database
-from semantix_cache.stores._sqlite_format import (
+from semantix_cache.stores._backends.sqlite import database
+from semantix_cache.stores._backends.sqlite.format import (
     HEADER,
     MAX_INT,
     MAX_US,

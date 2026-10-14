@@ -20,7 +20,7 @@ from semantix_cache import (
     CacheStoreError,
     CacheTimeoutError,
 )
-from semantix_cache.stores._mysql_worker import Job, Worker
+from semantix_cache.stores._backends.mysql.worker import Job, Worker
 from semantix_cache.stores.mysql import MySQLStore
 
 from .mysql_helpers import (

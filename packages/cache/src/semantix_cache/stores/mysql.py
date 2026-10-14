@@ -17,12 +17,12 @@ from ..errors import (
     SemantixCacheError,
 )
 from ..models import CacheEntry, CacheMatch, EmbeddingSpace
-from . import _mysql_cleanup as startup_cleanup
+from ._backends.mysql import cleanup as startup_cleanup
+from ._backends.mysql.config import Configuration, timeout
+from ._backends.mysql.database import Database
+from ._backends.mysql.format import micros, safe
+from ._backends.mysql.worker import Worker
 from ._mysql_cleanup import MySQLCleanupStatus
-from ._mysql_config import Configuration, timeout
-from ._mysql_database import Database
-from ._mysql_format import micros, safe
-from ._mysql_worker import Worker
 
 
 class MySQLStore:

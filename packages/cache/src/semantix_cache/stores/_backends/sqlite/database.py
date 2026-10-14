@@ -9,16 +9,16 @@ from typing import cast
 
 import numpy as np
 
-from .._semantics import (
+from ...._semantics import (
     cache_key_value,
     namespace_value,
     nearest_index,
     normalized_vector,
     resolve_ttl,
 )
-from ..errors import CacheConfigurationError, CacheStoreError, CacheValidationError
-from ..models import CacheEntry, CacheMatch
-from ._sqlite_format import (
+from ....errors import CacheConfigurationError, CacheStoreError, CacheValidationError
+from ....models import CacheEntry, CacheMatch
+from .format import (
     APPLICATION_ID,
     CHECKSUM,
     MAX_INT,
@@ -37,7 +37,7 @@ from ._sqlite_format import (
     sqlite3,
     timestamp,
 )
-from ._sqlite_worker import Job
+from .worker import Job
 
 
 def now_us() -> int:

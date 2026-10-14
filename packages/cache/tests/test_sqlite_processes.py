@@ -16,8 +16,8 @@ import pytest
 from examples.store_conformance import SPACE
 from examples.store_conformance.cases import entry
 from semantix_cache import CacheStoreError, CacheTimeoutError
-from semantix_cache.stores._sqlite_format import micros
-from semantix_cache.stores._sqlite_worker import Job, Row
+from semantix_cache.stores._backends.sqlite.format import micros
+from semantix_cache.stores._backends.sqlite.worker import Job, Row
 from semantix_cache.stores.sqlite import SQLiteStore
 
 from .sqlite_helpers import connection

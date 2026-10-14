@@ -42,7 +42,7 @@ Available implementations
     workers, ``aclose()``/async context exit seals the store. Owned close shares a
     shielded bounded cleanup task; borrowed resources stay caller-owned and keys
     remain. See ``redis.py`` for validation, decoding, deadlines and client
-    lifecycle; ``_redis_scripts.py`` owns fixed Lua bytes, layouts and checksums.
+    lifecycle; ``_backends/redis/scripts.py`` owns fixed Lua bytes, layouts and checksums.
     Change Redis behavior with its conformance/fault/inspection tests and the guide:
     https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/redis.md.
 

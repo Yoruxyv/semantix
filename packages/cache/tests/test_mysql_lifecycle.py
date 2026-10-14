@@ -21,11 +21,11 @@ from semantix_cache import (
     CacheStoreError,
     CacheTimeoutError,
 )
-from semantix_cache.stores import _mysql_schema as schema
-from semantix_cache.stores._mysql_cleanup import LIMIT
-from semantix_cache.stores._mysql_database import Database
-from semantix_cache.stores._mysql_transport import Resources
-from semantix_cache.stores._mysql_worker import Worker
+from semantix_cache.stores._backends.mysql import schema
+from semantix_cache.stores._backends.mysql.cleanup import LIMIT
+from semantix_cache.stores._backends.mysql.database import Database
+from semantix_cache.stores._backends.mysql.transport import Resources
+from semantix_cache.stores._backends.mysql.worker import Worker
 from semantix_cache.stores.mysql import MySQLStore
 
 from .mysql_helpers import admin, new_database, options
@@ -663,7 +663,7 @@ import json
 import threading
 from examples.store_conformance import SPACE
 from semantix_cache import CacheConfigurationError, CacheStoreError
-from semantix_cache.stores._mysql_worker import Worker
+from semantix_cache.stores._backends.mysql.worker import Worker
 from semantix_cache.stores.mysql import MySQLStore
 from tests.mysql_helpers import options
 import sys

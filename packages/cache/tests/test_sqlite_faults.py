@@ -18,8 +18,8 @@ from semantix_cache import (
     CacheStoreError,
     CacheTimeoutError,
 )
-from semantix_cache.stores import _sqlite_database as database
-from semantix_cache.stores._sqlite_worker import Job, Row, Worker
+from semantix_cache.stores._backends.sqlite import database
+from semantix_cache.stores._backends.sqlite.worker import Job, Row, Worker
 from semantix_cache.stores.sqlite import SQLiteStore
 
 from . import sqlite_helpers

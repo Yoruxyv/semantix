@@ -56,7 +56,7 @@ from ..inspection import (
     remaining,
 )
 from ..models import CacheEntry, CacheMatch, EmbeddingSpace
-from . import _redis_scripts
+from ._backends.redis import scripts as _redis_scripts
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 _PREFIX = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", re.ASCII)
