@@ -19,6 +19,7 @@ from semantix_cache import (
     CacheTimeoutError,
 )
 from semantix_cache.stores._backends.sqlite import database
+from semantix_cache.stores._backends.sqlite import worker as worker_module
 from semantix_cache.stores._backends.sqlite.worker import Job, Row, Worker
 from semantix_cache.stores.sqlite import SQLiteStore
 
@@ -570,3 +571,123 @@ async def test_cancel_while_connection_open_is_still_owned(
     assert closed[0] != threading.get_ident()
     async with await SQLiteStore.connect(path, embedding_space=SPACE) as store:
         await store.put(entry("later startup works"))
+
+
+@pytest.mark.parametrize("remaining_seconds", [0.0005, 0.0065, 0.1495, 1.5])
+async def test_native_lock_wait_covers_remaining_deadline(
+    sqlite_store: SQLiteStore,
+    monkeypatch: pytest.MonkeyPatch,
+    remaining_seconds: float,
+) -> None:
+    def budget(job: Job) -> int:
+        with monkeypatch.context() as patch:
+            patch.setattr(worker_module, "monotonic", lambda: 1000.0)
+            Job(job.owner, 1000.0 + remaining_seconds).prepare()
+            row = job.connection.execute("PRAGMA busy_timeout").fetchone()
+            assert row is not None
+            return int(row[0])
+
+    milliseconds = await sqlite_store._worker.run(budget)
+    assert milliseconds / 1000 >= min(remaining_seconds, 1.0)
+    assert 0 < milliseconds <= 1000
+
+
+@pytest.mark.parametrize(
+    ("expired", "expected"), [(False, CacheStoreError), (True, CacheTimeoutError)]
+)
+async def test_native_failure_classification_at_deadline(
+    sqlite_store: SQLiteStore,
+    monkeypatch: pytest.MonkeyPatch,
+    expired: bool,
+    expected: type[Exception],
+) -> None:
+    clock = [1000.0]
+    monkeypatch.setattr(worker_module, "monotonic", lambda: clock[0])
+
+    def fail(job: Job) -> None:
+        try:
+            job.connection.execute("SELECT * FROM absent_diagnostic_table").close()
+        except sqlite3.OperationalError:
+            if expired:
+                clock[0] = job.deadline
+            raise
+
+    with pytest.raises(expected) as caught:
+        await sqlite_store._worker.run(fail)
+    assert type(caught.value) is expected
+    assert "absent_diagnostic_table" not in str(caught.value)
+    assert caught.value.__context__ is None
+    assert not sqlite_store._worker.faulted.is_set()
+
+
+@pytest.mark.parametrize("expired", [False, True])
+async def test_worker_completion_is_fenced_at_deadline(
+    sqlite_store: SQLiteStore, monkeypatch: pytest.MonkeyPatch, expired: bool
+) -> None:
+    clock = [1000.0]
+    monkeypatch.setattr(worker_module, "monotonic", lambda: clock[0])
+
+    def complete(job: Job) -> int:
+        clock[0] = job.deadline - (0.0 if expired else 0.001)
+        return 7
+
+    if expired:
+        with pytest.raises(CacheTimeoutError):
+            await sqlite_store._worker.run(complete)
+    else:
+        assert await sqlite_store._worker.run(complete) == 7
+
+
+async def test_timeout_retains_worker_until_late_completion(
+    sqlite_store: SQLiteStore,
+) -> None:
+    entered = asyncio.Event()
+    release = threading.Event()
+    loop = asyncio.get_running_loop()
+
+    def work(job: Job) -> int:
+        loop.call_soon_threadsafe(entered.set)
+        if not release.wait(5):
+            raise RuntimeError("Test did not release retained worker")
+        return 7
+
+    task = asyncio.create_task(sqlite_store._worker.run(work, budget_seconds=0.02))
+    try:
+        await asyncio.wait_for(entered.wait(), 5)
+        with pytest.raises(CacheTimeoutError):
+            await task
+        assert sqlite_store._worker.admitted == 1
+        assert len(sqlite_store._worker.pending) == 1
+        with pytest.raises(CacheBusyError):
+            await sqlite_store.aclose()
+    finally:
+        release.set()
+        async with asyncio.timeout(5):
+            await asyncio.gather(
+                *tuple(sqlite_store._worker.pending), return_exceptions=True
+            )
+    assert not sqlite_store._worker.pending
+    assert sqlite_store._worker.admitted == 0
+    assert sqlite_store._worker.current is None
+    await sqlite_store.put(entry("usable after late completion"))
+
+
+async def test_immediate_native_lock_refusal_is_not_timeout(
+    sqlite_store: SQLiteStore,
+) -> None:
+    def fail(job: Job) -> None:
+        job.connection.execute("PRAGMA busy_timeout=0").close()
+        with pytest.raises(sqlite3.OperationalError) as caught:
+            job.connection.execute("BEGIN IMMEDIATE").close()
+        assert caught.value.sqlite_errorcode == sqlite3.SQLITE_BUSY
+        raise caught.value
+
+    with connection(sqlite_store._config.path) as blocker:
+        blocker.execute("BEGIN IMMEDIATE")
+        with pytest.raises(CacheStoreError) as caught:
+            await sqlite_store._worker.run(fail)
+        assert type(caught.value) is CacheStoreError
+        assert caught.value.__context__ is None
+        blocker.execute("ROLLBACK")
+    assert not sqlite_store._worker.faulted.is_set()
+    await sqlite_store.put(entry("usable after immediate lock refusal"))

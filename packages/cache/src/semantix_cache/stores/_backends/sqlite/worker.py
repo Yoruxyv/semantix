@@ -10,6 +10,7 @@ from collections.abc import Callable, Generator, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from math import ceil
 from time import monotonic
 from typing import Any, TypeVar, cast
 
@@ -46,7 +47,8 @@ class Job:
 
     def prepare(self) -> None:
         self.check()
-        remaining_ms = max(0, min(1000, int((self.deadline - monotonic()) * 1000)))
+        # Truncation can report a lock failure just before the job deadline.
+        remaining_ms = max(0, min(1000, ceil((self.deadline - monotonic()) * 1000)))
         self.connection.execute(f"PRAGMA busy_timeout={remaining_ms}").close()
 
     def rows(self, sql: str, parameters: Sequence[object] = ()) -> list[Row]:
