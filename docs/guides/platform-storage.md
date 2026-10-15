@@ -152,7 +152,13 @@ unavailable store fails readiness; it is never replaced by an implicit memory ca
 
 ## Local Docker and validation
 
-The development stack keeps memory as the default. Choose the `pgvector` or `redis`
+For newly created project-owned development volumes, the
+[development launcher](getting-started.md#recommended-development-launcher)
+runs separate explicit setup and then validates storage. Existing volumes and
+external URLs are validation-only; partial/incompatible states require operator
+review. This does not change ordinary server startup or hardened deployment.
+
+The advanced direct Compose workflow keeps memory as the default. Choose the `pgvector` or `redis`
 profile only when its corresponding backend is configured. Start that service,
 run explicit setup using separately supplied operator configuration, then start
 backend/frontend. Development ports and credentials are local conveniences, not

@@ -16,7 +16,8 @@
 </div>
 
 <p align="center">
-  <a href="#install-and-run">Quick start</a> ·
+  <a href="#install-and-run">Embedded quick start</a> ·
+  <a href="#optional-dashboard--quick-start">Dashboard quick start</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#verified-ai-providers">Providers</a> ·
   <a href="#storage">Storage</a> ·
@@ -24,9 +25,15 @@
   <a href="packages/cache/benchmarks/reuse_quality/README.md">Reuse quality</a>
 </p>
 
-**semantix-cache** is the intended first public PyPI product. Its 0.1.0 API
-is async-only and runs in your Python process. No Semantix server, web UI,
-Docker or PostgreSQL is required.
+**semantix-cache** is the primary embedded Python library and the intended first
+public PyPI product. Its 0.1.0 API is async-only and runs in your Python process.
+No Semantix server, web UI, Docker or PostgreSQL is required.
+
+| Use Semantix | Start here |
+| --- | --- |
+| **Embedded Python (primary)** | [Source quick start](#install-and-run); no Docker or official server |
+| **Backend/dashboard (optional)** | [Dashboard quick start](#optional-dashboard--quick-start); optional local application |
+| **PostgreSQL persistence** | [Embedded setup](docs/embedded/storage.md#new-postgresql-database) or [dashboard setup](#optional-postgresql-persistence); explicit initialization required |
 
 ## Install and run
 
@@ -298,6 +305,10 @@ and initialize its separate marked cache schema explicitly; normal cache operati
 perform no DDL. Runtime operations enforce ownership markers, version and migration
 checksums, not a complete catalog fingerprint. Protect out-of-band schema changes.
 
+`PgVectorStore.connect()` can raise typed errors and returns no usable store on
+failure. Applications own recovery or fail-startup decisions; see
+[PostgreSQL connection failures](docs/embedded/storage.md#connections-cancellation-and-failures).
+
 See [embedded storage and user databases](docs/embedded/storage.md) for least-privileged
 runtime access, pool ownership, migrations and custom stores. pgvector stores float32
 vectors; near-threshold scores can differ from MemoryStore's float64 scoring.
@@ -329,6 +340,71 @@ The optional server/workbench is a full-stack laboratory for inspecting cache
 decisions, evaluating thresholds and measuring provider work. Its namespace-scoped
 authorization and hardened two-replica deployment are server features, not embedded
 prerequisites. Operational tooling lives in `ops/`; developer tooling in `scripts/`.
+
+<a id="-quick-start"></a>
+
+## Optional Dashboard — Quick Start
+
+<a id="requirements"></a>
+
+Install Git, Python 3.11–3.14, and Docker Desktop or Docker CLI/Engine 23+
+(API 1.42+) with Compose 2.20+. Start the local Docker engine. Host Python is
+only needed for the development launcher; backend dependencies stay in Docker.
+
+<a id="1-clone-the-repository"></a>
+
+Use the [checkout above](#install-and-run) and run from the **repository root**
+(`cd ../..` if you are still in `packages/cache`). For a new configuration,
+copy the example; if `apps/server/.env` already exists, keep it and edit it instead:
+
+```bash
+cp apps/server/.env.example apps/server/.env
+```
+
+In PowerShell, use `Copy-Item apps/server/.env.example apps/server/.env`.
+
+<a id="2-configure-local-development"></a>
+
+Set these values in the **untracked** `apps/server/.env`, keeping the other
+example defaults, for a credential-free MemoryStore dashboard:
+
+```env
+EMBEDDING_PROVIDER=mock
+GENERATION_PROVIDER=mock
+MOCK_EMBEDDING_DIMENSIONS=384
+CACHE_BACKEND=memory
+EVALUATION_DATASET_STORAGE=session
+EVALUATION_RUN_HISTORY_STORAGE=disabled
+COORDINATION_BACKEND=memory
+AUTH_MODE=disabled
+AUTH_PRINCIPALS=[]
+TRUSTED_PROXY_CIDRS=[]
+MAX_REQUEST_BODY_BYTES=65536
+```
+
+<a id="3-start-the-complete-development-stack"></a>
+
+Then start the dashboard:
+
+```bash
+python scripts/dev.py up
+```
+
+Or use `uv run --no-project scripts/dev.py up`. The launcher waits for backend
+readiness before starting the frontend; this configuration needs no database or
+provider API key. The first build can download images and dependencies.
+
+<a id="4-open-the-application"></a>
+
+Open **<http://localhost:4173>** (or the URL printed for your configured ports).
+Mock responses are deterministic examples; memory cache/session data disappear
+when the backend restarts. Authentication is disabled for **trusted local
+use only**; never expose this development stack publicly.
+
+For [other providers](docs/guides/providers.md), persistent storage, or direct
+Docker-only startup, follow [Getting started](docs/guides/getting-started.md#local-development), including
+[PostgreSQL credentials/setup](docs/guides/getting-started.md#postgresql-runtime-credentials)
+and [advanced direct Compose](docs/guides/getting-started.md#advanced-direct-docker-compose).
 
 <details>
 <summary>Optional server/workbench: tour, Docker setup and deployment evidence</summary>
@@ -400,76 +476,7 @@ Core capabilities:
 - optional namespace-authorized PostgreSQL evaluation dataset catalog with
   explicit save, bounded retention, and no stored run results.
 
-### 🚀 Quick start
-
-#### Requirements
-
-Install Git and Docker Desktop, or Docker Engine with Compose.
-
-#### 1. Clone the repository
-
-Linux or macOS:
-
-```bash
-git clone https://github.com/Yoruxyv/semantix.git
-cd semantix
-cp apps/server/.env.example apps/server/.env
-```
-
-Windows PowerShell:
-
-```powershell
-git clone https://github.com/Yoruxyv/semantix.git
-Set-Location semantix
-Copy-Item apps\server\.env.example apps\server\.env
-```
-
-#### 2. Configure local development
-
-For the simplest first run, use mock providers and MemoryStore. Set these values
-in `apps/server/.env`; no provider API key or database setup is required:
-
-```env
-EMBEDDING_PROVIDER=mock
-GENERATION_PROVIDER=mock
-MOCK_EMBEDDING_DIMENSIONS=384
-
-CACHE_BACKEND=memory
-EVALUATION_DATASET_STORAGE=session
-EVALUATION_RUN_HISTORY_STORAGE=disabled
-COORDINATION_BACKEND=memory
-
-AUTH_MODE=disabled
-AUTH_PRINCIPALS=[]
-TRUSTED_PROXY_CIDRS=[]
-MAX_REQUEST_BODY_BYTES=65536
-```
-
-Cache entries and session datasets live in memory and disappear when the backend
-restarts. For persistent cache entries and saved datasets, follow the optional
-PostgreSQL procedure below.
-
-These authentication and proxy values are intentionally empty or disabled for
-trusted local development. Do not use the development configuration for a
-public deployment.
-
-To use Hugging Face, OpenAI, Anthropic, Gemini, or Ollama, see
-[Providers](docs/guides/providers.md). For every environment option, see
-[Getting started](docs/guides/getting-started.md) and `apps/server/.env.example`.
-
-#### 3. Start the complete development stack
-
-Run the same command in PowerShell, Bash, or another terminal:
-
-```bash
-docker compose -f docker-compose.dev.yml up --build -d --wait --wait-timeout 120 backend frontend
-```
-
-This starts FastAPI and the Vite frontend with hot reload. The memory setup needs
-neither the `pgvector` nor the `redis` profile. If startup fails, inspect backend
-logs before sending queries; `/ready` must return HTTP 200.
-
-#### 4. Open the application
+### Dashboard endpoints and operations
 
 | Service | Address |
 |---|---|
@@ -506,13 +513,20 @@ database before setup.
 
 ```env
 CACHE_BACKEND=pgvector
-DATABASE_URL=postgresql://replace-runtime-user:replace-runtime-password@postgres:5432/semantix
+DATABASE_URL=postgresql://semantix_runtime:replace-runtime-password@postgres:5432/semantix
 DATABASE_MIGRATION_MODE=external
 EVALUATION_DATASET_STORAGE=postgres
 EVALUATION_DATASET_DEFAULT_RETENTION_DAYS=30
 ```
 
-Start only PostgreSQL and wait for its health check:
+For a fresh launcher-managed volume, generate/configure the runtime password as
+explained in [PostgreSQL credentials](docs/guides/getting-started.md#postgresql-runtime-credentials),
+then run `python scripts/dev.py up`. It provisions the missing restricted login
+with that password and runs separate setup; existing roles/data are never repaired
+or overwritten. No external provider supplies this password.
+
+**Advanced direct Compose setup:** the remaining steps require explicit operator
+authority. Start only PostgreSQL and wait for its health check:
 
 ```bash
 docker compose -f docker-compose.dev.yml --profile pgvector up -d --wait --wait-timeout 60 postgres
@@ -523,10 +537,7 @@ Do not use that privileged role in the backend's `DATABASE_URL`. Securely load
 these operator variables into your shell, without putting migration credentials
 in `apps/server/.env`, tracked files, shell history, or logs:
 
-- `SEMANTIX_RUNTIME_USER` and `SEMANTIX_RUNTIME_PASSWORD`: a separate runtime
-  login matching `DATABASE_URL`, with no superuser, role/database-creation, schema
-  ownership, or migration authority;
-- `DATABASE_RUNTIME_ROLE`: the same name as `SEMANTIX_RUNTIME_USER`;
+- `DATABASE_RUNTIME_ROLE`: the restricted login name from `DATABASE_URL`;
 - `MIGRATION_DATABASE_URL`: the bootstrap/migration connection for this development
   database, with authority to enable pgvector, initialize schemas, and grant access.
 
@@ -534,34 +545,36 @@ Inside containers, both URLs use `postgres:5432/semantix`. A host tool instead
 uses `127.0.0.1:5433` by default (`POSTGRES_PORT` can change the published port).
 For an existing volume, use its actual credentials and back it up before setup.
 
-In PowerShell, prompt for the operator secrets without echoing them. The runtime
-password must match the URL in `apps/server/.env`; enter the full bootstrap URL
-only at the masked migration prompt:
+For a genuinely missing runtime role, open psql using local bootstrap authority:
+
+```bash
+docker compose -f docker-compose.dev.yml --profile pgvector exec postgres psql -X --set ON_ERROR_STOP=1 --username semantix --dbname semantix
+```
+
+Inside psql, create the restricted role and enter the password from `DATABASE_URL`
+at the hidden `\password` prompts. If the role already exists, stop and verify
+its privileges and credentials separately; do not reset its password.
+
+```sql
+CREATE ROLE semantix_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+GRANT CONNECT ON DATABASE semantix TO semantix_runtime;
+\password semantix_runtime
+\q
+```
+
+The password prompt avoids plaintext password SQL and process arguments. The
+migration command grants schema/table access; it does not create the login.
+In PowerShell, supply migration authority through a masked prompt:
 
 ```powershell
-$env:SEMANTIX_RUNTIME_USER = 'semantix_runtime'
-$env:DATABASE_RUNTIME_ROLE = $env:SEMANTIX_RUNTIME_USER
-$env:SEMANTIX_RUNTIME_PASSWORD = [pscredential]::new(
-    $env:SEMANTIX_RUNTIME_USER,
-    (Read-Host 'Runtime password matching DATABASE_URL' -AsSecureString)
-).GetNetworkCredential().Password
+$env:DATABASE_RUNTIME_ROLE = 'semantix_runtime'
 $env:MIGRATION_DATABASE_URL = [pscredential]::new(
     'migration', (Read-Host 'Migration database URL' -AsSecureString)
 ).GetNetworkCredential().Password
 ```
 
-For a fresh runtime login, reuse the existing
-[runtime-role provisioner](ops/postgres/init-runtime-role.sh):
-
-```bash
-docker compose -f docker-compose.dev.yml --profile pgvector cp ops/postgres/init-runtime-role.sh postgres:/tmp/init-runtime-role.sh
-docker compose -f docker-compose.dev.yml --profile pgvector exec -T -e SEMANTIX_RUNTIME_USER -e SEMANTIX_RUNTIME_PASSWORD postgres sh /tmp/init-runtime-role.sh
-```
-
-The script creates a missing login and grants database `CONNECT`; it does not
-rotate credentials or remove privileges from an existing role. Verify an existing
-role separately. The migration command grants the required schema/table access;
-it does not create the runtime login.
+In other shells, securely load the same two operator variables without putting
+their secret values in shell history or arguments.
 
 Run explicit setup in a one-shot backend container and continue only if it exits
 successfully:
@@ -615,7 +628,7 @@ notes.
 
 | Mode | Intended use | Main behavior |
 |---|---|---|
-| **Development** | One trusted local developer | Hot reload, loopback ports, disabled authentication, automatic migrations |
+| **Development** | One trusted local developer | Hot reload, loopback ports, disabled authentication, explicit setup for persistent cache |
 | **Hardened** | Shared or public two-replica deployment | Token authentication, namespace roles, internal backend/database networks, external migrations, TLS proxy required |
 
 Create `.env.production` from `.env.production.example` only when preparing a

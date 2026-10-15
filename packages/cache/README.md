@@ -8,6 +8,9 @@ The distribution name is **semantix-cache** and its import is **semantix_cache**
 Only `packages/cache` is the intended first public distribution. The optional
 backend/dashboard and the separate HTTP client are not required for embedded use.
 
+[Source quick start](#run-from-source) · [Local installation](#use-in-another-python-project) ·
+[Storage setup](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md#choose-a-store) · [Contract](#contract)
+
 ## Run from source
 
 Install Git, Python 3.11–3.14 and [uv](https://docs.astral.sh/uv/getting-started/installation/).
@@ -421,7 +424,9 @@ use borrowed HTTP clients; install only the HTTP extra you need. The default cor
 keeps its NumPy/Pydantic dependency boundary. Optional
 [PostgreSQL/pgvector storage and custom databases](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md)
 use `semantix_cache.stores.pgvector.PgVectorStore` with the `[pgvector]` extra.
-Schema initialization is explicit; normal cache use performs no DDL.
+Schema initialization is explicit; normal cache use performs no DDL. See
+[PostgreSQL connection failures and recovery](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md#connections-cancellation-and-failures)
+for typed startup errors and application-owned recovery decisions.
 Optional [Redis storage](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/redis.md)
 uses `semantix_cache.stores.redis.RedisStore` with `[redis]`, direct redis-py
 asyncio and bounded exact float64 scans. Setup is explicit; the initial server

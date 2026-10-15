@@ -385,7 +385,23 @@ pool, with default initial size 1, maximum 5; accepted bounds are 1–100. It op
 connections without DDL. See the [asyncpg pool API](https://magicstack.github.io/asyncpg/current/api/index.html)
 for application-owned pool configuration, including idle lifetime and TLS.
 
-Startup has a total 10-second default deadline. Operations include acquisition,
+`await PgVectorStore.connect(...)` either returns an owned store or raises; a
+failed or cancelled attempt provides no usable partial store and terminates any
+pool it created. Invalid connection/binding settings raise `CacheConfigurationError`,
+startup deadline expiry raises `CacheTimeoutError`, and expected connection/driver
+failures raise `CacheStoreError`. Caller cancellation and unexpected programming
+errors propagate. A successful connection does not initialize or validate the
+cache schema: complete [explicit setup](#new-postgresql-database), then call
+`validate_schema()` before cache use.
+
+Semantix does not retry a failed `connect()` call, recover it in the background
+or switch to MemoryStore. Applications decide whether to fail startup, attempt a fresh
+connection under their own recovery policy, or explicitly select another store.
+Handle these failures before accepting cache work; never proceed with a failed
+construction attempt.
+
+Startup defaults to a 10-second deadline; cancellation unwinding and cleanup can
+finish after that deadline. Operations include acquisition,
 commands, transaction completion and release within the default 30-second deadline.
 Owned-pool close defaults to 30 seconds. Timeouts must be positive finite numbers
 up to 86,400 seconds. Cancellation propagates; failed writes/migrations roll back
@@ -402,6 +418,10 @@ server error detail and payloads are excluded from public exception chains. Unex
 programming errors propagate. There is no automatic replay: a connection loss at
 commit may leave outcome uncertain, so application recovery must account for that.
 Your own driver callbacks/logging and domain serialization still require care.
+
+Historical intermittent startup timeouts observed during local validation remain
+unexplained. That evidence neither establishes widespread PostgreSQL startup
+failures nor identifies their cause; the failure contract above is not a failure-rate claim.
 
 ## Custom database or vector service
 
