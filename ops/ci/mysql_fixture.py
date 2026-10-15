@@ -148,7 +148,7 @@ def public_command_output(output: str, credential: str | None, cwd: Path) -> str
     safe = re.sub(
         r"\b[a-zA-Z][a-zA-Z0-9+.-]*://[^\s\"'<>]+", "[redacted endpoint]", safe
     )
-    return safe[:4096] + ("[truncated]" if len(safe) > 4096 else "")
+    return safe if len(safe) <= 4096 else safe[:2048] + "[truncated]" + safe[-2048:]
 
 
 def command(
@@ -190,7 +190,7 @@ def command(
             "timeout_seconds": round(timeout, 3),
         }
         if phase is not None and code != 0:
-            # Only credential-free permission commands opt into public stream output.
+            # Only credential-free image/permission commands export public streams.
             diagnostic["stdout"] = public_command_output(stdout, credential, cwd)
             diagnostic["stderr"] = public_command_output(stderr, credential, cwd)
         print("Fixture command: " + json.dumps(diagnostic), file=sys.stderr, flush=True)
@@ -644,9 +644,21 @@ class Fixture:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--pull-image", action="store_true")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     child = args.command[1:] if args.command[:1] == ["--"] else args.command
+    if args.pull_image:
+        if child:
+            parser.error("--pull-image cannot be combined with a test command")
+        # The pinned cold download is 256 MiB; do not spend the 90s setup budget on it.
+        command(
+            ["docker", "pull", IMAGE],
+            cwd=private_directory(),
+            phase="Pinned MySQL image acquisition",
+            timeout=300,
+        )
+        return 0
     if not child:
         parser.error("A test command is required after --")
     root = private_directory()

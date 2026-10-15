@@ -552,3 +552,58 @@ def test_timeout_accepts_windows_already_decoded_partial_streams(
     assert event["status"] == "timeout"
     assert event["stdout"] == "Pulling fs layer"
     assert event["stderr"] == "registry diagnostic"
+
+
+def test_bounded_permission_diagnostics_keep_final_error_after_pull_progress(
+    tmp_path: Path,
+) -> None:
+    output = (
+        "Pulling fs layer\n" + "progress " * 1000 + "\nregistry connection timed out"
+    )
+    public = fixture.public_command_output(output, None, tmp_path)
+    assert public.startswith("Pulling fs layer")
+    assert public.endswith("registry connection timed out")
+    assert "[truncated]" in public
+    assert len(public) <= 4107
+
+
+@pytest.mark.parametrize("failure", [False, True])
+def test_explicit_image_acquisition_precedes_fixture_resources_without_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: bool
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["fixture", "--pull-image"])
+    monkeypatch.setattr(fixture, "private_directory", lambda: tmp_path)
+    initialize = MagicMock(side_effect=AssertionError("must not construct SQL fixture"))
+    monkeypatch.setattr(fixture, "Fixture", initialize)
+    generate = MagicMock(side_effect=AssertionError("must not generate TLS keys"))
+    monkeypatch.setattr(fixture, "certificates", generate)
+    command = MagicMock(
+        side_effect=RuntimeError("image acquisition timed out") if failure else None
+    )
+    monkeypatch.setattr(fixture, "command", command)
+    if failure:
+        with pytest.raises(RuntimeError, match="image acquisition"):
+            fixture.main()
+    else:
+        assert fixture.main() == 0
+    command.assert_called_once_with(
+        ["docker", "pull", fixture.IMAGE],
+        cwd=tmp_path,
+        phase="Pinned MySQL image acquisition",
+        timeout=300,
+    )
+    initialize.assert_not_called()
+    generate.assert_not_called()
+    assert not list(tmp_path.iterdir())
+
+
+def test_image_acquisition_rejects_a_combined_test_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["fixture", "--pull-image", "--", "test-child"])
+    command = MagicMock()
+    monkeypatch.setattr(fixture, "command", command)
+    with pytest.raises(SystemExit) as caught:
+        fixture.main()
+    assert caught.value.code == 2
+    command.assert_not_called()
