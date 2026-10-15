@@ -9,6 +9,7 @@ import stat
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -342,3 +343,267 @@ def test_command_preserves_requested_diagnostic_streams(
     )
     assert "stdout diagnostic" in result
     assert ("stderr diagnostic" in result) == include_stderr
+
+
+@pytest.mark.parametrize("timeout", [False, True])
+@pytest.mark.parametrize("complete_key", [False, True])
+def test_public_permission_failure_is_bounded_and_secret_safe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    timeout: bool,
+    complete_key: bool,
+) -> None:
+    owned = fixture.Fixture(tmp_path)
+    key = "-----BEGIN PRIVATE KEY-----\nprivate-key-canary\n"
+    if complete_key:
+        key += "-----END PRIVATE KEY-----\n"
+    output = (
+        "permission denied "
+        + owned.password
+        + " https://user:proxy-canary@private.invalid/token\n"
+        + key
+    )
+    output += "x" * 6000
+
+    def failed(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        assert kwargs["timeout"] == 90
+        if timeout:
+            raise subprocess.TimeoutExpired(
+                args, 90, output=output.encode(), stderr=output.encode()
+            )
+        return subprocess.CompletedProcess(args, 1, output, output)
+
+    monkeypatch.setattr(fixture.subprocess, "run", failed)
+    with pytest.raises(RuntimeError, match="sanitized output"):
+        fixture.command(
+            ["docker", "start", "--attach", "owned"],
+            cwd=tmp_path,
+            credential=owned.password,
+            phase="TLS permissions execution",
+        )
+    public = capsys.readouterr().err
+    assert owned.password not in public
+    assert "private-key-canary" not in public
+    assert "proxy-canary" not in public
+    assert "private.invalid" not in public
+    assert "permission denied" in public
+    event = json.loads(public.removeprefix("Fixture command: "))
+    assert event["status"] == ("timeout" if timeout else "failed")
+    assert event["timeout_seconds"] == 90
+    assert event["elapsed_seconds"] >= 0
+    assert len(event["stdout"]) <= 4107
+    assert len(event["stderr"]) <= 4107
+    assert "[redacted private key]" in event["stdout"]
+    assert "[redacted endpoint]" in event["stderr"]
+
+
+def test_non_public_command_does_not_export_raw_inspect_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        fixture.subprocess,
+        "run",
+        MagicMock(
+            return_value=subprocess.CompletedProcess(
+                [], 1, "unknown-environment-secret", "private-inspect-output"
+            )
+        ),
+    )
+    with pytest.raises(RuntimeError):
+        fixture.command(["docker", "inspect", "owned"], cwd=tmp_path)
+    public = capsys.readouterr().err
+    assert "unknown-environment-secret" not in public
+    assert "private-inspect-output" not in public
+    event = json.loads(public.removeprefix("Fixture command: "))
+    assert event["status"] == "failed"
+    assert "stdout" not in event
+    assert "stderr" not in event
+
+
+def test_failure_is_visible_even_when_private_diagnostic_write_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        fixture.subprocess,
+        "run",
+        MagicMock(
+            return_value=subprocess.CompletedProcess([], 1, "", "permission denied")
+        ),
+    )
+    monkeypatch.setattr(
+        fixture, "private_write", MagicMock(side_effect=OSError("write failed"))
+    )
+    with pytest.raises(OSError, match="write failed"):
+        fixture.command(
+            ["docker", "start"], cwd=tmp_path, phase="TLS permissions execution"
+        )
+    assert "permission denied" in capsys.readouterr().err
+
+
+def test_public_phase_success_records_monotonic_elapsed_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    times = iter([100.0, 100.25])
+    monkeypatch.setattr(fixture.time, "monotonic", lambda: next(times))
+    monkeypatch.setattr(
+        fixture.subprocess,
+        "run",
+        MagicMock(
+            return_value=subprocess.CompletedProcess([], 0, "owned-container-id", "")
+        ),
+    )
+    assert (
+        fixture.command(
+            ["docker", "create"], cwd=tmp_path, phase="TLS permissions create"
+        )
+        == "owned-container-id"
+    )
+    event = json.loads(capsys.readouterr().err.removeprefix("Fixture command: "))
+    assert event["status"] == "succeeded"
+    assert event["elapsed_seconds"] == pytest.approx(0.25)
+    assert "stdout" not in event
+
+
+@pytest.mark.parametrize("failure", [None, "create", "start"])
+def test_permission_creation_and_execution_are_separate_without_replay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str | None
+) -> None:
+    owned = fixture.Fixture(tmp_path)
+    owned.tls.mkdir()
+    monkeypatch.setattr(fixture, "os", SimpleNamespace(name="posix"))
+    monkeypatch.setattr(fixture, "certificates", lambda root: owned.tls)
+    calls: list[tuple[list[str], dict[str, object]]] = []
+
+    def command(args: list[str], **kwargs: object) -> str:
+        calls.append((args, kwargs))
+        assert owned.containers == [f"semantix-mysql-p5-{owned.identifier}-permissions"]
+        if args[1] == failure:
+            raise RuntimeError("controlled command failure")
+        return "owned-container-id"
+
+    monkeypatch.setattr(fixture, "command", command)
+    if failure:
+        with pytest.raises(RuntimeError, match="controlled"):
+            owned.prepare()
+        assert not owned.prepared
+    else:
+        owned.prepare()
+        assert owned.prepared
+    create, create_options = calls[0]
+    assert create[:3] == ["docker", "create", "--rm"]
+    assert fixture.IMAGE in create
+    assert f"semantix.owner={fixture.OWNER}" in create
+    assert f"semantix.fixture={owned.identifier}" in create
+    assert f"type=bind,source={owned.tls},target=/tls" in create
+    assert (
+        create_options["phase"]
+        == "TLS permissions image acquisition/container creation"
+    )
+    assert len(calls) == (1 if failure == "create" else 2)
+    if failure != "create":
+        assert calls[1][0] == ["docker", "start", "--attach", owned.containers[0]]
+        assert 0 < calls[1][1]["timeout"] <= 90
+        assert (
+            calls[1][1]["phase"]
+            == "TLS permissions container startup/filesystem changes"
+        )
+
+
+def test_permission_shared_deadline_cannot_dispatch_start_after_expiry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owned = fixture.Fixture(tmp_path)
+    owned.tls.mkdir()
+    monkeypatch.setattr(fixture, "os", SimpleNamespace(name="posix"))
+    monkeypatch.setattr(fixture, "certificates", lambda root: owned.tls)
+    times = iter([100.0, 191.0])
+    monkeypatch.setattr(fixture.time, "monotonic", lambda: next(times))
+    command = MagicMock(return_value="owned-container-id")
+    monkeypatch.setattr(fixture, "command", command)
+    with pytest.raises(RuntimeError, match="90-second budget"):
+        owned.prepare()
+    command.assert_called_once()
+    assert command.call_args.args[0][:2] == ["docker", "create"]
+    assert not owned.prepared
+    assert len(owned.containers) == 1
+
+
+def test_timeout_accepts_windows_already_decoded_partial_streams(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        fixture.subprocess,
+        "run",
+        MagicMock(
+            side_effect=subprocess.TimeoutExpired(
+                ["docker", "create"],
+                90,
+                output="Pulling fs layer",
+                stderr="registry diagnostic",
+            )
+        ),
+    )
+    with pytest.raises(RuntimeError, match="sanitized output"):
+        fixture.command(
+            ["docker", "create"], cwd=tmp_path, phase="TLS permissions create"
+        )
+    event = json.loads(capsys.readouterr().err.removeprefix("Fixture command: "))
+    assert event["status"] == "timeout"
+    assert event["stdout"] == "Pulling fs layer"
+    assert event["stderr"] == "registry diagnostic"
+
+
+def test_bounded_permission_diagnostics_keep_final_error_after_pull_progress(
+    tmp_path: Path,
+) -> None:
+    output = (
+        "Pulling fs layer\n" + "progress " * 1000 + "\nregistry connection timed out"
+    )
+    public = fixture.public_command_output(output, None, tmp_path)
+    assert public.startswith("Pulling fs layer")
+    assert public.endswith("registry connection timed out")
+    assert "[truncated]" in public
+    assert len(public) <= 4107
+
+
+@pytest.mark.parametrize("failure", [False, True])
+def test_explicit_image_acquisition_precedes_fixture_resources_without_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: bool
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["fixture", "--pull-image"])
+    monkeypatch.setattr(fixture, "private_directory", lambda: tmp_path)
+    initialize = MagicMock(side_effect=AssertionError("must not construct SQL fixture"))
+    monkeypatch.setattr(fixture, "Fixture", initialize)
+    generate = MagicMock(side_effect=AssertionError("must not generate TLS keys"))
+    monkeypatch.setattr(fixture, "certificates", generate)
+    command = MagicMock(
+        side_effect=RuntimeError("image acquisition timed out") if failure else None
+    )
+    monkeypatch.setattr(fixture, "command", command)
+    if failure:
+        with pytest.raises(RuntimeError, match="image acquisition"):
+            fixture.main()
+    else:
+        assert fixture.main() == 0
+    command.assert_called_once_with(
+        ["docker", "pull", fixture.IMAGE],
+        cwd=tmp_path,
+        phase="Pinned MySQL image acquisition",
+        timeout=300,
+    )
+    initialize.assert_not_called()
+    generate.assert_not_called()
+    assert not list(tmp_path.iterdir())
+
+
+def test_image_acquisition_rejects_a_combined_test_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["fixture", "--pull-image", "--", "test-child"])
+    command = MagicMock()
+    monkeypatch.setattr(fixture, "command", command)
+    with pytest.raises(SystemExit) as caught:
+        fixture.main()
+    assert caught.value.code == 2
+    command.assert_not_called()
