@@ -415,7 +415,7 @@ Core capabilities:
 
 #### Requirements
 
-Install Git and Docker Desktop, or Docker Engine with Compose.
+Install Git, Docker Desktop or Docker CLI/Engine 23+ (API 1.42+) with Compose 2.20+, and Python 3.11–3.14 for the development launcher. The [advanced Docker-only path](docs/guides/getting-started.md#advanced-direct-docker-compose) remains available.
 
 #### 1. Clone the repository
 
@@ -470,15 +470,18 @@ To use Hugging Face, OpenAI, Anthropic, Gemini, or Ollama, see
 
 #### 3. Start the complete development stack
 
-Run the same command in PowerShell, Bash, or another terminal:
+After configuration, run from PowerShell, Bash, or another terminal:
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build -d --wait --wait-timeout 120 backend frontend
+python scripts/dev.py up
 ```
 
-This starts FastAPI and the Vite frontend with hot reload. The memory setup needs
-neither the `pgvector` nor the `redis` profile. If startup fails, inspect backend
-logs before sending queries; `/ready` must return HTTP 200.
+Or use `uv run --no-project scripts/dev.py up`. No backend dependencies are
+installed on the host. The launcher selects necessary local services, initializes
+only newly created owned storage, validates existing storage, and waits for
+backend readiness before starting the dashboard. Memory-only needs no databases.
+See [startup, credentials and recovery](docs/guides/getting-started.md#recommended-development-launcher)
+or the [advanced direct Compose path](docs/guides/getting-started.md#advanced-direct-docker-compose).
 
 #### 4. Open the application
 
@@ -517,13 +520,20 @@ database before setup.
 
 ```env
 CACHE_BACKEND=pgvector
-DATABASE_URL=postgresql://replace-runtime-user:replace-runtime-password@postgres:5432/semantix
+DATABASE_URL=postgresql://semantix_runtime:replace-runtime-password@postgres:5432/semantix
 DATABASE_MIGRATION_MODE=external
 EVALUATION_DATASET_STORAGE=postgres
 EVALUATION_DATASET_DEFAULT_RETENTION_DAYS=30
 ```
 
-Start only PostgreSQL and wait for its health check:
+For a fresh launcher-managed volume, generate/configure the runtime password as
+explained in [PostgreSQL credentials](docs/guides/getting-started.md#postgresql-runtime-credentials),
+then run `python scripts/dev.py up`. It provisions the missing restricted login
+with that password and runs separate setup; existing roles/data are never repaired
+or overwritten. No external provider supplies this password.
+
+**Advanced direct Compose setup:** the remaining steps require explicit operator
+authority. Start only PostgreSQL and wait for its health check:
 
 ```bash
 docker compose -f docker-compose.dev.yml --profile pgvector up -d --wait --wait-timeout 60 postgres
@@ -534,10 +544,7 @@ Do not use that privileged role in the backend's `DATABASE_URL`. Securely load
 these operator variables into your shell, without putting migration credentials
 in `apps/server/.env`, tracked files, shell history, or logs:
 
-- `SEMANTIX_RUNTIME_USER` and `SEMANTIX_RUNTIME_PASSWORD`: a separate runtime
-  login matching `DATABASE_URL`, with no superuser, role/database-creation, schema
-  ownership, or migration authority;
-- `DATABASE_RUNTIME_ROLE`: the same name as `SEMANTIX_RUNTIME_USER`;
+- `DATABASE_RUNTIME_ROLE`: the restricted login name from `DATABASE_URL`;
 - `MIGRATION_DATABASE_URL`: the bootstrap/migration connection for this development
   database, with authority to enable pgvector, initialize schemas, and grant access.
 
@@ -545,34 +552,36 @@ Inside containers, both URLs use `postgres:5432/semantix`. A host tool instead
 uses `127.0.0.1:5433` by default (`POSTGRES_PORT` can change the published port).
 For an existing volume, use its actual credentials and back it up before setup.
 
-In PowerShell, prompt for the operator secrets without echoing them. The runtime
-password must match the URL in `apps/server/.env`; enter the full bootstrap URL
-only at the masked migration prompt:
+For a genuinely missing runtime role, open psql using local bootstrap authority:
+
+```bash
+docker compose -f docker-compose.dev.yml --profile pgvector exec postgres psql -X --set ON_ERROR_STOP=1 --username semantix --dbname semantix
+```
+
+Inside psql, create the restricted role and enter the password from `DATABASE_URL`
+at the hidden `\password` prompts. If the role already exists, stop and verify
+its privileges and credentials separately; do not reset its password.
+
+```sql
+CREATE ROLE semantix_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+GRANT CONNECT ON DATABASE semantix TO semantix_runtime;
+\password semantix_runtime
+\q
+```
+
+The password prompt avoids plaintext password SQL and process arguments. The
+migration command grants schema/table access; it does not create the login.
+In PowerShell, supply migration authority through a masked prompt:
 
 ```powershell
-$env:SEMANTIX_RUNTIME_USER = 'semantix_runtime'
-$env:DATABASE_RUNTIME_ROLE = $env:SEMANTIX_RUNTIME_USER
-$env:SEMANTIX_RUNTIME_PASSWORD = [pscredential]::new(
-    $env:SEMANTIX_RUNTIME_USER,
-    (Read-Host 'Runtime password matching DATABASE_URL' -AsSecureString)
-).GetNetworkCredential().Password
+$env:DATABASE_RUNTIME_ROLE = 'semantix_runtime'
 $env:MIGRATION_DATABASE_URL = [pscredential]::new(
     'migration', (Read-Host 'Migration database URL' -AsSecureString)
 ).GetNetworkCredential().Password
 ```
 
-For a fresh runtime login, reuse the existing
-[runtime-role provisioner](ops/postgres/init-runtime-role.sh):
-
-```bash
-docker compose -f docker-compose.dev.yml --profile pgvector cp ops/postgres/init-runtime-role.sh postgres:/tmp/init-runtime-role.sh
-docker compose -f docker-compose.dev.yml --profile pgvector exec -T -e SEMANTIX_RUNTIME_USER -e SEMANTIX_RUNTIME_PASSWORD postgres sh /tmp/init-runtime-role.sh
-```
-
-The script creates a missing login and grants database `CONNECT`; it does not
-rotate credentials or remove privileges from an existing role. Verify an existing
-role separately. The migration command grants the required schema/table access;
-it does not create the runtime login.
+In other shells, securely load the same two operator variables without putting
+their secret values in shell history or arguments.
 
 Run explicit setup in a one-shot backend container and continue only if it exits
 successfully:

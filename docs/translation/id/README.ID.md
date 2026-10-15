@@ -405,7 +405,7 @@ Kapabilitas inti:
 
 #### Prasyarat
 
-Instal Git dan Docker Desktop, atau Docker Engine beserta Compose.
+Instal Git, Docker Desktop atau Docker CLI/Engine 23+ (API 1.42+) dengan Compose 2.20+, dan Python 3.11–3.14 untuk launcher development. [Jalur Docker langsung](guides/getting-started.md#lanjutan-docker-compose-langsung) tetap tersedia.
 
 #### 1. Clone repository
 
@@ -457,15 +457,18 @@ Untuk menggunakan Hugging Face, OpenAI, Anthropic, Gemini, atau Ollama, lihat [P
 
 #### 3. Jalankan stack development lengkap
 
-Gunakan perintah yang sama di PowerShell, Bash, atau terminal lain:
+Setelah konfigurasi, jalankan perintah yang sama di PowerShell atau Bash:
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build -d --wait --wait-timeout 120 backend frontend
+python scripts/dev.py up
 ```
 
-Perintah ini menjalankan FastAPI dan frontend Vite dengan hot reload. Konfigurasi
-memory tidak memerlukan profil `pgvector` maupun `redis`. Jika startup gagal,
-periksa log backend sebelum mengirim query; `/ready` harus mengembalikan HTTP 200.
+Atau gunakan `uv run --no-project scripts/dev.py up`. Dependency backend tetap
+di Docker. Launcher memilih service yang diperlukan, menyiapkan hanya storage
+baru yang dimilikinya, memvalidasi storage lama, lalu menunggu readiness backend
+sebelum memulai dashboard. Memory murni tidak memerlukan database. Lihat
+[startup, kredensial dan recovery](guides/getting-started.md#direkomendasikan-launcher-development)
+atau [Compose langsung](guides/getting-started.md#lanjutan-docker-compose-langsung).
 
 #### 4. Buka aplikasi
 
@@ -503,12 +506,19 @@ backup database yang sudah ada sebelum setup.
 
 ```env
 CACHE_BACKEND=pgvector
-DATABASE_URL=postgresql://replace-runtime-user:replace-runtime-password@postgres:5432/semantix
+DATABASE_URL=postgresql://semantix_runtime:replace-runtime-password@postgres:5432/semantix
 DATABASE_MIGRATION_MODE=external
 EVALUATION_DATASET_STORAGE=postgres
 EVALUATION_DATASET_DEFAULT_RETENTION_DAYS=30
 ```
 
+Untuk volume baru yang dibuat launcher, ikuti
+[kredensial PostgreSQL](guides/getting-started.md#kredensial-runtime-postgresql),
+lalu jalankan `python scripts/dev.py up`. Akun runtime terbatas dibuat dengan
+password yang Anda konfigurasikan, melalui setup terpisah. Role/data lama tidak
+diperbaiki atau ditimpa otomatis. Password ini bukan dari provider eksternal.
+
+**Compose langsung (lanjutan):** langkah berikut memerlukan wewenang operator eksplisit.
 Jalankan hanya PostgreSQL dan tunggu health check-nya:
 
 ```bash
@@ -520,10 +530,7 @@ menggunakan role berhak istimewa tersebut dalam `DATABASE_URL` backend. Muat
 variabel operator berikut secara aman ke shell, tanpa menyimpan kredensial
 migration di `apps/server/.env`, tracked files, shell history, atau logs:
 
-- `SEMANTIX_RUNTIME_USER` dan `SEMANTIX_RUNTIME_PASSWORD`: login runtime terpisah
-  yang cocok dengan `DATABASE_URL`, tanpa superuser, hak membuat role/database,
-  kepemilikan schema, atau wewenang migration;
-- `DATABASE_RUNTIME_ROLE`: nama yang sama dengan `SEMANTIX_RUNTIME_USER`;
+- `DATABASE_RUNTIME_ROLE`: nama login terbatas pada `DATABASE_URL`;
 - `MIGRATION_DATABASE_URL`: koneksi bootstrap/migration untuk database development
   ini, dengan wewenang mengaktifkan pgvector, menginisialisasi schema, dan memberikan akses.
 
@@ -532,34 +539,36 @@ menggunakan `127.0.0.1:5433` secara default (`POSTGRES_PORT` dapat mengubah port
 publikasi). Untuk volume yang sudah ada, gunakan kredensial aktual dan lakukan
 backup sebelum setup.
 
-Di PowerShell, masukkan secret operator melalui prompt tanpa menampilkannya.
-Password runtime harus cocok dengan URL di `apps/server/.env`; masukkan URL
-bootstrap lengkap hanya pada prompt migration yang disamarkan:
+Untuk role runtime yang benar-benar belum ada, buka psql dengan wewenang bootstrap lokal:
+
+```bash
+docker compose -f docker-compose.dev.yml --profile pgvector exec postgres psql -X --set ON_ERROR_STOP=1 --username semantix --dbname semantix
+```
+
+Di psql, buat role terbatas dan masukkan password dari `DATABASE_URL` pada prompt
+`\password` yang tidak menampilkannya. Jika role sudah ada, berhenti dan periksa
+hak/kredensial secara terpisah; jangan reset password-nya.
+
+```sql
+CREATE ROLE semantix_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+GRANT CONNECT ON DATABASE semantix TO semantix_runtime;
+\password semantix_runtime
+\q
+```
+
+Prompt password menghindari plaintext password pada SQL dan argumen proses.
+Migration memberikan akses schema/table, bukan membuat login.
+Di PowerShell, masukkan wewenang migration melalui prompt tersamar:
 
 ```powershell
-$env:SEMANTIX_RUNTIME_USER = 'semantix_runtime'
-$env:DATABASE_RUNTIME_ROLE = $env:SEMANTIX_RUNTIME_USER
-$env:SEMANTIX_RUNTIME_PASSWORD = [pscredential]::new(
-    $env:SEMANTIX_RUNTIME_USER,
-    (Read-Host 'Password runtime yang cocok dengan DATABASE_URL' -AsSecureString)
-).GetNetworkCredential().Password
+$env:DATABASE_RUNTIME_ROLE = 'semantix_runtime'
 $env:MIGRATION_DATABASE_URL = [pscredential]::new(
     'migration', (Read-Host 'URL database migration' -AsSecureString)
 ).GetNetworkCredential().Password
 ```
 
-Untuk login runtime baru, gunakan kembali
-[provisioner role runtime](../../../ops/postgres/init-runtime-role.sh) yang sudah ada:
-
-```bash
-docker compose -f docker-compose.dev.yml --profile pgvector cp ops/postgres/init-runtime-role.sh postgres:/tmp/init-runtime-role.sh
-docker compose -f docker-compose.dev.yml --profile pgvector exec -T -e SEMANTIX_RUNTIME_USER -e SEMANTIX_RUNTIME_PASSWORD postgres sh /tmp/init-runtime-role.sh
-```
-
-Script membuat login yang belum ada dan memberikan `CONNECT` ke database; script
-ini tidak merotasi kredensial atau menghapus hak role yang sudah ada. Verifikasi
-role yang sudah ada secara terpisah. Perintah migration memberikan akses
-schema/table yang diperlukan; perintah tersebut tidak membuat login runtime.
+Pada shell lain, muat dua variabel operator yang sama secara aman tanpa menulis
+secret dalam shell history atau argumen.
 
 Jalankan setup eksplisit dalam container backend sekali jalan dan lanjutkan hanya
 jika perintah berhasil exit:
@@ -611,7 +620,7 @@ Hanya pengaturan yang diperlukan oleh kapabilitas yang dipilih yang akan divalid
 
 | Mode | Penggunaan yang dituju | Perilaku utama |
 |---|---|---|
-| **Development** | Satu developer lokal yang tepercaya | Hot reload, port loopback, autentikasi dinonaktifkan, migrasi otomatis |
+| **Development** | Satu developer lokal yang tepercaya | Hot reload, port loopback, autentikasi dinonaktifkan, setup cache persisten terpisah |
 | **Hardened** | Deployment dua replika yang dibagikan atau publik | Autentikasi token, peran namespace, jaringan backend/database internal, migrasi eksternal, proxy TLS wajib |
 
 Buat `.env.production` dari `.env.production.example` hanya ketika Anda menyiapkan deployment yang diperkeras (hardened):
