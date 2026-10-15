@@ -1,5 +1,9 @@
 # Getting started
 
+This guide covers the **optional backend/dashboard application**. For the primary
+embedded Python library, use the [package quick start](../../packages/cache/README.md#run-from-source);
+embedded users need neither Docker nor the official server.
+
 Semantix has separate development and hardened deployment paths. The development stack is for one trusted developer on a local machine. The hardened stack is the starting point for shared or public deployment and must sit behind TLS.
 
 ## Prerequisites
@@ -24,31 +28,39 @@ Set-Location semantix
 Copy-Item apps\server\.env.example apps\server\.env
 ```
 
-For a network-free development configuration, set:
+For a credential-free mock development configuration, set:
 
 ```env
 EMBEDDING_PROVIDER=mock
 GENERATION_PROVIDER=mock
 MOCK_EMBEDDING_DIMENSIONS=384
 CACHE_BACKEND=memory
+EVALUATION_DATASET_STORAGE=session
+EVALUATION_RUN_HISTORY_STORAGE=disabled
+COORDINATION_BACKEND=memory
 AUTH_MODE=disabled
 ```
 
 For hosted or local inference, choose the embedding and generation providers in
 [Providers](providers.md) before starting the stack. Mock responses are example
-output, not production answers.
+output, not production answers. The first Docker build can download images and
+dependencies; the mock providers make no AI API calls.
 
 Start the explicitly named development stack:
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build -d
+docker compose -f docker-compose.dev.yml up --build -d --wait --wait-timeout 120 backend frontend
 ```
 
 Docker Compose 2.20 or newer can also use the compatibility entry point, which loads the same development stack:
 
 ```bash
-docker compose up --build -d
+docker compose up --build -d --wait --wait-timeout 120 backend frontend
 ```
+
+These commands start the in-memory dashboard with the configuration above. They
+do not initialize PostgreSQL or create cache tables. Complete the
+[persistent-storage setup](#development-with-persistent-storage) first when selecting PostgreSQL.
 
 All published development ports bind to `127.0.0.1` by default:
 
@@ -85,6 +97,8 @@ Start the corresponding Docker profile's database, run explicit operator setup,
 then start backend/frontend. Cache startup validates storage and never performs
 automatic cache migrations. Existing PostgreSQL cache tables remain untouched;
 the new official binding starts empty. Keep existing volumes and back up first.
+The [development PostgreSQL walkthrough](../../README.md#optional-postgresql-persistence)
+provides the ordered database, runtime-role and migration commands.
 
 ### Local toolchains
 

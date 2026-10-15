@@ -16,7 +16,8 @@
 </div>
 
 <p align="center">
-  <a href="#instalasi-dan-contoh-awal">Mulai</a> ·
+  <a href="#instalasi-dan-contoh-awal">Mulai embedded</a> ·
+  <a href="guides/getting-started.md#development-lokal">Mulai dashboard</a> ·
   <a href="#cara-kerja-embedded">Cara kerja</a> ·
   <a href="#provider-ai-terverifikasi">Provider</a> ·
   <a href="#storage-embedded">Storage</a> ·

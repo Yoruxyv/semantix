@@ -16,7 +16,8 @@
 </div>
 
 <p align="center">
-  <a href="#install-and-run">Quick start</a> ·
+  <a href="#install-and-run">Embedded quick start</a> ·
+  <a href="docs/guides/getting-started.md#local-development">Dashboard quick start</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#verified-ai-providers">Providers</a> ·
   <a href="#storage">Storage</a> ·
@@ -24,9 +25,15 @@
   <a href="packages/cache/benchmarks/reuse_quality/README.md">Reuse quality</a>
 </p>
 
-**semantix-cache** is the intended first public PyPI product. Its 0.1.0 API
-is async-only and runs in your Python process. No Semantix server, web UI,
-Docker or PostgreSQL is required.
+**semantix-cache** is the primary embedded Python library and the intended first
+public PyPI product. Its 0.1.0 API is async-only and runs in your Python process.
+No Semantix server, web UI, Docker or PostgreSQL is required.
+
+| Use Semantix | Start here |
+| --- | --- |
+| **Embedded Python (primary)** | [Source quick start](#install-and-run); no Docker or official server |
+| **Backend/dashboard (optional)** | [Development quick start](docs/guides/getting-started.md#local-development); Docker with Compose |
+| **PostgreSQL persistence** | [Embedded setup](docs/embedded/storage.md#new-postgresql-database) or [dashboard setup](#optional-postgresql-persistence); explicit initialization required |
 
 ## Install and run
 
@@ -297,6 +304,10 @@ using an application-controlled PostgreSQL database. Provision the vector extens
 and initialize its separate marked cache schema explicitly; normal cache operations
 perform no DDL. Runtime operations enforce ownership markers, version and migration
 checksums, not a complete catalog fingerprint. Protect out-of-band schema changes.
+
+`PgVectorStore.connect()` can raise typed errors and returns no usable store on
+failure. Applications own recovery or fail-startup decisions; see
+[PostgreSQL connection failures](docs/embedded/storage.md#connections-cancellation-and-failures).
 
 See [embedded storage and user databases](docs/embedded/storage.md) for least-privileged
 runtime access, pool ownership, migrations and custom stores. pgvector stores float32
@@ -615,7 +626,7 @@ notes.
 
 | Mode | Intended use | Main behavior |
 |---|---|---|
-| **Development** | One trusted local developer | Hot reload, loopback ports, disabled authentication, automatic migrations |
+| **Development** | One trusted local developer | Hot reload, loopback ports, disabled authentication, explicit setup for persistent cache |
 | **Hardened** | Shared or public two-replica deployment | Token authentication, namespace roles, internal backend/database networks, external migrations, TLS proxy required |
 
 Create `.env.production` from `.env.production.example` only when preparing a
