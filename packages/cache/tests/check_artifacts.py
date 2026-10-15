@@ -104,18 +104,35 @@ def main(artifact_dir: Path = Path("dist")) -> None:
         )
         assert "semantix_cache/stores/_redis_scripts.py" not in names
         mysql_resources = {
-            "semantix_cache/stores/mysql_migrations/0001_cache.sql",
-            "semantix_cache/stores/mysql_migrations/0001_shape.json",
-            "semantix_cache/stores/mysql_migrations/0002_verifier.sql",
+            "semantix_cache/stores/_backends/mysql/migrations/0001_cache.sql",
+            "semantix_cache/stores/_backends/mysql/migrations/0001_shape.json",
+            "semantix_cache/stores/_backends/mysql/migrations/0002_verifier.sql",
         }
         for resource in mysql_resources:
             assert archive.read(resource) == Path("src").joinpath(resource).read_bytes()
-        migration = "semantix_cache/stores/migrations/0001_cache.sql"
-        sqlite_migration = "semantix_cache/stores/sqlite_migrations/0001_cache.sql"
+        migration = "semantix_cache/stores/_backends/postgres/migrations/0001_cache.sql"
+        sqlite_migration = (
+            "semantix_cache/stores/_backends/sqlite/migrations/0001_cache.sql"
+        )
         assert {name for name in names if name.endswith(".sql")} == {
             migration,
             sqlite_migration,
         } | {resource for resource in mysql_resources if resource.endswith(".sql")}
+        resource_files = (migration, sqlite_migration, *sorted(mysql_resources))
+        old_prefixes = tuple(
+            f"semantix_cache/stores/{package}/"
+            for package in ("migrations", "sqlite_migrations", "mysql_migrations")
+        )
+        assert not any(name.startswith(old_prefixes) for name in names)
+        assert all(names.count(resource) == 1 for resource in resource_files)
+        initializers = tuple(
+            f"semantix_cache/stores/_backends/{provider}/migrations/__init__.py"
+            for provider in ("postgres", "sqlite", "mysql")
+        )
+        assert all(
+            archive.read(path) == Path("src").joinpath(path).read_bytes()
+            for path in initializers
+        )
         for resource in (migration, sqlite_migration):
             assert archive.read(resource) == Path("src").joinpath(resource).read_bytes()
         for module in (
@@ -195,6 +212,23 @@ def main(artifact_dir: Path = Path("dist")) -> None:
                     )
                 )
             ), relative
+        assert not any(
+            name.startswith(f"{root}/src/{prefix}")
+            for name in archive.getnames()
+            for prefix in old_prefixes
+        )
+        assert all(
+            archive.getnames().count(f"{root}/src/{resource}") == 1
+            for resource in resource_files
+        )
+        package_files = {
+            path: archive.extractfile(f"{root}/src/{path}") for path in initializers
+        }
+        assert all(
+            package_file is not None
+            and package_file.read() == Path("src").joinpath(path).read_bytes()
+            for path, package_file in package_files.items()
+        )
         assert f"{root}/src/semantix_cache/py.typed" in archive.getnames()
         assert (
             f"{root}/src/semantix_cache/stores/_backends/redis/scripts.py"
@@ -210,16 +244,14 @@ def main(artifact_dir: Path = Path("dist")) -> None:
         )
         for module in ("observability", "_coalescing_metrics"):
             assert f"{root}/src/semantix_cache/{module}.py" in archive.getnames()
-        sqlite_resource = (
-            f"{root}/src/semantix_cache/stores/sqlite_migrations/0001_cache.sql"
-        )
+        sqlite_resource = f"{root}/src/semantix_cache/stores/_backends/sqlite/migrations/0001_cache.sql"
         assert sqlite_resource in archive.getnames()
         resource_file = archive.extractfile(sqlite_resource)
         assert resource_file is not None
         assert (
             resource_file.read()
             == Path(
-                "src/semantix_cache/stores/sqlite_migrations/0001_cache.sql"
+                "src/semantix_cache/stores/_backends/sqlite/migrations/0001_cache.sql"
             ).read_bytes()
         )
         for resource in mysql_resources:
@@ -235,9 +267,12 @@ def main(artifact_dir: Path = Path("dist")) -> None:
             )
         assert f"{root}/examples/persistent_support.py" in archive.getnames()
         assert (
-            f"{root}/src/semantix_cache/stores/migrations/0001_cache.sql"
+            f"{root}/src/semantix_cache/stores/_backends/postgres/migrations/0001_cache.sql"
             in archive.getnames()
         )
+        postgres_file = archive.extractfile(f"{root}/src/{migration}")
+        assert postgres_file is not None
+        assert postgres_file.read() == Path("src").joinpath(migration).read_bytes()
     print("Embedded archive, namespace, license and dependency allowlists verified")
 
 

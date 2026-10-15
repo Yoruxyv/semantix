@@ -57,7 +57,9 @@ async def main() -> None:
     assert semantix_cache.__file__ is not None
     assert "site-packages" in Path(semantix_cache.__file__).parts
     assert (
-        files("semantix_cache.stores.migrations").joinpath("0001_cache.sql").is_file()
+        files("semantix_cache.stores._backends.postgres.migrations")
+        .joinpath("0001_cache.sql")
+        .is_file()
     )
     assert "app" not in sys.modules and "fastapi" not in sys.modules
     print("Installed pgvector wheel, migration resource and persistence verified")

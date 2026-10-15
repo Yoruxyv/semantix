@@ -21,7 +21,7 @@ async def main() -> None:
     assert module.__file__ is not None
     assert "site-packages" in Path(module.__file__).parts
     assert (
-        files("semantix_cache.stores.sqlite_migrations")
+        files("semantix_cache.stores._backends.sqlite.migrations")
         .joinpath("0001_cache.sql")
         .read_bytes()
         .startswith(b"CREATE TABLE")

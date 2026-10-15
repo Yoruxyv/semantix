@@ -15,7 +15,7 @@ from .worker import Job
 
 OWNER = b"semantix-cache:mysql:v1"
 MIGRATION = (
-    files("semantix_cache.stores.mysql_migrations")
+    files("semantix_cache.stores._backends.mysql.migrations")
     .joinpath("0001_cache.sql")
     .read_bytes()
 )
@@ -24,7 +24,7 @@ STATEMENTS = tuple(
     part.strip() for part in MIGRATION.decode("utf8").split(";") if part.strip()
 )
 VERIFIER = (
-    files("semantix_cache.stores.mysql_migrations")
+    files("semantix_cache.stores._backends.mysql.migrations")
     .joinpath("0002_verifier.sql")
     .read_bytes()
 )
@@ -33,7 +33,7 @@ VERIFIER_CHECKSUM = sha256(VERIFIER).digest()
 VERIFIER_BODY = VERIFIER_SQL[VERIFIER_SQL.index("\nSELECT 2,") + 1 :]
 VERIFIER_BODY_CHECKSUM = sha256(VERIFIER_BODY.encode("utf8")).hexdigest()
 EXPECTED = json.loads(
-    files("semantix_cache.stores.mysql_migrations")
+    files("semantix_cache.stores._backends.mysql.migrations")
     .joinpath("0001_shape.json")
     .read_text(encoding="utf8")
 )

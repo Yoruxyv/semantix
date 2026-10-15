@@ -5,12 +5,14 @@ import inspect
 import pickle
 import subprocess
 import sys
+from hashlib import sha256
+from importlib.resources import files
 
 import pytest
 
 from semantix_cache.stores import _mysql_cleanup as status_types
 from semantix_cache.stores import mysql
-from semantix_cache.stores._backends.mysql import cleanup
+from semantix_cache.stores._backends.mysql import cleanup, schema
 
 _PUBLIC_BINDINGS = {
     "mysql": (
@@ -108,6 +110,9 @@ import semantix_cache.stores._backends.sqlite
 import semantix_cache.stores._backends.redis
 import semantix_cache.stores._backends.redis.format
 import semantix_cache.stores._backends.postgres
+import semantix_cache.stores._backends.postgres.migrations
+import semantix_cache.stores._backends.sqlite.migrations
+import semantix_cache.stores._backends.mysql.migrations
 assert not {'pymysql', 'asyncpg', 'redis', 'sqlite3'} & sys.modules.keys()
 """
     result = subprocess.run(  # noqa: S603 -- fixed interpreter/script; no shell or external inputs
@@ -117,3 +122,50 @@ assert not {'pymysql', 'asyncpg', 'redis', 'sqlite3'} & sys.modules.keys()
         check=False,
     )
     assert result.returncode == 0, result.stderr.decode("utf8", errors="replace")
+
+
+@pytest.mark.parametrize(
+    ("provider", "resource", "checksum"),
+    [
+        (
+            "postgres",
+            "0001_cache.sql",
+            "f1c4f8bcc6e78b7245e5b0e3dd5e445f0cef8d0c411a2375eab9cb5f05fba2ec",
+        ),
+        (
+            "sqlite",
+            "0001_cache.sql",
+            "2438f440a3f76a4c406ecbec8b14e0620bc5d91d02b2b1d8bfa618478d23d4e2",
+        ),
+        (
+            "mysql",
+            "0001_cache.sql",
+            "2a2b9d29118053d8091871c30369ac0c629fa03d7291722ca1a0ba840f13cd13",
+        ),
+        (
+            "mysql",
+            "0001_shape.json",
+            "16a9f2160175f20f5678f9d1f86f874ce4b349f2c55b2ed50b15d3ab93b49fc2",
+        ),
+        (
+            "mysql",
+            "0002_verifier.sql",
+            "1def57a91b81fe74c08cd71557fbc3dabf0e31480e92549e018e5cef838146a7",
+        ),
+    ],
+)
+def test_provider_migration_frozen_bytes(
+    provider: str, resource: str, checksum: str
+) -> None:
+    data = (
+        files("semantix_cache.stores._backends." + provider + ".migrations")
+        .joinpath(resource)
+        .read_bytes()
+    )
+    assert sha256(data).hexdigest() == checksum
+
+
+def test_mysql_verifier_body_digest_is_unchanged() -> None:
+    assert schema.VERIFIER_BODY_CHECKSUM == (
+        "c1aab7237816fe3b0d02f951c34117d5f22fb8641bb6675666d5f32791ec4a14"
+    )

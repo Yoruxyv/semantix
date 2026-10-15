@@ -120,7 +120,7 @@ async def main() -> None:
     assert semantix_cache.__file__ is not None
     assert "site-packages" in Path(semantix_cache.__file__).parts
     migration = import_module("semantix_cache.stores._backends.mysql.schema")
-    resources = files("semantix_cache.stores.mysql_migrations")
+    resources = files("semantix_cache.stores._backends.mysql.migrations")
     assert (
         sha256(resources.joinpath("0001_cache.sql").read_bytes()).digest()
         == migration.CHECKSUM

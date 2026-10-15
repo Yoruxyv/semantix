@@ -268,9 +268,14 @@ Construction, `connect()`, validation and normal cache operations perform no DDL
 An absent or incompatible schema raises a typed error; it never falls back to memory.
 For external deployment control, call this initialization from your migration job
 rather than application startup. The SQL template is packaged at
-`semantix_cache.stores.migrations/0001_cache.sql`; it contains quoted-layout
+`semantix_cache.stores._backends.postgres.migrations/0001_cache.sql`; it contains quoted-layout
 placeholders and is not a standalone unrendered SQL script. The explicit
 initializer renders it, applies it transactionally and records its checksum.
+
+The former `semantix_cache.stores.migrations` resource package has been removed.
+Deployment tooling that reads the template directly must use the new package
+path; `PgVectorStore.initialize_schema()` retains its existing initialization
+workflow and database compatibility.
 
 ## Existing application database
 
