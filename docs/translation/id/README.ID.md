@@ -17,16 +17,23 @@
 
 <p align="center">
   <a href="#instalasi-dan-contoh-awal">Mulai embedded</a> ·
-  <a href="guides/getting-started.md#development-lokal">Mulai dashboard</a> ·
+  <a href="#dashboard-opsional--mulai-cepat">Mulai dashboard</a> ·
   <a href="#cara-kerja-embedded">Cara kerja</a> ·
   <a href="#provider-ai-terverifikasi">Provider</a> ·
   <a href="#storage-embedded">Storage</a> ·
   <a href="#performa-embedded">Benchmark</a>
 </p>
 
-**semantix-cache** adalah produk PyPI publik pertama yang direncanakan.
+**semantix-cache** adalah library Python embedded utama dan produk PyPI publik
+pertama yang direncanakan.
 API 0.1.0 hanya asinkron dan berjalan di dalam proses Python Anda. Tidak
 memerlukan server Semantix, web UI, Docker, atau PostgreSQL.
+
+| Gunakan Semantix | Mulai di sini |
+| --- | --- |
+| **Python embedded (utama)** | [Contoh dari source](#instalasi-dan-contoh-awal); tanpa Docker atau server resmi |
+| **Backend/dashboard (opsional)** | [Mulai dashboard](#dashboard-opsional--mulai-cepat); aplikasi lokal opsional |
+| **Persistensi PostgreSQL** | [Setup embedded](../../embedded/storage.md#new-postgresql-database) atau [setup dashboard](#opsional-persistensi-postgresql); inisialisasi eksplisit diperlukan |
 
 ## Instalasi dan contoh awal
 
@@ -348,6 +355,71 @@ cache, mengevaluasi threshold, dan mengukur kerja provider. Otorisasi namespace 
 deployment hardened dua replika adalah fitur server, bukan prasyarat embedded.
 Tooling operasional berada di `ops/`; tooling developer di `scripts/`.
 
+<a id="-mulai-cepat"></a>
+
+## Dashboard Opsional — Mulai Cepat
+
+<a id="prasyarat"></a>
+
+Instal Git, Python 3.11–3.14, dan Docker Desktop atau Docker CLI/Engine 23+
+(API 1.42+) dengan Compose 2.20+. Jalankan engine Docker lokal. Python pada host
+hanya diperlukan launcher development; dependency backend tetap di Docker.
+
+<a id="1-clone-repository"></a>
+
+Gunakan [checkout di atas](#instalasi-dan-contoh-awal) dan jalankan dari **root
+repository** (`cd ../..` jika masih berada di `packages/cache`). Untuk konfigurasi
+baru, salin contoh; jika `apps/server/.env` sudah ada, pertahankan dan edit file itu:
+
+```bash
+cp apps/server/.env.example apps/server/.env
+```
+
+Di PowerShell, gunakan `Copy-Item apps/server/.env.example apps/server/.env`.
+
+<a id="2-konfigurasi-development-lokal"></a>
+
+Atur nilai berikut dalam `apps/server/.env` yang **tidak dilacak Git**, dengan
+mempertahankan default contoh lainnya, untuk dashboard MemoryStore tanpa kredensial:
+
+```env
+EMBEDDING_PROVIDER=mock
+GENERATION_PROVIDER=mock
+MOCK_EMBEDDING_DIMENSIONS=384
+CACHE_BACKEND=memory
+EVALUATION_DATASET_STORAGE=session
+EVALUATION_RUN_HISTORY_STORAGE=disabled
+COORDINATION_BACKEND=memory
+AUTH_MODE=disabled
+AUTH_PRINCIPALS=[]
+TRUSTED_PROXY_CIDRS=[]
+MAX_REQUEST_BODY_BYTES=65536
+```
+
+<a id="3-jalankan-stack-development-lengkap"></a>
+
+Lalu mulai dashboard:
+
+```bash
+python scripts/dev.py up
+```
+
+Atau gunakan `uv run --no-project scripts/dev.py up`. Launcher menunggu readiness
+backend sebelum memulai frontend; konfigurasi ini tidak memerlukan database atau
+API key provider. Build pertama dapat mengunduh image dan dependency.
+
+<a id="4-buka-aplikasi"></a>
+
+Buka **<http://localhost:4173>** (atau URL yang dicetak untuk port pilihan Anda).
+Respons mock hanyalah contoh deterministik; cache memory/data sesi hilang saat
+backend dimulai ulang. Autentikasi dinonaktifkan hanya untuk **penggunaan lokal
+tepercaya**; jangan mengekspos stack development ini ke publik.
+
+Untuk [provider lain](guides/providers.md), storage persisten, atau startup
+langsung hanya dengan Docker, ikuti [Getting started](guides/getting-started.md#development-lokal), termasuk
+[kredensial/setup PostgreSQL](guides/getting-started.md#kredensial-runtime-postgresql)
+dan [Compose langsung lanjutan](guides/getting-started.md#lanjutan-docker-compose-langsung).
+
 <details>
 <summary>Server/workbench opsional: tur, setup Docker, dan bukti deployment</summary>
 
@@ -401,76 +473,7 @@ Kapabilitas inti:
 - dataset evaluasi JSON versi 1 yang tersimpan hanya selama sesi browser, dengan pratinjau tanpa panggilan provider;
 - katalog dataset evaluasi PostgreSQL opsional dengan penyimpanan eksplisit dan retensi terbatas.
 
-### 🚀 Mulai Cepat
-
-#### Prasyarat
-
-Instal Git, Docker Desktop atau Docker CLI/Engine 23+ (API 1.42+) dengan Compose 2.20+, dan Python 3.11–3.14 untuk launcher development. [Jalur Docker langsung](guides/getting-started.md#lanjutan-docker-compose-langsung) tetap tersedia.
-
-#### 1. Clone repository
-
-Linux atau macOS:
-
-```bash
-git clone https://github.com/Yoruxyv/semantix.git
-cd semantix
-cp apps/server/.env.example apps/server/.env
-```
-
-Windows PowerShell:
-
-```powershell
-git clone https://github.com/Yoruxyv/semantix.git
-Set-Location semantix
-Copy-Item apps\server\.env.example apps\server\.env
-```
-
-#### 2. Konfigurasi development lokal
-
-Untuk percobaan pertama yang paling sederhana, gunakan provider mock dan
-MemoryStore. Atur nilai berikut di `apps/server/.env`; API key provider dan setup
-database tidak diperlukan:
-
-```env
-EMBEDDING_PROVIDER=mock
-GENERATION_PROVIDER=mock
-MOCK_EMBEDDING_DIMENSIONS=384
-
-CACHE_BACKEND=memory
-EVALUATION_DATASET_STORAGE=session
-EVALUATION_RUN_HISTORY_STORAGE=disabled
-COORDINATION_BACKEND=memory
-
-AUTH_MODE=disabled
-AUTH_PRINCIPALS=[]
-TRUSTED_PROXY_CIDRS=[]
-MAX_REQUEST_BODY_BYTES=65536
-```
-
-Entri cache dan dataset sesi berada di memori dan hilang ketika backend dimulai
-ulang. Untuk entri cache dan dataset tersimpan yang persisten, ikuti prosedur
-PostgreSQL opsional di bawah.
-
-Nilai autentikasi dan proxy ini sengaja dikosongkan atau dinonaktifkan untuk development lokal yang tepercaya. Jangan gunakan konfigurasi development ini untuk deployment publik.
-
-Untuk menggunakan Hugging Face, OpenAI, Anthropic, Gemini, atau Ollama, lihat [Providers](guides/providers.md). Untuk setiap opsi environment, lihat [Getting started](guides/getting-started.md) dan `apps/server/.env.example`.
-
-#### 3. Jalankan stack development lengkap
-
-Setelah konfigurasi, jalankan perintah yang sama di PowerShell atau Bash:
-
-```bash
-python scripts/dev.py up
-```
-
-Atau gunakan `uv run --no-project scripts/dev.py up`. Dependency backend tetap
-di Docker. Launcher memilih service yang diperlukan, menyiapkan hanya storage
-baru yang dimilikinya, memvalidasi storage lama, lalu menunggu readiness backend
-sebelum memulai dashboard. Memory murni tidak memerlukan database. Lihat
-[startup, kredensial dan recovery](guides/getting-started.md#direkomendasikan-launcher-development)
-atau [Compose langsung](guides/getting-started.md#lanjutan-docker-compose-langsung).
-
-#### 4. Buka aplikasi
+### Endpoint dan operasi dashboard
 
 | Layanan | Alamat |
 |---|---|

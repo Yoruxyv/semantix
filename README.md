@@ -17,7 +17,7 @@
 
 <p align="center">
   <a href="#install-and-run">Embedded quick start</a> ·
-  <a href="docs/guides/getting-started.md#local-development">Dashboard quick start</a> ·
+  <a href="#optional-dashboard--quick-start">Dashboard quick start</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#verified-ai-providers">Providers</a> ·
   <a href="#storage">Storage</a> ·
@@ -32,7 +32,7 @@ No Semantix server, web UI, Docker or PostgreSQL is required.
 | Use Semantix | Start here |
 | --- | --- |
 | **Embedded Python (primary)** | [Source quick start](#install-and-run); no Docker or official server |
-| **Backend/dashboard (optional)** | [Development quick start](docs/guides/getting-started.md#local-development); Docker with Compose |
+| **Backend/dashboard (optional)** | [Dashboard quick start](#optional-dashboard--quick-start); optional local application |
 | **PostgreSQL persistence** | [Embedded setup](docs/embedded/storage.md#new-postgresql-database) or [dashboard setup](#optional-postgresql-persistence); explicit initialization required |
 
 ## Install and run
@@ -341,6 +341,71 @@ decisions, evaluating thresholds and measuring provider work. Its namespace-scop
 authorization and hardened two-replica deployment are server features, not embedded
 prerequisites. Operational tooling lives in `ops/`; developer tooling in `scripts/`.
 
+<a id="-quick-start"></a>
+
+## Optional Dashboard — Quick Start
+
+<a id="requirements"></a>
+
+Install Git, Python 3.11–3.14, and Docker Desktop or Docker CLI/Engine 23+
+(API 1.42+) with Compose 2.20+. Start the local Docker engine. Host Python is
+only needed for the development launcher; backend dependencies stay in Docker.
+
+<a id="1-clone-the-repository"></a>
+
+Use the [checkout above](#install-and-run) and run from the **repository root**
+(`cd ../..` if you are still in `packages/cache`). For a new configuration,
+copy the example; if `apps/server/.env` already exists, keep it and edit it instead:
+
+```bash
+cp apps/server/.env.example apps/server/.env
+```
+
+In PowerShell, use `Copy-Item apps/server/.env.example apps/server/.env`.
+
+<a id="2-configure-local-development"></a>
+
+Set these values in the **untracked** `apps/server/.env`, keeping the other
+example defaults, for a credential-free MemoryStore dashboard:
+
+```env
+EMBEDDING_PROVIDER=mock
+GENERATION_PROVIDER=mock
+MOCK_EMBEDDING_DIMENSIONS=384
+CACHE_BACKEND=memory
+EVALUATION_DATASET_STORAGE=session
+EVALUATION_RUN_HISTORY_STORAGE=disabled
+COORDINATION_BACKEND=memory
+AUTH_MODE=disabled
+AUTH_PRINCIPALS=[]
+TRUSTED_PROXY_CIDRS=[]
+MAX_REQUEST_BODY_BYTES=65536
+```
+
+<a id="3-start-the-complete-development-stack"></a>
+
+Then start the dashboard:
+
+```bash
+python scripts/dev.py up
+```
+
+Or use `uv run --no-project scripts/dev.py up`. The launcher waits for backend
+readiness before starting the frontend; this configuration needs no database or
+provider API key. The first build can download images and dependencies.
+
+<a id="4-open-the-application"></a>
+
+Open **<http://localhost:4173>** (or the URL printed for your configured ports).
+Mock responses are deterministic examples; memory cache/session data disappear
+when the backend restarts. Authentication is disabled for **trusted local
+use only**; never expose this development stack publicly.
+
+For [other providers](docs/guides/providers.md), persistent storage, or direct
+Docker-only startup, follow [Getting started](docs/guides/getting-started.md#local-development), including
+[PostgreSQL credentials/setup](docs/guides/getting-started.md#postgresql-runtime-credentials)
+and [advanced direct Compose](docs/guides/getting-started.md#advanced-direct-docker-compose).
+
 <details>
 <summary>Optional server/workbench: tour, Docker setup and deployment evidence</summary>
 
@@ -411,79 +476,7 @@ Core capabilities:
 - optional namespace-authorized PostgreSQL evaluation dataset catalog with
   explicit save, bounded retention, and no stored run results.
 
-### 🚀 Quick start
-
-#### Requirements
-
-Install Git, Docker Desktop or Docker CLI/Engine 23+ (API 1.42+) with Compose 2.20+, and Python 3.11–3.14 for the development launcher. The [advanced Docker-only path](docs/guides/getting-started.md#advanced-direct-docker-compose) remains available.
-
-#### 1. Clone the repository
-
-Linux or macOS:
-
-```bash
-git clone https://github.com/Yoruxyv/semantix.git
-cd semantix
-cp apps/server/.env.example apps/server/.env
-```
-
-Windows PowerShell:
-
-```powershell
-git clone https://github.com/Yoruxyv/semantix.git
-Set-Location semantix
-Copy-Item apps\server\.env.example apps\server\.env
-```
-
-#### 2. Configure local development
-
-For the simplest first run, use mock providers and MemoryStore. Set these values
-in `apps/server/.env`; no provider API key or database setup is required:
-
-```env
-EMBEDDING_PROVIDER=mock
-GENERATION_PROVIDER=mock
-MOCK_EMBEDDING_DIMENSIONS=384
-
-CACHE_BACKEND=memory
-EVALUATION_DATASET_STORAGE=session
-EVALUATION_RUN_HISTORY_STORAGE=disabled
-COORDINATION_BACKEND=memory
-
-AUTH_MODE=disabled
-AUTH_PRINCIPALS=[]
-TRUSTED_PROXY_CIDRS=[]
-MAX_REQUEST_BODY_BYTES=65536
-```
-
-Cache entries and session datasets live in memory and disappear when the backend
-restarts. For persistent cache entries and saved datasets, follow the optional
-PostgreSQL procedure below.
-
-These authentication and proxy values are intentionally empty or disabled for
-trusted local development. Do not use the development configuration for a
-public deployment.
-
-To use Hugging Face, OpenAI, Anthropic, Gemini, or Ollama, see
-[Providers](docs/guides/providers.md). For every environment option, see
-[Getting started](docs/guides/getting-started.md) and `apps/server/.env.example`.
-
-#### 3. Start the complete development stack
-
-After configuration, run from PowerShell, Bash, or another terminal:
-
-```bash
-python scripts/dev.py up
-```
-
-Or use `uv run --no-project scripts/dev.py up`. No backend dependencies are
-installed on the host. The launcher selects necessary local services, initializes
-only newly created owned storage, validates existing storage, and waits for
-backend readiness before starting the dashboard. Memory-only needs no databases.
-See [startup, credentials and recovery](docs/guides/getting-started.md#recommended-development-launcher)
-or the [advanced direct Compose path](docs/guides/getting-started.md#advanced-direct-docker-compose).
-
-#### 4. Open the application
+### Dashboard endpoints and operations
 
 | Service | Address |
 |---|---|
