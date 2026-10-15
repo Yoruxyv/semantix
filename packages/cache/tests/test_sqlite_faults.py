@@ -24,7 +24,7 @@ from semantix_cache.stores._backends.sqlite.worker import Job, Row, Worker
 from semantix_cache.stores.sqlite import SQLiteStore
 
 from . import sqlite_helpers
-from .sqlite_helpers import block_lookup, connection, state
+from .sqlite_helpers import block_lookup, connection, drain_workers, state
 
 sqlite_store = sqlite_helpers.sqlite_store
 
@@ -196,8 +196,11 @@ async def test_cancelled_numeric_worker_admission_and_delayed_interrupt(
     sqlite_store._worker.interrupt(old)  # safely ignores a closed connection
 
 
+@pytest.mark.parametrize("retained_completion", [False, True])
 async def test_real_sql_progress_cancellation_and_lock_deadline(
     sqlite_store: SQLiteStore,
+    monkeypatch: pytest.MonkeyPatch,
+    retained_completion: bool,
 ) -> None:
     loop = asyncio.get_running_loop()
     entered = asyncio.Event()
@@ -223,14 +226,43 @@ async def test_real_sql_progress_cancellation_and_lock_deadline(
         path,
         embedding_space=SPACE,
         default_ttl_seconds=None,
-        operation_timeout_seconds=0.15,
     )
+    release = threading.Event()
+    pending = asyncio.Event()
+    original = Job.rows
+
+    def rows(job: Job, sql: str, parameters: Sequence[object] = ()) -> list[Row]:
+        try:
+            return original(job, sql, parameters)
+        finally:
+            if (
+                retained_completion
+                and job.owner is other._worker
+                and sql == "BEGIN IMMEDIATE"
+            ):
+                loop.call_soon_threadsafe(pending.set)
+                if not release.wait(5):
+                    raise RuntimeError("Test did not release retained SQLite work")
+
+    monkeypatch.setattr(Job, "rows", rows)
     try:
         with connection(path) as blocker:
             blocker.execute("BEGIN IMMEDIATE")
             with pytest.raises(CacheTimeoutError):
-                await other.put(entry("timed out"))
+                # Limit only the deadline probe, not the independent recovery write.
+                await other._worker.run(
+                    lambda job: other._database.put(job, entry("timed out"), None),
+                    budget_seconds=0.15,
+                )
             blocker.execute("ROLLBACK")
+        if retained_completion:
+            await asyncio.wait_for(pending.wait(), 5)
+            assert other._worker.pending
+            with pytest.raises(CacheBusyError):
+                await other.aclose()
+        release.set()
+        await drain_workers(other)
+        assert not other._worker.faulted.is_set()
         await other.put(entry("later independent operation"))
         with connection(path) as db:
             assert (
@@ -241,6 +273,8 @@ async def test_real_sql_progress_cancellation_and_lock_deadline(
                 == []
             )
     finally:
+        release.set()
+        await drain_workers(other)
         await other.aclose()
 
 
@@ -691,3 +725,29 @@ async def test_immediate_native_lock_refusal_is_not_timeout(
         blocker.execute("ROLLBACK")
     assert not sqlite_store._worker.faulted.is_set()
     await sqlite_store.put(entry("usable after immediate lock refusal"))
+
+
+async def test_public_configured_write_deadline_keeps_aborted_state(
+    sqlite_store: SQLiteStore,
+) -> None:
+    path = sqlite_store._config.path
+    before = state(path)
+    other = await SQLiteStore.connect(
+        path,
+        embedding_space=SPACE,
+        default_ttl_seconds=None,
+        operation_timeout_seconds=0.15,
+    )
+    try:
+        with connection(path) as blocker:
+            blocker.execute("BEGIN IMMEDIATE")
+            with pytest.raises(CacheTimeoutError):
+                await other.put(entry("public configured deadline"))
+            blocker.execute("ROLLBACK")
+        await drain_workers(other)
+        assert not other._worker.faulted.is_set()
+        assert state(path) == before
+    finally:
+        await drain_workers(other)
+        await other.aclose()
+    assert other._worker.connection is None
