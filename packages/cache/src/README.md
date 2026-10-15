@@ -22,8 +22,9 @@ application; no Semantix FastAPI server is required. The separate
 | [`stores/pgvector.py`](semantix_cache/stores/pgvector.py) | Optional application-database PostgreSQL/pgvector persistence |
 | [`stores/redis.py`](semantix_cache/stores/redis.py) | Optional bounded exact Redis storage with explicit schema and owned/borrowed clients |
 | [`stores/mysql.py`](semantix_cache/stores/mysql.py) | Optional verified-TLS MySQL storage, one owned worker and bounded cleanup recovery |
-| [`stores/mysql_migrations/`](semantix_cache/stores/mysql_migrations/0002_verifier.sql) | Immutable table/shape/verifier resources; explicit initialization only |
-| [`stores/migrations/`](semantix_cache/stores/migrations/0001_cache.sql) | Packaged, checksum-tracked SQL template applied only by explicit initialization |
+| [`stores/_backends/mysql/migrations/`](semantix_cache/stores/_backends/mysql/migrations/0002_verifier.sql) | Immutable table/shape/verifier resources; explicit initialization only |
+| [`stores/_backends/postgres/migrations/`](semantix_cache/stores/_backends/postgres/migrations/0001_cache.sql) | Packaged, checksum-tracked SQL template applied only by explicit initialization |
+| [`stores/_backends/sqlite/migrations/`](semantix_cache/stores/_backends/sqlite/migrations/0001_cache.sql) | Frozen SQLite schema resource; explicit initialization only |
 | [`py.typed`](semantix_cache/py.typed) | Installed-package typing marker |
 
 Root imports use only NumPy/Pydantic and the standard library. They do not import

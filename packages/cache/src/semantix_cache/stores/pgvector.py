@@ -66,7 +66,7 @@ _IDENTIFIER = _postgres_config._IDENTIFIER
 
 _MARKER = "semantix-cache:pgvector:v1"
 _MIGRATION = (
-    files("semantix_cache.stores.migrations")
+    files("semantix_cache.stores._backends.postgres.migrations")
     .joinpath("0001_cache.sql")
     .read_text(encoding="utf-8")
 )

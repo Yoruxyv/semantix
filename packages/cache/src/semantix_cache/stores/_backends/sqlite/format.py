@@ -38,7 +38,7 @@ MAX_PAYLOAD = 1230000
 OWNER = "semantix-cache:sqlite:v1"
 APPLICATION_ID = 0x534D5843
 MIGRATION = (
-    files("semantix_cache.stores.sqlite_migrations")
+    files("semantix_cache.stores._backends.sqlite.migrations")
     .joinpath("0001_cache.sql")
     .read_bytes()
 )

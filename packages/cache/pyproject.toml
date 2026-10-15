@@ -55,9 +55,9 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 semantix_cache = ["py.typed"]
-"semantix_cache.stores.migrations" = ["*.sql"]
-"semantix_cache.stores.sqlite_migrations" = ["*.sql"]
-"semantix_cache.stores.mysql_migrations" = ["*.sql", "*.json"]
+"semantix_cache.stores._backends.postgres.migrations" = ["*.sql"]
+"semantix_cache.stores._backends.sqlite.migrations" = ["*.sql"]
+"semantix_cache.stores._backends.mysql.migrations" = ["*.sql", "*.json"]
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
