@@ -221,7 +221,11 @@ class Worker:
                         if not done.cancelled():
                             done.exception()
 
-                    future.add_done_callback(completed)
+                    # Awaiting an already-complete future does not yield to its callbacks.
+                    if future.done():
+                        completed(future)
+                    else:
+                        future.add_done_callback(completed)
                     result, failure = await asyncio.shield(future)
                     if failure is not None:
                         if isinstance(failure, (CacheStoreError, CacheTimeoutError)):

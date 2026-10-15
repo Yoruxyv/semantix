@@ -24,7 +24,7 @@ from semantix_cache.stores._backends.sqlite.worker import Job, Row
 from semantix_cache.stores.sqlite import SQLiteStore
 
 from . import sqlite_helpers
-from .sqlite_helpers import connection
+from .sqlite_helpers import connection, drain_workers
 
 sqlite_store = sqlite_helpers.sqlite_store
 
@@ -37,6 +37,8 @@ class Channel(Protocol):
 
 
 REVISION = datetime(2020, 1, 1, tzinfo=UTC)
+NativeFailure = tuple[str, int, bool]
+REFUSED_BEGIN = ("BEGIN IMMEDIATE", sqlite3.SQLITE_BUSY, False)
 
 
 # One writer per buffer; the parent also retains observations after an abrupt exit.
@@ -114,7 +116,10 @@ def diagnostic_phase(data: Any, phase: int, command: str | None = None) -> None:
             data[3] = {"put": 1, "hit": 2}.get(command, 3)
 
 
-def capture_sqlite_failures(pipe: Channel, data: Any = None) -> None:
+def capture_sqlite_failures(
+    pipe: Channel, data: Any = None, *, contention: bool = False
+) -> list[NativeFailure]:
+    failures: list[NativeFailure] = []
     original_rows = Job.rows
     installed = False
     active: int | None = None
@@ -169,17 +174,23 @@ def capture_sqlite_failures(pipe: Channel, data: Any = None) -> None:
         try:
             return original_rows(job, sql, parameters)
         except sqlite3.Error as error:
+            failure = (
+                sql,
+                getattr(error, "sqlite_errorcode", 0),
+                job.connection.in_transaction,
+            )
+            failures.append(failure)
             if data is not None:
-                if active is None:
-                    active = start(job, 3, started)
+                active = start(job, 3, started) if active is None else active
                 data[active + 8] = error.sqlite_errorcode
                 finish(job)
-            pipe.send(
-                {
-                    "sqlite_failure": error.sqlite_errorname,
-                    "statement": sql.split(maxsplit=1)[0],
-                }
-            )
+            if not (contention and failure == REFUSED_BEGIN):
+                pipe.send(
+                    {
+                        "sqlite_failure": error.sqlite_errorname,
+                        "statement": sql.split(maxsplit=1)[0],
+                    }
+                )
             raise
         finally:
             finish(job)
@@ -187,10 +198,15 @@ def capture_sqlite_failures(pipe: Channel, data: Any = None) -> None:
 
     diagnostics = pytest.MonkeyPatch()
     diagnostics.setattr(Job, "rows", reported_rows)
+    return failures
 
 
 def child(
-    path: str, pipe: Channel, crash: str | None = None, diagnostics: Any = None
+    path: str,
+    pipe: Channel,
+    crash: str | None = None,
+    diagnostics: Any = None,
+    contention: bool = False,
 ) -> None:
     diagnostic_phase(diagnostics, 1)
 
@@ -199,7 +215,9 @@ def child(
             path, embedding_space=SPACE, default_ttl_seconds=None
         )
         diagnostic_phase(diagnostics, 2)
-        capture_sqlite_failures(pipe, diagnostics)
+        native_failures = capture_sqlite_failures(
+            pipe, diagnostics, contention=contention
+        )
         if crash is not None:
             original = Job.rows
 
@@ -227,44 +245,57 @@ def child(
                     break
                 diagnostic_phase(diagnostics, 3, command)
                 started = perf_counter()
-                if command == "put":
-                    await store.put(entry("shared", created_at=REVISION))
-                    result: object = 1
-                elif command == "hit":
-                    candidate = await store.find_nearest((1, 0), namespace="default")
-                    assert candidate
-                    result = await store.record_hit(
-                        candidate.entry.cache_key,
-                        namespace="default",
-                        expected_created_at=candidate.entry.created_at,
-                    )
-                elif command == "replace":
-                    await store.put(
-                        entry(
-                            "shared",
-                            response="process replacement",
-                            created_at=REVISION,
+                native_failures.clear()
+                try:
+                    if command == "put":
+                        await store.put(entry("shared", created_at=REVISION))
+                        result: object = 1
+                    elif command == "hit":
+                        candidate = await store.find_nearest(
+                            (1, 0), namespace="default"
                         )
-                    )
-                    result = True
-                elif command == "delete":
-                    result = await store.delete_entry(
-                        entry("shared").cache_key, namespace="default"
-                    )
-                elif command == "clear":
-                    result = await store.clear(namespace="default")
-                elif command == "hold":
-                    db = sqlite3.connect(path, isolation_level=None)
-                    try:
-                        db.execute("BEGIN IMMEDIATE")
-                        pipe.send("locked")
-                        assert pipe.recv() == "release"
-                        db.execute("ROLLBACK")
-                    finally:
-                        db.close()
-                    result = True
-                else:
-                    raise AssertionError(command)
+                        assert candidate
+                        result = await store.record_hit(
+                            candidate.entry.cache_key,
+                            namespace="default",
+                            expected_created_at=candidate.entry.created_at,
+                        )
+                    elif command == "replace":
+                        await store.put(
+                            entry(
+                                "shared",
+                                response="process replacement",
+                                created_at=REVISION,
+                            )
+                        )
+                        result = True
+                    elif command == "delete":
+                        result = await store.delete_entry(
+                            entry("shared").cache_key, namespace="default"
+                        )
+                    elif command == "clear":
+                        result = await store.clear(namespace="default")
+                    elif command == "hold":
+                        db = sqlite3.connect(path, isolation_level=None)
+                        try:
+                            db.execute("BEGIN IMMEDIATE")
+                            pipe.send("locked")
+                            assert pipe.recv() == "release"
+                            db.execute("ROLLBACK")
+                        finally:
+                            db.close()
+                        result = True
+                    else:
+                        raise AssertionError(command)
+                except CacheStoreError:
+                    if not (
+                        contention
+                        and command in {"put", "hit"}
+                        and native_failures == [REFUSED_BEGIN]
+                        and not store._worker.faulted.is_set()
+                    ):
+                        raise
+                    result = "busy"
                 diagnostic_phase(diagnostics, 2)
                 pipe.send((result, perf_counter() - started))
         finally:
@@ -286,19 +317,23 @@ def receive(pipe: Channel, seconds: float = 20) -> Any:
 
 
 def spawn(
-    path: Path, crash: str | None = None, *, diagnostics: Any = None
+    path: Path,
+    crash: str | None = None,
+    *,
+    diagnostics: Any = None,
+    contention: bool = False,
 ) -> tuple[BaseProcess, Channel]:
     context = multiprocessing.get_context("spawn")
     parent, remote = context.Pipe()
     process = context.Process(
-        target=child, args=(str(path), remote, crash, diagnostics)
+        target=child, args=(str(path), remote, crash, diagnostics, contention)
     )
     process.start()
     remote.close()
     return process, parent
 
 
-def stop(process: BaseProcess, pipe: Channel, diagnostics: Any = None) -> None:
+def stop(process: BaseProcess, pipe: Channel, diagnostics: Any = None) -> int | None:
     if process.is_alive():
         # Preserve the primary child failure while its owned cleanup/traceback ends.
         with suppress(BrokenPipeError, EOFError):
@@ -313,7 +348,9 @@ def stop(process: BaseProcess, pipe: Channel, diagnostics: Any = None) -> None:
         report_sqlite_diagnostics(
             process.pid, process.exitcode, diagnostics, "after stop"
         )
+    exitcode = process.exitcode
     process.close()
+    return exitcode
 
 
 @pytest.mark.parametrize("count", [2, 4])
@@ -331,32 +368,51 @@ async def test_process_revision_and_hit_serialization(
         )
         for _ in range(count)
     ]
-    children = [spawn(path, diagnostics=data) for data in buffers]
+    children = [spawn(path, diagnostics=data, contention=True) for data in buffers]
     failed = True
     try:
         assert [receive(pipe) for _, pipe in children] == ["ready"] * count
-        # Barrier each round: SQLite's bounded busy wait does not promise fairness
-        # across repeated writers; lock-budget exhaustion is tested separately.
+        # Force refusal once: only an unstarted transaction may report "busy".
+        with connection(path) as blocker:
+            before = blocker.execute("SELECT * FROM binding_state").fetchall()
+            blocker.execute("BEGIN IMMEDIATE")
+            for _, pipe in children:
+                pipe.send("put")
+            assert [receive(pipe)[0] for _, pipe in children] == ["busy"] * count
+            assert blocker.execute("SELECT * FROM binding_state").fetchall() == before
+            assert blocker.execute("SELECT count(*) FROM cache_entries").fetchone() == (
+                0,
+            )
+            blocker.execute("ROLLBACK")
+        # Keep every concurrent round; account for committed operations, not fairness.
+        writes = 0
         for _ in range(8):
             for _, pipe in children:
                 pipe.send("put")
-            assert [receive(pipe)[0] for _, pipe in children] == [1] * count
+            outcomes = [receive(pipe)[0] for _, pipe in children]
+            assert all(result in (1, "busy") for result in outcomes)
+            writes += outcomes.count(1)
+        assert writes > 0
         with connection(path) as db:
             assert db.execute(
                 "SELECT last_revision_us,access_counter FROM binding_state"
-            ).fetchone() == (micros(REVISION) + count * 8 - 1, count * 8)
+            ).fetchone() == (micros(REVISION) + writes - 1, writes)
             assert db.execute("SELECT count(*) FROM cache_entries").fetchone() == (1,)
+        hits = 0
         for _ in range(8):
             for _, pipe in children:
                 pipe.send("hit")
-            assert [receive(pipe)[0] for _, pipe in children] == [True] * count
+            outcomes = [receive(pipe)[0] for _, pipe in children]
+            assert all(result is True or result == "busy" for result in outcomes)
+            hits += outcomes.count(True)
+        assert hits > 0
         with connection(path) as db:
             assert db.execute("SELECT hit_count FROM cache_entries").fetchone() == (
-                count * 8,
+                hits,
             )
             assert db.execute(
                 "SELECT access_counter FROM binding_state"
-            ).fetchone() == (count * 16,)
+            ).fetchone() == (writes + hits,)
             assert db.execute("PRAGMA integrity_check").fetchone() == ("ok",)
             assert db.execute("PRAGMA foreign_key_check").fetchall() == []
         failed = False
@@ -367,7 +423,9 @@ async def test_process_revision_and_hit_serialization(
                     process.pid, process.exitcode, data, "before stop"
                 )
         for (process, pipe), data in zip(children, buffers, strict=True):
-            stop(process, pipe, data if failed else None)
+            exitcode = stop(process, pipe, data if failed else None)
+            if not failed:
+                assert exitcode == 0
 
 
 @pytest.mark.parametrize("mutation", ["replace", "delete", "clear"])
@@ -416,17 +474,25 @@ async def test_process_writer_lock_deadline_and_later_success(tmp_path: Path) ->
             path,
             embedding_space=SPACE,
             default_ttl_seconds=None,
-            operation_timeout_seconds=0.2,
         ) as store:
-            with pytest.raises((CacheTimeoutError, CacheStoreError)):
-                await store.put(entry("busy"))
-            pipe.send("release")
-            assert receive(pipe)[0] is True
-            await store.put(entry("later"))
-            with connection(path) as db:
-                assert db.execute("SELECT cache_key FROM cache_entries").fetchall() == [
-                    (entry("later").cache_key,)
-                ]
+            try:
+                with pytest.raises(CacheTimeoutError):
+                    await store._worker.run(
+                        lambda job: store._database.put(job, entry("busy"), None),
+                        budget_seconds=0.2,
+                    )
+                pipe.send("release")
+                assert receive(pipe)[0] is True
+                await drain_workers(store)
+                await store.put(entry("later"))
+                with connection(path) as db:
+                    assert db.execute(
+                        "SELECT cache_key FROM cache_entries"
+                    ).fetchall() == [
+                        (entry("later").cache_key,),
+                    ]
+            finally:
+                await drain_workers(store)
     finally:
         stop(process, pipe)
 
@@ -467,17 +533,19 @@ async def test_killed_process_before_and_after_commit_recovers(
         stop(process, pipe)
 
 
+@pytest.mark.parametrize("contention", [False, True])
 async def test_process_diagnostics_are_bounded_and_sanitized(
     sqlite_store: SQLiteStore,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    contention: bool,
 ) -> None:
     data = multiprocessing.get_context("spawn").RawArray(
         "q", DIAGNOSTIC_HEADER + DIAGNOSTIC_LIMIT * len(DIAGNOSTIC_FIELDS)
     )
     pipe = Mock(spec=Channel)
     monkeypatch.setattr(Job, "rows", Job.rows)
-    capture_sqlite_failures(pipe, data)
+    capture_sqlite_failures(pipe, data, contention=contention)
 
     def action(job: Job) -> None:
         for _ in range(DIAGNOSTIC_LIMIT // 2 + 1):
@@ -505,3 +573,25 @@ async def test_process_diagnostics_are_bounded_and_sanitized(
     assert all(r["busy_timeout_ms"] == 1000 for r in boundaries)
     assert all(r["statement_start_ns"] >= r["rows_start_ns"] for r in boundaries)
     assert all(r["remaining_at_finish_ns"] > 0 for r in boundaries)
+
+
+async def test_contention_accounting_rejects_busy_outside_immediate_begin(
+    sqlite_store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pipe = Mock(spec=Channel)
+    monkeypatch.setattr(Job, "rows", Job.rows)
+    failures = capture_sqlite_failures(pipe, contention=True)
+    with connection(sqlite_store._config.path) as blocker:
+        blocker.execute("BEGIN IMMEDIATE")
+        with pytest.raises(CacheStoreError):
+            await sqlite_store._worker.run(lambda job: job.rows("BEGIN EXCLUSIVE"))
+        blocker.execute("ROLLBACK")
+    assert failures == [("BEGIN EXCLUSIVE", sqlite3.SQLITE_BUSY, False)]
+    assert pipe.send.call_args.args[0] == {
+        "sqlite_failure": "SQLITE_BUSY",
+        "statement": "BEGIN",
+    }
+    assert not sqlite_store._worker.faulted.is_set()
+    await sqlite_store.put(
+        entry("independent call after rejected contention classification")
+    )

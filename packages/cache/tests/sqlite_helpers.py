@@ -64,6 +64,17 @@ async def block_lookup(
             await store.find_nearest((1, 0), namespace="default")
 
 
+async def drain_workers(store: SQLiteStore) -> None:
+    """Observe actual worker retirement without cancelling its retained future."""
+    if store._worker.pending:
+        _, pending = await asyncio.wait(tuple(store._worker.pending), timeout=5)
+        assert not pending, (
+            "SQLite worker did not retire after its blocker was released"
+        )
+    assert not store._worker.pending
+    assert store._worker.admitted == 0
+
+
 @pytest.fixture
 async def store_factory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
