@@ -378,7 +378,7 @@ jobs:
         run: uv run --no-sync ruff format --config ../../ruff.toml --check .
 
       - name: Run mypy
-        run: uv run --no-sync mypy app tests scripts
+        run: uv run --no-sync mypy app tests scripts ../../scripts/dev.py
       - name: Set up Node for Pyright
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -386,10 +386,17 @@ jobs:
       - name: Run Pyright
         run: >-
           npx --yes pyright@1.1.414 --project ../../pyrightconfig.json
-          --pythonpath .venv/bin/python app scripts
+          --pythonpath .venv/bin/python app scripts ../../scripts/dev.py
 
       - name: Run backend unit tests with coverage
         run: uv run --no-sync pytest -m "not pgvector and not redis" --cov=app
+
+      - name: Verify development launcher boundaries
+        working-directory: .
+        run: |
+          uv run --project apps/server --no-sync ruff check --config ruff.toml scripts/dev.py ops/ci/tests/test_dev_startup.py
+          uv run --project apps/server --no-sync ruff format --config ruff.toml --check scripts/dev.py ops/ci/tests/test_dev_startup.py
+          uv run --project apps/server --no-sync python -m pytest -c packages/cache/pyproject.toml ops/ci/tests/test_dev_startup.py
 
   backend-compatibility:
     name: Backend compatibility (Python ${{ matrix.python-version }})
@@ -429,6 +436,10 @@ jobs:
 
       - name: Run backend compatibility tests
         run: uv run --no-sync --python "${{ matrix.python-version }}" pytest -m "not pgvector and not redis"
+
+      - name: Verify development launcher compatibility
+        working-directory: .
+        run: uv run --project apps/server --no-sync python -m pytest -c packages/cache/pyproject.toml ops/ci/tests/test_dev_startup.py
 
   sdk:
     name: Python SDK quality
