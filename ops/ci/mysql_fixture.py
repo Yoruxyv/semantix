@@ -127,6 +127,30 @@ def redact(output: str, credential: str | None) -> str:
     )
 
 
+def diagnostic_text(output: str | bytes | None) -> str:
+    """Windows may already have decoded a completed pipe when the other times out."""
+    return (
+        output.decode("utf8", errors="replace")
+        if isinstance(output, bytes)
+        else output or ""
+    )
+
+
+def public_command_output(output: str, credential: str | None, cwd: Path) -> str:
+    """Bound permission-helper diagnostics without exporting keys or endpoints."""
+    safe = redact(output, credential).replace(str(cwd), "[fixture directory]")
+    safe = re.sub(
+        r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----.*?(?:-----END (?:[A-Z0-9]+ )*PRIVATE KEY-----|$)",
+        "[redacted private key]",
+        safe,
+        flags=re.DOTALL,
+    )
+    safe = re.sub(
+        r"\b[a-zA-Z][a-zA-Z0-9+.-]*://[^\s\"'<>]+", "[redacted endpoint]", safe
+    )
+    return safe[:4096] + ("[truncated]" if len(safe) > 4096 else "")
+
+
 def command(
     args: list[str],
     *,
@@ -134,9 +158,12 @@ def command(
     env: dict[str, str] | None = None,
     credential: str | None = None,
     include_stderr: bool = False,
+    phase: str | None = None,
+    timeout: float = 90,
 ) -> str:
     if credential is None and env is not None:
         credential = env.get("MYSQL_ROOT_PASSWORD")
+    started = time.monotonic()
     try:
         result = subprocess.run(  # noqa: S603 -- fixed tool argv and owned paths, no shell
             args,
@@ -144,14 +171,29 @@ def command(
             env=env,
             capture_output=True,
             text=True,
-            timeout=90,
+            timeout=timeout,
             check=False,
         )
         code, stdout, stderr = result.returncode, result.stdout, result.stderr
     except subprocess.TimeoutExpired as failure:
         code = None
-        stdout = (failure.stdout or b"").decode("utf8", errors="replace")
-        stderr = (failure.stderr or b"").decode("utf8", errors="replace")
+        stdout = diagnostic_text(failure.stdout)
+        stderr = diagnostic_text(failure.stderr)
+    elapsed = round(time.monotonic() - started, 3)
+    if phase is not None or code != 0:
+        diagnostic: dict[str, Any] = {
+            "phase": phase or "fixture command",
+            "tool": Path(args[0]).name,
+            "status": "timeout" if code is None else "failed" if code else "succeeded",
+            "code": code,
+            "elapsed_seconds": elapsed,
+            "timeout_seconds": round(timeout, 3),
+        }
+        if phase is not None and code != 0:
+            # Only credential-free permission commands opt into public stream output.
+            diagnostic["stdout"] = public_command_output(stdout, credential, cwd)
+            diagnostic["stderr"] = public_command_output(stderr, credential, cwd)
+        print("Fixture command: " + json.dumps(diagnostic), file=sys.stderr, flush=True)
     if code != 0:
         private_write(
             cwd / "command-failures.jsonl",
@@ -160,6 +202,8 @@ def command(
                     {
                         "args": [redact(arg, credential) for arg in args],
                         "code": code,
+                        "phase": phase,
+                        "elapsed_seconds": elapsed,
                         "stdout": redact(stdout, credential),
                         "stderr": redact(stderr, credential),
                     }
@@ -356,10 +400,11 @@ class Fixture:
             # Only this freshly created TLS directory is changed, never developer data.
             permissions = f"semantix-mysql-p5-{self.identifier}-permissions"
             self.containers.append(permissions)
+            deadline = time.monotonic() + 90
             command(
                 [
                     "docker",
-                    "run",
+                    "create",
                     "--rm",
                     "--name",
                     permissions,
@@ -378,6 +423,18 @@ class Fixture:
                     "chown 27:27 /tls/server-key.pem && chmod 755 /tls && chmod 600 /tls/server-key.pem && chmod 644 /tls/ca.pem /tls/server.pem /tls/expired.pem",
                 ],
                 cwd=self.root,
+                phase="TLS permissions image acquisition/container creation",
+            )
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError(
+                    "TLS permission preparation exhausted its 90-second budget before startup"
+                )
+            command(
+                ["docker", "start", "--attach", permissions],
+                cwd=self.root,
+                phase="TLS permissions container startup/filesystem changes",
+                timeout=remaining,
             )
 
         self.prepared = True
