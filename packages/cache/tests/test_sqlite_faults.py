@@ -3,9 +3,10 @@
 import asyncio
 import sqlite3
 import threading
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
+from typing import Any, ParamSpec, TypeVar
 
 import pytest
 
@@ -20,6 +21,7 @@ from semantix_cache import (
 )
 from semantix_cache.stores._backends.sqlite import database
 from semantix_cache.stores._backends.sqlite import worker as worker_module
+from semantix_cache.stores._backends.sqlite.format import Configuration
 from semantix_cache.stores._backends.sqlite.worker import Job, Row, Worker
 from semantix_cache.stores.sqlite import SQLiteStore
 
@@ -751,3 +753,58 @@ async def test_public_configured_write_deadline_keeps_aborted_state(
         await drain_workers(other)
         await other.aclose()
     assert other._worker.connection is None
+
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+
+async def test_completed_executor_job_retires_before_public_close(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class CompletedExecutor(ThreadPoolExecutor):
+        def submit(
+            self, fn: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs
+        ) -> Future[T]:
+            future = super().submit(fn, *args, **kwargs)
+            # Model a worker finishing before asyncio wraps the real concurrent future.
+            future.result(timeout=5)
+            return future
+
+    stores: list[SQLiteStore] = []
+    original = SQLiteStore.__init__
+
+    def allocated(store: SQLiteStore, configuration: Configuration) -> None:
+        original(store, configuration)
+        stores.append(store)
+
+    monkeypatch.setattr(worker_module, "ThreadPoolExecutor", CompletedExecutor)
+    monkeypatch.setattr(SQLiteStore, "__init__", allocated)
+    path = tmp_path / "already-completed.db"
+    try:
+        await SQLiteStore.initialize_schema(path, embedding_space=SPACE)
+        assert stores[0]._worker.connection is None
+        store = await SQLiteStore.connect(path, embedding_space=SPACE)
+        assert not store._worker.pending
+        assert store._worker.admitted == 0
+        await store.put(entry("completed worker"))
+        with pytest.raises(CacheStoreError):
+            await store._worker.run(
+                lambda job: job.rows("SELECT * FROM nonexistent_table")
+            )
+        assert not store._worker.pending
+        assert store._worker.admitted == 0
+        # Deliver any queued callbacks to expose duplicate admission/slot retirement.
+        ready = asyncio.Event()
+        asyncio.get_running_loop().call_soon(ready.set)
+        await ready.wait()
+        assert store._worker.admitted == 0
+        assert store._worker.slot._value == 1
+        await store.put(entry("later independent call"))
+        await store.aclose()
+        assert store._worker.connection is None
+    finally:
+        # The regression must also retire the baseline's inaccessible startup owner.
+        for store in stores:
+            await drain_workers(store)
+            await store.aclose()
