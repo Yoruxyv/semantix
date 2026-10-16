@@ -229,6 +229,30 @@ Choose capacity with representative payloads/dimensions, then measure whole-proc
 RSS and peak/steady-state behavior under your application's load. Do not extrapolate
 a fixed RSS budget from entry count or this one-off allocation table.
 
+## Verified PostgreSQL combinations
+
+The required [embedded CI jobs](../../.github/workflows/quality.yml) exercise
+these combinations with immutable service-image digests. Each job checks the
+actual server major and extension version before running the full embedded suite
+and installed-wheel migration/persistence checks.
+
+| PostgreSQL server | pgvector extension | asyncpg driver | Linux CPython |
+| --- | --- | --- | --- |
+| 16.15 | 0.8.7 | 0.31.0 | 3.11 |
+| 17.10 | 0.8.5 | 0.31.0 | 3.12, 3.13 |
+| 18.6 | 0.8.7 | 0.31.0 | 3.14 |
+
+These are verified targets, not a new PostgreSQL runtime minimum. Other
+server/extension/driver combinations are unverified by this CI matrix; do not
+infer that every combination across these versions has been tested. The optional
+extra still requires asyncpg `>=0.31,<0.32`. Use maintained PostgreSQL patches
+and validate your exact deployment before upgrading.
+
+The table covers Linux service containers and standard CPython builds. It does
+not certify managed proxies, database failover, TLS configurations, other
+architectures or free-threaded Python. Application-owned pool/TLS configuration
+and the existing migration, transaction and cleanup contracts still apply.
+
 ## New PostgreSQL database
 
 Create a database through your normal operator tooling. Install pgvector on the
@@ -501,6 +525,8 @@ uv run --no-sync mypy src tests examples
 ```
 
 Without the test DSN, database cases skip; that is insufficient to validate a
-PostgreSQL release. CI runs the full suite with a pinned pgvector service on each
-supported Python version, retains the coverage gate, and tests migrations/persistence
-from the installed wheel. pytest and driver typing stubs stay development-only.
+PostgreSQL release. CI runs the full suite against the
+[verified combinations](#verified-postgresql-combinations), rejects missing or
+skipped required cases, retains the coverage gate, and tests migrations/persistence
+from the installed wheel. Only explicitly enumerated optional conformance skips
+are permitted. pytest and driver typing stubs stay development-only.

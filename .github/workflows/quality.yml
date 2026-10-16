@@ -90,6 +90,23 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          - python-version: "3.11"
+            postgres-image: pgvector/pgvector:0.8.7-pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
+            postgres-major: "16"
+            pgvector-version: "0.8.7"
+          - python-version: "3.12"
+            postgres-image: pgvector/pgvector:pg17@sha256:d2ef61f42ef767baa5a1475393303cc235bcd92febd9d7014eddb48b41f3bad0
+            postgres-major: "17"
+            pgvector-version: "0.8.5"
+          - python-version: "3.13"
+            postgres-image: pgvector/pgvector:pg17@sha256:d2ef61f42ef767baa5a1475393303cc235bcd92febd9d7014eddb48b41f3bad0
+            postgres-major: "17"
+            pgvector-version: "0.8.5"
+          - python-version: "3.14"
+            postgres-image: pgvector/pgvector:0.8.7-pg18@sha256:2358fcba361ed2233a5ed81b5fe4ca779ccb304120ce531a3bf51c0ed7e2bc11
+            postgres-major: "18"
+            pgvector-version: "0.8.7"
     env:
       REDIS_TEST_URL: redis://127.0.0.1:6379/0
       PGVECTOR_TEST_DATABASE_URL: postgresql://postgres:ci-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/semantix_embedded_test
@@ -104,7 +121,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
       postgres:
-        image: pgvector/pgvector:pg17@sha256:d2ef61f42ef767baa5a1475393303cc235bcd92febd9d7014eddb48b41f3bad0
+        image: ${{ matrix.postgres-image }}
         env:
           POSTGRES_DB: semantix_embedded_test
           POSTGRES_PASSWORD: "ci-${{ github.run_id }}-${{ github.run_attempt }}"
@@ -132,6 +149,39 @@ jobs:
           version: "0.11.32"
       - name: Sync locked embedded dependencies
         run: uv sync --locked --extra dev --managed-python --python "${{ matrix.python-version }}"
+      - name: Verify PostgreSQL and pgvector target
+        env:
+          EXPECTED_POSTGRES_MAJOR: ${{ matrix.postgres-major }}
+          EXPECTED_PGVECTOR_VERSION: ${{ matrix.pgvector-version }}
+        run: |
+          uv run --no-sync python - <<'PY'
+          import asyncio
+          import os
+
+          import asyncpg
+
+          async def verify():
+              connection = await asyncpg.connect(
+                  os.environ["PGVECTOR_TEST_DATABASE_URL"], timeout=10, command_timeout=10,
+              )
+              try:
+                  # Explicit operator setup for this disposable CI database.
+                  await connection.execute("CREATE EXTENSION IF NOT EXISTS vector")
+                  major = int(await connection.fetchval("SHOW server_version_num")) // 10000
+                  vector = await connection.fetchval(
+                      "SELECT extversion FROM pg_extension WHERE extname = 'vector'"
+                  )
+                  expected_major = int(os.environ["EXPECTED_POSTGRES_MAJOR"])
+                  expected_vector = os.environ["EXPECTED_PGVECTOR_VERSION"]
+                  assert major == expected_major, f"Expected PostgreSQL {expected_major}, got {major}"
+                  assert vector == expected_vector, f"Expected pgvector {expected_vector}, got {vector}"
+                  server = await connection.fetchval("SHOW server_version")
+                  print(f"Verified PostgreSQL {server}; pgvector {vector}; asyncpg {asyncpg.__version__}")
+              finally:
+                  await connection.close(timeout=10)
+
+          asyncio.run(verify())
+          PY
       - name: Fetch recorded reuse-quality source
         run: |
           source_sha=$(uv run --no-sync --offline python -B -c "import json; from pathlib import Path; print(json.loads(Path('../../apps/web/public/benchmarks/reuse-quality-summary.json').read_text(encoding='utf-8'))['source_sha'])")
