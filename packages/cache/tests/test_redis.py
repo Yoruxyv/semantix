@@ -51,7 +51,7 @@ def client(url: str = "redis://127.0.0.1:16379/0") -> Redis:
 async def redis_client() -> AsyncIterator[Redis]:
     url = os.environ.get("REDIS_TEST_URL")
     if not url:
-        pytest.skip("Set REDIS_TEST_URL to disposable Redis 8.10.2")
+        pytest.skip("Set REDIS_TEST_URL to a disposable supported Redis server")
     active = client(url)
     try:
         yield active

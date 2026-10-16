@@ -29,6 +29,16 @@ EMBEDDED_REQUIRED = frozenset(
         "tests/test_coalescing.py::test_postgresql_confirmation_ownership_and_pool_drain",
     }
 )
+REDIS_REQUIRED = frozenset(
+    {
+        "tests/test_redis.py::test_fresh_idempotent_concurrent_schema",
+        "tests/test_redis.py::TestRedisStore::test_empty_exact_similar_and_threshold",
+        "tests/test_redis_faults.py::test_real_paused_write_operation_deadline",
+        "tests/test_redis_layout.py::test_inspection_leaf_failure_keeps_one_operation_and_borrowed_client[cancel]",
+        "tests/test_redis_scripts.py::test_checksum_and_clear_all_composition",
+        "tests/test_inspection.py::test_redis_small_page_does_not_decode_unselected_payloads",
+    }
+)
 SDK_REQUIRED = frozenset(
     {
         "tests/test_integration.py::test_sync_client_crosses_real_http_query_boundary",
@@ -91,7 +101,7 @@ def validate(scope: str, expected: Sequence[str], report: Path) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("scope", choices=("embedded", "sdk"))
+    parser.add_argument("scope", choices=("embedded", "redis", "sdk"))
     parser.add_argument("report", type=Path)
     parser.add_argument("pytest_args", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
@@ -109,12 +119,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             return int(code)
         if collection.skipped:
             raise ValueError(f"Test collection skipped: {sorted(collection.skipped)}")
-        if (
-            args.scope == "embedded"
-            and not set(collection.expected) >= EMBEDDED_REQUIRED
-        ):
+        anchors = (
+            EMBEDDED_REQUIRED
+            if args.scope == "embedded"
+            else REDIS_REQUIRED
+            if args.scope == "redis"
+            else frozenset()
+        )
+        if not set(collection.expected) >= anchors:
             raise ValueError(
-                f"Embedded integration cases not collected: {sorted(EMBEDDED_REQUIRED - set(collection.expected))}"
+                f"{args.scope.title()} integration cases not collected: {sorted(anchors - set(collection.expected))}"
             )
         validate(args.scope, collection.expected, args.report)
     except (OSError, ElementTree.ParseError, ValueError) as error:

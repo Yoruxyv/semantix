@@ -136,7 +136,8 @@ The PostgreSQL tests require `PGVECTOR_TEST_DATABASE_URL` set through the
 environment to a **fresh disposable** pgvector database. Fixtures install the
 extension and remove only UUID-named schemas they own. No DSN means PostgreSQL
 skips; that does not verify PostgreSQL compatibility. The Redis consumer requires
-`REDIS_TEST_URL` pointing to disposable Redis 8.10.2; without it Redis cases skip.
+`REDIS_TEST_URL` pointing to a [supported disposable Redis server](redis.md#supported-versions);
+without it Redis cases skip.
 The existing quality
 workflow runs the shared consumers, full coverage and static checks with pinned
 pgvector and Redis services on Python 3.11-3.14. The kit itself adds no runtime

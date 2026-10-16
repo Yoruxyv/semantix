@@ -96,6 +96,29 @@ _PREFIX = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", re.ASCII)
 _MARKER = "semantix-cache:redis:v1"
 
 
+_SERVER_MINIMUM_PATCH = {
+    (7, 4): 11,
+    (8, 2): 10,
+    (8, 4): 7,
+    (8, 6): 7,
+    (8, 8): 3,
+    (8, 10): 2,
+}
+
+
+def _supported_server_version(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        major, minor, patch = (int(part) for part in value.split("."))
+    except ValueError:
+        return False
+    minimum = _SERVER_MINIMUM_PATCH.get((major, minor))
+    return (
+        minimum is not None and patch >= minimum and value == f"{major}.{minor}.{patch}"
+    )
+
+
 @dataclass(frozen=True)
 class _Configuration:
     space: EmbeddingSpace
@@ -169,7 +192,8 @@ class RedisStore:
 
     Construction borrows the client and does not initialize or adopt keys.
     The supported deployment is a direct writable standalone Redis Open Source
-    primary >=8.10.2,<8.11 using noeviction; Cluster, Sentinel, replica reads
+    primary in the supported 7.4/8.2/8.4/8.6/8.8/8.10 release families at
+    verified patch floors, using noeviction; Cluster, Sentinel, replica reads
     and automatic failover are outside this boundary. Operators own persistence,
     backups and stable server time; Redis storage alone is no durability promise.
 
@@ -306,17 +330,18 @@ class RedisStore:
                 dict[str, object], await execute("CONFIG GET", "maxmemory-policy")
             )
             if (
-                re.fullmatch(
-                    r"8\.10\.(?:[2-9]|[1-9][0-9]+)", str(server.get("redis_version"))
-                )
-                is None
+                not isinstance(server, dict)
+                or not _supported_server_version(server.get("redis_version"))
+                or server.get("server_name", "redis") != "redis"
+                or "valkey_version" in server
                 or server.get("redis_mode") != "standalone"
                 or replication.get("role") != "master"
                 or cluster.get("cluster_enabled") != 0
                 or policy.get("maxmemory-policy") != "noeviction"
             ):
                 raise CacheStoreError(
-                    "Require Redis Open Source >=8.10.2,<8.11, a direct writable "
+                    "Require Redis 7.4.11+, 8.2.10+, 8.4.7+, 8.6.7+, 8.8.3+ or "
+                    "8.10.2+ within those release families, a direct writable "
                     "non-cluster primary and noeviction"
                 )
             commands = await execute(
@@ -324,7 +349,8 @@ class RedisStore:
             )
             if (
                 not isinstance(commands, dict)
-                or len(cast(dict[object, object], commands)) != 4
+                or set(cast(dict[object, object], commands))
+                != {"eval", "eval_ro", "hpexpireat", "hpexpiretime"}
                 or any(v is None for v in cast(dict[object, object], commands).values())
             ):
                 raise CacheStoreError(

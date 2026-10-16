@@ -8,7 +8,7 @@ from redis.asyncio import Redis
 from redis.asyncio.retry import Retry
 from redis.backoff import NoBackoff
 
-from semantix_cache import EmbeddingSpace
+from semantix_cache import CacheStoreError, EmbeddingSpace
 from semantix_cache.stores import redis as module
 from semantix_cache.stores._backends.redis import scripts as _redis_scripts
 from semantix_cache.stores.redis import RedisStore, _Configuration
@@ -163,6 +163,165 @@ async def test_operations_use_redis_script_globals(
         assert module._CHECKSUM == CHECKSUM
         if script_name in ("_READ", "_WRITE"):
             assert original_clear_all == module._CLEAR_ALL
+    finally:
+        await store.aclose()
+        await active.aclose(close_connection_pool=True)
+
+
+@pytest.mark.parametrize(
+    ("value", "accepted"),
+    [
+        *[
+            (value, True)
+            for value in (
+                "7.4.11",
+                "7.4.12",
+                "8.2.10",
+                "8.2.11",
+                "8.4.7",
+                "8.4.8",
+                "8.6.7",
+                "8.6.8",
+                "8.8.3",
+                "8.8.4",
+                "8.10.2",
+                "8.10.3",
+            )
+        ],
+        *[
+            (value, False)
+            for value in (
+                "6.2.24",
+                "7.2.16",
+                "7.4.10",
+                "7.5.11",
+                "8.0.99",
+                "8.1.10",
+                "8.2.9",
+                "8.3.10",
+                "8.4.6",
+                "8.6.6",
+                "8.8.2",
+                "8.10.1",
+                "8.12.0",
+                "9.0.0",
+                "",
+                "8.10",
+                "8.10.2.0",
+                "v8.10.2",
+                "8.10.2-rc1",
+                "8.10.2+vendor",
+                "8.10.2\n",
+                " 8.10.2",
+                "08.10.2",
+                "8.010.2",
+                "8.10.02",
+                "8.10.+2",
+                "8.10.-2",
+                "8.10.٢",
+                "8.10.2_0",
+                "8.10." + "9" * 5000,
+                None,
+                8.10,
+                b"8.10.2",
+                ["8", "10", "2"],
+            )
+        ],
+    ],
+)
+def test_server_version_policy(value: object, accepted: bool) -> None:
+    assert module._supported_server_version(value) is accepted
+
+
+@pytest.mark.parametrize(
+    ("position", "response"),
+    [
+        (0, None),
+        (0, {}),
+        (0, {"redis_version": None, "redis_mode": "standalone"}),
+        (0, {"redis_version": "7.2.16", "redis_mode": "standalone"}),
+        (0, {"redis_version": "8.0.99", "redis_mode": "standalone"}),
+        (0, {"redis_version": "8.10.2+vendor", "redis_mode": "standalone"}),
+        (0, {"redis_version": "8.10.2", "redis_mode": "cluster"}),
+        (
+            0,
+            {
+                "redis_version": "8.10.2",
+                "redis_mode": "standalone",
+                "server_name": "valkey",
+            },
+        ),
+        (
+            0,
+            {
+                "redis_version": "8.10.2",
+                "redis_mode": "standalone",
+                "server_name": "other",
+            },
+        ),
+        (
+            0,
+            {
+                "redis_version": "8.10.2",
+                "redis_mode": "standalone",
+                "valkey_version": "9.1.2",
+            },
+        ),
+        (1, {"role": "slave"}),
+        (2, {"cluster_enabled": 1}),
+        (3, {"maxmemory-policy": "allkeys-lru"}),
+        (4, None),
+        *[
+            (
+                4,
+                {
+                    name: [1]
+                    for name in ("eval", "eval_ro", "hpexpireat", "hpexpiretime")
+                    if name != missing
+                },
+            )
+            for missing in ("eval", "eval_ro", "hpexpireat", "hpexpiretime")
+        ],
+        *[
+            (
+                4,
+                {
+                    name: None if name == missing else [1]
+                    for name in ("eval", "eval_ro", "hpexpireat", "hpexpiretime")
+                },
+            )
+            for missing in ("eval", "eval_ro", "hpexpireat", "hpexpiretime")
+        ],
+        (4, {name: [1] for name in ("eval", "eval_ro", "hpexpireat", "wrong_command")}),
+    ],
+)
+async def test_initialization_rejects_unsupported_server_before_writes(
+    monkeypatch: pytest.MonkeyPatch, position: int, response: object
+) -> None:
+    active = Redis(
+        retry=Retry(NoBackoff(), 0),
+        protocol=2,
+        decode_responses=False,
+        socket_timeout=5,
+        socket_connect_timeout=5,
+    )
+    store = RedisStore(client=active, embedding_space=SPACE)
+    responses: list[object] = [
+        {"redis_version": "8.10.2", "redis_mode": "standalone"},
+        {"role": "master"},
+        {"cluster_enabled": 0},
+        {"maxmemory-policy": "noeviction"},
+        {name: [1] for name in ("eval", "eval_ro", "hpexpireat", "hpexpiretime")},
+    ]
+    responses[position] = response
+    execute = AsyncMock(side_effect=responses)
+    write = AsyncMock()
+    monkeypatch.setattr(active, "execute_command", execute)
+    monkeypatch.setattr(active, "eval", write)
+    try:
+        with pytest.raises(CacheStoreError):
+            await store.initialize_schema(initialization_client=active)
+        write.assert_not_awaited()
     finally:
         await store.aclose()
         await active.aclose(close_connection_pool=True)

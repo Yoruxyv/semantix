@@ -78,7 +78,8 @@ for ownership and maintenance details.
 
 ## Redis: setup, permissions and recovery
 
-Use direct standalone Redis 8.10.2 with `noeviction`; hosted/cluster/replica
+Use a direct standalone server from the [tested Redis version matrix](../embedded/redis.md#supported-versions)
+with `noeviction`; hosted/cluster/replica
 support is not inferred from a URL. Read the [Redis store contract](../embedded/redis.md)
 for the supported version range, exact scan ceiling and ACL commands.
 

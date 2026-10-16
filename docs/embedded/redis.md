@@ -16,11 +16,56 @@ stores require no Redis driver. The extra adds direct redis-py
 
 ## Supported deployment and work limits
 
-The initial tested server is Redis Open Source 8.10.2. The accepted server range
-is `>=8.10.2,<8.11`, on a directly addressed writable standalone primary using
+The supported deployment is a directly addressed writable standalone primary using
 **noeviction**. Operators configure that policy; Semantix never changes server
-configuration. Cluster, Sentinel, automatic failover, replica reads, active-active
-and universal managed-provider compatibility are outside this support boundary.
+configuration. Cluster, Sentinel, automatic failover, replica reads, active-active,
+Valkey and universal managed-provider compatibility remain outside this boundary.
+
+### Supported versions
+
+Server admission accepts only the release families and conservative patch floors
+below. All rows use **redis-py 8.1.0**; the accepted client policy remains 8.1.x.
+The required [Quality workflow](../../.github/workflows/quality.yml) checks the
+actual Redis identity and exact version before counting test results.
+
+| Redis family and minimum | Exact CI server | CI execution | Prior experimental server |
+| --- | --- | --- | --- |
+| 7.4.x, >=7.4.11 | 7.4.11 | Full embedded suite: Python 3.11; Redis suite/faults/wheel: 3.14 | 7.4.11 |
+| 8.2.x, >=8.2.10 | 8.2.10 | Full embedded suite and wheel: Python 3.12 | 8.2.10 |
+| 8.4.x, >=8.4.7 | 8.4.7 | Redis suite/faults/wheel: Python 3.14 | 8.4.7 |
+| 8.6.x, >=8.6.7 | 8.6.7 | Full embedded suite and wheel: Python 3.13 | 8.6.7 |
+| 8.8.x, >=8.8.3 | 8.8.3 | Redis suite/faults/wheel: Python 3.14 | 8.8.3 |
+| 8.10.x, >=8.10.2 | 8.10.2 | Full embedded suite, wheel and real faults: Python 3.14 | 8.10.2 |
+
+Each CI image has an immutable digest. Redis suites include shared conformance,
+layout, inspection, concurrency, cancellation and fault tests, with collection-bound
+JUnit verification and no skipped cases. Real fault runs cover graceful AOF restart,
+out-of-memory refusal and read-only replica refusal. Full embedded jobs retain their
+package coverage gate and the four explicitly permitted optional conformance skips.
+
+The prior experiments used isolated server-admission changes for the five added
+targets. They support the choice of targets; the CI table above tests the shipped
+implementation. These are Linux service containers with standard CPython clients,
+not certification of every Python/server/platform permutation.
+
+Floors are the tested patch baselines, not a claim that every earlier patch is broken.
+Later patches within these six families are admitted but remain unverified until
+tested; intermediate families and future major/minor versions are not admitted.
+Recommend current security-patched releases and validate your exact deployment.
+As of 2026-10-16 these families appear in the upstream
+[security-supported version list](https://github.com/redis/redis/security/policy).
+Maintainers must review that list and update pins, tests and floors as support changes.
+
+Redis 7.2 and earlier lack the native hash-field expiration required here.
+Initialization checks `EVAL`, `EVAL_RO`, `HPEXPIREAT` and `HPEXPIRETIME` explicitly;
+the [hash-field expiration commands](https://redis.io/docs/latest/commands/hpexpireat/)
+were introduced in Redis 7.4. A compatible-looking version cannot replace those
+checks. Redis 8.0 is intentionally excluded from the policy and the upstream
+security-supported list. Other unlisted families, malformed/vendor-suffixed
+versions and identified Redis forks are rejected. redis-py 7.4/8.0, Valkey,
+managed failover and clustered deployments require separate compatibility work.
+
+### Exact search and work limits
 
 Search transfers all eligible vectors in the requested namespace and performs an
 exact NumPy float64 cosine scan. It preserves negative similarities and orders
@@ -230,12 +275,20 @@ exactly-once behavior.
 
 ## Contributor validation
 
-Set REDIS_TEST_URL only to a disposable Redis 8.10.2 instance. Run
-`pytest tests/test_redis.py tests/test_redis_faults.py` for shared conformance and
-Redis probes. The required CI matrix rejects skipped Redis cases. The Docker
-restart/fault harness additionally requires REDIS_TEST_CONTAINER naming a labelled
+From `packages/cache`, set REDIS_TEST_URL only to a disposable server from the
+tested matrix, then run the complete Redis selection with its no-skip guard:
+
+```text
+python ../../ops/ci/required_tests.py redis .cache/redis.xml -- tests/test_redis.py tests/test_redis_faults.py tests/test_redis_layout.py tests/test_redis_scripts.py tests/test_inspection.py -k redis
+```
+
+The required CI matrix also rejects skipped Redis cases. The Docker restart/fault
+harness additionally requires REDIS_TEST_CONTAINER naming a labelled
 `semantix-redis-...` disposable container; it verifies ownership before restarting
-or deleting its own resources. No database-wide flush is used.
+or deleting its own resources. Set REDIS_TEST_VERSION to the exact expected
+server version; `--verify-version` checks it without restarting the container.
+The restart harness requires a digest-pinned Redis image and uses that same image
+for its OOM/read-only containers. No database-wide flush is used.
 
 `tests/redis_benchmark_smoke.py` measures synthetic 500 by 1,536 and 2,000 by 1,536
 bindings and saves process/server/latency evidence under ignored .cache/.

@@ -65,7 +65,7 @@ pythonpath = ["."]
 asyncio_mode = "auto"
 cache_dir = ".cache/pytest"
 testpaths = ["tests"]
-markers = ["mysql: requires explicitly owned verified-TLS MySQL Community 8.4", "pgvector: requires a disposable PostgreSQL database with vector installed", "redis: requires disposable Redis 8.10.2"]
+markers = ["mysql: requires explicitly owned verified-TLS MySQL Community 8.4", "pgvector: requires a disposable PostgreSQL database with vector installed", "redis: requires a disposable supported Redis server"]
 
 [tool.coverage.run]
 branch = true

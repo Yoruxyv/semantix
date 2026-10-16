@@ -40,16 +40,18 @@ def junit(path: Path, cases: list[tuple[str, str, str]]) -> Path:
     return path
 
 
-def test_required_shared_case_passes(tmp_path: Path) -> None:
+@pytest.mark.parametrize("scope", ["embedded", "redis"])
+def test_required_shared_case_passes(tmp_path: Path, scope: str) -> None:
     report = junit(tmp_path / "report.xml", [(REQUIRED, "", "")])
-    guard.validate("embedded", [REQUIRED], report)
+    guard.validate(scope, [REQUIRED], report)
 
 
 @pytest.mark.parametrize("outcome", ["skipped", "failure", "error"])
-def test_required_outcomes_rejected(tmp_path: Path, outcome: str) -> None:
+@pytest.mark.parametrize("scope", ["embedded", "redis"])
+def test_required_outcomes_rejected(tmp_path: Path, outcome: str, scope: str) -> None:
     report = junit(tmp_path / "report.xml", [(REQUIRED, outcome, "unavailable")])
     with pytest.raises(ValueError, match="Required test"):
-        guard.validate("embedded", [REQUIRED], report)
+        guard.validate(scope, [REQUIRED], report)
 
 
 @pytest.mark.parametrize("expected", [[], [REQUIRED, REQUIRED]])
@@ -199,13 +201,14 @@ def test_sdk_runner_rejects_uncollected_expected_cases(tmp_path: Path) -> None:
     assert "SDK integration cases not collected" in result.stderr
 
 
-def test_embedded_runner_rejects_missing_owned_paths(tmp_path: Path) -> None:
+@pytest.mark.parametrize("scope", ["embedded", "redis"])
+def test_runner_rejects_missing_owned_paths(tmp_path: Path, scope: str) -> None:
     (tmp_path / "test_other.py").write_text(
         "def test_other(): pass\n", encoding="utf-8"
     )
-    result = run_pytest(tmp_path, "embedded")
+    result = run_pytest(tmp_path, scope)
     assert result.returncode == 1
-    assert "Embedded integration cases not collected" in result.stderr
+    assert f"{scope.title()} integration cases not collected" in result.stderr
 
 
 def test_runner_rejects_collection_skip(tmp_path: Path) -> None:
@@ -276,3 +279,12 @@ def test_actual_dependency_review_gate(event: str, result: str, accepted: bool) 
         check=False,
     )
     assert (completed.returncode == 0) is accepted, completed.stderr
+
+
+@pytest.mark.parametrize(("node_id", "reason"), list(guard.OPTIONAL_SKIPS.items()))
+def test_redis_rejects_embedded_optional_skips(
+    tmp_path: Path, node_id: str, reason: str
+) -> None:
+    report = junit(tmp_path / "report.xml", [(node_id, "skipped", reason)])
+    with pytest.raises(ValueError, match="Required test skipped"):
+        guard.validate("redis", [node_id], report)
