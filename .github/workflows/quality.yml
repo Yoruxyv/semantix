@@ -164,10 +164,7 @@ jobs:
       # The shared suite collects real MemoryStore/PgVectorStore and the standalone custom consumer.
       - name: Test store conformance, embedded behavior and coverage
         run: |
-          uv run --no-sync pytest -m "not mysql" --cov=semantix_cache --cov-append --junitxml=.cache/embedded.xml
-          uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/embedded.xml').findall('.//testcase'); redis=[c for c in cases if c.get('classname', '').startswith('tests.test_redis')]; assert redis and all(c.find('skipped') is None for c in redis), 'Required Redis tests skipped'"
-          uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/embedded.xml').findall('.//testcase'); pg=[c for c in cases if c.get('classname', '').startswith('tests.test_pgvector')]; assert pg and all(c.find('skipped') is None for c in pg), 'Required PostgreSQL tests skipped'"
-          uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/embedded.xml').findall('.//testcase'); sqlite=[c for c in cases if c.get('classname', '').startswith('tests.test_sqlite')]; assert sqlite and all(c.find('skipped') is None for c in sqlite), 'Required SQLite tests skipped'"
+          uv run --no-sync python ../../ops/ci/required_tests.py embedded .cache/embedded.xml -- -m "not mysql" --cov=semantix_cache --cov-append
       - name: Execute custom integration examples
         run: |
           uv run --no-sync python examples/custom_integration.py
@@ -391,6 +388,12 @@ jobs:
       - name: Run backend unit tests with coverage
         run: uv run --no-sync pytest -m "not pgvector and not redis" --cov=app
 
+      - name: Verify required-test execution guard controls
+        working-directory: .
+        run: |
+          uv run --project apps/server --no-sync ruff format --config ruff.toml --check ops/ci/required_tests.py ops/ci/tests/test_required_tests.py
+          uv run --project apps/server --no-sync pytest -c packages/cache/pyproject.toml ops/ci/tests/test_required_tests.py
+
       - name: Verify development launcher boundaries
         working-directory: .
         run: |
@@ -527,7 +530,7 @@ jobs:
           cd ../../packages/client
           SEMANTIX_INTEGRATION_URL=http://127.0.0.1:18081 \
             SEMANTIX_INTEGRATION_TOKEN=sdk-operator-token \
-            uv run --no-sync pytest -m integration
+            uv run --no-sync python ../../ops/ci/required_tests.py sdk .cache/sdk-integration.xml -- -m integration
 
       - name: Build wheel and source distribution
         run: uv run --no-sync python -m build
@@ -1015,5 +1018,16 @@ jobs:
           test "$HARDENED_WINDOWS_CHECKOUT_RESULT" = "success"
           test "$PGVECTOR_RESULT" = "success"
           test "$REDIS_RESULT" = "success"
-          test "$DEPENDENCY_REVIEW_RESULT" = "success" \
-            || test "$DEPENDENCY_REVIEW_RESULT" = "skipped"
+          case "$GITHUB_EVENT_NAME" in
+            pull_request)
+              test "$DEPENDENCY_REVIEW_RESULT" = "success"
+              ;;
+            push|workflow_dispatch)
+              test "$DEPENDENCY_REVIEW_RESULT" = "success" \
+                || test "$DEPENDENCY_REVIEW_RESULT" = "skipped"
+              ;;
+            *)
+              echo "Unexpected Quality gate event" >&2
+              exit 1
+              ;;
+          esac
