@@ -95,24 +95,33 @@ jobs:
             postgres-image: pgvector/pgvector:0.8.7-pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
             postgres-major: "16"
             pgvector-version: "0.8.7"
+            redis-image: redis:7.4.11@sha256:4fa24486b8bcca8eec45ee0eb166edc674795e53a2b53d1a9ef263eecebaac85
+            redis-version: "7.4.11"
           - python-version: "3.12"
             postgres-image: pgvector/pgvector:pg17@sha256:d2ef61f42ef767baa5a1475393303cc235bcd92febd9d7014eddb48b41f3bad0
             postgres-major: "17"
             pgvector-version: "0.8.5"
+            redis-image: redis:8.2.10@sha256:47670742d7924adbcdb404d1288b6327815b23141969c0939b8e5d61f78c2634
+            redis-version: "8.2.10"
           - python-version: "3.13"
             postgres-image: pgvector/pgvector:pg17@sha256:d2ef61f42ef767baa5a1475393303cc235bcd92febd9d7014eddb48b41f3bad0
             postgres-major: "17"
             pgvector-version: "0.8.5"
+            redis-image: redis:8.6.7@sha256:192fab3335680aa420049026a18dc6baa30a69406cd29af35145bca0523d781a
+            redis-version: "8.6.7"
           - python-version: "3.14"
             postgres-image: pgvector/pgvector:0.8.7-pg18@sha256:2358fcba361ed2233a5ed81b5fe4ca779ccb304120ce531a3bf51c0ed7e2bc11
             postgres-major: "18"
             pgvector-version: "0.8.7"
+            redis-image: redis:8.10.2@sha256:c94085d298b738be22c9ccdc0ac3761fa6649df7dd82ad1d42367f3cb9714935
+            redis-version: "8.10.2"
     env:
       REDIS_TEST_URL: redis://127.0.0.1:6379/0
+      REDIS_TEST_VERSION: ${{ matrix.redis-version }}
       PGVECTOR_TEST_DATABASE_URL: postgresql://postgres:ci-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/semantix_embedded_test
     services:
       redis:
-        image: redis:8.10.2@sha256:c94085d298b738be22c9ccdc0ac3761fa6649df7dd82ad1d42367f3cb9714935
+        image: ${{ matrix.redis-image }}
         ports:
           - 6379:6379
         options: >-
@@ -182,6 +191,8 @@ jobs:
 
           asyncio.run(verify())
           PY
+      - name: Verify Redis server target
+        run: uv run --no-sync python tests/redis_infrastructure_smoke.py --verify-version
       - name: Fetch recorded reuse-quality source
         run: |
           source_sha=$(uv run --no-sync --offline python -B -c "import json; from pathlib import Path; print(json.loads(Path('../../apps/web/public/benchmarks/reuse-quality-summary.json').read_text(encoding='utf-8'))['source_sha'])")
@@ -340,6 +351,7 @@ jobs:
         working-directory: packages/cache
     env:
       REDIS_TEST_URL: redis://127.0.0.1:16379/0
+      REDIS_TEST_VERSION: "8.10.2"
       REDIS_TEST_CONTAINER: semantix-redis-ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Check out repository
@@ -373,6 +385,43 @@ jobs:
           path: packages/cache/.cache/redis-performance.json
           if-no-files-found: error
           retention-days: 7
+      - name: Verify remaining Redis families and oldest restart boundary
+        shell: bash
+        run: |
+          uv run --no-sync python -m build
+          uv run --no-sync python tests/check_artifacts.py
+          uv venv --python .venv/bin/python "$RUNNER_TEMP/redis-compatibility-wheel"
+          wheel_python="$RUNNER_TEMP/redis-compatibility-wheel/bin/python"
+          uv pip install --python "$wheel_python" "dist/semantix_cache-0.1.0-py3-none-any.whl[redis]"
+          compatibility_owner="redis-store-compat-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          compatibility_container=""
+          cleanup_compatibility() {
+            if [[ -n "$compatibility_container" ]] && docker inspect "$compatibility_container" > /dev/null 2>&1; then
+              test "$(docker inspect --format '{{ index .Config.Labels "semantix.disposable" }}' "$compatibility_container")" = "$compatibility_owner"
+              docker rm --force --volumes "$compatibility_container"
+            fi
+          }
+          trap cleanup_compatibility EXIT
+          for target in \
+            "7.4.11@sha256:4fa24486b8bcca8eec45ee0eb166edc674795e53a2b53d1a9ef263eecebaac85" \
+            "8.4.7@sha256:43afe4a9a43080e64dfa29699eef903fc9d54991fe8b03d57237c05bed2a396c" \
+            "8.8.3@sha256:eb1aa641bc5380ed14442398e45a5a51aeaaac919fab811e4f134eb77c71dd2d"; do
+            export REDIS_TEST_VERSION="${target%@*}"
+            compatibility_container="semantix-redis-compat-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-${REDIS_TEST_VERSION//./-}"
+            # A fixed host port survives restart; these targets run sequentially.
+            docker run --detach --name "$compatibility_container" \
+              --label "semantix.disposable=$compatibility_owner" \
+              --publish 127.0.0.1:16380:6379 "redis:$target" \
+              redis-server --appendonly yes --appendfsync always --maxmemory-policy noeviction
+            export REDIS_TEST_URL="redis://127.0.0.1:16380/0"
+            export REDIS_TEST_CONTAINER="$compatibility_container"
+            uv run --no-sync python tests/redis_infrastructure_smoke.py --verify-version
+            uv run --no-sync python ../../ops/ci/required_tests.py redis ".cache/redis-$REDIS_TEST_VERSION.xml" -- tests/test_redis*.py tests/test_inspection.py -k redis
+            "$wheel_python" tests/redis_wheel_smoke.py
+            uv run --no-sync python tests/redis_infrastructure_smoke.py
+            cleanup_compatibility
+            compatibility_container=""
+          done
       - name: Remove only this job's labelled container and volumes
         if: ${{ always() }}
         run: |

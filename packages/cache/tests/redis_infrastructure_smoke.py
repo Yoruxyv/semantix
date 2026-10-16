@@ -1,11 +1,13 @@
 """Run only with an explicitly labelled disposable Redis Docker container."""
 
+import argparse
 import asyncio
 import json
 import os
 import re
 import subprocess
 from datetime import UTC, datetime
+from importlib.metadata import version
 from shutil import which
 from uuid import uuid4
 
@@ -75,6 +77,22 @@ async def ready(active: Redis) -> None:
     raise RuntimeError("Disposable Redis did not become ready")
 
 
+async def verify_version() -> None:
+    expected = os.environ["REDIS_TEST_VERSION"]
+    active = client(os.environ["REDIS_TEST_URL"])
+    try:
+        await ready(active)
+        server = await active.info("server")
+        assert server.get("redis_version") == expected, "Unexpected Redis version"
+        assert (
+            server.get("server_name", "redis") == "redis"
+            and "valkey_version" not in server
+        ), "Unexpected Redis server identity"
+        print(f"Verified Redis {expected}; redis-py {version('redis')}")
+    finally:
+        await asyncio.wait_for(active.aclose(close_connection_pool=True), timeout=5)
+
+
 async def restart(container: str, url: str) -> None:
     owned(container)
     prefix = "redis_restart_" + uuid4().hex
@@ -142,7 +160,7 @@ async def restart(container: str, url: str) -> None:
         await active.aclose(close_connection_pool=True)
 
 
-async def fault_container(mode: str) -> None:
+async def fault_container(mode: str, *, image: str = IMAGE) -> None:
     name = "semantix-redis-fault-" + uuid4().hex
     args = [
         "run",
@@ -153,7 +171,7 @@ async def fault_container(mode: str) -> None:
         "semantix.disposable=redis-store",
         "--publish",
         "127.0.0.1::6379",
-        IMAGE,
+        image,
         "redis-server",
         "--maxmemory-policy",
         "noeviction",
@@ -218,10 +236,19 @@ async def fault_container(mode: str) -> None:
 
 
 async def main() -> None:
-    await restart(os.environ["REDIS_TEST_CONTAINER"], os.environ["REDIS_TEST_URL"])
-    await fault_container("oom")
-    await fault_container("readonly")
+    await verify_version()
+    container = os.environ["REDIS_TEST_CONTAINER"]
+    owned(container)
+    image = docker("inspect", "--format", "{{.Config.Image}}", container)
+    if re.fullmatch(r"redis:[0-9]+\.[0-9]+\.[0-9]+@sha256:[0-9a-f]{64}", image) is None:
+        raise RuntimeError("Disposable fault tests require a pinned Redis image")
+    await restart(container, os.environ["REDIS_TEST_URL"])
+    await fault_container("oom", image=image)
+    await fault_container("readonly", image=image)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--verify-version", action="store_true")
+    args = parser.parse_args()
+    asyncio.run(verify_version() if args.verify_version else main())

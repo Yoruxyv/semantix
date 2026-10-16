@@ -627,7 +627,9 @@ async def test_owned_close_deadline_closes_real_transports(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     url = os.environ.get("REDIS_TEST_URL")
-    assert url, "Set REDIS_TEST_URL to disposable Redis 8.10.2 for integration testing"
+    assert url, (
+        "Set REDIS_TEST_URL to a disposable supported Redis server for integration testing"
+    )
     owned = await RedisStore.connect(
         url=url,
         embedding_space=SPACE,
@@ -654,7 +656,9 @@ async def test_startup_cancellation_cleans_created_client(
     monkeypatch: pytest.MonkeyPatch, cleanup_timeout: bool
 ) -> None:
     url = os.environ.get("REDIS_TEST_URL")
-    assert url, "Set REDIS_TEST_URL to disposable Redis 8.10.2 for integration testing"
+    assert url, (
+        "Set REDIS_TEST_URL to a disposable supported Redis server for integration testing"
+    )
     entered = asyncio.Event()
     clients: list[Redis] = []
     original = cast(Callable[..., Awaitable[object]], Redis.execute_command)
@@ -972,8 +976,15 @@ async def test_infrastructure_readiness_failure_closes_client(
 
 
 @pytest.mark.parametrize("ownership_changed", [False, True])
+@pytest.mark.parametrize(
+    "image",
+    [
+        infrastructure.IMAGE,
+        "redis:7.4.11@sha256:4fa24486b8bcca8eec45ee0eb166edc674795e53a2b53d1a9ef263eecebaac85",
+    ],
+)
 async def test_fault_cleanup_survives_client_close_failure(
-    monkeypatch: pytest.MonkeyPatch, ownership_changed: bool
+    monkeypatch: pytest.MonkeyPatch, ownership_changed: bool, image: str
 ) -> None:
     active = client()
     original_close = active.aclose
@@ -985,6 +996,7 @@ async def test_fault_cleanup_survives_client_close_failure(
         nonlocal name, inspections
         if args[0] == "run":
             name = args[args.index("--name") + 1]
+            assert args[args.index("redis-server") - 1] == image
             return "synthetic-container-id"
         if args[0] == "inspect":
             assert args[-1] == name
@@ -1025,8 +1037,64 @@ async def test_fault_cleanup_survives_client_close_failure(
     monkeypatch.setattr(RedisStore, "put", put)
     expected = AssertionError if ownership_changed else OSError
     with pytest.raises(expected) as caught:
-        await infrastructure.fault_container("readonly")
+        await infrastructure.fault_container("readonly", image=image)
     assert inspections == 2
     assert removals == ([] if ownership_changed else [name])
     if not ownership_changed:
         assert str(caught.value) == "Synthetic client-close failure"
+
+
+@pytest.mark.parametrize(
+    ("server", "expected", "accepted"),
+    [
+        ({"redis_version": "7.4.11"}, "7.4.11", True),
+        ({"redis_version": "8.10.2", "server_name": "redis"}, "8.10.2", True),
+        ({"redis_version": "7.4.11"}, "8.10.2", False),
+        ({"redis_version": "8.10.2", "server_name": "valkey"}, "8.10.2", False),
+        ({"redis_version": "8.10.2", "valkey_version": "9.1.2"}, "8.10.2", False),
+        ({"redis_version": None}, "8.10.2", False),
+        ({}, "8.10.2", False),
+    ],
+)
+async def test_infrastructure_version_probe_and_cleanup(
+    monkeypatch: pytest.MonkeyPatch,
+    server: dict[str, object],
+    expected: str,
+    accepted: bool,
+) -> None:
+    active = client()
+    original_close = active.aclose
+    closed = False
+
+    async def ready(resource: Redis) -> None:
+        assert resource is active
+
+    async def info(section: str) -> dict[str, object]:
+        assert section == "server"
+        return server
+
+    async def close(close_connection_pool: bool | None = None) -> None:
+        nonlocal closed
+        closed = True
+        await original_close(close_connection_pool=close_connection_pool)
+
+    monkeypatch.setenv("REDIS_TEST_URL", "unused")
+    monkeypatch.setenv("REDIS_TEST_VERSION", expected)
+    monkeypatch.setattr(infrastructure, "client", lambda url: active)
+    monkeypatch.setattr(infrastructure, "ready", ready)
+    monkeypatch.setattr(active, "info", info)
+    monkeypatch.setattr(active, "aclose", close)
+    if accepted:
+        await infrastructure.verify_version()
+    else:
+        with pytest.raises(AssertionError, match="Unexpected Redis"):
+            await infrastructure.verify_version()
+    assert closed
+
+
+def test_infrastructure_version_requires_explicit_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("REDIS_TEST_VERSION", raising=False)
+    with pytest.raises(KeyError, match="REDIS_TEST_VERSION"):
+        asyncio.run(infrastructure.verify_version())
