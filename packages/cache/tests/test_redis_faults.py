@@ -622,11 +622,14 @@ async def test_cancelled_real_client_boundaries(
     assert await redis_client.ping()
 
 
+@pytest.mark.redis
 async def test_owned_close_deadline_closes_real_transports(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    url = os.environ.get("REDIS_TEST_URL")
+    assert url, "Set REDIS_TEST_URL to disposable Redis 8.10.2 for integration testing"
     owned = await RedisStore.connect(
-        url=os.environ["REDIS_TEST_URL"],
+        url=url,
         embedding_space=SPACE,
         close_timeout_seconds=0.02,
     )
@@ -645,10 +648,13 @@ async def test_owned_close_deadline_closes_real_transports(
         await owned.aclose()
 
 
+@pytest.mark.redis
 @pytest.mark.parametrize("cleanup_timeout", [False, True])
 async def test_startup_cancellation_cleans_created_client(
     monkeypatch: pytest.MonkeyPatch, cleanup_timeout: bool
 ) -> None:
+    url = os.environ.get("REDIS_TEST_URL")
+    assert url, "Set REDIS_TEST_URL to disposable Redis 8.10.2 for integration testing"
     entered = asyncio.Event()
     clients: list[Redis] = []
     original = cast(Callable[..., Awaitable[object]], Redis.execute_command)
@@ -662,7 +668,7 @@ async def test_startup_cancellation_cleans_created_client(
     monkeypatch.setattr(Redis, "execute_command", ping)
     task = asyncio.create_task(
         RedisStore.connect(
-            url=os.environ["REDIS_TEST_URL"],
+            url=url,
             embedding_space=SPACE,
             close_timeout_seconds=0.02 if cleanup_timeout else 30,
         )

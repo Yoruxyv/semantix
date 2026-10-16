@@ -420,8 +420,8 @@ class RedisStore:
                     limit=limit,
                     sort=sort,
                 )
-            # ponytail: prompt search scans at most 5000 payloads in batches of 100;
-            # a separate prompt index is unjustified for this optional admin operation.
+            # Each 100-entry page revalidates and sorts binding metadata;
+            # prompt search scans payloads up to the configured capacity.
             selected: list[InspectionEntry] = []
             matched = 0
             scanned = 0
@@ -623,8 +623,8 @@ class RedisStore:
             await self._worker_slot.acquire()
             retained = False
             try:
-                # ponytail: bounded O(N) Lua and O(N*D) transfer/scoring; consider
-                # an indexed backend only when measured workloads exceed this ceiling.
+                # O(N*D) vector transfer/scoring also needs validation and sorting;
+                # choose an indexed backend only when measured workloads justify it.
                 rows = await self._client.eval_ro(
                     _READ,
                     3,
