@@ -59,9 +59,9 @@ def _history_record(
     terminal_state: EvaluationRunTerminalState = "completed",
     completed_at: datetime | None = None,
 ) -> EvaluationRunHistoryRecord:
-    completed = completed_at or datetime.now(UTC)
-    started = completed - timedelta(seconds=1)
-    accepted = started - timedelta(seconds=1)
+    completed = completed_at or datetime.now(UTC).replace(microsecond=123456)
+    started = completed - timedelta(seconds=3, microseconds=234567)
+    accepted = started - timedelta(seconds=5, microseconds=345678)
 
     dataset_id = (
         str(source_dataset_id)
@@ -80,10 +80,10 @@ def _history_record(
         digest=dataset_digest,
         name="History synthetic dataset",
         description="Aggregate-only run history evidence.",
-        query_count=2,
-        expected_hits=1,
-        expected_misses=1,
-        categories=["storage"],
+        query_count=31,
+        expected_hits=15,
+        expected_misses=16,
+        categories=["storage", "mapping"],
     )
 
     reproducibility = BenchmarkReproducibilityMetadata(
@@ -93,21 +93,21 @@ def _history_record(
         dataset_schema_version=schema_version,
         dataset_version=dataset_version,
         dataset_digest=dataset_digest,
-        embedding_provider_category="mock",
-        generation_provider_category="mock",
+        embedding_provider_category="mock-embedding",
+        generation_provider_category="mock-generation",
         generation_configuration_fingerprint="b" * 64,
         comparison_contract_version=1,
         embedding_dimensions=384,
         embedding_space_fingerprint="c" * 64,
-        normalization_mode="identity",
+        normalization_mode="typo_correction",
         normalization_fingerprint="d" * 64,
         measured_threshold=0.92,
         evaluation_thresholds=[0.80, 0.92],
-        repetitions=1,
-        reset_cache_before_run=True,
-        estimated_cost_per_request_usd=0.001,
-        estimated_cost_per_1k_tokens_usd=0.002,
-        evaluation_timeout_seconds=30.0,
+        repetitions=3,
+        reset_cache_before_run=False,
+        estimated_cost_per_request_usd=0.00125,
+        estimated_cost_per_1k_tokens_usd=0.0075,
+        evaluation_timeout_seconds=37.5,
         configuration_fingerprint="e" * 64,
     )
 
@@ -122,57 +122,58 @@ def _history_record(
     thresholds: tuple[ThresholdEvaluation, ...]
 
     if terminal_state == "completed":
+        # Unequal counts and rates expose compatible-type column swaps.
         metrics = BenchmarkMetrics(
-            total_queries=2,
-            cache_hits=1,
-            cache_misses=1,
-            provider_calls=1,
-            provider_calls_avoided=1,
-            hit_rate=0.5,
-            average_latency_ms=10.0,
-            median_latency_ms=9.0,
-            p95_latency_ms=15.0,
-            average_cache_hit_latency_ms=2.0,
-            average_cache_miss_latency_ms=18.0,
-            estimated_latency_saved_ms=16.0,
-            estimated_provider_cost_saved_usd=0.001,
-            estimated_tokens_saved=25,
-            true_positive_hits=1,
-            true_negative_misses=1,
-            false_positive_hits=0,
-            false_negative_misses=0,
-            precision=1.0,
-            recall=1.0,
-            f1_score=1.0,
+            total_queries=93,
+            cache_hits=24,
+            cache_misses=69,
+            provider_calls=69,
+            provider_calls_avoided=24,
+            hit_rate=24 / 93,
+            average_latency_ms=31.5,
+            median_latency_ms=23.25,
+            p95_latency_ms=87.75,
+            average_cache_hit_latency_ms=3.125,
+            average_cache_miss_latency_ms=41.5,
+            estimated_latency_saved_ms=921.0,
+            estimated_provider_cost_saved_usd=0.0375,
+            estimated_tokens_saved=575,
+            true_positive_hits=9,
+            true_negative_misses=33,
+            false_positive_hits=15,
+            false_negative_misses=36,
+            precision=9 / 24,
+            recall=9 / 45,
+            f1_score=18 / 69,
         )
         thresholds = (
             ThresholdEvaluation(
                 threshold=0.80,
                 result_kind="projected",
-                hit_rate=0.5,
-                precision=1.0,
-                recall=1.0,
-                f1_score=1.0,
-                average_latency_ms=10.0,
-                provider_calls_avoided=1,
-                true_positive_hits=1,
-                true_negative_misses=1,
-                false_positive_hits=0,
-                false_negative_misses=0,
+                hit_rate=41 / 93,
+                precision=21 / 41,
+                recall=21 / 45,
+                f1_score=42 / 86,
+                average_latency_ms=21.25,
+                provider_calls_avoided=41,
+                true_positive_hits=21,
+                true_negative_misses=28,
+                false_positive_hits=20,
+                false_negative_misses=24,
             ),
             ThresholdEvaluation(
                 threshold=0.92,
                 result_kind="measured",
-                hit_rate=0.5,
-                precision=1.0,
-                recall=1.0,
-                f1_score=1.0,
-                average_latency_ms=10.0,
-                provider_calls_avoided=1,
-                true_positive_hits=1,
-                true_negative_misses=1,
-                false_positive_hits=0,
-                false_negative_misses=0,
+                hit_rate=24 / 93,
+                precision=9 / 24,
+                recall=9 / 45,
+                f1_score=18 / 69,
+                average_latency_ms=31.5,
+                provider_calls_avoided=24,
+                true_positive_hits=9,
+                true_negative_misses=33,
+                false_positive_hits=15,
+                false_negative_misses=36,
             ),
         )
         failure_code = None
@@ -232,7 +233,7 @@ async def _insert_source_dataset(
                 'imported',
                 1,
                 $3,
-                2,
+                31,
                 64,
                 $4,
                 $5
@@ -257,10 +258,18 @@ async def test_repository_persists_completed_aggregate_history(
         max_per_namespace=10,
         cleanup_batch_size=10,
     )
-    record = _history_record()
+    record = _history_record(run_id=f"{1:032x}")
 
     await repository.persist_terminal_run(record)
     await repository.readiness()
+
+    reconstructed = await repository.get_run(
+        record.context.run_id,
+        authorized_namespaces=frozenset({"tenant-a"}),
+    )
+    assert reconstructed is not None
+    assert reconstructed.record == record
+    assert reconstructed.expires_at == record.completed_at + timedelta(days=30)
 
     async with history_pool.acquire() as connection:
         run = await connection.fetchrow(
@@ -303,11 +312,11 @@ async def test_repository_persists_completed_aggregate_history(
     assert run["namespace"] == "tenant-a"
     assert run["terminal_state"] == "completed"
     assert run["dataset_source"] == "builtin"
-    assert run["total_queries"] == 2
-    assert run["cache_hits"] == 1
-    assert run["cache_misses"] == 1
-    assert run["provider_calls"] == 1
-    assert run["provider_calls_avoided"] == 1
+    assert run["total_queries"] == 93
+    assert run["cache_hits"] == 24
+    assert run["cache_misses"] == 69
+    assert run["provider_calls"] == 69
+    assert run["provider_calls_avoided"] == 24
     assert run["generation_configuration_fingerprint"] == "b" * 64
     assert run["comparison_contract_version"] == 1
     assert run["failure_code"] is None
@@ -323,14 +332,20 @@ async def test_repository_persists_completed_aggregate_history(
         )
         for row in thresholds
     ] == [
-        (1, 0.80, "projected", 1),
-        (2, 0.92, "measured", 1),
+        (1, 0.80, "projected", 41),
+        (2, 0.92, "measured", 24),
     ]
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("terminal_state", "failure_code"),
+    [("failed", "evaluation_failed"), ("timed_out", "evaluation_timeout")],
+)
 async def test_repository_persists_failed_terminal_history_without_metrics(
     history_pool: Pool,
+    terminal_state: EvaluationRunTerminalState,
+    failure_code: str,
 ) -> None:
     await apply_migrations(history_pool)
     repository = PostgresEvaluationRunHistoryRepository(
@@ -339,7 +354,7 @@ async def test_repository_persists_failed_terminal_history_without_metrics(
         max_per_namespace=10,
         cleanup_batch_size=10,
     )
-    record = _history_record(terminal_state="failed")
+    record = _history_record(run_id=f"{2:032x}", terminal_state=terminal_state)
 
     await repository.persist_terminal_run(record)
 
@@ -367,12 +382,20 @@ async def test_repository_persists_failed_terminal_history_without_metrics(
         )
 
     assert run is not None
-    assert run["terminal_state"] == "failed"
+    assert run["terminal_state"] == terminal_state
     assert run["total_queries"] is None
     assert run["hit_rate"] is None
-    assert run["failure_code"] == "evaluation_failed"
+    assert run["failure_code"] == failure_code
     assert run["safe_failure_detail"] == ("Synthetic safe terminal failure evidence.")
     assert threshold_count == 0
+
+    reconstructed = await repository.get_run(
+        record.context.run_id,
+        authorized_namespaces=frozenset({"tenant-a"}),
+    )
+    assert reconstructed is not None
+    assert reconstructed.record == record
+    assert reconstructed.expires_at == record.completed_at + timedelta(days=30)
 
 
 @pytest.mark.asyncio
@@ -382,8 +405,8 @@ async def test_persisted_source_caps_retention_and_dataset_delete_cascades(
     await apply_migrations(history_pool)
 
     completed_at = datetime.now(UTC)
-    source_dataset_id = uuid4()
-    source_expires_at = completed_at + timedelta(days=2)
+    source_dataset_id = UUID(int=4)
+    source_expires_at = completed_at + timedelta(days=2, microseconds=654321)
 
     await _insert_source_dataset(
         history_pool,
@@ -399,6 +422,7 @@ async def test_persisted_source_caps_retention_and_dataset_delete_cascades(
         cleanup_batch_size=10,
     )
     record = _history_record(
+        run_id=f"{3:032x}",
         namespace="tenant-persisted",
         dataset_source="persisted",
         source_dataset_id=source_dataset_id,
@@ -407,6 +431,14 @@ async def test_persisted_source_caps_retention_and_dataset_delete_cascades(
     )
 
     await repository.persist_terminal_run(record)
+
+    reconstructed = await repository.get_run(
+        record.context.run_id,
+        authorized_namespaces=frozenset({"tenant-persisted"}),
+    )
+    assert reconstructed is not None
+    assert reconstructed.record == record
+    assert reconstructed.expires_at == source_expires_at
 
     async with history_pool.acquire() as connection:
         retained = await connection.fetchrow(
