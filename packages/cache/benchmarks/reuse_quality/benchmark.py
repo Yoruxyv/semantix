@@ -227,7 +227,8 @@ class LexicalEmbedder:
         )
 
     async def embed(self, text: str) -> Sequence[float]:
-        # ponytail: hashed lexical features collide and miss paraphrases; use the semantic baseline for model-quality evidence.
+        # Hashed lexical features collide and miss paraphrases; use the separate
+        # semantic baseline for model-quality evidence.
         features = (
             re.findall(r"[^\W_]+|[^\w\s]", text)
             if self.baseline == "token-count"
