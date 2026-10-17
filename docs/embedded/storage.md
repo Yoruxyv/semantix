@@ -461,8 +461,13 @@ Startup defaults to a 10-second deadline; cancellation unwinding and cleanup can
 finish after that deadline. Operations include acquisition,
 commands, transaction completion and release within the default 30-second deadline.
 Owned-pool close defaults to 30 seconds. Timeouts must be positive finite numbers
-up to 86,400 seconds. Cancellation propagates; failed writes/migrations roll back
-and release acquired connections. Close during an admitted operation raises
+up to 86,400 seconds. Cancellation propagates after connection release finishes
+within the remaining operation budget; the store retains cleanup ownership while
+unwinding. A connection proven closed is retired before release, without closing
+other users of a borrowed pool. Internal driver errors on live connections still
+propagate. Failed transactions roll back when the server can establish that outcome;
+a disconnect during commit remains uncertain and is never replayed.
+Close during an admitted operation raises
 `CacheBusyError` and leaves the store open. Drain or cancel work before close;
 closed stores cannot reopen, and repeated close is harmless.
 

@@ -276,20 +276,67 @@ class PgVectorStore:
     ) -> AsyncGenerator[PoolConnectionProxy[asyncpg.Record], None]:
         with self._state.operation():
             failure: SemantixCacheError | None = None
+            disconnected = False
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + self._config.timeout
+            active_pool = self._pool if pool is None else pool
             try:
-                async with asyncio.timeout(self._config.timeout):
-                    async with (self._pool if pool is None else pool).acquire(
-                        timeout=self._config.timeout
-                    ) as connection:
+                async with asyncio.timeout_at(deadline):
+                    connection = await active_pool.acquire(timeout=self._config.timeout)
+                    primary: BaseException | None = None
+                    try:
                         yield connection
+                    except BaseException as error:
+                        # Cleanup must preserve programming errors and cancellation.
+                        primary = error
+                        raise
+                    finally:
+                        try:
+                            disconnected = connection.is_closed()
+                        except asyncpg.InterfaceError:
+                            # An already released proxy provides no disconnect evidence.
+                            disconnected = False
+                        if disconnected:
+                            # 0.31 can leave an aborted connection's holder unreleased.
+                            connection.terminate()
+                        cleanup = asyncio.gather(
+                            active_pool.release(
+                                connection, timeout=max(0.0, deadline - loop.time())
+                            ),
+                            return_exceptions=True,
+                        )
+                        cancelled: asyncio.CancelledError | None = None
+                        while not cleanup.done():
+                            try:
+                                await asyncio.shield(cleanup)
+                            except asyncio.CancelledError as error:
+                                cancelled = cancelled or error
+                        if cancelled is not None and not isinstance(
+                            primary, asyncio.CancelledError
+                        ):
+                            raise cancelled
+                        if primary is None:
+                            result = cleanup.result()[0]
+                            if isinstance(result, BaseException):
+                                raise result
             except TimeoutError:
                 failure = CacheTimeoutError("PostgreSQL operation deadline expired")
+            except asyncpg.InternalClientError:
+                if not disconnected:
+                    raise
+                failure = CacheStoreError(
+                    "PostgreSQL connection was lost; outcome may be uncertain"
+                )
             except (OSError, asyncpg.PostgresError, asyncpg.InterfaceError):
                 failure = CacheStoreError(
                     "PostgreSQL operation failed; check connectivity, permissions and schema"
                 )
             if failure is not None:
-                raise failure from RuntimeError(str(failure))
+                try:
+                    raise failure from RuntimeError(str(failure))
+                finally:
+                    # The generator caller can still be handling the private driver error.
+                    failure.__context__ = None
 
     async def _layout(
         self, connection: PoolConnectionProxy[asyncpg.Record], *, require_schema: bool
@@ -885,8 +932,7 @@ class PgVectorStore:
         except (OSError, asyncpg.PostgresError, asyncpg.InterfaceError):
             failure = CacheStoreError("PostgreSQL pool could not close")
         finally:
-            if not self._pool.is_closing():
-                self._pool.terminate()
+            self._pool.terminate()
         if failure is not None:
             raise failure from RuntimeError(str(failure))
 

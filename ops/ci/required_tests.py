@@ -22,6 +22,8 @@ OPTIONAL_SKIPS = {
 EMBEDDED_REQUIRED = frozenset(
     {
         "tests/test_pgvector.py::test_owned_pool_persistence_no_implicit_ddl_and_double_close",
+        "tests/test_pgvector_faults.py::test_disconnect_at_commit_never_replays_or_closes_other_pool_users[False-False]",
+        "tests/test_pgvector_faults.py::test_release_finishes_before_deadline_or_cancellation_returns[True-True]",
         "tests/test_redis.py::test_fresh_idempotent_concurrent_schema",
         "tests/test_sqlite.py::test_revision_lru_and_ttl_survive_reopen",
         "tests/test_store_conformance.py::TestBuiltInStores::test_empty_exact_similar_and_threshold[pgvector]",
