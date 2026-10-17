@@ -118,8 +118,10 @@ class Job:
 
 class Worker:
     def __init__(self, config: Configuration) -> None:
-        if version("PyMySQL") != "1.2.3":
-            raise CacheConfigurationError("MySQLStore requires verified PyMySQL 1.2.3")
+        if version("PyMySQL") not in {"1.2.1", "1.2.2", "1.2.3"}:
+            raise CacheConfigurationError(
+                "MySQLStore requires verified PyMySQL 1.2.1, 1.2.2 or 1.2.3"
+            )
         self.config = config
         self.loop = asyncio.get_running_loop()
         self.pid = os.getpid()

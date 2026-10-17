@@ -29,6 +29,10 @@ from typing import Any
 import pymysql
 
 IMAGE = "container-registry.oracle.com/mysql/community-server@sha256:7dcc4add9183664de3a214daf85a50c3ba6cccfd7534f700b6561bf5b41885be"
+IMAGES = {
+    "8.4.12": IMAGE,
+    "8.4.11": "container-registry.oracle.com/mysql/community-server@sha256:76c7220704e3a4fce4dc687e22df65c8edd560d24b232d388f4ff86cbc738885",
+}
 OWNER = "semantix-mysql-phase5"
 
 
@@ -371,7 +375,9 @@ def connection(config: dict[str, Any], credential: str) -> Any:
 
 
 class Fixture:
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, server_version: str = "8.4.12") -> None:
+        self.server_version = server_version
+        self.image = IMAGES[server_version]
         self.root = root
         self.identifier = secrets.token_hex(8)
         self.password = secrets.token_hex(32)
@@ -418,7 +424,7 @@ class Fixture:
                     f"type=bind,source={self.tls},target=/tls",
                     "--entrypoint",
                     "/bin/sh",
-                    IMAGE,
+                    self.image,
                     "-c",
                     "chown 27:27 /tls/server-key.pem && chmod 755 /tls && chmod 600 /tls/server-key.pem && chmod 644 /tls/ca.pem /tls/server.pem /tls/expired.pem",
                 ],
@@ -508,7 +514,7 @@ class Fixture:
                 f"type=bind,source={self.tls},target=/tls,readonly",
                 "--mount",
                 f"type=volume,source={volume},target=/var/lib/mysql",
-                IMAGE,
+                self.image,
                 *common,
                 *tls,
             ],
@@ -536,10 +542,23 @@ class Fixture:
                     database = connection(config, self.password)
                     try:
                         with database.cursor() as cursor:
-                            cursor.execute("SELECT @@server_uuid,@@version", ())
-                            config["server_uuid"], config["server_version"] = (
-                                cursor.fetchone()
+                            cursor.execute(
+                                "SELECT @@server_uuid,@@version,@@version_comment", ()
                             )
+                            (
+                                config["server_uuid"],
+                                config["server_version"],
+                                config["server_comment"],
+                            ) = cursor.fetchone()
+                            if (
+                                config["server_version"] != self.server_version
+                                or config["server_comment"]
+                                != "MySQL Community Server - GPL"
+                                or not config["server_uuid"]
+                            ):
+                                raise RuntimeError(
+                                    "Pinned MySQL server identity/version mismatch"
+                                )
                             return config
                     finally:
                         database.close()
@@ -582,14 +601,14 @@ class Fixture:
             ]
             labels = inspected["Config"]["Labels"]
             expected_image = command(
-                ["docker", "image", "inspect", IMAGE, "--format", "{{.Id}}"],
+                ["docker", "image", "inspect", self.image, "--format", "{{.Id}}"],
                 cwd=self.root,
             )
             if (
                 labels.get("semantix.fixture") != self.identifier
                 or labels.get("semantix.owner") != OWNER
                 or inspected["Image"] != expected_image
-                or inspected["Config"]["Image"] != IMAGE
+                or inspected["Config"]["Image"] != self.image
             ):
                 raise RuntimeError("Fixture ownership changed; refusing cleanup")
             command(["docker", "stop", "--timeout", "5", name], cwd=self.root)
@@ -645,6 +664,7 @@ class Fixture:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pull-image", action="store_true")
+    parser.add_argument("--server-version", choices=IMAGES, default="8.4.12")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     child = args.command[1:] if args.command[:1] == ["--"] else args.command
@@ -653,7 +673,7 @@ def main() -> int:
             parser.error("--pull-image cannot be combined with a test command")
         # The pinned cold download is 256 MiB; do not spend the 90s setup budget on it.
         command(
-            ["docker", "pull", IMAGE],
+            ["docker", "pull", IMAGES[args.server_version]],
             cwd=private_directory(),
             phase="Pinned MySQL image acquisition",
             timeout=300,
@@ -662,7 +682,7 @@ def main() -> int:
     if not child:
         parser.error("A test command is required after --")
     root = private_directory()
-    fixture = Fixture(root)
+    fixture = Fixture(root, args.server_version)
     try:
         valid = fixture.start("valid")
         valid["expired_port"] = fixture.start("expired")["port"]

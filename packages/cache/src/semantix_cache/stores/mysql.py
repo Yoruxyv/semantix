@@ -1,4 +1,4 @@
-"""Owned verified-TLS MySQL storage using the optional pinned synchronous driver."""
+"""Owned verified-TLS MySQL storage using the optional verified synchronous driver."""
 
 from __future__ import annotations
 

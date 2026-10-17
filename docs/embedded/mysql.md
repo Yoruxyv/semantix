@@ -14,17 +14,45 @@ then install its optional extra in your application's environment:
 python -m pip install './dist/semantix_cache-0.1.0-py3-none-any.whl[mysql]'
 ```
 
-Adjust the path for your consumer project. This adds **PyMySQL 1.2.3**, an MIT
-licensed synchronous driver, without changing the NumPy/Pydantic core. Root
-imports do not load PyMySQL. No global asyncio loop-policy change is needed.
-Windows default Proactor and Linux default-loop clients on Python 3.11–3.14
-have been exercised against MySQL Community **8.4.12/InnoDB**. The new workflow
-targets Linux; hosted execution is pending. Local Windows evidence does not
-establish hosted Windows/MySQL coverage. Tests used x86-64 clients; other CPU
-architectures and free-threaded builds are unverified.
-macOS, MariaDB, Aurora, TiDB, HeatWave, replicas, failover, IPv6 and DNS dialing
-are outside the verified boundary. Other 8.4 patches pass the major/minor check
-but require their own evidence; they are not certified by the 8.4.12 tests.
+Adjust the path for your consumer project. This adds **PyMySQL >=1.2.1,<=1.2.3**,
+an MIT licensed synchronous driver, without changing the NumPy/Pydantic core.
+Runtime accepts exactly **1.2.1, 1.2.2 and 1.2.3**; prerelease, development,
+post-release, vendor/local and future versions fail before worker allocation.
+The development lock retains 1.2.3. The dependency interval bounds resolution;
+the exact runtime check deliberately refuses unverified version strings.
+
+[PyMySQL's versioned changelog](https://github.com/PyMySQL/PyMySQL/blob/v1.2.3/CHANGELOG.md)
+identifies 1.2.1 as the security-fix floor for bytes/surrogate SQL escaping.
+Versions 1.2.2 and 1.2.3 restore converter aliases unused by this adapter.
+The adapter retains UTF-8, parameter binding and verified TLS. Root imports do
+not load PyMySQL, and no global asyncio loop-policy change is needed.
+
+### Verified compatibility
+
+All rows use x86-64 clients, default event loops, dedicated MySQL Community
+servers with InnoDB and verified TLS, the complete mandatory MySQL suite
+(including security, cancellation and fault cases), and independent installed
+wheel consumers.
+
+| Operating system | CPython | MySQL Community | PyMySQL | Evidence |
+|---|---|---|---|---|
+| Linux | 3.11, 3.12, 3.13, 3.14 | 8.4.12 | 1.2.3 | Required Quality jobs |
+| Linux | 3.11 | 8.4.12 | 1.2.1 | Required sequential certification |
+| Linux | 3.14 | 8.4.12 | 1.2.2 | Required sequential certification |
+| Linux | 3.14 | 8.4.11 | 1.2.3 | Required sequential certification |
+| Windows (default Proactor) | 3.11 | 8.4.12 | 1.2.1 | Local disposable Docker server |
+| Windows (default Proactor) | 3.14 | 8.4.12 | 1.2.2 | Local disposable Docker server |
+| Windows (default Proactor) | 3.14 | 8.4.11, 8.4.12 | 1.2.3 | Local disposable Docker server |
+
+Production admission remains MySQL Community **8.4.x** with those three exact
+driver versions. This is not evidence for every server/driver/Python cross
+combination or every 8.4 patch. The bounded CI combinations exercise each
+admitted driver and both certified servers without another Python matrix.
+Local Windows runs do not establish hosted Windows/MySQL coverage.
+
+Other CPU architectures, free-threaded builds, macOS, MySQL 8.0/9.x, MariaDB,
+Aurora, TiDB, HeatWave, replicas, failover, IPv6 and DNS dialing are outside the
+verified boundary. Other 8.4 patches require their own evidence.
 
 Use a canonical numeric IPv4 `address` and a separately verified
 `tls_hostname` from the server certificate. Supply a trusted CA file. CA and
@@ -254,8 +282,11 @@ uv sync --locked --extra dev
 uv run --no-sync python ../../ops/ci/mysql_fixture.py -- uv run --no-sync pytest -m mysql
 ```
 
-The helper uses the digest-pinned MySQL Community **8.4.12** artifact, generated
-credentials and CA/valid/expired certificates. It verifies fixture identity,
+The helper defaults to the digest-pinned MySQL Community **8.4.12** artifact.
+Pass `--server-version 8.4.11` before `--` to select the other verified immutable
+image; arbitrary versions/images are refused. It generates credentials and
+CA/valid/expired certificates, checks the actual exact server version, Community
+identity and nonempty server UUID before tests, verifies fixture identity,
 executes mandatory conformance/security/lifecycle tests, then stops and removes
 only its ownership-verified containers. Database volumes, public certificates,
 non-secret connection receipts and sanitized logs remain for diagnosis; generated

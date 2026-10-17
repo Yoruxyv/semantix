@@ -98,11 +98,12 @@ def test_command_failure_sanitizes_both_streams(
     assert diagnostic["code"] == (None if timeout else 1)
 
 
+@pytest.mark.parametrize("server_version", ["8.4.11", "8.4.12"])
 @pytest.mark.parametrize("lost_ack", [False, True])
 def test_start_uses_environment_and_tracks_uncertain_create(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lost_ack: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lost_ack: bool, server_version: str
 ) -> None:
-    owned = fixture.Fixture(tmp_path)
+    owned = fixture.Fixture(tmp_path, server_version)
     owned.prepared = True
     calls: list[tuple[list[str], dict[str, object]]] = []
 
@@ -111,6 +112,7 @@ def test_start_uses_environment_and_tracks_uncertain_create(
         assert owned.password not in " ".join(args)
         assert "--env-file" not in args
         if args[:2] == ["docker", "create"]:
+            assert fixture.IMAGES[server_version] in args
             assert args[args.index("--env") + 1] == "MYSQL_ROOT_PASSWORD"
             assert kwargs["env"]["MYSQL_ROOT_PASSWORD"] == owned.password
             assert (
@@ -126,7 +128,8 @@ def test_start_uses_environment_and_tracks_uncertain_create(
     database = MagicMock()
     database.cursor.return_value.__enter__.return_value.fetchone.return_value = (
         "server-uuid",
-        "8.4.12",
+        server_version,
+        "MySQL Community Server - GPL",
     )
     monkeypatch.setattr(fixture, "connection", lambda config, credential: database)
     if lost_ack:
@@ -135,17 +138,21 @@ def test_start_uses_environment_and_tracks_uncertain_create(
     else:
         receipt = owned.start("valid")
         assert "password" not in receipt
-        assert receipt["server_version"] == "8.4.12"
+        assert receipt["server_version"] == server_version
         database.close.assert_called_once()
     assert len([args for args, _ in calls if args[:2] == ["docker", "create"]]) == 1
     assert not list(tmp_path.glob("*.env"))
 
 
+@pytest.mark.parametrize("server_version", ["8.4.11", "8.4.12"])
 @pytest.mark.parametrize("failure", [None, "owner", "image", "stop"])
 def test_close_preserves_diagnostics_volumes_and_ownership(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str | None
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str | None,
+    server_version: str,
 ) -> None:
-    owned = fixture.Fixture(tmp_path)
+    owned = fixture.Fixture(tmp_path, server_version)
     owned.tls.mkdir()
     for filename in ("ca-key.pem", "untrusted-ca-key.pem", "server-key.pem", "ca.pem"):
         (owned.tls / filename).write_text("disposable test marker")
@@ -168,7 +175,7 @@ def test_close_preserves_diagnostics_volumes_and_ownership(
                         "Config": {
                             "Image": "foreign-image"
                             if failure == "image"
-                            else fixture.IMAGE,
+                            else fixture.IMAGES[server_version],
                             "Labels": {
                                 "semantix.fixture": "foreign"
                                 if failure == "owner"
@@ -183,6 +190,7 @@ def test_close_preserves_diagnostics_volumes_and_ownership(
                 ]
             )
         if args[:3] == ["docker", "image", "inspect"]:
+            assert args[3] == fixture.IMAGES[server_version]
             return "image-id"
         if args[:2] == ["docker", "stop"] and failure == "stop":
             raise RuntimeError("stop failed")
@@ -255,7 +263,7 @@ def test_child_receipt_environment_and_persisted_output(
 ) -> None:
     owned = fixture.Fixture(tmp_path)
     monkeypatch.setattr(fixture, "private_directory", lambda: tmp_path)
-    monkeypatch.setattr(fixture, "Fixture", lambda root: owned)
+    monkeypatch.setattr(fixture, "Fixture", lambda root, server_version: owned)
     monkeypatch.setattr(
         owned, "start", lambda kind: {"port": 33060, "server_version": "8.4.12"}
     )
@@ -293,7 +301,7 @@ def test_partial_startup_and_cleanup_errors_both_remain_visible(
 ) -> None:
     owned = fixture.Fixture(tmp_path)
     monkeypatch.setattr(fixture, "private_directory", lambda: tmp_path)
-    monkeypatch.setattr(fixture, "Fixture", lambda root: owned)
+    monkeypatch.setattr(fixture, "Fixture", lambda root, server_version: owned)
     monkeypatch.setattr(sys, "argv", ["fixture", "--", "test-child"])
     startup = RuntimeError("provisioning failed")
     cleanup = RuntimeError("cleanup failed")
@@ -310,7 +318,7 @@ def test_failed_certificate_preparation_still_disposes_keys(
 ) -> None:
     owned = fixture.Fixture(tmp_path)
     monkeypatch.setattr(fixture, "private_directory", lambda: tmp_path)
-    monkeypatch.setattr(fixture, "Fixture", lambda root: owned)
+    monkeypatch.setattr(fixture, "Fixture", lambda root, server_version: owned)
     monkeypatch.setattr(sys, "argv", ["fixture", "--", "test-child"])
 
     def failed_certificates(root: Path) -> Path:
@@ -567,11 +575,14 @@ def test_bounded_permission_diagnostics_keep_final_error_after_pull_progress(
     assert len(public) <= 4107
 
 
+@pytest.mark.parametrize("server_version", ["8.4.11", "8.4.12"])
 @pytest.mark.parametrize("failure", [False, True])
 def test_explicit_image_acquisition_precedes_fixture_resources_without_retry(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: bool, server_version: str
 ) -> None:
-    monkeypatch.setattr(sys, "argv", ["fixture", "--pull-image"])
+    monkeypatch.setattr(
+        sys, "argv", ["fixture", "--server-version", server_version, "--pull-image"]
+    )
     monkeypatch.setattr(fixture, "private_directory", lambda: tmp_path)
     initialize = MagicMock(side_effect=AssertionError("must not construct SQL fixture"))
     monkeypatch.setattr(fixture, "Fixture", initialize)
@@ -587,7 +598,7 @@ def test_explicit_image_acquisition_precedes_fixture_resources_without_retry(
     else:
         assert fixture.main() == 0
     command.assert_called_once_with(
-        ["docker", "pull", fixture.IMAGE],
+        ["docker", "pull", fixture.IMAGES[server_version]],
         cwd=tmp_path,
         phase="Pinned MySQL image acquisition",
         timeout=300,
@@ -607,3 +618,43 @@ def test_image_acquisition_rejects_a_combined_test_command(
         fixture.main()
     assert caught.value.code == 2
     command.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        ("server-uuid", "8.4.11", "MySQL Community Server - GPL"),
+        ("server-uuid", "8.4.12", "foreign server"),
+        ("", "8.4.12", "MySQL Community Server - GPL"),
+    ],
+)
+def test_server_identity_mismatch_fails_without_readiness_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, identity: tuple[str, str, str]
+) -> None:
+    owned = fixture.Fixture(tmp_path)
+    owned.prepared = True
+    monkeypatch.setattr(fixture, "command", MagicMock(return_value="127.0.0.1:33060"))
+    database = MagicMock()
+    database.cursor.return_value.__enter__.return_value.fetchone.return_value = identity
+    connect = MagicMock(return_value=database)
+    monkeypatch.setattr(fixture, "connection", connect)
+    with pytest.raises(RuntimeError, match="identity/version mismatch"):
+        owned.start("valid")
+    connect.assert_called_once()
+    database.close.assert_called_once()
+
+
+def test_unverified_server_argument_rejected_before_fixture_allocation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        sys, "argv", ["fixture", "--server-version", "8.4.13", "--", "child"]
+    )
+    allocate = MagicMock(
+        side_effect=AssertionError("Must not allocate private resources")
+    )
+    monkeypatch.setattr(fixture, "private_directory", allocate)
+    with pytest.raises(SystemExit) as caught:
+        fixture.main()
+    assert caught.value.code == 2
+    allocate.assert_not_called()
