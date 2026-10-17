@@ -119,6 +119,26 @@ def _supported_server_version(value: object) -> bool:
     )
 
 
+def _supported_server_identity(server: dict[str, object]) -> bool:
+    if server.get("server_name") == "valkey":
+        # Valkey's Redis compatibility version is not its product version.
+        return (
+            server.get("valkey_version") == "9.1.2"
+            and server.get("valkey_release_stage") == "ga"
+            and server.get("redis_version") == "7.2.4"
+            and server.get("server_mode") == "standalone"
+            and "redis_mode" not in server
+        )
+    return (
+        server.get("server_name", "redis") == "redis"
+        and "valkey_version" not in server
+        and "valkey_release_stage" not in server
+        and "server_mode" not in server
+        and _supported_server_version(server.get("redis_version"))
+        and server.get("redis_mode") == "standalone"
+    )
+
+
 @dataclass(frozen=True)
 class _Configuration:
     space: EmbeddingSpace
@@ -188,12 +208,13 @@ _INSPECT = _redis_scripts._INSPECT
 
 
 class RedisStore:
-    """A CacheStore binding to three owned keys on a Redis primary.
+    """A CacheStore binding to three owned keys on a Redis or Valkey primary.
 
     Construction borrows the client and does not initialize or adopt keys.
     The supported deployment is a direct writable standalone Redis Open Source
     primary in the supported 7.4/8.2/8.4/8.6/8.8/8.10 release families at
-    verified patch floors, using noeviction; Cluster, Sentinel, replica reads
+    verified patch floors, or exact Valkey 9.1.2, using noeviction;
+    Cluster, Sentinel, replica reads
     and automatic failover are outside this boundary. Operators own persistence,
     backups and stable server time; Redis storage alone is no durability promise.
 
@@ -332,17 +353,15 @@ class RedisStore:
             )
             if (
                 not isinstance(server, dict)
-                or not _supported_server_version(server.get("redis_version"))
-                or server.get("server_name", "redis") != "redis"
-                or "valkey_version" in server
-                or server.get("redis_mode") != "standalone"
+                or not _supported_server_identity(server)
                 or replication.get("role") != "master"
                 or cluster.get("cluster_enabled") != 0
                 or policy.get("maxmemory-policy") != "noeviction"
             ):
                 raise CacheStoreError(
                     "Require Redis 7.4.11+, 8.2.10+, 8.4.7+, 8.6.7+, 8.8.3+ or "
-                    "8.10.2+ within those release families, a direct writable "
+                    "8.10.2+ within those release families, or exact Valkey 9.1.2; "
+                    "a direct writable "
                     "non-cluster primary and noeviction"
                 )
             commands = await execute(

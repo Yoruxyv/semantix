@@ -289,3 +289,44 @@ def test_non_embedded_scopes_reject_optional_skips(
     report = junit(tmp_path / "report.xml", [(node_id, "skipped", reason)])
     with pytest.raises(ValueError, match="Required test skipped"):
         guard.validate(scope, [node_id], report)
+
+
+@pytest.mark.parametrize(
+    "node_id",
+    [
+        "tests/test_redis_scripts.py::test_initialization_accepts_explicit_server_identity[valkey]",
+        "tests/test_redis_faults.py::test_real_suppressed_acknowledgement_never_replays[hit]",
+    ],
+)
+@pytest.mark.parametrize(
+    "outcome", ["passed", "uncollected", "missing", "skipped", "failure", "error"]
+)
+def test_redis_certification_anchors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, node_id: str, outcome: str
+) -> None:
+    assert node_id in guard.REDIS_REQUIRED
+    expected = sorted(guard.REDIS_REQUIRED)
+    report = tmp_path / "redis.xml"
+
+    def invoke(args: list[str], *, plugins: list[guard.Collection]) -> int:
+        plugins[0].expected = [
+            n for n in expected if n != node_id or outcome != "uncollected"
+        ]
+        junit(
+            report,
+            [
+                (
+                    n,
+                    outcome
+                    if n == node_id and outcome in {"skipped", "failure", "error"}
+                    else "",
+                    "synthetic",
+                )
+                for n in plugins[0].expected
+                if n != node_id or outcome != "missing"
+            ],
+        )
+        return 0
+
+    monkeypatch.setattr(guard.pytest, "main", invoke)
+    assert guard.main(["redis", str(report)]) == (0 if outcome == "passed" else 1)

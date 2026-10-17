@@ -5,6 +5,7 @@ import os
 import sys
 from datetime import UTC, datetime
 from importlib import import_module
+from importlib.metadata import version
 from pathlib import Path
 from uuid import uuid4
 
@@ -59,13 +60,25 @@ async def main() -> None:
                     namespace="default",
                     expected_created_at=match.entry.created_at,
                 )
+            async with await RedisStore.connect(
+                url=os.environ["REDIS_TEST_URL"],
+                embedding_space=space,
+                key_prefix=prefix,
+            ) as reopened:
+                await reopened.validate_schema()
+                detail = await reopened.inspect_entry(
+                    value.cache_key, namespaces=("default",)
+                )
+                assert detail is not None and detail.hit_count == 1
+                assert detail.response == value.response
         finally:
             await store._client.delete(*store._config.keys)
     assert semantix_cache.__file__ is not None
     assert "site-packages" in Path(semantix_cache.__file__).parts
     assert "app" not in sys.modules and "fastapi" not in sys.modules
     print(
-        "Installed Redis wheel, explicit schema, persistence and confirmation verified"
+        f"Installed RedisStore wheel ({semantix_cache.__file__}), redis-py {version('redis')}: "
+        "explicit schema, persistence, confirmation and reopen verified"
     )
 
 

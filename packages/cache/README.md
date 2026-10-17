@@ -434,8 +434,8 @@ Optional [Redis storage](https://github.com/Yoruxyv/semantix/blob/main/docs/embe
 uses `semantix_cache.stores.redis.RedisStore` with `[redis]`, direct redis-py
 (7.4.1, 8.0.1 or stable 8.1.x; locks retain 8.1.0),
 asyncio and bounded exact float64 scans. Setup is explicit; supported server
-families and verified patches are listed in the Redis guide. A directly addressed
-writable standalone primary with noeviction is required.
+families and verified patches, plus exact Valkey 9.1.2 through the same RedisStore,
+are listed in the Redis guide. A directly addressed writable standalone primary with noeviction is required.
 See the [source layout](https://github.com/Yoruxyv/semantix/blob/main/packages/cache/src/README.md) for package boundaries.
 
 ## Contributor checks

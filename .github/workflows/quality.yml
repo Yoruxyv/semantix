@@ -644,6 +644,39 @@ jobs:
             "$wheel_python" -c "from importlib.metadata import version; import sys; assert version('redis') == sys.argv[1]; print('Verified wheel redis-py', version('redis'))" "$driver"
             "$wheel_python" -I tests/redis_wheel_smoke.py
           done
+      - name: Certify exact Valkey 9.1.2 through RedisStore
+        timeout-minutes: 4
+        shell: bash
+        env:
+          REDIS_TEST_PRODUCT: valkey
+          REDIS_TEST_VERSION: "9.1.2"
+          REDIS_TEST_URL: redis://127.0.0.1:16381/0
+          REDIS_TEST_CONTAINER: semantix-redis-valkey-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          image="valkey/valkey:9.1.2@sha256:418652cfb58ef879d4978c33553735d7147016032d5aefaa14c828e611eb9dfd"
+          owner="redis-store-valkey-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          cleanup_valkey() {
+            if docker inspect "$REDIS_TEST_CONTAINER" > /dev/null 2>&1; then
+              test "$(docker inspect --format '{{ index .Config.Labels "semantix.disposable" }}' "$REDIS_TEST_CONTAINER")" = "$owner"
+              test "$(docker inspect --format '{{.Config.Image}}' "$REDIS_TEST_CONTAINER")" = "$image"
+              docker rm --force --volumes "$REDIS_TEST_CONTAINER"
+            fi
+          }
+          trap cleanup_valkey EXIT
+          docker run --detach --platform linux/amd64 --name "$REDIS_TEST_CONTAINER" \
+            --label "semantix.disposable=$owner" --memory 512m --cpus 2 \
+            --publish 127.0.0.1:16381:6379 "$image" \
+            valkey-server --appendonly yes --appendfsync always --maxmemory-policy noeviction
+          test "$(docker inspect --format '{{.Architecture}}/{{.Os}}' "$image")" = "amd64/linux"
+          uv run --no-sync python -c "from importlib.metadata import version; assert version('redis') == '8.1.0'"
+          uv run --no-sync python tests/redis_infrastructure_smoke.py --verify-version
+          uv run --no-sync python ../../ops/ci/required_tests.py redis .cache/valkey-9.1.2.xml -- tests/test_redis*.py tests/test_inspection.py -k redis
+          uv run --no-sync python tests/redis_infrastructure_smoke.py
+          uv venv --python .venv/bin/python "$RUNNER_TEMP/valkey-wheel"
+          wheel_python="$RUNNER_TEMP/valkey-wheel/bin/python"
+          uv pip install --python "$wheel_python" "dist/semantix_cache-0.1.0-py3-none-any.whl[redis]" "redis==8.1.0"
+          "$wheel_python" -I -c "from importlib.metadata import version; assert version('redis') == '8.1.0'"
+          "$wheel_python" -I tests/redis_wheel_smoke.py
       - name: Remove only this job's labelled container and volumes
         if: ${{ always() }}
         run: |

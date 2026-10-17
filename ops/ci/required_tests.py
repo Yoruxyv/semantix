@@ -43,6 +43,8 @@ REDIS_REQUIRED = frozenset(
         "tests/test_redis_faults.py::test_real_paused_write_operation_deadline",
         "tests/test_redis_layout.py::test_inspection_leaf_failure_keeps_one_operation_and_borrowed_client[cancel]",
         "tests/test_redis_scripts.py::test_checksum_and_clear_all_composition",
+        "tests/test_redis_scripts.py::test_initialization_accepts_explicit_server_identity[valkey]",
+        "tests/test_redis_faults.py::test_real_suppressed_acknowledgement_never_replays[hit]",
         "tests/test_inspection.py::test_redis_small_page_does_not_decode_unselected_payloads",
     }
 )
