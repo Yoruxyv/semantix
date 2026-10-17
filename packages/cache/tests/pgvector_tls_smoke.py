@@ -188,9 +188,10 @@ async def stalled_negotiation(
         reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         try:
-            assert await reader.read(4096)
+            # Leave handshake bytes unread to exercise fragmented delivery.
+            assert await reader.read(1)
             accepted.set()
-            assert await reader.read() == b""
+            await reader.read()
             disconnected.set()
         finally:
             writer.close()
