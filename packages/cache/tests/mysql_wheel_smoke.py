@@ -9,6 +9,7 @@ import sys
 import threading
 from hashlib import sha256
 from importlib import import_module
+from importlib.metadata import version
 from importlib.resources import files
 from pathlib import Path
 from uuid import uuid4
@@ -33,7 +34,7 @@ async def main() -> None:
         await asyncio.to_thread(Path(os.environ["MYSQL_TEST_CONFIG"]).read_text)
     )
     assert config["fixture_owner"] == "semantix-mysql-phase5"
-    assert config["server_version"] == "8.4.12"
+    assert config["server_version"] in {"8.4.11", "8.4.12"}
     assert "password" not in config
     credential = os.environ["MYSQL_TEST_PASSWORD"]
     name = "smx_wheel_" + uuid4().hex
@@ -55,7 +56,10 @@ async def main() -> None:
         admin.connect(sock=raw)
         with admin.cursor() as cursor:
             cursor.execute("SELECT @@server_uuid,@@version")
-            assert cursor.fetchone() == (config["server_uuid"], "8.4.12")
+            assert cursor.fetchone() == (
+                config["server_uuid"],
+                config["server_version"],
+            )
             cursor.execute(
                 f"CREATE DATABASE `{name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin"
             )
@@ -140,7 +144,8 @@ async def main() -> None:
         for name in ("app", "fastapi", "asyncpg", "redis", "httpx")
     )
     print(
-        "Installed MySQL resources, optional isolation, least-privileged miss/hit and reopen verified"
+        f"Installed MySQL {config['server_version']} / PyMySQL {version('PyMySQL')} "
+        "resources, optional isolation, least-privileged miss/hit and reopen verified"
     )
 
 

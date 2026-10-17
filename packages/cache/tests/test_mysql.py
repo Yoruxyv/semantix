@@ -6,6 +6,7 @@ import traceback
 from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime
 from typing import Any, cast
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import numpy as np
@@ -15,7 +16,8 @@ from examples.store_conformance import SPACE
 from examples.store_conformance.cases import entry
 from semantix_cache import CacheConfigurationError, CacheStoreError, EmbeddingSpace
 from semantix_cache._semantics import nearest_index, normalized_vector
-from semantix_cache.stores._backends.mysql import schema
+from semantix_cache.stores._backends.mysql import schema, worker
+from semantix_cache.stores._backends.mysql.config import Configuration
 from semantix_cache.stores._backends.mysql.format import (
     HEADER,
     MAX_INT,
@@ -28,6 +30,86 @@ from .mysql_helpers import admin, new_database, options, store_factory
 
 __all__ = ["store_factory"]
 pytestmark = pytest.mark.mysql
+
+
+@pytest.mark.parametrize(
+    "driver_version",
+    [
+        "1.2.0",
+        "1.2.4",
+        "1.3.0",
+        "1.2.1.post1",
+        "1.2.2rc1",
+        "1.2.2.dev1",
+        "1.2.3+vendor",
+        "1.2.03",
+        "invalid",
+    ],
+)
+def test_unverified_driver_rejected_before_worker_allocation(
+    monkeypatch: pytest.MonkeyPatch, driver_version: str
+) -> None:
+    monkeypatch.setattr(worker, "version", lambda _: driver_version)
+    executor = MagicMock(side_effect=AssertionError("Must not allocate a worker"))
+    monkeypatch.setattr(worker, "ThreadPoolExecutor", executor)
+    with pytest.raises(CacheConfigurationError, match="verified PyMySQL"):
+        worker.Worker(cast(Configuration, None))
+    executor.assert_not_called()
+
+
+@pytest.mark.parametrize("setting", ["read_only", "super_read_only"])
+async def test_read_only_server_rejected_without_schema_mutation(setting: str) -> None:
+    name = await new_database()
+    config = options(name) | {"embedding_space": SPACE, "default_ttl_seconds": None}
+    await MySQLStore.initialize_schema(**config)
+    before = await asyncio.to_thread(admin, "SHOW TABLES", name=name)
+    assert await asyncio.to_thread(
+        admin, "SELECT @@global.read_only,@@global.super_read_only"
+    ) == [(0, 0)]
+    try:
+        await asyncio.to_thread(
+            admin,
+            f"SET GLOBAL {setting}=ON",
+        )
+        for operation in (MySQLStore.connect, MySQLStore.initialize_schema):
+            with pytest.raises(CacheStoreError, match="single-primary"):
+                await operation(**config)
+    finally:
+        await asyncio.to_thread(admin, "SET GLOBAL super_read_only=OFF")
+        await asyncio.to_thread(admin, "SET GLOBAL read_only=OFF")
+    assert await asyncio.to_thread(admin, "SHOW TABLES", name=name) == before
+    assert not MySQLStore.failed_cleanups()
+
+
+@pytest.mark.parametrize(("column", "value"), [(0, "8.0.45"), (1, "MariaDB Server")])
+async def test_unverified_server_identity_rejected_after_real_connection(
+    mysql_store: MySQLStore,
+    monkeypatch: pytest.MonkeyPatch,
+    column: int,
+    value: str,
+) -> None:
+    original = worker.Job.rows
+    observed = []
+
+    def rows(job: worker.Job, sql: str, parameters: Any = ()) -> Any:
+        result = original(job, sql, parameters)
+        if sql.startswith("SELECT @@version,"):
+            observed.append(result)
+            changed = list(result[0])
+            changed[column] = value
+            return [tuple(changed)]
+        return result
+
+    with monkeypatch.context() as patch:
+        patch.setattr(worker.Job, "rows", rows)
+        with pytest.raises(CacheStoreError, match="single-primary"):
+            await MySQLStore.connect(
+                **(options(mysql_store._config.database) | {"embedding_space": SPACE})
+            )
+    assert len(observed) == 1
+    assert observed[0][0][0] in {"8.4.11", "8.4.12"}
+    assert observed[0][0][1] == "MySQL Community Server - GPL"
+    assert not MySQLStore.failed_cleanups()
 
 
 @pytest.fixture

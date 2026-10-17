@@ -38,7 +38,7 @@ for authorization, search costs and pagination limitations.
 | `SQLiteStore` | Local dedicated WAL file | stdlib sqlite3 with a patched linked runtime | Owns one connection and worker |
 | `PgVectorStore` | PostgreSQL/pgvector | `semantix-cache[pgvector]` adds asyncpg | Borrows `pool=`; `connect()` creates an owned pool |
 | `RedisStore` | Redis primary; operator-managed persistence | `semantix-cache[redis]` adds redis-py | Borrows `client=`; `connect()` creates an owned client/pool |
-| `MySQLStore` | Dedicated MySQL Community 8.4.12 database | `[mysql]` adds pinned PyMySQL 1.2.3 | Owns one connection and worker; explicit setup |
+| `MySQLStore` | Dedicated MySQL Community 8.4.x; verified 8.4.11/8.4.12 | `[mysql]` adds PyMySQL >=1.2.1,<=1.2.3; exact stable versions enforced | Owns one connection and worker; explicit setup |
 | Your `CacheStore` | Your implementation | Your application chooses | Your implementation documents ownership |
 
 MemoryStore is bounded and appropriate for tests, local use and small ephemeral
@@ -68,7 +68,8 @@ exports from `semantix_cache` are unchanged by adding persistent storage.
 See [Redis storage](redis.md) for its supported versions, exact scan,
 explicit setup, TTL/LRU, failure handling and persistence boundary.
 
-See [MySQL storage](mysql.md) for verified TLS, the locked schema verifier,
+See [MySQL storage](mysql.md#verified-compatibility) for tested server/driver/Python/OS
+combinations, verified TLS, the locked schema verifier,
 explicit least-privileged setup, exact-search costs and failed-construction
 recovery. MySQLStore is embedded-only and has no optional inspection/clear_all API.
 
