@@ -19,16 +19,21 @@ OPTIONAL_SKIPS = {
     "tests/test_store_conformance.py::TestCompanyStore::test_optional_cache_timeout_propagation": "Backend lookup has no controllable asynchronous blocking boundary",
 }
 # Preserve backend presence and shared-path collection without filename prefixes.
-EMBEDDED_REQUIRED = frozenset(
+POSTGRES_REQUIRED = frozenset(
     {
         "tests/test_pgvector.py::test_owned_pool_persistence_no_implicit_ddl_and_double_close",
         "tests/test_pgvector_faults.py::test_disconnect_at_commit_never_replays_or_closes_other_pool_users[False-False]",
         "tests/test_pgvector_faults.py::test_release_finishes_before_deadline_or_cancellation_returns[True-True]",
+        "tests/test_store_conformance.py::TestBuiltInStores::test_empty_exact_similar_and_threshold[pgvector]",
+        "tests/test_coalescing.py::test_postgresql_confirmation_ownership_and_pool_drain",
+        "tests/test_inspection.py::test_native_ttl_and_clear_all_are_separate_mutations[pgvector]",
+    }
+)
+EMBEDDED_REQUIRED = POSTGRES_REQUIRED | frozenset(
+    {
         "tests/test_redis.py::test_fresh_idempotent_concurrent_schema",
         "tests/test_sqlite.py::test_revision_lru_and_ttl_survive_reopen",
-        "tests/test_store_conformance.py::TestBuiltInStores::test_empty_exact_similar_and_threshold[pgvector]",
         "tests/test_inspection.py::test_redis_small_page_does_not_decode_unselected_payloads",
-        "tests/test_coalescing.py::test_postgresql_confirmation_ownership_and_pool_drain",
     }
 )
 REDIS_REQUIRED = frozenset(
@@ -103,7 +108,7 @@ def validate(scope: str, expected: Sequence[str], report: Path) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("scope", choices=("embedded", "redis", "sdk"))
+    parser.add_argument("scope", choices=("embedded", "postgresql", "redis", "sdk"))
     parser.add_argument("report", type=Path)
     parser.add_argument("pytest_args", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
@@ -121,13 +126,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             return int(code)
         if collection.skipped:
             raise ValueError(f"Test collection skipped: {sorted(collection.skipped)}")
-        anchors = (
-            EMBEDDED_REQUIRED
-            if args.scope == "embedded"
-            else REDIS_REQUIRED
-            if args.scope == "redis"
-            else frozenset()
-        )
+        anchors = {
+            "embedded": EMBEDDED_REQUIRED,
+            "postgresql": POSTGRES_REQUIRED,
+            "redis": REDIS_REQUIRED,
+        }.get(args.scope, frozenset())
         if not set(collection.expected) >= anchors:
             raise ValueError(
                 f"{args.scope.title()} integration cases not collected: {sorted(anchors - set(collection.expected))}"

@@ -297,12 +297,92 @@ jobs:
             "$wheel_python" -c "import sys; from semantix_cache import MemoryStore; import semantix_cache.adapters; assert 'httpx' not in sys.modules"
             "$wheel_python" tests/providers_wheel_smoke.py
           done
-          "$wheel_python" -m pip install --disable-pip-version-check "dist/semantix_cache-0.1.0-py3-none-any.whl[pgvector]"
+          "$wheel_python" -m pip install --disable-pip-version-check "dist/semantix_cache-0.1.0-py3-none-any.whl[pgvector]" "asyncpg==0.31.0"
+          "$wheel_python" -c "import asyncpg; assert asyncpg.__version__ == '0.31.0'"
           "$wheel_python" tests/pgvector_wheel_smoke.py
           "$wheel_python" -m pip install --disable-pip-version-check "dist/semantix_cache-0.1.0-py3-none-any.whl[redis]"
           "$wheel_python" tests/redis_wheel_smoke.py
           "$wheel_python" -m pip install --disable-pip-version-check ../client
           "$wheel_python" -c "import sys; import semantix_client; assert 'semantix_cache' not in sys.modules; import semantix_cache; assert semantix_client.CachePolicy is not semantix_cache.CachePolicy"
+      - name: Certify exact asyncpg 0.32.0 at Python boundaries
+        if: matrix.python-version == '3.11' || matrix.python-version == '3.14'
+        timeout-minutes: 4
+        shell: bash
+        env:
+          EXPECTED_POSTGRES_MAJOR: ${{ matrix.postgres-major }}
+          EXPECTED_PGVECTOR_VERSION: ${{ matrix.pgvector-version }}
+        run: |
+          target="$RUNNER_TEMP/asyncpg-032"
+          mkdir -p "$target"
+          cp .coverage "$target/baseline.coverage"
+          uv export --locked --extra dev --no-emit-project --no-hashes --no-annotate |
+            sed -e 's/^asyncpg==0.31.0$/asyncpg==0.32.0/' \
+                -e 's/^asyncpg-stubs==0.31.3$/asyncpg-stubs==0.32.0/' > "$target/requirements.txt"
+          uv venv --python .venv/bin/python "$target/driver"
+          driver_python="$target/driver/bin/python"
+          uv pip install --python "$driver_python" -r "$target/requirements.txt" --editable '.[pgvector]'
+          "$driver_python" - <<'PY'
+          import asyncio
+          import os
+          from importlib.metadata import version
+          import asyncpg
+          assert version("asyncpg") == version("asyncpg-stubs") == "0.32.0"
+          async def verify():
+              connection = await asyncpg.connect(os.environ["PGVECTOR_TEST_DATABASE_URL"], timeout=10, command_timeout=10)
+              try:
+                  major = int(await connection.fetchval("SHOW server_version_num")) // 10000
+                  vector = await connection.fetchval("SELECT extversion FROM pg_extension WHERE extname='vector'")
+                  assert str(major) == os.environ["EXPECTED_POSTGRES_MAJOR"]
+                  assert vector == os.environ["EXPECTED_PGVECTOR_VERSION"]
+                  print(f"Verified candidate asyncpg 0.32.0, PostgreSQL {major}, pgvector {vector}")
+              finally:
+                  await connection.close(timeout=10)
+          asyncio.run(verify())
+          PY
+          "$driver_python" -m mypy src examples
+          "$driver_python" ../../ops/ci/required_tests.py postgresql "$target/tests.xml" -- -m pgvector --no-cov
+          uv venv --python .venv/bin/python "$target/wheel"
+          wheel_python="$target/wheel/bin/python"
+          uv pip install --python "$wheel_python" 'dist/semantix_cache-0.1.0-py3-none-any.whl[pgvector]' 'asyncpg==0.32.0'
+          "$wheel_python" -c "import asyncpg; assert asyncpg.__version__ == '0.32.0'"
+          "$wheel_python" -I tests/pgvector_wheel_smoke.py
+          cmp .coverage "$target/baseline.coverage"
+      - name: Verify real TLS and direct ALPN on PostgreSQL 18
+        if: matrix.python-version == '3.14'
+        timeout-minutes: 4
+        shell: bash
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          tls_dir="$RUNNER_TEMP/asyncpg-tls"
+          umask 077
+          mkdir -p "$tls_dir"
+          trap 'rm -f "$tls_dir/ca.key" "$tls_dir/bad-ca.key" "$tls_dir/server.key"; docker exec "$POSTGRES_CONTAINER" rm -f /tmp/semantix-server.key' EXIT
+          for authority in ca bad-ca; do
+            openssl req -x509 -newkey rsa:2048 -noenc -days 1 -subj "/CN=semantix-$authority" \
+              -addext 'basicConstraints=critical,CA:TRUE' -addext 'keyUsage=critical,keyCertSign,cRLSign' \
+              -keyout "$tls_dir/$authority.key" -out "$tls_dir/$authority.crt"
+          done
+          openssl req -newkey rsa:2048 -noenc -subj /CN=localhost -keyout "$tls_dir/server.key" -out "$tls_dir/server.csr"
+          printf '%s\n' 'subjectAltName=DNS:localhost' 'extendedKeyUsage=serverAuth' \
+            'keyUsage=critical,digitalSignature,keyEncipherment' 'basicConstraints=critical,CA:FALSE' > "$tls_dir/extensions"
+          openssl x509 -req -days 1 -in "$tls_dir/server.csr" -CA "$tls_dir/ca.crt" -CAkey "$tls_dir/ca.key" \
+            -CAcreateserial -extfile "$tls_dir/extensions" -out "$tls_dir/server.crt"
+          docker cp "$tls_dir/server.key" "$POSTGRES_CONTAINER:/tmp/semantix-server.key"
+          docker cp "$tls_dir/server.crt" "$POSTGRES_CONTAINER:/tmp/semantix-server.crt"
+          docker exec "$POSTGRES_CONTAINER" chown postgres:postgres /tmp/semantix-server.key /tmp/semantix-server.crt
+          docker exec "$POSTGRES_CONTAINER" chmod 600 /tmp/semantix-server.key
+          for setting in "ssl_cert_file='/tmp/semantix-server.crt'" "ssl_key_file='/tmp/semantix-server.key'" "ssl='on'"; do
+            docker exec "$POSTGRES_CONTAINER" psql -U postgres -d semantix_embedded_test -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET $setting"
+          done
+          docker exec "$POSTGRES_CONTAINER" psql -U postgres -d semantix_embedded_test -v ON_ERROR_STOP=1 -c 'SELECT pg_reload_conf()'
+          export TLS_CA="$tls_dir/ca.crt" TLS_BAD_CA="$tls_dir/bad-ca.crt"
+          EXPECTED_ASYNCPG_DRIVER=0.31.0 uv run --no-sync python tests/pgvector_tls_smoke.py
+          EXPECTED_ASYNCPG_DRIVER=0.32.0 "$RUNNER_TEMP/asyncpg-032/driver/bin/python" tests/pgvector_tls_smoke.py
+          export PGVECTOR_TEST_DATABASE_URL="${PGVECTOR_TEST_DATABASE_URL/127.0.0.1/localhost}?sslmode=verify-full&sslrootcert=$TLS_CA"
+          "$RUNNER_TEMP/semantix-embedded-wheel/bin/python" -I tests/pgvector_wheel_smoke.py
+          "$RUNNER_TEMP/asyncpg-032/wheel/bin/python" -I tests/pgvector_wheel_smoke.py
+          cmp .coverage "$RUNNER_TEMP/asyncpg-032/baseline.coverage"
 
   sqlite-windows:
     name: SQLite Windows (Python ${{ matrix.python-version }})

@@ -40,14 +40,14 @@ def junit(path: Path, cases: list[tuple[str, str, str]]) -> Path:
     return path
 
 
-@pytest.mark.parametrize("scope", ["embedded", "redis"])
+@pytest.mark.parametrize("scope", ["embedded", "postgresql", "redis"])
 def test_required_shared_case_passes(tmp_path: Path, scope: str) -> None:
     report = junit(tmp_path / "report.xml", [(REQUIRED, "", "")])
     guard.validate(scope, [REQUIRED], report)
 
 
 @pytest.mark.parametrize("outcome", ["skipped", "failure", "error"])
-@pytest.mark.parametrize("scope", ["embedded", "redis"])
+@pytest.mark.parametrize("scope", ["embedded", "postgresql", "redis"])
 def test_required_outcomes_rejected(tmp_path: Path, outcome: str, scope: str) -> None:
     report = junit(tmp_path / "report.xml", [(REQUIRED, outcome, "unavailable")])
     with pytest.raises(ValueError, match="Required test"):
@@ -201,7 +201,7 @@ def test_sdk_runner_rejects_uncollected_expected_cases(tmp_path: Path) -> None:
     assert "SDK integration cases not collected" in result.stderr
 
 
-@pytest.mark.parametrize("scope", ["embedded", "redis"])
+@pytest.mark.parametrize("scope", ["embedded", "postgresql", "redis"])
 def test_runner_rejects_missing_owned_paths(tmp_path: Path, scope: str) -> None:
     (tmp_path / "test_other.py").write_text(
         "def test_other(): pass\n", encoding="utf-8"
@@ -282,9 +282,10 @@ def test_actual_dependency_review_gate(event: str, result: str, accepted: bool) 
 
 
 @pytest.mark.parametrize(("node_id", "reason"), list(guard.OPTIONAL_SKIPS.items()))
-def test_redis_rejects_embedded_optional_skips(
-    tmp_path: Path, node_id: str, reason: str
+@pytest.mark.parametrize("scope", ["postgresql", "redis"])
+def test_non_embedded_scopes_reject_optional_skips(
+    tmp_path: Path, node_id: str, reason: str, scope: str
 ) -> None:
     report = junit(tmp_path / "report.xml", [(node_id, "skipped", reason)])
     with pytest.raises(ValueError, match="Required test skipped"):
-        guard.validate("redis", [node_id], report)
+        guard.validate(scope, [node_id], report)
