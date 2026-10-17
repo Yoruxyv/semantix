@@ -25,8 +25,9 @@ class SQLiteStore:
     borrows this store. Namespace partitioning is not authorization. Every hit
     writes under SQLite's file-wide writer lock; no business operation is retried.
 
-    Requires thread-capable SQLite >=3.51.3 except withdrawn 3.52.0. Python's linked
-    runtime matters, not just its version. No additional package extra is needed.
+    Requires thread-capable SQLite >=3.51.3 except withdrawn 3.52.0, or the exact
+    upstream WAL-patched 3.44.6/3.50.7 backports. The linked library and its trusted
+    build provenance matter, not Python's version. No package extra is needed.
     Capacity is 1-5,000 (default 500), dimensions 1-16,000, with capacity*D*8 <=64MiB.
     Total RSS exceeds the vector bound. Only owned ordinary files are supported.
     """

@@ -91,11 +91,42 @@ miss → generation → write → confirmed hit, closes the store, and verifies 
 after reopening its disposable file. It exits silently on success. Its embeddings
 verify integration behavior, not semantic understanding. No provider calls occur.
 
-SQLiteStore requires thread-capable SQLite **>=3.51.3, excluding withdrawn 3.52.0**.
-This gate addresses the documented [WAL-reset corruption bug](https://sqlite.org/wal.html#walreset).
-Named older backports (3.44.6 and 3.50.7) and vendor-specific backports remain
-unsupported until tested. A supported Python version alone is insufficient; an
-older linked runtime raises `CacheConfigurationError` before file access. A Python
+SQLiteStore accepts thread-capable SQLite **>=3.51.3, excluding withdrawn 3.52.0**,
+plus exactly **3.44.6 and 3.50.7** from their upstream WAL-patched sources.
+Prefer a current maintained release in the normal range for new deployments;
+the two older versions are compatibility options. All other versions below 3.51.3
+remain rejected, including 3.50.4 and 3.51.2. Thread-disabled builds are rejected
+regardless of version.
+
+The [WAL-reset advisory](https://sqlite.org/wal.html#walreset) identifies these two
+upstream backports. Required Linux CI builds them sequentially from full check-in
+identities, verifies archive SHA-256, source VERSION and manifest identity, then
+asserts the actual linked version, source ID and thread capability. Each runs the
+complete SQLite schema/conformance, fault and multiprocessing suites and an
+independent installed-wheel consumer.
+
+| SQLite | Verified environment | Verified source |
+| --- | --- | --- |
+| 3.44.6 | Linux x86_64, CPython 3.14.7, threadsafety 3 | [863c171b76cd36e0](https://sqlite.org/src/info/863c171b76cd36e0c71662d4a50d84da531cc7fbead893d02459577febdf6396) |
+| 3.50.7 | Linux x86_64, CPython 3.14.7, threadsafety 3 | [c7facf7ac58d2cda](https://sqlite.org/src/info/c7facf7ac58d2cdac619a2da838c5fd5c5270f52b3458c7881b5a4fca1ca4791) |
+| 3.51.3 | Linux x86_64, stock dynamically linked CPython 3.14 in required CI | Official amalgamation, verified source checksum |
+
+The immutable archive hashes and build commands are in the existing
+[SQLite Linux CI job](../../.github/workflows/quality.yml). Windows separately
+retains managed CPython 3.11–3.14 conformance and installed-wheel checks.
+The two older backports have not been certified on Windows, macOS or other
+architectures, nor with arbitrary compiler options or vendor modifications.
+
+The runtime gate checks the linked version tuple and thread capability; it
+**does not authenticate a binary or prove its patch contents**. A binary merely
+reporting one of these version numbers is not independently verified evidence.
+Use a trusted upstream build or validate the vendor's source and WAL fix
+provenance. Other vendor backports are not automatically admitted. The same
+provenance limitation applies to the normal accepted range.
+
+A supported Python version alone is insufficient, and upgrading Python package
+dependencies does not upgrade its linked SQLite library. An ineligible runtime
+raises `CacheConfigurationError` before path inspection or file creation. A Python
 build without sqlite3 gives an actionable import error for this adapter. Core,
 MemoryStore, RedisStore and PgVectorStore imports do not load SQLite.
 

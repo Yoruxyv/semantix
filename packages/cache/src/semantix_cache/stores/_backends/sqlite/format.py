@@ -58,14 +58,16 @@ def safe(error: SemantixCacheError) -> NoReturn:
 
 
 def runtime_gate() -> None:
-    # Named old backports are deferred until exercised, rather than guessed from vendor strings.
+    # Upstream's WAL-reset fixes also exist in these two exercised backports.
+    version = sqlite3.sqlite_version_info
     if (
         sqlite3.threadsafety == 0
-        or sqlite3.sqlite_version_info < (3, 51, 3)
-        or sqlite3.sqlite_version_info == (3, 52, 0)
+        or (version < (3, 51, 3) and version not in ((3, 44, 6), (3, 50, 7)))
+        or version == (3, 52, 0)
     ):
         raise CacheConfigurationError(
-            "SQLiteStore requires thread-capable SQLite >=3.51.3, excluding withdrawn 3.52.0; "
+            "SQLiteStore requires thread-capable SQLite >=3.51.3, excluding withdrawn 3.52.0, "
+            "or WAL-patched upstream 3.44.6/3.50.7; "
             "use a supported Python runtime or another store"
         )
 

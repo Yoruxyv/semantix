@@ -46,8 +46,13 @@ sqlite_store = sqlite_helpers.sqlite_store
         ((3, 51, 2), 3),
         ((3, 52, 0), 3),
         ((3, 53, 1), 0),
-        ((3, 44, 6), 3),
-        ((3, 50, 7), 3),
+        ((3, 44, 5), 3),
+        ((3, 44, 7), 3),
+        ((3, 50, 6), 3),
+        ((3, 50, 8), 3),
+        ((3, 44, 6), 0),
+        ((3, 50, 7), 0),
+        ((3, 51, 3), 0),
     ],
 )
 async def test_runtime_gate_before_file_access(
@@ -59,9 +64,32 @@ async def test_runtime_gate_before_file_access(
     monkeypatch.setattr(sqlite3, "sqlite_version_info", version)
     monkeypatch.setattr(sqlite3, "threadsafety", threads)
     path = tmp_path / "absent.db"
+    monkeypatch.setattr(
+        "semantix_cache.stores._backends.sqlite.format.checked_path",
+        lambda _: pytest.fail("Runtime validation must precede path inspection"),
+    )
     with pytest.raises(CacheConfigurationError, match="thread-capable"):
         await SQLiteStore.initialize_schema(path, embedding_space=SPACE)
+    with pytest.raises(CacheConfigurationError, match="thread-capable"):
+        await SQLiteStore.connect(path, embedding_space=SPACE)
     assert not path.exists()
+
+
+@pytest.mark.parametrize("version", [(3, 44, 6), (3, 50, 7), (3, 51, 3), (3, 53, 1)])
+@pytest.mark.parametrize("threads", [1, 3])
+async def test_supported_runtime_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    version: tuple[int, int, int],
+    threads: int,
+) -> None:
+    monkeypatch.setattr(sqlite3, "sqlite_version_info", version)
+    monkeypatch.setattr(sqlite3, "threadsafety", threads)
+    path = tmp_path / "supported.db"
+    await SQLiteStore.initialize_schema(path, embedding_space=SPACE)
+    assert path.is_file()
+    async with await SQLiteStore.connect(path, embedding_space=SPACE) as store:
+        assert await store.find_nearest((1, 0), namespace="default") is None
 
 
 async def test_missing_sqlite_does_not_break_memory() -> None:

@@ -138,9 +138,11 @@ process memory; recreating it loses the cache. It is not persistent storage.
 
 Use `from semantix_cache.stores.sqlite import SQLiteStore` for a dedicated local
 file without a database service or additional dependency. It requires
-thread-capable **linked SQLite >=3.51.3, except withdrawn 3.52.0**; Python's version
-alone does not establish this. From this directory, the credential-free example
-reuses the integration flow above and verifies persistence after closing/reopening:
+thread-capable **linked SQLite >=3.51.3, except withdrawn 3.52.0**, or the exact
+upstream WAL-patched **3.44.6 / 3.50.7** backports. Prefer a current maintained
+release in the normal range for new deployments. Python's version alone does not
+establish eligibility or binary provenance. From this directory, the credential-free
+example reuses the integration flow above and verifies persistence after closing/reopening:
 
 ~~~text
 uv run --no-sync python -m examples.sqlite_cache
