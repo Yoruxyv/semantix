@@ -12,9 +12,11 @@ from uuid import uuid4
 import numpy as np
 import pytest
 from numpy.typing import NDArray
-from redis.asyncio import Redis
+from redis.asyncio import ConnectionPool, Redis
+from redis.asyncio.connection import Connection
 from redis.asyncio.retry import Retry
 from redis.backoff import NoBackoff
+from redis.retry import Retry as SyncRetry
 
 from examples.store_conformance import SPACE as CONFORMANCE_SPACE
 from examples.store_conformance import (
@@ -30,6 +32,7 @@ from semantix_cache import (
     EmbeddingSpace,
 )
 from semantix_cache.stores import redis as redis_module
+from semantix_cache.stores._backends.redis import config as redis_config
 from semantix_cache.stores.redis import RedisStore, _datetime, _micros
 
 SPACE = EmbeddingSpace(identity="redis-test-v1", dimensions=2)
@@ -108,6 +111,16 @@ def test_configuration(kwargs: dict[str, object]) -> None:
         {"retry": Retry(NoBackoff(), 1)},
         {"socket_timeout": None},
         {"parser_class": object},
+        {"socket_timeout": 0},
+        {"socket_timeout": float("inf")},
+        {"socket_timeout": float("nan")},
+        {"socket_connect_timeout": None},
+        {"socket_connect_timeout": 0},
+        {"socket_connect_timeout": float("inf")},
+        {"socket_connect_timeout": float("nan")},
+        {"retry": SyncRetry(NoBackoff(), 0)},
+        {"retry": None},
+        {"redis_connect_func": object()},
     ],
 )
 def test_borrowed_policy(kwargs: dict[str, object]) -> None:
@@ -121,6 +134,87 @@ def test_borrowed_policy(kwargs: dict[str, object]) -> None:
     active.connection_pool.connection_kwargs.update(kwargs)
     with pytest.raises(CacheConfigurationError):
         RedisStore(client=active, embedding_space=SPACE)
+
+
+def test_redis_policy_checks_actual_pool_options(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    active = client()
+    claimed = active.connection_pool.connection_kwargs.copy()
+    active.connection_pool.connection_kwargs["protocol"] = 3
+    monkeypatch.setattr(active, "get_connection_kwargs", lambda: claimed)
+    with pytest.raises(CacheConfigurationError):
+        RedisStore(client=active, embedding_space=SPACE)
+
+
+@pytest.mark.parametrize("driver_version", ["7.4.1", "8.0.1", "8.1.0", "8.1.1"])
+def test_supported_redis_driver_policy(
+    monkeypatch: pytest.MonkeyPatch, driver_version: str
+) -> None:
+    monkeypatch.setattr(redis_config, "version", lambda _: driver_version)
+    redis_config._client(client())
+
+
+@pytest.mark.parametrize(
+    "driver_version",
+    [
+        "7.4.0",
+        "7.4.2",
+        "7.5.0",
+        "8.0.0",
+        "8.0.2",
+        "8.2.0",
+        "9.0.0",
+        "8.1.0rc1",
+        "8.1.0.post1",
+        "8.1.0.dev1",
+        "8.1.0+vendor",
+        "8.1.00",
+        "8.1.\u0661",
+        "invalid",
+    ],
+)
+def test_unsupported_redis_driver_rejected_before_io(
+    monkeypatch: pytest.MonkeyPatch, driver_version: str
+) -> None:
+    monkeypatch.setattr(redis_config, "version", lambda _: driver_version)
+    with pytest.raises(CacheConfigurationError, match="supported redis-py"):
+        RedisStore(client=client(), embedding_space=SPACE)
+
+
+@pytest.mark.parametrize("deadline", ["socket_timeout", "socket_connect_timeout"])
+def test_missing_redis_socket_deadline(deadline: str) -> None:
+    active = client()
+    del active.connection_pool.connection_kwargs[deadline]
+    with pytest.raises(CacheConfigurationError):
+        RedisStore(client=active, embedding_space=SPACE)
+
+
+@pytest.mark.parametrize("kind", ["client", "pool", "connection"])
+async def test_custom_redis_transport_rejected(kind: str) -> None:
+    class CustomClient(Redis):
+        pass
+
+    class CustomPool(ConnectionPool):
+        pass
+
+    class CustomConnection(Connection):
+        pass
+
+    pool = (CustomPool if kind == "pool" else ConnectionPool)(
+        connection_class=CustomConnection if kind == "connection" else Connection,
+        retry=Retry(NoBackoff(), 0),
+        protocol=2,
+        decode_responses=False,
+        socket_timeout=5,
+        socket_connect_timeout=5,
+    )
+    active = (CustomClient if kind == "client" else Redis)(connection_pool=pool)
+    try:
+        with pytest.raises(CacheConfigurationError):
+            RedisStore(client=active, embedding_space=SPACE)
+    finally:
+        await active.aclose(close_connection_pool=True)
 
 
 def test_exact_datetime_roundtrip() -> None:

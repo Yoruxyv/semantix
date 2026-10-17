@@ -18,7 +18,7 @@ Repository = "https://github.com/Yoruxyv/semantix"
 [project.optional-dependencies]
 mysql = ["PyMySQL>=1.2.1,<=1.2.3"]
 pgvector = ["asyncpg>=0.31,<0.32"]
-redis = ["redis>=8.1.0,<8.2"]
+redis = ["redis>=7.4.1,<8.2,!=8.0.0"]
 providers = ["httpx>=0.28.1,<0.29"]
 openai = ["httpx>=0.28.1,<0.29"]
 huggingface = ["httpx>=0.28.1,<0.29"]

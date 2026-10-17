@@ -432,6 +432,7 @@ Schema initialization is explicit; normal cache use performs no DDL. See
 for typed startup errors and application-owned recovery decisions.
 Optional [Redis storage](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/redis.md)
 uses `semantix_cache.stores.redis.RedisStore` with `[redis]`, direct redis-py
+(7.4.1, 8.0.1 or stable 8.1.x; locks retain 8.1.0),
 asyncio and bounded exact float64 scans. Setup is explicit; supported server
 families and verified patches are listed in the Redis guide. A directly addressed
 writable standalone primary with noeviction is required.

@@ -230,8 +230,9 @@ class RedisStore:
 
         Args:
             client: Standard redis.asyncio.Redis and ConnectionPool from redis-py
-                8.1.x, with positive finite socket deadlines, binary responses
-                and async Retry(NoBackoff(), 0). Custom pools/parsers are unsupported.
+                7.4.1, 8.0.1 or 8.1.x, with positive finite socket deadlines,
+                binary responses and async Retry(NoBackoff(), 0).
+                Custom pools/parsers are unsupported.
             embedding_space: Stable identity (at most 1,024 characters, no NUL)
                 and 1-16,000 dimensions for every entry in this binding.
             key_prefix: Application-owned prefix; default semantix_cache. Matches
@@ -356,8 +357,12 @@ class RedisStore:
                 raise CacheStoreError(
                     "Required Redis scripting/field-expiry commands are unavailable"
                 )
-            await initialization_client.eval(
-                _INITIALIZE, 3, *self._config.keys, *self._config.descriptor
+            # redis-py 7.4 shares sync/async Lua annotations; this client is asynchronous.
+            await cast(
+                Awaitable[object],
+                initialization_client.eval(
+                    _INITIALIZE, 3, *self._config.keys, *self._config.descriptor
+                ),
             )
 
     async def validate_schema(self) -> None:
@@ -374,8 +379,11 @@ class RedisStore:
         """
 
         async with self._operation():
-            await self._client.eval_ro(
-                _READ, 3, *self._config.keys, *self._config.descriptor, "validate"
+            await cast(
+                Awaitable[object],
+                self._client.eval_ro(
+                    _READ, 3, *self._config.keys, *self._config.descriptor, "validate"
+                ),
             )
 
     async def _inspect(
@@ -519,8 +527,16 @@ class RedisStore:
             optional mutation does not flush the database or remove unrelated keys.
         """
         async with self._operation():
-            result = await self._client.eval(
-                _CLEAR_ALL, 3, *self._config.keys, *self._config.descriptor, "clear", ""
+            result = await cast(
+                Awaitable[object],
+                self._client.eval(
+                    _CLEAR_ALL,
+                    3,
+                    *self._config.keys,
+                    *self._config.descriptor,
+                    "clear",
+                    "",
+                ),
             )
             if type(result) is not int or result < 0:
                 _raise_safe(CacheStoreError("Invalid Redis clear result"))
@@ -597,17 +613,20 @@ class RedisStore:
                 requested = _micros(entry.created_at)
             except (ValueError, TypeError):
                 _raise_safe(CacheStoreError("Invalid stored entry or TTL"))
-            await self._client.eval(
-                _WRITE,
-                3,
-                *self._config.keys,
-                *self._config.descriptor,
-                "put",
-                entry.namespace + "|" + entry.cache_key,
-                requested,
-                duration,
-                payload,
-                vector.astype("<f8", copy=False).tobytes(),
+            await cast(
+                Awaitable[object],
+                self._client.eval(
+                    _WRITE,
+                    3,
+                    *self._config.keys,
+                    *self._config.descriptor,
+                    "put",
+                    entry.namespace + "|" + entry.cache_key,
+                    requested,
+                    duration,
+                    payload,
+                    vector.astype("<f8", copy=False).tobytes(),
+                ),
             )
 
     async def find_nearest(
@@ -651,13 +670,16 @@ class RedisStore:
             try:
                 # O(N*D) vector transfer/scoring also needs validation and sorting;
                 # choose an indexed backend only when measured workloads justify it.
-                rows = await self._client.eval_ro(
-                    _READ,
-                    3,
-                    *self._config.keys,
-                    *self._config.descriptor,
-                    "snapshot",
-                    namespace,
+                rows = await cast(
+                    Awaitable[object],
+                    self._client.eval_ro(
+                        _READ,
+                        3,
+                        *self._config.keys,
+                        *self._config.descriptor,
+                        "snapshot",
+                        namespace,
+                    ),
                 )
                 worker = asyncio.create_task(
                     asyncio.to_thread(
@@ -683,14 +705,17 @@ class RedisStore:
             if winner is None:
                 return None
             member, revision, similarity = winner
-            raw = await self._client.eval_ro(
-                _READ,
-                3,
-                *self._config.keys,
-                *self._config.descriptor,
-                "winner",
-                member,
-                revision,
+            raw = await cast(
+                Awaitable[object],
+                self._client.eval_ro(
+                    _READ,
+                    3,
+                    *self._config.keys,
+                    *self._config.descriptor,
+                    "winner",
+                    member,
+                    revision,
+                ),
             )
             if raw is None:
                 return None
@@ -730,14 +755,17 @@ class RedisStore:
                 _raise_safe(
                     CacheValidationError("Expected revision must be timezone-aware")
                 )
-            result = await self._client.eval(
-                _WRITE,
-                3,
-                *self._config.keys,
-                *self._config.descriptor,
-                "hit",
-                member,
-                revision,
+            result = await cast(
+                Awaitable[object],
+                self._client.eval(
+                    _WRITE,
+                    3,
+                    *self._config.keys,
+                    *self._config.descriptor,
+                    "hit",
+                    member,
+                    revision,
+                ),
             )
             return bool(result)
 
@@ -755,13 +783,16 @@ class RedisStore:
         async with self._operation():
             member = self._member(cache_key, namespace)
             return bool(
-                await self._client.eval(
-                    _WRITE,
-                    3,
-                    *self._config.keys,
-                    *self._config.descriptor,
-                    "delete",
-                    member,
+                await cast(
+                    Awaitable[object],
+                    self._client.eval(
+                        _WRITE,
+                        3,
+                        *self._config.keys,
+                        *self._config.descriptor,
+                        "delete",
+                        member,
+                    ),
                 )
             )
 
@@ -781,13 +812,16 @@ class RedisStore:
                 namespace = namespace_value(namespace)
             except ValueError:
                 _raise_safe(CacheValidationError("Invalid namespace"))
-            result = await self._client.eval(
-                _WRITE,
-                3,
-                *self._config.keys,
-                *self._config.descriptor,
-                "clear",
-                namespace,
+            result = await cast(
+                Awaitable[object],
+                self._client.eval(
+                    _WRITE,
+                    3,
+                    *self._config.keys,
+                    *self._config.descriptor,
+                    "clear",
+                    namespace,
+                ),
             )
             return cast(int, result)
 
@@ -864,7 +898,7 @@ class RedisStore:
         active: Redis | None = None
         store: RedisStore | None = None
         try:
-            # Pinned redis-py 8.1 leaves **kwargs untyped; RedisStore validates policy.
+            # Verified redis-py releases leave **kwargs untyped; RedisStore validates policy.
             create = cast(Callable[..., Redis], Redis.from_url)  # pyright: ignore[reportUnknownMemberType]
             active = create(
                 url,

@@ -66,10 +66,7 @@ def main(artifact_dir: Path = Path("dist")) -> None:
             path = f"semantix_cache/stores/_backends/postgres/{module}.py"
             assert archive.read(path) == Path("src").joinpath(path).read_bytes()
         redis = [item for item in requirements if 'extra == "redis"' in item]
-        assert len(redis) == 1
-        assert redis[0].startswith("redis")
-        assert ">=8.1.0" in redis[0]
-        assert "<8.2" in redis[0]
+        assert redis == ['redis!=8.0.0,<8.2,>=7.4.1; extra == "redis"']
         assert "semantix_cache/stores/redis.py" in names
         assert (
             archive.read("semantix_cache/stores/_backends/redis/scripts.py")

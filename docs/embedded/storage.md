@@ -65,7 +65,8 @@ from semantix_cache.stores.pgvector import PgVectorStore
 Root imports load neither asyncpg nor provider HTTP dependencies. Imports and
 exports from `semantix_cache` are unchanged by adding persistent storage.
 
-See [Redis storage](redis.md) for its supported versions, exact scan,
+See [Redis storage](redis.md#verified-driver-combinations) for separate server/driver
+certification, resolver policy, exact scan,
 explicit setup, TTL/LRU, failure handling and persistence boundary.
 
 See [MySQL storage](mysql.md#verified-compatibility) for tested server/driver/Python/OS

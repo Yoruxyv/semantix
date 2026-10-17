@@ -542,6 +542,28 @@ jobs:
             cleanup_compatibility
             compatibility_container=""
           done
+      - name: Verify exact alternate Redis drivers and independent wheels
+        shell: bash
+        run: |
+          for driver in 7.4.1 8.0.1; do
+            target="$RUNNER_TEMP/redis-driver-$driver"
+            uv venv --python .venv/bin/python "$target/tests"
+            driver_python="$target/tests/bin/python"
+            # Keep locked test tools and the 8.1.x development baseline unchanged.
+            uv export --locked --extra dev --no-emit-project --no-hashes --no-annotate |
+              sed "s/^redis==8.1.0$/redis==$driver/" > "$target/requirements.txt"
+            uv pip install --python "$driver_python" -r "$target/requirements.txt" --editable '.[redis]'
+            "$driver_python" -c "from importlib.metadata import version; import sys; assert version('redis') == sys.argv[1]; print('Verified redis-py', version('redis'))" "$driver"
+            "$driver_python" tests/redis_infrastructure_smoke.py --verify-version
+            "$driver_python" -m mypy src examples
+            "$driver_python" ../../ops/ci/required_tests.py redis "$target/tests.xml" -- tests/test_redis*.py tests/test_inspection.py -k redis
+            "$driver_python" tests/redis_infrastructure_smoke.py
+            uv venv --python .venv/bin/python "$target/wheel"
+            wheel_python="$target/wheel/bin/python"
+            uv pip install --python "$wheel_python" "dist/semantix_cache-0.1.0-py3-none-any.whl[redis]" "redis==$driver"
+            "$wheel_python" -c "from importlib.metadata import version; import sys; assert version('redis') == sys.argv[1]; print('Verified wheel redis-py', version('redis'))" "$driver"
+            "$wheel_python" -I tests/redis_wheel_smoke.py
+          done
       - name: Remove only this job's labelled container and volumes
         if: ${{ always() }}
         run: |
