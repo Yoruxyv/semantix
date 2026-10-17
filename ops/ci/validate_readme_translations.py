@@ -85,8 +85,9 @@ class Table:
 
 def read_sections(text: str) -> list[Section]:
     try:
-        from markdown_it import MarkdownIt  # noqa: PLC0415 -- unrelated commits need no Markdown dependencies
-        from markdown_it.token import Token  # noqa: PLC0415 -- defer the parser until validation is selected
+        # Unrelated commits need no parser dependencies.
+        from markdown_it import MarkdownIt  # noqa: PLC0415
+        from markdown_it.token import Token  # noqa: PLC0415
     except ModuleNotFoundError as exc:
         raise SystemExit(
             "Install README checker tools in the active Python environment: python -m pip install --require-hashes --only-binary=:all: -r ops/ci/readme-requirements.txt"
