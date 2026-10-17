@@ -27,6 +27,20 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Validate root README translation freshness and regression controls
+        env:
+          README_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
+        run: |
+          python3 -m venv "$RUNNER_TEMP/readme-translations"
+          "$RUNNER_TEMP/readme-translations/bin/python" -m pip install --disable-pip-version-check --only-binary=:all: --require-hashes -r ops/ci/readme-requirements.txt
+          "$RUNNER_TEMP/readme-translations/bin/python" -B -m unittest discover -s ops/ci -p 'test_readme_translations.py'
+          comparison=()
+          if [ -n "$README_BASE_SHA" ]; then
+            git fetch --no-tags --depth=1 origin "$README_BASE_SHA"
+            comparison=(--base "$README_BASE_SHA")
+          fi
+          "$RUNNER_TEMP/readme-translations/bin/python" -B ops/ci/validate_readme_translations.py "${comparison[@]}"
+
       - name: Restore Lychee cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:

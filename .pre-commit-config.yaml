@@ -7,3 +7,10 @@ repos:
         language: system
         pass_filenames: false
         files: '^(packages/cache/benchmarks/reuse_quality/|apps/web/public/benchmarks/reuse-quality-summary\.json$|packages/cache/src/semantix_cache/[^/]+\.py$|packages/cache/benchmarks/(common|__init__)\.py$|packages/cache/(pyproject\.toml|uv\.lock)$)'
+      # The checker selects index changes itself so deletion-only edits are checked.
+      - id: readme-translations
+        name: Validate reviewed root README translations
+        entry: python -B ops/ci/validate_readme_translations.py --staged
+        language: system
+        pass_filenames: false
+        always_run: true

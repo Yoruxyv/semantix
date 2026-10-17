@@ -16,14 +16,11 @@
 </div>
 
 <p align="center">
-  <a href="#install-and-run">Embedded quick start</a> ·
-  <a href="#optional-dashboard--quick-start">Dashboard quick start</a> ·
+  <a href="#install-and-run">Quick start</a> ·
   <a href="#how-it-works">How it works</a> ·
-  <a href="#verified-ai-providers">Providers</a> ·
-  <a href="#storage">Storage</a> ·
   <a href="#compatibility-and-supported-backends">Compatibility</a> ·
-  <a href="#performance">Benchmarks</a> ·
-  <a href="packages/cache/benchmarks/reuse_quality/README.md">Reuse quality</a>
+  <a href="#optional-dashboard--quick-start">Dashboard</a> ·
+  <a href="docs/README.md">Documentation</a>
 </p>
 
 **semantix-cache** is the primary embedded Python library and the intended first

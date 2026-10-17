@@ -1,10 +1,12 @@
+<!-- readme-source-sha256: 78c4cdb5c90ad50c0e1283a6c3e7d72629bb24affc66b38ffa59180c63612901 -->
+
 <div align="center">
 
 <h1>🧠 Semantix</h1>
 
 <p><strong>Semantic caching asinkron untuk Python.</strong></p>
 
-<p>Penyimpanan memory, SQLite, MySQL, PostgreSQL, atau Redis. Alur generation tetap Anda kendalikan.</p>
+<p>Penyimpanan memory, SQLite, MySQL, PostgreSQL, Redis, atau Valkey. Alur generation tetap Anda kendalikan.</p>
 
 <p>
   <img src="https://img.shields.io/badge/Python-3.11%E2%80%933.14-555555?logo=python&amp;logoColor=FFD43B&amp;labelColor=3776AB" alt="Python 3.11–3.14" />
@@ -16,12 +18,11 @@
 </div>
 
 <p align="center">
-  <a href="#instalasi-dan-contoh-awal">Mulai embedded</a> ·
-  <a href="#dashboard-opsional--mulai-cepat">Mulai dashboard</a> ·
+  <a href="#instalasi-dan-contoh-awal">Mulai cepat</a> ·
   <a href="#cara-kerja-embedded">Cara kerja</a> ·
-  <a href="#provider-ai-terverifikasi">Provider</a> ·
-  <a href="#storage-embedded">Storage</a> ·
-  <a href="#performa-embedded">Benchmark</a>
+  <a href="#kompatibilitas-dan-backend-yang-didukung">Kompatibilitas</a> ·
+  <a href="#dashboard-opsional--mulai-cepat">Dashboard</a> ·
+  <a href="README.md">Dokumentasi</a>
 </p>
 
 **semantix-cache** adalah library Python embedded utama dan produk PyPI publik
@@ -121,8 +122,49 @@ Context manager menutup facade dan store; resource lain yang diinjeksi tetap dim
 | Aspek | Ringkasan |
 | --- | --- |
 | **Runtime** | Python asinkron, in-process |
-| **Storage** | MemoryStore, SQLite lokal, MySQL, PostgreSQL/pgvector atau Redis opsional |
+| **Storage** | MemoryStore, SQLite lokal, MySQL, PostgreSQL/pgvector, Redis, atau Valkey opsional |
 | **Generation** | Callable asinkron milik Anda |
+
+## Kompatibilitas dan backend yang didukung
+
+Paket embedded `semantix-cache` mendukung **CPython 3.11–3.14**.
+Tautan backend di bawah menjelaskan persyaratan setup dan rincian sertifikasi lengkap.
+
+| Backend | Server/runtime yang didukung | Driver Python | Ketersediaan |
+| --- | --- | --- | --- |
+| [MemoryStore](../../embedded/storage.md#choose-a-store) | In-process, tidak persisten; tanpa database eksternal | Termasuk dalam core minimal; tanpa driver database | Embedded + server/dashboard opsional |
+| [SQLiteStore](../../embedded/storage.md#sqlite-local-file-persistence) | SQLite yang ditautkan ke Python dan mendukung thread: **>=3.51.3, kecuali 3.52.0 yang ditarik**, atau hanya rilis upstream berpatch WAL **3.44.6 / 3.50.7** | `sqlite3` dari standard library Python; tanpa paket driver tambahan | Hanya embedded |
+| [MySQLStore](../../embedded/mysql.md#verified-compatibility) | Runtime: MySQL Community **8.4.x**; tersertifikasi di CI: **8.4.11 / 8.4.12** | `[mysql]`: PyMySQL versi persis **1.2.1, 1.2.2, atau 1.2.3** | Hanya embedded |
+| [PgVectorStore](../../embedded/storage.md#verified-postgresql-combinations) | Pasangan PostgreSQL / pgvector terverifikasi: **16.15 / 0.8.7**, **17.10 / 0.8.5**, **18.6 / 0.8.7** | `[pgvector]`: `asyncpg>=0.31,<=0.32.0`; tersertifikasi **0.31.0 / 0.32.0** dalam kombinasi CI yang berbeda | Embedded + server/dashboard opsional |
+| [RedisStore — Redis Open Source](../../embedded/redis.md#supported-versions) | Keluarga versi minor yang diterima dan batas patch minimumnya: **7.4.x >=7.4.11; 8.2.x >=8.2.10; 8.4.x >=8.4.7; 8.6.x >=8.6.7; 8.8.x >=8.8.3; 8.10.x >=8.10.2** | `[redis]`: redis-py versi persis **7.4.1**, versi persis **8.0.1**, atau rilis stabil **8.1.x** | Embedded + server/dashboard opsional |
+| [RedisStore — Valkey](../../embedded/redis.md#valkey-912) | Produk server terpisah; versi persis **Valkey 9.1.2** | RedisStore dan extra `[redis]` yang sama; redis-py **8.1.0** terverifikasi, tanpa dependensi khusus Valkey | Embedded tersertifikasi; jalur server `redis` yang sudah ada (lihat di bawah) |
+
+Versi yang **diterima saat runtime** lolos kebijakan kompatibilitas implementasi.
+Kombinasi yang **diverifikasi di CI** adalah target persis yang dijalankan dalam
+pengujian yang dipelihara, sebagaimana tercantum dalam panduan terkait. Penerimaan
+versi tidak berarti setiap kombinasi server, extension, driver, Python, arsitektur,
+OS, atau layanan terkelola telah diuji. Target PostgreSQL di atas **bukan versi
+minimum runtime**.
+
+Lockfile development tetap memakai asyncpg **0.31.0**, PyMySQL **1.2.3**, dan
+redis-py **8.1.0**. Rentang resolver dependensi Redis lebih luas daripada versi yang
+diterima saat runtime; lihat [kebijakan driver](../../embedded/redis.md). redis-py
+**8.0.1** tidak berarti server Redis **8.0** didukung. MySQL 8.0/9.x, MariaDB,
+dan varian terkelola berada di luar batas verifikasi MySQL.
+
+Untuk SQLite, gunakan build upstream tepercaya atau verifikasi asal-usul patch
+WAL dari vendor: nomor versi saja tidak mengautentikasi sebuah binary. Sertifikasi
+Valkey mencakup kombinasi **9.1.2 / redis-py 8.1.0 / Linux x86-64 / CPython 3.14**,
+dengan bukti tambahan dari klien Windows lokal. Rilis, driver, dan platform Valkey
+lain belum tersertifikasi secara individual. Batas TLS, layanan terkelola, dan
+failover tetap mengikuti panduan masing-masing; migrasi file data Redis/Valkey
+belum terverifikasi.
+
+[Server/dashboard opsional](../../guides/platform-storage.md) hanya menerima
+`CACHE_BACKEND=memory`, `pgvector`, atau `redis`; SQLite dan MySQL tetap khusus
+embedded. Valkey memakai jalur `redis` yang sudah ada, tanpa ValkeyStore atau
+selector `valkey` terpisah. Deployment dashboard Valkey secara end-to-end belum
+tersertifikasi secara terpisah.
 
 ## Mengapa Semantix?
 
@@ -284,47 +326,57 @@ kredensial, atau respons provider mentah dalam issue, commit, log, atau fixture.
 
 ## Storage embedded
 
+Mulai dengan MemoryStore untuk state process-local yang terbatas. Lihat
+[tabel kompatibilitas](#kompatibilitas-dan-backend-yang-didukung) untuk versi yang
+diterima, target terverifikasi, serta ketersediaan embedded dibandingkan server.
+
 Untuk persistensi lokal, `semantix_cache.stores.sqlite.SQLiteStore` memiliki file
-khusus dan worker sendiri. Inisialisasi harus eksplisit; `connect()` tidak membuat
-atau mengadopsi file. Diperlukan **SQLite >=3.51.3, kecuali 3.52.0**, yang ditautkan ke Python
-dan mendukung thread; versi Python saja tidak cukup. Tidak ada
-extra SQLite atau dependensi runtime tambahan. Dari `packages/cache`, jalankan:
+khusus dan worker sendiri, dengan setup eksplisit. Periksa runtime yang ditautkan
+ke Python, dukungan thread, serta asal-usul patch WAL; versi Python saja tidak
+cukup. Dari `packages/cache`, jalankan
+`uv run --no-sync python -m examples.sqlite_cache` untuk memeriksa miss/write/hit
+dan pembukaan ulang tanpa kredensial. Lihat
+[setup dan batas SQLite](../../embedded/storage.md#sqlite-local-file-persistence)
+untuk pemindaian float64 lengkap yang dibatasi, kepemilikan file, dan batas pembatalan.
 
-```text
-uv run --no-sync python -m examples.sqlite_cache
-```
-
-Contoh tanpa kredensial ini memakai ulang embedder/generation deterministik,
-memverifikasi miss → generation → write → hit terkonfirmasi, lalu reuse setelah
-file dibuka ulang. Vektornya menguji integrasi, bukan pemahaman semantik.
-Pencarian float64 lengkap dibatasi 5.000 entri, 16.000 dimensi, dan
+`connect()` tidak membuat atau mengadopsi file. Tidak ada extra SQLite atau
+dependensi runtime tambahan. Contoh tersebut memverifikasi integrasi API, bukan
+pemahaman semantik. Pemindaian lengkap dibatasi 5.000 entri, 16.000 dimensi, dan
 `capacity * dimensions * 8 <= 64 MiB`; RSS total lebih besar. Setiap hit menulis
-melalui lock writer seluruh file. Gunakan disk lokal privat, hentikan pekerjaan
-aktif sebelum menutup store, dan baca [setup serta batas SQLite (Inggris)](../../embedded/storage.md#sqlite-local-file-persistence)
-untuk TTL jam host, pembatalan di sekitar COMMIT, pemulihan, dan durabilitas.
-SQLite hanya untuk paket embedded; backend/dashboard dan inspector belum memakainya.
+melalui lock writer seluruh file. Gunakan disk lokal privat dan hentikan pekerjaan
+aktif sebelum menutup store. Panduan yang sama menjelaskan TTL berdasarkan jam
+host, pembatalan di sekitar COMMIT, pemulihan, dan durabilitas.
 
-Opsional `semantix_cache.stores.mysql.MySQLStore` memakai PyMySQL 1.2.3 yang dipin,
-worker milik store, TLS terverifikasi, serta setup eksplisit pada database khusus
-MySQL Community 8.4.12. Pencarian float64 eksak dan kontrak CacheStore tetap sama.
-Pasang extra `[mysql]` dari wheel lokal; baca [setup dan batas MySQL (Inggris)](../../embedded/mysql.md)
-untuk grant runtime minimum, verifier schema dengan akun definer terkunci, deadline,
-ketidakpastian COMMIT, serta pemulihan konstruksi gagal dengan kepemilikan terbatas.
-MySQL hanya untuk paket embedded; backend dashboard tidak ditambahkan. Klien
-Windows/Linux Python 3.11–3.14 telah diuji; workflow baru menargetkan Linux,
-tetapi eksekusi hosted masih menunggu. Kesenjangan cakupan Windows/MySQL hosted
-dijelaskan secara terbuka.
+Opsional `semantix_cache.stores.mysql.MySQLStore` memakai extra `[mysql]` dari wheel
+lokal, worker milik store, TLS terverifikasi, serta setup eksplisit pada database
+khusus MySQL Community 8.4.x. Hosted CI mencakup kedua rilis server tersertifikasi
+dan ketiga versi PyMySQL yang diterima, dalam kombinasi yang tercantum di
+[panduan MySQL](../../embedded/mysql.md#verified-compatibility). Baca panduan itu
+untuk grant dengan izin minimum, verifier schema terkunci, pencarian float64 eksak,
+deadline, ketidakpastian COMMIT, dan pemulihan konstruksi gagal yang dibatasi.
 
-Mulai dengan MemoryStore untuk state process-local yang terbatas. Opsional
-`semantix_cache.stores.pgvector.PgVectorStore` mempertahankan data antarproses/restart
-melalui database PostgreSQL yang dikendalikan aplikasi. Siapkan extension vector dan
-inisialisasi schema cache terpisah yang bertanda secara eksplisit; operasi cache
-normal tidak menjalankan DDL. Runtime memeriksa penanda kepemilikan, versi, dan
-checksum migrasi, bukan fingerprint katalog lengkap. Lindungi perubahan schema di luar migrasi.
+`semantix_cache.stores.redis.RedisStore` memakai `[redis]` untuk Redis Open Source
+atau Valkey versi persis 9.1.2. Keduanya memerlukan inisialisasi binding eksplisit
+dan primary standalone yang dapat ditulis, diakses langsung, serta memakai
+**noeviction**. Operator bertanggung jawab atas persistensi, backup, TLS, dan
+pemulihan; Cluster, Sentinel, pembacaan dari replika, dan failover otomatis tidak
+didukung. Lihat [setup dan batas Redis serta Valkey](../../embedded/redis.md).
 
-Lihat [storage embedded dan database pengguna](../../embedded/storage.md) untuk akses
-runtime dengan izin minimum, kepemilikan pool, migrasi, dan store kustom. pgvector
-menyimpan vektor float32; skor dekat threshold dapat berbeda dari scoring float64 MemoryStore.
+Opsional `semantix_cache.stores.pgvector.PgVectorStore` mempertahankan data
+antarproses/restart melalui database PostgreSQL yang dikendalikan aplikasi. Siapkan
+extension vector dan inisialisasi schema cache terpisah yang bertanda secara
+eksplisit; operasi cache normal tidak menjalankan DDL. Runtime memeriksa penanda
+kepemilikan, versi, dan checksum migrasi, bukan fingerprint katalog lengkap.
+Lindungi perubahan schema di luar migrasi.
+
+`PgVectorStore.connect()` dapat memunculkan error bertipe dan tidak mengembalikan
+store yang dapat digunakan jika gagal. Aplikasi menentukan pemulihan atau keputusan
+menggagalkan startup; lihat [kegagalan koneksi PostgreSQL](../../embedded/storage.md#connections-cancellation-and-failures).
+
+Lihat [storage embedded dan database pengguna](../../embedded/storage.md) untuk
+akses runtime dengan izin minimum, kepemilikan pool, migrasi, dan store kustom.
+pgvector menyimpan vektor float32; skor dekat threshold dapat berbeda dari scoring
+float64 MemoryStore.
 
 ## Titik ekstensi
 
@@ -436,42 +488,62 @@ dan [Compose langsung lanjutan](guides/getting-started.md#lanjutan-docker-compos
 | **Monitor** | Mengirim probe kebijakan dalam namespace dan memeriksa hit, miss, latensi, prompt yang cocok, serta bukti similarity |
 | **Cache Inspector** | Mencari entri, memeriksa metadata, menghapus record, membersihkan namespace dengan aman |
 | **Evaluations** | Mengukur precision, recall, false hit, dan false miss; memeriksa bukti kasus terfilter serta mengekspor hasil run |
-| **Observability** | Melacak metrik proses dan memeriksa diagnostik runtime read-only yang aman |
+| **Observability** | Melacak metrik proses dan memeriksa diagnostik runtime read-only yang aman untuk reproduksibilitas evaluasi |
 
 ### Tur produk
 
 Workbench server opsional memeriksa cache server yang terhubung, menjalankan
 evaluasi berurutan, dan mendiagnosis server tersebut. Workbench tidak mengamati
-cache embedded dari sembarang proses aplikasi. Demo lokal dengan provider
-Hugging Face menampilkan workspace yang sama. Pilih pratinjau untuk melihat
-tangkapan layar berukuran penuh.
+cache embedded dari sembarang proses aplikasi. Demo lokal Hugging Face menampilkan
+workspace yang sama. Tangkapan layar di bawah menunjukkan UI saat ini; pilih gambar
+untuk membuka resolusi aslinya.
 
-Simpan URL `/evaluations?view=runs`, `?view=datasets`, `?view=history`, atau
-`?view=reuse-quality` untuk membuka kembali subview yang dipilih. Reuse quality
-menampilkan [bukti statis library yang ditinjau dan metodologinya](../../../packages/cache/benchmarks/reuse_quality/README.md),
-dengan calibration dan held-out dipisahkan dari run server berurutan. Hasil
+#### Cache Inspector
+
+Cari prompt tersimpan dan periksa usia, jumlah hit, kedaluwarsa, serta metadata
+cache tanpa menampilkan embedding mentah.
+
+[![Cache Inspector menampilkan entri cache contoh yang aman dengan jumlah hit dan TTL](../../assets/screenshots/cache-inspector.png)](../../assets/screenshots/cache-inspector.png)
+
+#### Evaluations
+
+Jalankan dataset terisolasi dan periksa perilaku cache, panggilan provider,
+latensi, serta hasil klasifikasi yang terukur. Simpan URL `/evaluations?view=runs`,
+`?view=datasets`, `?view=history`, atau `?view=reuse-quality` untuk membuka kembali
+view yang dipilih. Reuse quality menampilkan
+[bukti statis library yang ditinjau dan metodologinya](../../../packages/cache/benchmarks/reuse_quality/README.md),
+dengan hasil calibration dan held-out terpisah dari run server berurutan. Hasil
 sintetis ini tidak membuktikan kualitas produksi atau threshold yang aman secara universal.
 
-| Workspace | Tampilan saat ini |
-|---|---|
-| **Cache Inspector** — Cari prompt tersimpan dan periksa usia, jumlah hit, serta masa berlaku entri tanpa menampilkan embedding. | <a href="../../assets/screenshots/cache-inspector.png"><img src="../../assets/screenshots/cache-inspector.png" alt="Cache Inspector menampilkan entri contoh dengan jumlah hit dan TTL" width="320"></a> |
-| **Evaluations** — Jalankan dataset terisolasi dan tinjau hit rate, panggilan provider, serta klasifikasi yang terukur. | <a href="../../assets/screenshots/evaluations-results.png"><img src="../../assets/screenshots/evaluations-results.png" alt="Evaluations menampilkan hasil quick semantic safety set bawaan" width="320"></a> |
-| **Observability** — Periksa diagnostik runtime yang aman, kategori provider, fingerprint pencocokan, dan kesiapan layanan. | <a href="../../assets/screenshots/observability-diagnostics.png"><img src="../../assets/screenshots/observability-diagnostics.png" alt="Diagnostik runtime Observability menampilkan provider Hugging Face dan kesiapan layanan" width="320"></a> |
+[![Evaluations menampilkan hasil dataset semantic safety bawaan](../../assets/screenshots/evaluations-results.png)](../../assets/screenshots/evaluations-results.png)
+
+#### Observability
+
+Periksa diagnostik runtime yang aman, kategori provider, fingerprint pencocokan,
+readiness storage, dan sinyal reproduksibilitas lainnya.
+
+[![Observability menampilkan diagnostik runtime dan readiness provider](../../assets/screenshots/observability-diagnostics.png)](../../assets/screenshots/observability-diagnostics.png)
 
 Kapabilitas inti:
 
-- embedding dan generation provider yang independen;
-- penyimpanan memory atau PostgreSQL + pgvector yang persisten;
+- embedding provider dan generation provider yang independen;
+- penyimpanan MemoryStore, PostgreSQL/pgvector, atau RedisStore;
 - TTL, eviction LRU, namespace, request privat, dan kebijakan read/write;
-- kontrol Monitor sesuai peran, minimisasi trace privat, dan tautan hit ke detail Cache yang diotorisasi;
-- penggabungan request (request coalescing) untuk cache miss identik yang terjadi bersamaan;
+- kontrol Monitor sesuai peran, minimisasi trace privat, dan tautan hit langsung
+  ke detail Cache yang diotorisasi;
+- penggabungan request (request coalescing) untuk miss identik yang terjadi bersamaan;
 - normalisasi prompt yang menyadari typo (opsional);
-- threshold cache global yang dapat dilihat dan diagnostik runtime read-only khusus admin;
-- peran token dan otorisasi namespace untuk deployment yang diperkeras;
+- threshold cache global yang terlihat dan diagnostik runtime read-only khusus
+  global admin, dengan kategori provider yang aman, fingerprint, readiness,
+  dan batas evaluasi;
+- peran token dan otorisasi namespace untuk deployment hardened;
 - provider mock deterministik untuk pengujian lokal yang aman;
-- cache evaluasi terpisah per run, confusion matrix lengkap, dan proyeksi threshold dari kandidat yang sudah diukur;
-- dataset evaluasi JSON versi 1 yang tersimpan hanya selama sesi browser, dengan pratinjau tanpa panggilan provider;
-- katalog dataset evaluasi PostgreSQL opsional dengan penyimpanan eksplisit dan retensi terbatas.
+- cache evaluasi terpisah per run, confusion matrix lengkap, serta sweep threshold
+  terbatas yang dapat dikonfigurasi dengan kandidat yang dibekukan;
+- dataset evaluasi JSON berversi yang hanya hidup selama sesi, dengan pratinjau
+  tanpa panggilan provider, validasi ketat, dan tanpa persistensi di browser;
+- katalog dataset evaluasi PostgreSQL opsional dengan otorisasi namespace,
+  penyimpanan eksplisit, retensi terbatas, dan tanpa menyimpan hasil run.
 
 ### Endpoint dan operasi dashboard
 
@@ -669,7 +741,14 @@ engine embedded.
 
 ### HTTP client referensi
 
-Aplikasi Python dapat memakai distribusi `semantix-client` melalui HTTP API publik. Paket ini menyediakan `SemantixClient` dan `AsyncSemantixClient` tanpa memerlukan modul internal backend. Paket belum diterbitkan di PyPI; lihat [panduan Python SDK](../../../packages/client/README.md) untuk instalasi dari repository atau wheel.
+Aplikasi Python eksternal dapat memakai distribusi `semantix-client` yang dapat
+diinstal secara mandiri melalui HTTP API publik. Kode Python mengimpornya sebagai
+`semantix_client`. Paket ini menyediakan client sinkron (`SemantixClient`) dan
+asinkron (`AsyncSemantixClient`) bertipe tanpa memasang atau mengimpor modul
+internal backend Semantix.
+
+Paket ini belum diterbitkan di PyPI; instal dari wheel yang dibangun atau langsung
+dari repository sesuai panduan lengkap.
 
 ```python
 from semantix_client import SemantixClient
@@ -680,6 +759,8 @@ with SemantixClient(base_url="http://localhost:8000") as client:
 print(result.response, result.cache_hit)
 ```
 
+[Panduan lengkap Python SDK →](../../../packages/client/README.md)
+
 ## Dokumentasi
 
 [Indeks dokumentasi](README.md) memisahkan panduan embedded dan server.
@@ -688,8 +769,8 @@ print(result.response, result.cache_hit)
 | --- | --- |
 | [Panduan paket cache](../../../packages/cache/README.md) | Quick start embedded, kebijakan, kepemilikan, dan kompatibilitas kanonis |
 | [Provider embedded](../../embedded/providers.md) | Adapter yang dipelihara dan embedding/generation kustom |
-| [Identitas konteks dan migrasi](../../embedded/context-identity-and-migration.md) | Scope eksplisit, revisi embedding, dan migrasi aman |
-| [Storage embedded](../../embedded/storage.md) | Memory, SQLite, MySQL, PostgreSQL/Redis opsional, dan database aplikasi |
+| [Identitas konteks dan migrasi](../../embedded/context-identity-and-migration.md) | Scope eksplisit, identitas model/tenant/knowledge/output, revisi embedding, dan migrasi aman |
+| [Storage embedded](../../embedded/storage.md) | Memory, SQLite, MySQL, PostgreSQL, Redis, Valkey, dan database milik pengguna |
 | [Contoh](../../../packages/cache/examples/) | Generation dan store yang dikendalikan aplikasi |
 | [Kualitas reuse yang ditinjau](../../../packages/cache/benchmarks/reuse_quality/README.md) | Baseline semantik, kontrol leksikal, pemisahan calibration/held-out, dan batas bukti |
 | [Metodologi benchmark](../../../packages/cache/benchmarks/README.md) | Workload runtime lokal yang reproducible beserta batasannya |
@@ -840,9 +921,11 @@ Frontend:
 cd apps/web
 npm ci
 npm run lint
+npm run format:check
 npm run imports:check
-npm run test
+npm run test:coverage
 npm run build
+npm run bundle:check
 ```
 
 Lihat [Development](guides/development.md) untuk toolchain lokal, aturan arsitektur, dan langkah-langkah kontribusi.
