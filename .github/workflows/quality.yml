@@ -465,82 +465,14 @@ jobs:
 
       - name: Verify exact WAL-patched backports and independent wheels
         run: |
-          uv run --no-sync python - <<'PY'
-          import hashlib
-          import os
-          from pathlib import Path
-          import subprocess
-          import sys
-          import tarfile
-          import tempfile
-          from urllib.request import urlopen
-          from xml.etree import ElementTree
-
-          from tests.check_artifacts import main as check_artifacts
-
-          targets = (
-              ("3.44.6", "863c171b76cd36e0c71662d4a50d84da531cc7fbead893d02459577febdf6396",
-               "c25cd42f803d5fb0af5f1a2863c9f529a8fd35177cb24b0f6e970b1cc96f00f0"),
-              ("3.50.7", "c7facf7ac58d2cdac619a2da838c5fd5c5270f52b3458c7881b5a4fca1ca4791",
-               "1cfdfb3758c25cf3c0f7d2eea5223f49ccb71217ddcccf6a9ce9c304fea80bbe"),
+          (
+            cd ../..
+            uv run --project packages/cache --no-sync ruff check --config ruff.toml ops/ci/sqlite_backport_certification.py ops/ci/tests/test_sqlite_backport_certification.py
+            uv run --project packages/cache --no-sync ruff format --config ruff.toml --check ops/ci/sqlite_backport_certification.py ops/ci/tests/test_sqlite_backport_certification.py
           )
-          test_files = (
-              "tests/test_sqlite.py", "tests/test_sqlite_faults.py",
-              "tests/test_sqlite_processes.py", "tests/test_sqlite_conformance.py",
-          )
-          with tempfile.TemporaryDirectory(prefix="semantix-sqlite-backports-") as directory:
-              root = Path(directory)
-              dist = root / "dist"
-              subprocess.run([sys.executable, "-m", "build", "--outdir", str(dist)], check=True, timeout=180)
-              check_artifacts(dist)
-              wheel_python = root / "consumer/bin/python"
-              subprocess.run(["uv", "venv", "--python", sys.executable, str(root / "consumer")], check=True, timeout=60)
-              subprocess.run(["uv", "pip", "install", "--python", str(wheel_python), str(next(dist.glob("*.whl")))], check=True, timeout=180)
-              for version, source_id, archive_sha in targets:
-                  work = root / version
-                  work.mkdir()
-                  archive = work / "source.tar.gz"
-                  with urlopen(f"https://sqlite.org/src/tarball/{source_id}/sqlite.tar.gz", timeout=60) as response:
-                      archive.write_bytes(response.read())
-                  assert hashlib.sha256(archive.read_bytes()).hexdigest() == archive_sha, "Source archive mismatch"
-                  source = work / "source"
-                  source.mkdir()
-                  with tarfile.open(archive) as bundle:
-                      bundle.extractall(source, filter="data")
-                  tree, = source.iterdir()
-                  assert (tree / "VERSION").read_text().strip() == version
-                  assert (tree / "manifest.uuid").read_text().strip() == source_id
-                  for command in (
-                      ["./configure", "--disable-shared"],
-                      ["make", "-j2", "sqlite3.c"],
-                      ["cc", "-O2", "-fPIC", "-shared", "-DSQLITE_THREADSAFE=1",
-                       str(tree / "sqlite3.c"), "-o", str(work / "libsqlite3.so.0"), "-lpthread", "-ldl", "-lm"],
-                  ):
-                      subprocess.run(command, cwd=tree, check=True, timeout=180)
-                  env = os.environ | {"LD_LIBRARY_PATH": str(work)}
-                  env.pop("PYTHONPATH", None)
-                  probe = (
-                      "import platform,sqlite3; "
-                      "c=sqlite3.connect(':memory:'); source=c.execute('SELECT sqlite_source_id()').fetchone()[0]; c.close(); "
-                      f"assert sqlite3.sqlite_version == {version!r}; "
-                      f"assert source.endswith({source_id!r}); "
-                      "assert sqlite3.threadsafety == 3; "
-                      "print('Verified runtime:',platform.python_version(),sqlite3.sqlite_version,sqlite3.threadsafety,source)"
-                  )
-                  for python in (sys.executable, str(wheel_python)):
-                      subprocess.run([python, "-c", probe], env=env, check=True, timeout=20)
-                  print("Verified source archive SHA256:", archive_sha, flush=True)
-                  print("Built library SHA256:", hashlib.sha256((work / "libsqlite3.so.0").read_bytes()).hexdigest(), flush=True)
-                  report = Path(f".cache/sqlite-backport-{version}.xml")
-                  subprocess.run([sys.executable, "-m", "pytest", *test_files, f"--junitxml={report}"], env=env, check=True, timeout=180)
-                  cases = ElementTree.parse(report).findall(".//testcase")
-                  assert cases and all(c.find(outcome) is None for c in cases for outcome in ("skipped", "failure", "error")), "Required SQLite outcomes missing or unsuccessful"
-                  for test_file in test_files:
-                      module = test_file.removesuffix(".py").replace("/", ".")
-                      assert any(c.get("classname", "") == module or c.get("classname", "").startswith(module + ".") for c in cases), f"Required module not exercised: {module}"
-                  subprocess.run([str(wheel_python), "-m", "tests.sqlite_wheel_smoke"], env=env, check=True, timeout=60)
-                  print(f"Verified SQLite {version}: {len(cases)} passing cases, zero skips; installed-wheel consumer passed", flush=True)
-          PY
+          uv run --no-sync mypy --strict ../../ops/ci/sqlite_backport_certification.py ../../ops/ci/tests/test_sqlite_backport_certification.py
+          uv run --no-sync pytest ../../ops/ci/tests/test_sqlite_backport_certification.py
+          uv run --no-sync python ../../ops/ci/sqlite_backport_certification.py
 
   redis:
     name: Redis restart and fault integration
