@@ -442,6 +442,123 @@ class ReadmeTranslationsTests(unittest.TestCase):
         translated = "# Batas\n\n**>=** 1.2.3, **<** 2.0.0\n"
         self.assertEqual(self.parity(source, translated), ("", ""))
 
+    def staged(self) -> tuple[int, str]:
+        with (
+            patch.object(checker, "__file__", str(self.root / "ops/ci/checker.py")),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            code = checker.main(["--staged"])
+        return code, stdout.getvalue() + stderr.getvalue()
+
+    def test_unrelated_staged_change_does_not_validate_unstaged_readmes(self) -> None:
+        self.snapshot()
+        (self.root / "example.py").write_text("# Unrelated\n", encoding="utf-8")
+        checker.git(self.root, "add", "example.py")
+        self.source.write_text(SOURCE + "Unreviewed.\n", encoding="utf-8")
+        with patch.object(
+            checker, "validate", side_effect=AssertionError("unnecessary validation")
+        ):
+            code, output = self.staged()
+        self.assertEqual(code, 0)
+        self.assertIn("No staged root README changes", output)
+
+    def test_staged_english_change_fails_without_acknowledging_automatically(
+        self,
+    ) -> None:
+        self.snapshot()
+        before = self.translation.read_bytes()
+        self.source.write_text(SOURCE + "New explanation.\n", encoding="utf-8")
+        checker.git(self.root, "add", "README.md")
+        code, output = self.staged()
+        self.assertEqual(code, 1)
+        self.assertIn("stale source hash", output)
+        self.assertIn("--update", output)
+        self.assertEqual(self.translation.read_bytes(), before)
+
+    def test_staged_reviewed_translation_with_stale_hash_fails(self) -> None:
+        self.snapshot()
+        self.source.write_text(SOURCE + "New explanation.\n", encoding="utf-8")
+        self.translation.write_text(
+            acknowledged(SOURCE, TRANSLATED + "Penjelasan baru.\n"), encoding="utf-8"
+        )
+        checker.git(self.root, "add", "README.md", TRANSLATION)
+        code, output = self.staged()
+        self.assertEqual(code, 1)
+        self.assertIn("stale source hash", output)
+        self.assertIn("--update", output)
+
+    def test_staged_reviewed_and_acknowledged_translation_passes(self) -> None:
+        self.snapshot()
+        changed = SOURCE + "New explanation.\n"
+        self.source.write_text(changed, encoding="utf-8")
+        self.translation.write_text(
+            acknowledged(changed, TRANSLATED + "Penjelasan baru.\n"), encoding="utf-8"
+        )
+        checker.git(self.root, "add", "README.md", TRANSLATION)
+        self.assertEqual(self.staged()[0], 0)
+
+    def test_staged_translation_only_improvement_passes(self) -> None:
+        self.snapshot()
+        self.translation.write_text(
+            acknowledged(SOURCE, TRANSLATED.replace("Baca", "Silakan baca")),
+            encoding="utf-8",
+        )
+        checker.git(self.root, "add", TRANSLATION)
+        self.assertEqual(self.staged()[0], 0)
+
+    def test_staged_hash_only_acknowledgement_still_fails(self) -> None:
+        self.snapshot()
+        changed = SOURCE + "New explanation.\n"
+        self.source.write_text(changed, encoding="utf-8")
+        self.translation.write_text(acknowledged(changed), encoding="utf-8")
+        checker.git(self.root, "add", "README.md", TRANSLATION)
+        code, output = self.staged()
+        self.assertEqual(code, 1)
+        self.assertIn("only hash/whitespace changed", output)
+
+    def test_unstaged_translation_fix_cannot_mask_stale_staged_content(self) -> None:
+        self.snapshot()
+        changed = SOURCE + "New explanation.\n"
+        self.source.write_text(changed, encoding="utf-8")
+        checker.git(self.root, "add", "README.md")
+        self.translation.write_text(
+            acknowledged(changed, TRANSLATED + "Penjelasan baru.\n"), encoding="utf-8"
+        )
+        code, output = self.staged()
+        self.assertEqual(code, 1)
+        self.assertIn("index/working-tree agreement", output)
+        self.assertIn(TRANSLATION, output)
+
+    def test_deletion_only_staged_translation_is_checked(self) -> None:
+        self.snapshot()
+        checker.git(self.root, "rm", TRANSLATION)
+        code, output = self.staged()
+        self.assertEqual(code, 1)
+        self.assertIn("missing/unreadable translation", output)
+
+    def test_untracked_translation_cannot_supply_unstaged_coverage(self) -> None:
+        self.snapshot()
+        other = self.root / "docs/translation/fr/README.FR.md"
+        other.parent.mkdir()
+        other.write_text(acknowledged(SOURCE, "# Exemple\n"), encoding="utf-8")
+        self.translation.write_text(
+            acknowledged(SOURCE, TRANSLATED + "Perbaikan.\n"), encoding="utf-8"
+        )
+        checker.git(self.root, "add", TRANSLATION)
+        code, output = self.staged()
+        self.assertEqual(code, 1)
+        self.assertIn("docs/translation/fr/README.FR.md", output)
+        checker.git(self.root, "add", "docs/translation/fr/README.FR.md")
+        self.assertEqual(self.staged()[0], 0)
+
+    def test_staged_update_and_base_modes_are_mutually_exclusive(self) -> None:
+        with contextlib.redirect_stderr(io.StringIO()):
+            for flags in (["--staged", "--update"], ["--staged", "--base", "0" * 40]):
+                with self.subTest(flags=flags), self.assertRaises(SystemExit) as error:  # noqa: PT027 -- stdlib runner
+                    checker.main(flags)
+                self.assertEqual(error.exception.code, 2)
+
     def test_current_repository_pair(self) -> None:
         self.assertEqual(checker.validate(Path(__file__).resolve().parents[2]), [])
 

@@ -106,6 +106,39 @@ Untuk menghapus backend cache dan editable-install metadata:
 .\scripts\windows\clean_artifacts.ps1
 ```
 
+### Terjemahan README utama
+
+Instal [pre-commit](https://pre-commit.com/#install), lalu gunakan environment Python
+3.11+ aktif dengan tool pemeriksa saja (dependensi aplikasi tidak diperlukan):
+
+Environment yang sudah ada dapat digunakan; untuk isolasi, buat dengan `python -m venv .cache/readme-tools`
+lalu aktifkan (`source .cache/readme-tools/bin/activate` di POSIX atau
+`.\.cache\readme-tools\Scripts\Activate.ps1` di PowerShell). Biarkan environment itu aktif
+saat melakukan commit agar hook dengan bahasa system menggunakan Python tersebut.
+
+```text
+python -m pip install --require-hashes --only-binary=:all: -r ops/ci/readme-requirements.txt
+pre-commit install
+```
+
+Edit dan tinjau README bahasa Inggris beserta terjemahan utamanya, lalu akui sumber secara eksplisit:
+
+```text
+python ops/ci/validate_readme_translations.py --update
+git add README.md docs/translation/id/README.ID.md
+pre-commit run readme-translations
+```
+
+Hook tidak pernah menjalankan `--update`: pengakuan otomatis atas perubahan bahasa Inggris
+dapat menyembunyikan perubahan yang belum diterjemahkan. Hook memeriksa edit README yang
+sudah di-stage terhadap HEAD, termasuk penghapusan. Saat commit, pre-commit menyembunyikan
+sementara edit terlacak yang belum di-stage; eksekusi manual menolak campuran isi README
+yang sudah dan belum di-stage. File lain yang di-stage melewati validasi Markdown.
+Hash sumber dan pemeriksaan teknis tidak membuktikan makna atau kelengkapan terjemahan;
+tinjauan manusia tetap wajib, dan CI menjadi batas penegakan utama karena hook lokal bersifat opsional.
+
+Untuk memeriksa working tree tanpa seleksi staged, jalankan `python ops/ci/validate_readme_translations.py`.
+
 ### Local frontend workflow
 
 ```powershell

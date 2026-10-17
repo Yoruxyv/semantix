@@ -30,8 +30,14 @@ CI supplies --base COMMIT on PRs/pushes, also requiring previous translations to
 exist and rejecting hash/whitespace-only acknowledgements of changed source text.
 For an English-only correction, an explanatory translation comment is reviewable
 evidence, not proof of correctness. Without --base, Git change checks do not run.
+Local pre-commit uses --staged: irrelevant commits bypass Markdown validation;
+relevant content must match the index and is compared with HEAD. The commit hook
+hides unstaged tracked edits; manual runs reject mixed staged/unstaged README edits.
+No hook ever runs --update. CI remains authoritative because local hooks are optional.
 Review meaning, omissions, code semantics and correctness manually in every case.
 """
+
+from __future__ import annotations
 
 import argparse
 import hashlib
@@ -43,14 +49,10 @@ from dataclasses import dataclass, field
 from datetime import date
 from itertools import pairwise
 from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING
 
-try:
-    from markdown_it import MarkdownIt
+if TYPE_CHECKING:
     from markdown_it.token import Token
-except ModuleNotFoundError as exc:
-    raise SystemExit(
-        "Install README checker tools: python -m pip install --require-hashes -r ops/ci/readme-requirements.txt"
-    ) from exc
 
 PATTERN = "docs/translation/*/README.*.md"
 MARKER = "readme-source-sha256:"
@@ -82,6 +84,13 @@ class Table:
 
 
 def read_sections(text: str) -> list[Section]:
+    try:
+        from markdown_it import MarkdownIt  # noqa: PLC0415 -- unrelated commits need no Markdown dependencies
+        from markdown_it.token import Token  # noqa: PLC0415 -- defer the parser until validation is selected
+    except ModuleNotFoundError as exc:
+        raise SystemExit(
+            "Install README checker tools in the active Python environment: python -m pip install --require-hashes --only-binary=:all: -r ops/ci/readme-requirements.txt"
+        ) from exc
     tokens = MarkdownIt("commonmark").enable("table").parse(text)
     result = [Section("introduction", 0, 1)]
     in_heading = False
@@ -382,7 +391,7 @@ def compare_structure(
 def git(root: Path, *arguments: str) -> str:
     executable = shutil.which("git")
     if executable is None:
-        raise FileNotFoundError("Git is required for --base comparison")
+        raise FileNotFoundError("Git is required for README change comparison")
     return (
         subprocess.check_output(  # noqa: S603 -- fixed commands and validated commit SHA; no shell
             [executable, *arguments], cwd=root, timeout=30, stderr=subprocess.PIPE
@@ -390,6 +399,29 @@ def git(root: Path, *arguments: str) -> str:
         .decode("utf-8")
         .replace("\r\n", "\n")
     )
+
+
+def staged_base(root: Path) -> str | None:
+    """Select actual index changes, including deletions pre-commit omits."""
+
+    def relevant(path: str) -> bool:
+        return path == "README.md" or PurePosixPath(path).match(PATTERN)
+
+    paths = ("--", "README.md", "docs/translation")
+    changed = git(root, "diff", "--cached", "--name-only", "--no-renames", "-z", *paths)
+    if not any(relevant(path) for path in changed.split("\0")):
+        return None
+    unstaged = git(root, "diff", "--name-only", "--no-renames", "-z", *paths)
+    untracked = git(root, "ls-files", "--others", "--exclude-standard", "-z", *paths)
+    pending = sorted(
+        path for path in (unstaged + untracked).split("\0") if relevant(path)
+    )
+    if pending:
+        raise ValueError(
+            "README pre-commit requires index/working-tree agreement; stage the reviewed README changes or set unstaged work aside: "
+            + ", ".join(pending)
+        )
+    return git(root, "rev-parse", "--verify", "HEAD").strip()
 
 
 def content(text: str) -> str:
@@ -503,10 +535,16 @@ def update(root: Path) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument(
         "--base", help="exact PR base / push-before commit SHA already fetched locally"
     )
-    parser.add_argument(
+    modes.add_argument(
+        "--staged",
+        action="store_true",
+        help="validate staged README changes against HEAD without updating acknowledgements",
+    )
+    modes.add_argument(
         "--update",
         action="store_true",
         help="refresh source hashes after human translation review",
@@ -515,18 +553,24 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(__file__).resolve().parents[2]
     try:
         if arguments.update:
-            if arguments.base is not None:
-                parser.error("--base is for checking, not --update")
             paths = update(root)
             sys.stdout.write(
                 f"Updated source acknowledgements: {', '.join(paths)}. This does not certify translation accuracy; human review is required.\n"
             )
             return 0
+        base = arguments.base
+        if arguments.staged:
+            base = staged_base(root)
+            if base is None:
+                sys.stdout.write(
+                    "No staged root README changes; translation validation not needed.\n"
+                )
+                return 0
         warnings: list[str] = []
-        errors = validate(root, arguments.base, warnings)
+        errors = validate(root, base, warnings)
         for warning in warnings:
             sys.stderr.write("WARNING: " + warning + "\n")
-    except (OSError, UnicodeError, ValueError) as exc:
+    except (OSError, UnicodeError, ValueError, subprocess.SubprocessError) as exc:
         errors = [str(exc)]
     if errors:
         sys.stderr.write(

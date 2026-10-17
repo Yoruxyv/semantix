@@ -119,6 +119,38 @@ To remove backend caches and editable-install metadata:
 .\scripts\windows\clean_artifacts.ps1
 ```
 
+### Root README translations
+
+Install [pre-commit](https://pre-commit.com/#install), then use an active Python
+3.11+ environment with only the checker tools (application dependencies are unnecessary):
+
+An existing environment works; for isolation, create one with `python -m venv .cache/readme-tools`
+and activate it (`source .cache/readme-tools/bin/activate` on POSIX or
+`.\.cache\readme-tools\Scripts\Activate.ps1` in PowerShell). Keep that environment active
+when committing so the system-language hook uses its Python.
+
+```text
+python -m pip install --require-hashes --only-binary=:all: -r ops/ci/readme-requirements.txt
+pre-commit install
+```
+
+Edit/review the English README and its root translations, then explicitly acknowledge the source:
+
+```text
+python ops/ci/validate_readme_translations.py --update
+git add README.md docs/translation/id/README.ID.md
+pre-commit run readme-translations
+```
+
+The hook never runs `--update`: automatically acknowledging an English change could conceal
+an untranslated change. It checks staged README edits against HEAD, including deletions.
+During commits, pre-commit temporarily hides unstaged tracked edits; manual runs reject
+mixed staged/unstaged README content. Unrelated staged files bypass Markdown validation.
+Source hashes and technical checks cannot prove translation meaning or completeness;
+human review remains mandatory, and CI is authoritative because local hooks are optional.
+
+For a working-tree check without staged selection, run `python ops/ci/validate_readme_translations.py`.
+
 ### Local frontend workflow
 
 ```powershell
