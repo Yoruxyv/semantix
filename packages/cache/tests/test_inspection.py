@@ -282,14 +282,12 @@ async def test_invalid_detail_inputs(inspected: Store, key: str, scope: object) 
         )
 
 
-async def test_expired_exclusion_without_purging(
-    inspected: Store, monkeypatch: pytest.MonkeyPatch
+async def expire_entry(
+    inspected: Store, cache_key: str, namespace: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    original = entry("expired")
-    await inspected.put(original)
     if isinstance(inspected, MemoryStore):
-        old = inspected._items[original.cache_key]
-        inspected._items[original.cache_key] = replace(
+        old = inspected._items[cache_key]
+        inspected._items[cache_key] = replace(
             old, expires_monotonic=1.0, expires_at=datetime(2000, 1, 1, tzinfo=UTC)
         )
         monkeypatch.setattr("semantix_cache.memory.monotonic", lambda: 2.0)
@@ -299,17 +297,27 @@ async def test_expired_exclusion_without_purging(
                 (
                     "UPDATE",
                     inspected._config.relation("cache_entries"),
-                    "SET expires_at=$1",
+                    "SET expires_at=$1 WHERE cache_key=$2 AND namespace=$3",
                 )
             ),
             datetime(2000, 1, 1, tzinfo=UTC),
+            cache_key,
+            namespace,
         )
     else:
         await inspected._client.hset(
             inspected._config.keys[1],
-            "default|" + original.cache_key + ":e",
+            namespace + "|" + cache_key + ":e",
             _micros(datetime(2000, 1, 1, tzinfo=UTC)),
         )
+
+
+async def test_expired_exclusion_without_purging(
+    inspected: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = entry("expired")
+    await inspected.put(original)
+    await expire_entry(inspected, original.cache_key, original.namespace, monkeypatch)
     before = await snapshot(inspected)
     assert (await inspected.inspect_entries()).total == 0
     assert await inspected.inspect_entry(original.cache_key, namespaces=None) is None
@@ -319,13 +327,19 @@ async def test_expired_exclusion_without_purging(
 
 
 async def test_native_ttl_and_clear_all_are_separate_mutations(
-    inspected: Store,
+    inspected: Store, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    await inspected.put(entry("short", namespace="alpha"), ttl_seconds=0.2)
+    original = entry("short", namespace="alpha")
+    # Observe the normal default retention, then control expiry without wall-clock waits.
+    await inspected.put(original, ttl_seconds=3600.0)
     await inspected.put(entry("live", namespace="beta"))
     before = await inspected.inspect_entries(namespace="alpha")
+    assert before.total == 1
+    assert before.items[0].cache_key == original.cache_key
+    assert before.items[0].expires_at is not None
     assert before.items[0].remaining_ttl_seconds is not None
-    await asyncio.sleep(0.25)
+    assert 0 < before.items[0].remaining_ttl_seconds <= 3600.0
+    await expire_entry(inspected, original.cache_key, original.namespace, monkeypatch)
     assert (await inspected.inspect_entries(namespace="alpha")).total == 0
     assert (await inspected.inspect_entries(namespace="beta")).total == 1
     assert await inspected.clear_all() == 1
