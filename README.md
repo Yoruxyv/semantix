@@ -4,7 +4,7 @@
 
 <p><strong>Async semantic caching for Python.</strong></p>
 
-<p>Memory, SQLite, MySQL, PostgreSQL or Redis storage. Your generation flow stays yours.</p>
+<p>Memory, SQLite, MySQL, PostgreSQL, Redis or Valkey storage. Your generation flow stays yours.</p>
 
 <p>
   <img src="https://img.shields.io/badge/Python-3.11%E2%80%933.14-555555?logo=python&amp;logoColor=FFD43B&amp;labelColor=3776AB" alt="Python 3.11–3.14" />
@@ -21,6 +21,7 @@
   <a href="#how-it-works">How it works</a> ·
   <a href="#verified-ai-providers">Providers</a> ·
   <a href="#storage">Storage</a> ·
+  <a href="#compatibility-and-supported-backends">Compatibility</a> ·
   <a href="#performance">Benchmarks</a> ·
   <a href="packages/cache/benchmarks/reuse_quality/README.md">Reuse quality</a>
 </p>
@@ -120,8 +121,46 @@ and store; the application owns any other injected resources.
 | Aspect | Summary |
 | --- | --- |
 | **Runtime** | Async, in-process Python |
-| **Storage** | MemoryStore, local SQLite, optional MySQL, PostgreSQL/pgvector or Redis |
+| **Storage** | MemoryStore, local SQLite, optional MySQL, PostgreSQL/pgvector, Redis or Valkey |
 | **Generation** | Your own async callable |
+
+## Compatibility and supported backends
+
+The embedded `semantix-cache` package supports **CPython 3.11–3.14**.
+Backend links below lead to setup requirements and complete certification details.
+
+| Backend | Supported server/runtime | Python driver | Availability |
+| --- | --- | --- | --- |
+| [MemoryStore](docs/embedded/storage.md#choose-a-store) | In-process, non-durable; no external database | Included in the minimal core; no database driver | Embedded + optional server/dashboard |
+| [SQLiteStore](docs/embedded/storage.md#sqlite-local-file-persistence) | Thread-capable linked SQLite **>=3.51.3, except withdrawn 3.52.0**, or exact upstream WAL-patched **3.44.6 / 3.50.7** | Python's standard-library `sqlite3`; no extra driver package | Embedded only |
+| [MySQLStore](docs/embedded/mysql.md#verified-compatibility) | Runtime: MySQL Community **8.4.x**; CI-certified: **8.4.11 / 8.4.12** | `[mysql]`: exact PyMySQL **1.2.1, 1.2.2 or 1.2.3** | Embedded only |
+| [PgVectorStore](docs/embedded/storage.md#verified-postgresql-combinations) | Verified PostgreSQL / pgvector: **16.15 / 0.8.7**, **17.10 / 0.8.5**, **18.6 / 0.8.7** | `[pgvector]`: `asyncpg>=0.31,<=0.32.0`; certified **0.31.0 / 0.32.0** in different CI combinations | Embedded + optional server/dashboard |
+| [RedisStore — Redis Open Source](docs/embedded/redis.md#supported-versions) | Admitted minor families and patch floors: **7.4.x >=7.4.11; 8.2.x >=8.2.10; 8.4.x >=8.4.7; 8.6.x >=8.6.7; 8.8.x >=8.8.3; 8.10.x >=8.10.2** | `[redis]`: exact redis-py **7.4.1**, exact **8.0.1**, or stable **8.1.x** | Embedded + optional server/dashboard |
+| [RedisStore — Valkey](docs/embedded/redis.md#valkey-912) | Separate server product; exact **Valkey 9.1.2** | Same RedisStore and `[redis]` extra; verified redis-py **8.1.0**, no Valkey-specific dependency | Embedded certified; existing server `redis` path (see below) |
+
+**Runtime-admitted** versions pass the implementation's compatibility policy.
+**CI-verified** combinations are the exact targets exercised in maintained tests,
+listed in the linked guides. Admission does not mean every server, extension,
+driver, Python, architecture, OS or managed-service combination has been tested.
+The PostgreSQL targets above are **not runtime minimum versions**.
+
+Development locks retain asyncpg **0.31.0**, PyMySQL **1.2.3** and redis-py
+**8.1.0**. The Redis dependency resolver range is broader than runtime admission;
+see the [driver policy](docs/embedded/redis.md). redis-py **8.0.1** does not imply
+Redis **8.0** server support. MySQL 8.0/9.x, MariaDB and managed variants are
+outside the MySQL verified boundary.
+
+For SQLite, use trusted upstream builds or verify the vendor's WAL-fix provenance:
+a version number alone does not authenticate a binary. Valkey certification pairs
+**9.1.2 / redis-py 8.1.0 / Linux x86-64 / CPython 3.14**, with additional local
+Windows-client evidence. Other Valkey releases, drivers and platforms are not
+individually certified. TLS, managed-service and failover limits remain specific
+to each guide; Redis/Valkey data-file migration remains unverified.
+
+The [optional server/dashboard](docs/guides/platform-storage.md) accepts only
+`CACHE_BACKEND=memory`, `pgvector` or `redis`; SQLite and MySQL remain embedded-only.
+Valkey uses the existing `redis` path, with no separate ValkeyStore or `valkey`
+selector. An end-to-end Valkey dashboard deployment has not been separately certified.
 
 ## Why Semantix?
 
@@ -279,24 +318,31 @@ commits, logs, or fixtures.
 
 ## Storage
 
-Start with MemoryStore for bounded process-local state. For local persistence,
-`semantix_cache.stores.sqlite.SQLiteStore` owns a dedicated file and worker with
-explicit setup. It needs thread-capable **linked SQLite >=3.51.3, except 3.52.0**;
-Python's version alone is insufficient. Run `uv run --no-sync python -m examples.sqlite_cache`
-from `packages/cache` for a credential-free miss/write/hit and reopen check.
-See [SQLite setup and limits](docs/embedded/storage.md#sqlite-local-file-persistence)
-for the bounded complete float64 scan, file ownership and cancellation restrictions.
-SQLite is embedded-only; the optional backend/dashboard does not select it.
+Start with MemoryStore for bounded process-local state. See the
+[compatibility table](#compatibility-and-supported-backends) for admitted versions,
+verified targets and embedded versus server availability.
 
-Optional `semantix_cache.stores.mysql.MySQLStore` uses pinned PyMySQL 1.2.3 in an
-owned worker with verified TLS and explicit setup on a dedicated MySQL Community
-8.4.12 database. It preserves exact float64 search and the shared CacheStore contract.
-Use the local wheel's `[mysql]` extra; see [MySQL setup and limits](docs/embedded/mysql.md)
-for least-privileged grants, the locked schema verifier, deadlines, uncertain COMMIT
-and bounded failed-construction recovery. MySQL is embedded-only; no dashboard
-backend is added. Windows/Linux Python 3.11–3.14 clients have been exercised;
-the new workflow targets Linux, with hosted execution still pending and the
-Windows/MySQL hosted coverage gap disclosed.
+For local persistence, `semantix_cache.stores.sqlite.SQLiteStore` owns a dedicated
+file and worker with explicit setup. Check the thread-capable linked runtime and
+WAL-fix provenance; Python's version alone is insufficient. Run
+`uv run --no-sync python -m examples.sqlite_cache` from `packages/cache` for a
+credential-free miss/write/hit and reopen check. See
+[SQLite setup and limits](docs/embedded/storage.md#sqlite-local-file-persistence)
+for the bounded complete float64 scan, file ownership and cancellation restrictions.
+
+Optional `semantix_cache.stores.mysql.MySQLStore` uses the local wheel's `[mysql]`
+extra, an owned worker, verified TLS and explicit setup on a dedicated MySQL
+Community 8.4.x database. Hosted CI covers both certified server releases and all
+three admitted PyMySQL versions in the combinations listed in the
+[MySQL guide](docs/embedded/mysql.md#verified-compatibility). See that guide for
+least-privileged grants, the locked schema verifier, exact float64 search, deadlines,
+uncertain COMMIT and bounded failed-construction recovery.
+
+`semantix_cache.stores.redis.RedisStore` uses `[redis]` for Redis Open Source or
+exact Valkey 9.1.2. Both require explicit binding initialization and a directly
+addressed writable standalone primary with **noeviction**. Operators own persistence,
+backups, TLS and recovery; Cluster, Sentinel, replica reads and automatic failover
+are unsupported. See [Redis and Valkey setup and limits](docs/embedded/redis.md).
 
 Optional
 `semantix_cache.stores.pgvector.PgVectorStore` persists across processes/restarts
@@ -459,7 +505,7 @@ storage readiness, and other reproducibility signals.
 Core capabilities:
 
 - independent embedding and generation providers;
-- memory or persistent PostgreSQL + pgvector storage;
+- MemoryStore, PostgreSQL/pgvector or RedisStore storage;
 - TTL, LRU eviction, namespaces, private requests, and read/write policies;
 - role-aware Monitor controls, private trace minimization, and live-hit links to
   authorized Cache detail;
@@ -727,7 +773,7 @@ The [documentation index](docs/README.md) separates embedded and server guides.
 | [Cache package guide](packages/cache/README.md) | Embedded quick start, policies, ownership and canonical compatibility |
 | [Embedded providers](docs/embedded/providers.md) | Maintained adapters and custom embedding/generation |
 | [Context identity and migration](docs/embedded/context-identity-and-migration.md) | Explicit scopes, embedding revisions and safe migration |
-| [Embedded storage](docs/embedded/storage.md) | Memory, SQLite, MySQL, PostgreSQL, Redis and user-owned databases |
+| [Embedded storage](docs/embedded/storage.md) | Memory, SQLite, MySQL, PostgreSQL, Redis, Valkey and user-owned databases |
 | [Examples](packages/cache/examples/) | Application-controlled generation and stores |
 | [Reviewed reuse quality](packages/cache/benchmarks/reuse_quality/README.md) | Semantic baseline, lexical controls, calibration/held-out split and evidence limitations |
 | [Benchmark methodology](packages/cache/benchmarks/README.md) | Reproducible local runtime workloads and limitations |
