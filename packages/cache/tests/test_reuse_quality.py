@@ -782,10 +782,15 @@ def test_validation_function_and_cli_make_no_file_writes(
 
 def test_precommit_filter_selects_only_benchmark_evidence_paths() -> None:
     text = (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
-    match = re.search(r"files: '(.+)'", text)
+    hook = re.search(
+        r"(?ms)^( +)- id: reuse-quality-validate\n(.*?)(?=^\1- id:|\Z)", text
+    )
+    assert hook is not None
+    hook_text = hook.group(2)
+    match = re.search(r"files: '(.+)'", hook_text)
     assert match is not None
     pattern = re.compile(match.group(1))
-    assert "always_run:" not in text
+    assert "always_run:" not in hook_text
     for path in [
         "packages/cache/benchmarks/reuse_quality/benchmark.py",
         "packages/cache/benchmarks/reuse_quality/data/cases.jsonl",
