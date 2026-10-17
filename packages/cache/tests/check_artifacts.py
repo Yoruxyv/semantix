@@ -57,10 +57,7 @@ def main(artifact_dir: Path = Path("dist")) -> None:
             assert ">=0.28.1" in selected[0]
             assert "<0.29" in selected[0]
         postgres = [item for item in requirements if 'extra == "pgvector"' in item]
-        assert len(postgres) == 1
-        assert postgres[0].startswith("asyncpg")
-        assert ">=0.31" in postgres[0]
-        assert "<0.32" in postgres[0]
+        assert postgres == ['asyncpg<=0.32.0,>=0.31; extra == "pgvector"']
         assert "semantix_cache/stores/pgvector.py" in names
         for module in ("__init__", "config", "inspection"):
             path = f"semantix_cache/stores/_backends/postgres/{module}.py"
@@ -153,6 +150,11 @@ def main(artifact_dir: Path = Path("dist")) -> None:
             assert f"semantix_cache/adapters/{module}.py" in names
     with tarfile.open(sdists[0]) as archive:
         root = "semantix_cache-0.1.0"
+        package_info = archive.extractfile(f"{root}/PKG-INFO")
+        assert package_info is not None
+        source_metadata = message_from_bytes(package_info.read())
+        assert source_metadata.get_all("Requires-Dist", []) == requirements
+        assert source_metadata["Requires-Python"] == metadata["Requires-Python"]
         checkout_only_tests = {
             "test_benchmark_harness.py",
             "test_coalescing_benchmark.py",

@@ -2158,7 +2158,7 @@ reuse-quality = [
 [package.metadata]
 requires-dist = [
     { name = "asyncpg", marker = "extra == 'dev'", specifier = ">=0.31,<0.32" },
-    { name = "asyncpg", marker = "extra == 'pgvector'", specifier = ">=0.31,<0.32" },
+    { name = "asyncpg", marker = "extra == 'pgvector'", specifier = ">=0.31,<=0.32.0" },
     { name = "asyncpg-stubs", marker = "extra == 'dev'", specifier = ">=0.31.3,<0.32" },
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.4,<2" },
     { name = "httpx", marker = "extra == 'anthropic'", specifier = ">=0.28.1,<0.29" },

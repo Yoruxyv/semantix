@@ -274,17 +274,47 @@ and installed-wheel migration/persistence checks.
 | 16.15 | 0.8.7 | 0.31.0 | 3.11 |
 | 17.10 | 0.8.5 | 0.31.0 | 3.12, 3.13 |
 | 18.6 | 0.8.7 | 0.31.0 | 3.14 |
+| 16.15 | 0.8.7 | 0.32.0 | 3.11, additional sequential certification |
+| 18.6 | 0.8.7 | 0.32.0 | 3.14, additional sequential certification |
 
 These are verified targets, not a new PostgreSQL runtime minimum. Other
 server/extension/driver combinations are unverified by this CI matrix; do not
 infer that every combination across these versions has been tested. The optional
-extra still requires asyncpg `>=0.31,<0.32`. Use maintained PostgreSQL patches
-and validate your exact deployment before upgrading.
+extra admits asyncpg `>=0.31,<=0.32.0`: the existing 0.31.x policy plus the
+exact tested 0.32.0 release; later 0.32.x releases require new evidence. Both
+project locks and the development extra retain the 0.31.0 baseline. For an
+explicit runtime candidate install, use `pip install 'semantix-cache[pgvector]'
+'asyncpg==0.32.0'`. Candidate typing is checked separately with asyncpg-stubs
+0.32.0; the development extra keeps its baseline driver/stub constraints.
+
+Windows x86_64 experiments additionally passed PostgreSQL 16.15/0.8.7 on CPython
+3.11.15 and 17.10/0.8.5 and 18.6/0.8.7 on CPython 3.14.6 with both exact drivers.
+These source checks include all PostgreSQL disconnect/cancellation regressions;
+independent wheels are checked separately. This does not certify every permutation.
+Use maintained PostgreSQL patches and validate your exact deployment before upgrading.
 
 The table covers Linux service containers and standard CPython builds. It does
-not certify managed proxies, database failover, TLS configurations, other
-architectures or free-threaded Python. Application-owned pool/TLS configuration
-and the existing migration, transaction and cleanup contracts still apply.
+not certify managed proxies, database failover, other architectures or
+free-threaded Python. Application-owned pool configuration and the existing
+migration, transaction and cleanup contracts still apply.
+
+### Verified TLS boundary
+
+Required PostgreSQL 18 CI checks both drivers with disposable CA/hostname-verified
+TLS, rejects untrusted CAs and incorrect hostnames, and verifies transport cleanup
+on cancelled or timed-out negotiation. Independent wheels exercise real cache
+persistence over verified TLS. Local PostgreSQL 16/17/18 experiments also verified
+traditional PostgreSQL TLS negotiation with both drivers.
+
+Direct TLS requires PostgreSQL 17+ and the `postgresql` ALPN protocol. asyncpg
+0.32.0 sets ALPN on contexts it creates, including a `verify-full` DSN with
+`sslnegotiation=direct`. A caller-provided `SSLContext` must set
+`set_alpn_protocols(["postgresql"])`; this also enables application-owned direct-TLS
+pools with 0.31.0. Automatic direct TLS with 0.31.0 and direct TLS to PostgreSQL 16
+are outside this verified boundary. Local direct-TLS checks covered PostgreSQL
+17/18; CI repeats them on 18. See the [asyncpg release notes](https://github.com/MagicStack/asyncpg/releases/tag/v0.32.0)
+and [PostgreSQL TLS protocol](https://www.postgresql.org/docs/17/protocol-flow.html#PROTOCOL-FLOW-SSL).
+Arbitrary CA policies, mutual TLS, proxies and managed TLS endpoints remain unverified.
 
 ## New PostgreSQL database
 
