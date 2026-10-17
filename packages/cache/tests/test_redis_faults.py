@@ -975,16 +975,17 @@ async def test_infrastructure_readiness_failure_closes_client(
     assert closed == 1
 
 
-@pytest.mark.parametrize("ownership_changed", [False, True])
+@pytest.mark.parametrize("ownership_change", [None, "label", "image"])
 @pytest.mark.parametrize(
     "image",
     [
         infrastructure.IMAGE,
+        infrastructure.VALKEY_IMAGE,
         "redis:7.4.11@sha256:4fa24486b8bcca8eec45ee0eb166edc674795e53a2b53d1a9ef263eecebaac85",
     ],
 )
 async def test_fault_cleanup_survives_client_close_failure(
-    monkeypatch: pytest.MonkeyPatch, ownership_changed: bool, image: str
+    monkeypatch: pytest.MonkeyPatch, ownership_change: str | None, image: str
 ) -> None:
     active = client()
     original_close = active.aclose
@@ -996,15 +997,24 @@ async def test_fault_cleanup_survives_client_close_failure(
         nonlocal name, inspections
         if args[0] == "run":
             name = args[args.index("--name") + 1]
-            assert args[args.index("redis-server") - 1] == image
+            assert args[args.index(infrastructure.server_command(image)) - 1] == image
             return "synthetic-container-id"
         if args[0] == "inspect":
             assert args[-1] == name
             inspections += 1
             label = (
-                "foreign" if ownership_changed and inspections > 1 else "redis-store"
+                "foreign"
+                if ownership_change == "label" and inspections > 1
+                else "redis-store"
             )
-            return json.dumps({"semantix.disposable": label})
+            return json.dumps(
+                {
+                    "Labels": {"semantix.disposable": label},
+                    "Image": "foreign"
+                    if ownership_change == "image" and inspections > 1
+                    else image,
+                }
+            )
         if args[0] == "port":
             assert args[1] == name
             return "127.0.0.1:1"
@@ -1015,8 +1025,14 @@ async def test_fault_cleanup_survives_client_close_failure(
     async def ready(resource: Redis) -> None:
         assert resource is active
 
+    initialized = False
+
     async def initialize(store: RedisStore, *, initialization_client: Redis) -> None:
+        nonlocal initialized
         assert initialization_client is active
+        if initialized:
+            raise CacheStoreError("Synthetic replica admission refusal")
+        initialized = True
 
     async def command(*args: Any, **kwargs: Any) -> bytes:
         return b"OK"
@@ -1035,12 +1051,18 @@ async def test_fault_cleanup_survives_client_close_failure(
     monkeypatch.setattr(active, "aclose", close)
     monkeypatch.setattr(RedisStore, "initialize_schema", initialize)
     monkeypatch.setattr(RedisStore, "put", put)
-    expected = AssertionError if ownership_changed else OSError
+    expected = (
+        RuntimeError
+        if ownership_change == "image"
+        else AssertionError
+        if ownership_change == "label"
+        else OSError
+    )
     with pytest.raises(expected) as caught:
         await infrastructure.fault_container("readonly", image=image)
     assert inspections == 2
-    assert removals == ([] if ownership_changed else [name])
-    if not ownership_changed:
+    assert removals == ([] if ownership_change is not None else [name])
+    if ownership_change is None:
         assert str(caught.value) == "Synthetic client-close failure"
 
 
@@ -1056,11 +1078,13 @@ async def test_fault_cleanup_survives_client_close_failure(
         ({}, "8.10.2", False),
     ],
 )
+@pytest.mark.parametrize("product", ["redis", "valkey"])
 async def test_infrastructure_version_probe_and_cleanup(
     monkeypatch: pytest.MonkeyPatch,
     server: dict[str, object],
     expected: str,
     accepted: bool,
+    product: str,
 ) -> None:
     active = client()
     original_close = active.aclose
@@ -1070,8 +1094,11 @@ async def test_infrastructure_version_probe_and_cleanup(
         assert resource is active
 
     async def info(section: str) -> dict[str, object]:
-        assert section == "server"
-        return server
+        if section == "server":
+            return server
+        return (
+            {"role": "master"} if section == "replication" else {"cluster_enabled": 0}
+        )
 
     async def close(close_connection_pool: bool | None = None) -> None:
         nonlocal closed
@@ -1080,6 +1107,10 @@ async def test_infrastructure_version_probe_and_cleanup(
 
     monkeypatch.setenv("REDIS_TEST_URL", "unused")
     monkeypatch.setenv("REDIS_TEST_VERSION", expected)
+    monkeypatch.setenv("REDIS_TEST_PRODUCT", product)
+    if product == "valkey":
+        # Existing Redis identities must never count as Valkey evidence.
+        accepted = False
     monkeypatch.setattr(infrastructure, "client", lambda url: active)
     monkeypatch.setattr(infrastructure, "ready", ready)
     monkeypatch.setattr(active, "info", info)
@@ -1087,7 +1118,7 @@ async def test_infrastructure_version_probe_and_cleanup(
     if accepted:
         await infrastructure.verify_version()
     else:
-        with pytest.raises(AssertionError, match="Unexpected Redis"):
+        with pytest.raises(AssertionError, match="Unexpected"):
             await infrastructure.verify_version()
     assert closed
 
@@ -1098,3 +1129,149 @@ def test_infrastructure_version_requires_explicit_configuration(
     monkeypatch.delenv("REDIS_TEST_VERSION", raising=False)
     with pytest.raises(KeyError, match="REDIS_TEST_VERSION"):
         asyncio.run(infrastructure.verify_version())
+
+
+@pytest.mark.redis
+@pytest.mark.parametrize("mutation", ["put", "hit"])
+async def test_real_suppressed_acknowledgement_never_replays(
+    redis_client: Redis, mutation: str
+) -> None:
+    active = client(os.environ["REDIS_TEST_URL"])
+    active.connection_pool.max_connections = 1
+    active.connection_pool.connection_kwargs["socket_timeout"] = 0.2
+    store = RedisStore(
+        client=active,
+        embedding_space=SPACE,
+        key_prefix="redis_lost_ack_" + uuid4().hex,
+        default_ttl_seconds=None,
+    )
+    value = entry("real lost acknowledgement")
+    try:
+        await store.initialize_schema(initialization_client=redis_client)
+        await store.put(value)
+        before = await redis_client.hgetall(store._config.keys[0])
+        # Suppress replies on this real socket, then dispatch exactly one mutation.
+        acquire = cast(
+            Callable[[], Awaitable[Connection]], active.connection_pool.get_connection
+        )
+        connection = await acquire()
+        try:
+            await connection.send_command("CLIENT", "REPLY", "OFF")
+        finally:
+            await active.connection_pool.release(connection)
+        operation = (
+            store.put(value)
+            if mutation == "put"
+            else store.record_hit(
+                value.cache_key,
+                namespace="default",
+                expected_created_at=value.created_at,
+            )
+        )
+        with pytest.raises(CacheTimeoutError):
+            await operation
+        assert not active.connection_pool._in_use_connections
+        # Normal client reconnect is allowed; the uncertain mutation is never replayed.
+        match = await store.find_nearest((1, 0), namespace="default")
+        assert match is not None
+        after = await redis_client.hgetall(store._config.keys[0])
+        if mutation == "put":
+            assert match.entry.created_at == value.created_at + timedelta(
+                microseconds=1
+            )
+        else:
+            assert match.entry.created_at == value.created_at
+            assert after[b"last_revision_us"] == before[b"last_revision_us"]
+        detail = await store.inspect_entry(value.cache_key, namespaces=("default",))
+        assert detail is not None
+        assert detail.hit_count == (1 if mutation == "hit" else 0)
+        assert int(after[b"access_counter"]) == int(before[b"access_counter"]) + 1
+    finally:
+        await store.aclose()
+        await redis_client.delete(*store._config.keys)
+        await active.aclose(close_connection_pool=True)
+
+
+@pytest.mark.parametrize(
+    "image",
+    [
+        "valkey/valkey:9.1.2",
+        "valkey/valkey:9.1.3@sha256:" + "a" * 64,
+        "other/valkey:9.1.2@sha256:" + "a" * 64,
+        "valkey/valkey:9.1.2@sha256:" + "a" * 64,
+        "redis:8.10.2",
+    ],
+)
+def test_fault_harness_rejects_unpinned_or_unapproved_images(image: str) -> None:
+    with pytest.raises(RuntimeError, match="approved pinned server image"):
+        infrastructure.server_command(image)
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        None,
+        "server_name",
+        "valkey_version",
+        "server_mode",
+        "valkey_release_stage",
+        "redis_version",
+    ],
+)
+async def test_infrastructure_valkey_probe(
+    monkeypatch: pytest.MonkeyPatch, invalid: str | None
+) -> None:
+    active = client()
+    server: dict[str, object] = {
+        "server_name": "valkey",
+        "valkey_version": "9.1.2",
+        "valkey_release_stage": "ga",
+        "server_mode": "standalone",
+        "redis_version": "7.2.4",
+    }
+    if invalid is not None:
+        del server[invalid]
+
+    async def info(section: str) -> dict[str, object]:
+        responses: dict[str, dict[str, object]] = {
+            "server": server,
+            "replication": {"role": "master"},
+            "cluster": {"cluster_enabled": 0},
+        }
+        return responses[section]
+
+    async def config_get(*args: Any) -> dict[str, str]:
+        return {"maxmemory-policy": "noeviction"}
+
+    async def command(*args: Any, **kwargs: Any) -> dict[str, object]:
+        assert args == (
+            "COMMAND",
+            "INFO",
+            "eval",
+            "eval_ro",
+            "hpexpireat",
+            "hpexpiretime",
+        )
+        return {name: [1] for name in args[2:]}
+
+    closed = False
+
+    async def close(close_connection_pool: bool | None = None) -> None:
+        nonlocal closed
+        closed = True
+
+    monkeypatch.setenv("REDIS_TEST_URL", "unused")
+    monkeypatch.setenv("REDIS_TEST_VERSION", "9.1.2")
+    monkeypatch.setenv("REDIS_TEST_PRODUCT", "valkey")
+    monkeypatch.setattr(infrastructure, "client", lambda url: active)
+    monkeypatch.setattr(infrastructure, "ready", lambda active: asyncio.sleep(0))
+    monkeypatch.setattr(active, "info", info)
+    monkeypatch.setattr(active, "config_get", config_get)
+    monkeypatch.setattr(active, "execute_command", command)
+    monkeypatch.setattr(active, "aclose", close)
+    if invalid is None:
+        await infrastructure.verify_version()
+    else:
+        with pytest.raises(AssertionError, match="Unexpected Valkey"):
+            await infrastructure.verify_version()
+    assert closed

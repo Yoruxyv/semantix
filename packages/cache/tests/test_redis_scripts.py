@@ -16,6 +16,14 @@ from semantix_cache.stores.redis import RedisStore, _Configuration
 # Captured from immutable main 412025807965d457fc320219e31660396c929150 before moving.
 CHECKSUM = "d39472099de85395dea75f2bb00b85f63bf395cfd4df3b8dafef61c0bf85babf"
 SPACE = EmbeddingSpace(identity="redis-script-refactor-v1", dimensions=2)
+# Captured INFO server fields from the pinned upstream Valkey 9.1.2 image.
+VALKEY_SERVER: dict[str, object] = {
+    "server_name": "valkey",
+    "valkey_version": "9.1.2",
+    "valkey_release_stage": "ga",
+    "redis_version": "7.2.4",
+    "server_mode": "standalone",
+}
 
 
 @pytest.mark.parametrize(
@@ -236,6 +244,56 @@ def test_server_version_policy(value: object, accepted: bool) -> None:
 @pytest.mark.parametrize(
     ("position", "response"),
     [
+        *[
+            (0, VALKEY_SERVER | {"valkey_version": value})
+            for value in (
+                "7.2.4",
+                "8.1.10",
+                "9.0.6",
+                "9.1.1",
+                "9.1.3",
+                "9.2.0",
+                "10.0.0",
+                "9.1.2-rc1",
+                "9.1.2+vendor",
+                "9.1.2.post1",
+                "09.1.2",
+                "9.01.2",
+                "9.1.02",
+                "v9.1.2",
+                "9.1.2\n",
+                "9.1.٢",
+                "9.1.2.0",
+                None,
+                b"9.1.2",
+                9.12,
+            )
+        ],
+        *[
+            (0, VALKEY_SERVER | {field: value})
+            for field, value in (
+                ("server_name", "redis"),
+                ("server_name", "other"),
+                ("server_name", None),
+                ("redis_version", "8.10.2"),
+                ("redis_version", "7.2.4+vendor"),
+                ("redis_version", None),
+                ("valkey_release_stage", "rc1"),
+                ("valkey_release_stage", "dev"),
+                ("valkey_release_stage", None),
+                ("server_mode", "cluster"),
+                ("server_mode", "sentinel"),
+                ("server_mode", None),
+                ("redis_mode", "standalone"),
+            )
+        ],
+        *[
+            (0, {"redis_version": "8.10.2", "redis_mode": "standalone", field: value})
+            for field, value in (
+                ("server_mode", "standalone"),
+                ("valkey_release_stage", "ga"),
+            )
+        ],
         (0, None),
         (0, {}),
         (0, {"redis_version": None, "redis_mode": "standalone"}),
@@ -295,8 +353,9 @@ def test_server_version_policy(value: object, accepted: bool) -> None:
         (4, {name: [1] for name in ("eval", "eval_ro", "hpexpireat", "wrong_command")}),
     ],
 )
+@pytest.mark.parametrize("product", ["redis", "valkey"])
 async def test_initialization_rejects_unsupported_server_before_writes(
-    monkeypatch: pytest.MonkeyPatch, position: int, response: object
+    monkeypatch: pytest.MonkeyPatch, position: int, response: object, product: str
 ) -> None:
     active = Redis(
         retry=Retry(NoBackoff(), 0),
@@ -313,6 +372,8 @@ async def test_initialization_rejects_unsupported_server_before_writes(
         {"maxmemory-policy": "noeviction"},
         {name: [1] for name in ("eval", "eval_ro", "hpexpireat", "hpexpiretime")},
     ]
+    if product == "valkey":
+        responses[0] = VALKEY_SERVER
     responses[position] = response
     execute = AsyncMock(side_effect=responses)
     write = AsyncMock()
@@ -322,6 +383,48 @@ async def test_initialization_rejects_unsupported_server_before_writes(
         with pytest.raises(CacheStoreError):
             await store.initialize_schema(initialization_client=active)
         write.assert_not_awaited()
+    finally:
+        await store.aclose()
+        await active.aclose(close_connection_pool=True)
+
+
+@pytest.mark.parametrize(
+    "version", ["7.4.11", "8.2.10", "8.4.7", "8.6.7", "8.8.3", "8.10.2", "valkey"]
+)
+async def test_initialization_accepts_explicit_server_identity(
+    monkeypatch: pytest.MonkeyPatch, version: str
+) -> None:
+    active = Redis(
+        retry=Retry(NoBackoff(), 0),
+        protocol=2,
+        decode_responses=False,
+        socket_timeout=5,
+        socket_connect_timeout=5,
+    )
+    store = RedisStore(client=active, embedding_space=SPACE)
+    server = (
+        VALKEY_SERVER
+        if version == "valkey"
+        else {"redis_version": version, "redis_mode": "standalone"}
+    )
+    execute = AsyncMock(
+        side_effect=[
+            server,
+            {"role": "master"},
+            {"cluster_enabled": 0},
+            {"maxmemory-policy": "noeviction"},
+            {name: [1] for name in ("eval", "eval_ro", "hpexpireat", "hpexpiretime")},
+        ]
+    )
+    write = AsyncMock(return_value=0)
+    monkeypatch.setattr(active, "execute_command", execute)
+    monkeypatch.setattr(active, "eval", write)
+    try:
+        await store.initialize_schema(initialization_client=active)
+        write.assert_awaited_once_with(
+            module._INITIALIZE, 3, *store._config.keys, *store._config.descriptor
+        )
+        assert execute.await_count == 5
     finally:
         await store.aclose()
         await active.aclose(close_connection_pool=True)

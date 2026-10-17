@@ -1,6 +1,8 @@
-# Redis storage for embedded Python caching
+# Redis and Valkey storage for embedded Python caching
 
-RedisStore is an optional structural CacheStore. It shares the existing
+RedisStore is an optional structural CacheStore for Redis Open Source and exact
+Valkey 9.1.2. Both use the existing `semantix_cache.stores.redis.RedisStore` API and
+`[redis]` extra; no Valkey-specific Python dependency is needed. It shares the existing
 AsyncSemanticCache policy, threshold, namespace and revision contract.
 
 Install `semantix-cache[redis]` when the package is published. Before publication,
@@ -43,14 +45,15 @@ security updates; no upstream long-term backport guarantee was found.
 The supported deployment is a directly addressed writable standalone primary using
 **noeviction**. Operators configure that policy; Semantix never changes server
 configuration. Cluster, Sentinel, automatic failover, replica reads, active-active,
-Valkey and universal managed-provider compatibility remain outside this boundary.
+other Redis-compatible forks and universal managed-provider compatibility remain
+outside this boundary. Redis and Valkey have independent admission policies.
 
 ### Supported versions
 
 Server admission accepts only the release families and conservative patch floors
 below. The server matrix uses **redis-py 8.1.0**; driver certification is listed separately.
 The required [Quality workflow](../../.github/workflows/quality.yml) checks the
-actual Redis identity and exact version before counting test results.
+actual product identity and exact version before counting test results.
 
 | Redis family and minimum | Exact CI server | CI execution | Prior experimental server |
 | --- | --- | --- | --- |
@@ -87,8 +90,46 @@ were introduced in Redis 7.4. A compatible-looking version cannot replace those
 checks. Redis 8.0 is intentionally excluded from the policy and the upstream
 security-supported list. Other unlisted families, malformed/vendor-suffixed
 versions and identified Redis forks are rejected. Driver versions 7.4.1/8.0.1
-do not imply Redis 8.0 server support. Valkey, managed failover and clustered
-deployments require separate compatibility work.
+do not imply Redis 8.0 server support. Managed failover and clustered deployments
+require separate compatibility work.
+
+### Valkey 9.1.2
+
+Valkey is admitted as its own product, only at **exact 9.1.2**. The upstream
+[Valkey release](https://github.com/valkey-io/valkey/releases/tag/9.1.2) and
+[community-maintained container](https://github.com/valkey-io/valkey-container)
+provide the tested artifact. CI pins
+`valkey/valkey:9.1.2@sha256:418652cfb58ef879d4978c33553735d7147016032d5aefaa14c828e611eb9dfd`
+and executes its Linux amd64 image.
+
+Measured `INFO server` fields are `server_name=valkey`, `valkey_version=9.1.2`,
+`valkey_release_stage=ga`, `server_mode=standalone` and `redis_version=7.2.4`;
+`redis_mode` is absent. All these identity fields are checked. The Redis version
+is a compatibility field, never the source of Valkey version support. Setup also
+requires primary role, cluster disabled, noeviction and the same four scripting
+and native field-expiry commands. Valkey added
+[HPEXPIREAT](https://valkey.io/commands/hpexpireat/) in 9.0; command availability
+alone is insufficient for admission. Earlier/later Valkey releases, prereleases,
+vendor-suffixed versions, contradictory identities and unknown forks are rejected.
+Self-reported INFO fields do not authenticate a malicious server; use a trusted
+artifact and secure the endpoint.
+
+The required Redis fault job adds one sequential Valkey target on Linux CPython
+3.14 / redis-py 8.1.0. It runs the complete RedisStore selection, including shared
+conformance, explicit identity/configuration rejections, native expiry, inspection,
+concurrency, cancellation and real lost-acknowledgement tests. JUnit outcomes must
+match collection with zero skips. The same pinned Valkey image supplies AOF
+restart, real OOM and read-only replica controls, followed by an isolated installed
+wheel consumer. Local Windows 11 CPython 3.14.6 / redis-py 8.1.0 runs against the
+Linux x86-64 container cover that same selection, faults and wheel.
+
+The unchanged Lua bytes/checksum, descriptor, key layout, revision/hit accounting,
+exact float64 scoring and TTL semantics justify reuse of the existing Redis v1
+binding marker. This certifies new Valkey bindings and same-product restart/reopen;
+it does **not** certify copying Redis data files to Valkey or migrating in either
+direction. No separate store, fork abstraction, migration or runtime dependency
+is introduced. Other driver/Python combinations, ARM64, macOS, Valkey TLS and
+managed Valkey offerings remain unverified; Cluster/failover remain unsupported.
 
 ### Verified driver combinations
 
@@ -246,7 +287,8 @@ runtime role to the owned three-key patterns and prevent out-of-band writes.
 
 Runtime commands include EVAL/EVAL_RO, TIME, TYPE, PTTL, EXISTS, HGET/HMGET,
 HEXISTS, HSTRLEN, HLEN/HKEYS, HSET/HINCRBY/HDEL, ZCARD/ZSCORE/ZRANGE/ZADD/ZREM
-and HPEXPIREAT. Explicit initialization additionally uses INFO, CONFIG GET and
+and HPEXPIREAT. The same protocol commands run on Valkey. Explicit initialization
+additionally uses INFO, CONFIG GET and
 COMMAND INFO. No FLUSH, broad key scan, CONFIG SET, SCRIPT LOAD, Functions
 deployment or automatic schema migration is used. Setup authority is a deployment
 rule; it is not a claim that a runtime ACL cannot modify metadata fields.
@@ -310,9 +352,12 @@ later operations fail closed. Inspect and preserve required data, then recover
 through reviewed operator tooling or a fresh prefix. There is no automatic repair,
 marker reset or dirty-state-as-empty behavior.
 
-Configure Redis persistence and backups for the required durability. A graceful
+Configure the selected server's persistence and backups for the required durability.
+A graceful
 disposable AOF restart is covered by integration tests for entries, revision
-history, hit metadata, LRU and absolute TTL accounting for downtime. That evidence
+history, hit metadata, LRU and absolute TTL accounting for downtime on Redis and
+Valkey. Real reply suppression verifies that completed server mutations are
+not replayed after a client timeout and normal reconnection. That evidence
 does not certify crash rollback, failover, restored old backups or distributed
 exactly-once behavior.
 
@@ -330,10 +375,13 @@ harness additionally requires REDIS_TEST_CONTAINER naming a labelled
 `semantix-redis-...` disposable container; it verifies ownership before restarting
 or deleting its own resources. Set REDIS_TEST_VERSION to the exact expected
 server version; `--verify-version` checks it without restarting the container.
-The restart harness requires a digest-pinned Redis image and uses that same image
-for its OOM/read-only containers. No database-wide flush is used.
+For Valkey additionally set `REDIS_TEST_PRODUCT=valkey` and
+`REDIS_TEST_VERSION=9.1.2`; the default product remains Redis. These are test harness
+variables, not runtime application settings. The restart harness verifies the owned
+container's label and approved immutable image before mutation/cleanup, and uses
+that same image for its OOM/read-only containers. No database-wide flush is used.
 
 `tests/redis_benchmark_smoke.py` measures synthetic 500 by 1,536 and 2,000 by 1,536
 bindings and saves process/server/latency evidence under ignored .cache/.
 For package verification, run the installed-wheel Redis smoke against disposable
-Redis after installing the wheel's redis extra.
+Redis or Valkey after installing the wheel's redis extra.
