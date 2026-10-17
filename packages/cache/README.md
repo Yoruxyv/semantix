@@ -9,7 +9,9 @@ Only `packages/cache` is the intended first public distribution. The optional
 backend/dashboard and the separate HTTP client are not required for embedded use.
 
 [Source quick start](#run-from-source) · [Local installation](#use-in-another-python-project) ·
-[Storage setup](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md#choose-a-store) · [Contract](#contract)
+[Optional dependencies](#choose-optional-dependencies) ·
+[Storage setup](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md#choose-a-store) ·
+[Contract](#contract) · [Troubleshooting](#troubleshooting)
 
 ## Run from source
 
@@ -82,6 +84,32 @@ editable install. These paths install local Semantix source/artifacts; they do n
 fetch an unpublished Semantix distribution from PyPI. Optional provider/store
 extras require their own dependencies and setup; see the [provider](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/providers.md)
 and [storage](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md) guides.
+
+## Choose optional dependencies
+
+Choose extras on the same local source or wheel install; the core does not require
+a provider SDK, database driver, HTTP client, server or dashboard dependency.
+
+| Capability | Extra | Import / setup guide |
+| --- | --- | --- |
+| MemoryStore and local SQLiteStore | None | [Storage selection and SQLite runtime requirements](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md#choose-a-store) |
+| Maintained HTTP embedding/generation adapters | `providers`, or `openai`, `huggingface`, `gemini`, `ollama`, `anthropic` | [Provider modules and configuration](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/providers.md#install-and-import); these extras all add HTTPX |
+| PostgreSQL/pgvector | `pgvector` | [Server/extension/asyncpg combinations and setup](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md#verified-postgresql-combinations) |
+| Redis or the certified Valkey target | `redis` | [RedisStore server/driver boundaries and setup](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/redis.md) |
+| MySQL | `mysql` | [MySQLStore server/driver boundaries and setup](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/mysql.md) |
+
+For example, from the directory containing the checkout, use your consumer
+environment's Python to install a built wheel with HTTP adapters and PostgreSQL:
+
+~~~text
+python -m pip install './semantix/packages/cache/dist/semantix_cache-0.1.0-py3-none-any.whl[providers,pgvector]'
+~~~
+
+For editable source, the corresponding target is
+`'./semantix/packages/cache[providers,pgvector]'` with `pip install -e`.
+Install only the capabilities you use; the `dev` extra is for package development.
+Installing a driver does not provision a database or initialize a store. The
+linked guides distinguish runtime admission from the exact tested combinations.
 
 ## Use your own embedding and generation
 
@@ -355,8 +383,10 @@ against your workload; semantic matches can be wrong.
 Per-write TTL is a finite positive number up to 31,536,000 seconds. None inherits the
 store default, including a no-expiry default of None. A requested TTL cannot extend
 a finite default retention cap. TTL starts at the write, resets on replacement,
-does not extend on hits, and expires at the exact monotonic deadline. Metadata
-timestamps are aware UTC. Candidate confirmation rechecks revision and expiry.
+does not extend on hits, and expires at the exact monotonic deadline in MemoryStore.
+Persistent stores use their documented authoritative clocks and precision; see the
+[storage guide](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md).
+Metadata timestamps are aware UTC. Candidate confirmation rechecks revision and expiry.
 
 ## Extension and ownership
 
@@ -437,6 +467,28 @@ asyncio and bounded exact float64 scans. Setup is explicit; supported server
 families and verified patches, plus exact Valkey 9.1.2 through the same RedisStore,
 are listed in the Redis guide. A directly addressed writable standalone primary with noeviction is required.
 See the [source layout](https://github.com/Yoruxyv/semantix/blob/main/packages/cache/src/README.md) for package boundaries.
+
+## Troubleshooting
+
+A cache miss is an ordinary result; configuration, provider and storage failures
+are errors. Do not turn those failures into invented miss/write evidence.
+
+| Symptom | Check / next step |
+| --- | --- |
+| Package or optional driver cannot be imported | Use the application's actual Python environment and the local source/wheel install above. Import persistent stores and provider adapters from their explicit modules. No PyPI release is available yet. |
+| SQLite raises `CacheConfigurationError` | Check `sqlite3.sqlite_version` and `sqlite3.threadsafety` in that same interpreter. Follow the [linked-runtime and WAL safety requirements](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md#sqlite-local-file-persistence); installing a Python extra cannot patch SQLite. |
+| A persistent store rejects its schema or binding | Complete its explicit operator setup with the documented authority; check identity, dimensions, capacity and TTL settings. Preserve existing data and migrations. Never repair a checksum error by editing the migration or adopting foreign tables. |
+| `EmbeddingSpaceError` or invalid vectors | Keep embedder/store metadata identical; verify actual output dimensions, finite nonzero values and stable model/preprocessing identity. Use a new matching binding when the embedding space changes. |
+| Unexpected hit or miss | Check namespace, response-context revision, expiry, capacity eviction and threshold. Even hits require embedding/lookup. Similarity does not prove answer compatibility; review the [accuracy limits](https://github.com/Yoruxyv/semantix/blob/main/docs/reference/semantic-accuracy-limitations.md). |
+| `CacheBusyError` during shutdown | Stop admitting work and drain/cancel application tasks, then allow retained workers/cleanup to finish before closing owned resources. Closing the facade does not close borrowed dependencies. Follow the store-specific recovery guide if cleanup fails. |
+| `CacheTimeoutError` / `CacheStoreError` after generation or a write | A timeout does not prove rollback. Reconcile an uncertain mutation before an application-requested retry; see [generation succeeds but persistence fails](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/context-identity-and-migration.md#generation-succeeds-but-persistence-fails). Semantix does not replay the operation automatically. |
+
+Provider wrappers report expected failures as `EmbeddingError`/`GenerationError`;
+exceptions from your own generation callable propagate unchanged. Keep credentials,
+prompts, answers and raw driver/provider diagnostics out of public logs.
+
+For application-owned inspection, see [optional inspection and administration](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md#optional-inspection-and-administration).
+Its preview/detail results remain sensitive and require application authorization.
 
 ## Contributor checks
 

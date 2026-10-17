@@ -13,12 +13,14 @@ application; no Semantix FastAPI server is required. The separate
 | [`models.py`](semantix_cache/models.py) | Immutable embedding metadata, entries, matches and public results |
 | [`policies.py`](semantix_cache/policies.py), [`errors.py`](semantix_cache/errors.py) | Cache policies and typed errors |
 | [`memory.py`](semantix_cache/memory.py) | Bounded, process-local, non-durable `MemoryStore` |
+| [`inspection.py`](semantix_cache/inspection.py) | Optional concrete-store observation models; outside the mandatory CacheStore port |
 | [`_semantics.py`](semantix_cache/_semantics.py) | Pure canonicalization, keys, namespaces, vectors, TTL and decision rules shared with the server |
 | [`_lifecycle.py`](semantix_cache/_lifecycle.py) | Synchronous operation admission, busy-close and closed-state checks |
 | [`observability.py`](semantix_cache/observability.py) | Immutable numeric coalescing snapshot |
 | [`_coalescing.py`](semantix_cache/_coalescing.py) | Bounded completion gates, synchronization and isolated collection |
 | [`_coalescing_metrics.py`](semantix_cache/_coalescing_metrics.py) | Fixed numeric lifetime ledger; no payloads |
 | [`adapters/`](semantix_cache/adapters/__init__.py) | Maintained provider adapters, imported explicitly with optional HTTP dependencies |
+| [`stores/sqlite.py`](semantix_cache/stores/sqlite.py) | Dedicated local WAL file, explicit setup, one owned connection and worker |
 | [`stores/pgvector.py`](semantix_cache/stores/pgvector.py) | Optional application-database PostgreSQL/pgvector persistence |
 | [`stores/redis.py`](semantix_cache/stores/redis.py) | Optional bounded exact Redis storage with explicit schema and owned/borrowed clients |
 | [`stores/mysql.py`](semantix_cache/stores/mysql.py) | Optional verified-TLS MySQL storage, one owned worker and bounded cleanup recovery |
@@ -30,6 +32,8 @@ application; no Semantix FastAPI server is required. The separate
 Root imports use only NumPy/Pydantic and the standard library. They do not import
 HTTPX, PyMySQL, asyncpg, redis, FastAPI, provider SDKs, adapter modules or storage modules. Import
 `PgVectorStore` from `semantix_cache.stores.pgvector` with the `[pgvector]` extra.
+Import `SQLiteStore` from `semantix_cache.stores.sqlite` without an extra; its
+[linked SQLite runtime must meet the WAL safety policy](../../../docs/embedded/storage.md#sqlite-local-file-persistence).
 Import `RedisStore` from `semantix_cache.stores.redis` with `[redis]`.
 Import `MySQLStore` from `semantix_cache.stores.mysql` with `[mysql]`; it owns its
 connection and worker. See [MySQL setup and recovery](../../../docs/embedded/mysql.md).
@@ -59,13 +63,18 @@ uv run --no-sync pytest --cov=semantix_cache
 ```
 
 mypy enables deprecation diagnostics. Supply `PGVECTOR_TEST_DATABASE_URL` only for
-a disposable PostgreSQL database and `REDIS_TEST_URL` only for disposable Redis
-8.10.2 to execute the respective storage integration cases. Without the matching
-URL those cases skip. For custom-store development, use the source-based kit in
+a disposable PostgreSQL database and `REDIS_TEST_URL` only for a
+[supported disposable Redis or Valkey target](../../../docs/embedded/redis.md#supported-versions)
+to execute the respective storage integration cases. Without the matching URL
+those cases skip; skips do not verify compatibility. SQLite tests create temporary
+files but require an eligible linked runtime. MySQL tests require the
+[owned verified-TLS fixture](../../../docs/embedded/mysql.md#disposable-verification),
+not an ordinary database. For custom-store development, use the source-based kit in
 [`../examples/store_conformance/`](../examples/store_conformance/__init__.py), following
 its [standalone consumer](../examples/test_custom_store_conformance.py). The
-repository's [built-in store tests](../tests/test_store_conformance.py) supply
-MemoryStore/PgVectorStore fixtures and collect that custom consumer; they are not
+repository's [shared consumer](../tests/test_store_conformance.py) supplies
+MemoryStore/PgVectorStore fixtures and collects that custom consumer; separate
+SQLite, MySQL and Redis consumers use the same kit. These backend fixtures are not
 the reusable kit. See the [conformance guide](../../../docs/embedded/cache-store-conformance.md)
 for setup and evidence boundaries. Examples ship in the source archive, not the
 wheel; the kit requires development pytest tooling, never a runtime dependency.

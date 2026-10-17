@@ -9,12 +9,15 @@ The separate `semantix_client` package is the optional/reference HTTP client.
 The server/workbench delegates to MemoryStore, PgVectorStore and RedisStore. See
 [server storage configuration](../guides/platform-storage.md) for selection and setup.
 
+## Optional inspection and administration
+
 MemoryStore, PgVectorStore and RedisStore additionally offer optional `inspect_entries` and
 `inspect_entry` observations. They exclude expired entries without purging them,
 recording hits, extending TTL or changing LRU. Lists contain prompts, identifiers
 and bounded response previews (at most 240 characters), never vectors or complete
 long answers. These fields remain sensitive; applications authorize namespace
-scope before inspection. Only explicitly scoped detail reads return a full answer.
+scope before inspection. Detail reads can return a full answer; pass an explicitly
+authorized namespace filter.
 The package does not authenticate callers. Results are observations, never leases.
 
 `clear_all` is a separate administrative mutation across namespaces of the active
@@ -29,6 +32,31 @@ operation deadline and the existing binding capacity ceiling. No new index or
 metadata keys are introduced. Concurrent changes can shift live offsets and Redis
 search totals. See [server storage](../guides/platform-storage.md#inspector-and-diagnostics)
 for authorization, search costs and pagination limitations.
+
+Call these methods on a concrete supported store, not on `AsyncSemanticCache` or
+the mandatory `CacheStore` protocol. Result types live in
+`semantix_cache.inspection`; SQLiteStore and MySQLStore do not implement this API.
+
+For an existing MemoryStore populated through your cache, inside an async function:
+
+```python
+# Authorize this namespace in the application before issuing either read.
+namespace = "support:tenant123"
+page = await store.inspect_entries(namespace=namespace, limit=20, sort="newest")
+if page.items:
+    detail = await store.inspect_entry(
+        page.items[0].cache_key, namespaces=(namespace,)
+    )
+    # detail may be None if the entry expired or was deleted after the list read.
+```
+
+The same calls apply to PgVectorStore and RedisStore. List `namespace=None`
+(the default) observes all namespaces in the binding. Detail `namespaces=None`
+also allows all namespaces, while `namespaces=()` allows none; neither filter
+authenticates a caller. Avoid unrestricted scope in tenant-facing code.
+`clear_all()` requires separate administrative authorization; ordinary
+`cache.clear(namespace=...)` remains scoped. Clearing is not secure erasure of
+database files, backups or already-returned snapshots.
 
 ## Choose a store
 
@@ -283,9 +311,15 @@ infer that every combination across these versions has been tested. The optional
 extra admits asyncpg `>=0.31,<=0.32.0`: the existing 0.31.x policy plus the
 exact tested 0.32.0 release; later 0.32.x releases require new evidence. Both
 project locks and the development extra retain the 0.31.0 baseline. For an
-explicit runtime candidate install, use `pip install 'semantix-cache[pgvector]'
-'asyncpg==0.32.0'`. Candidate typing is checked separately with asyncpg-stubs
-0.32.0; the development extra keeps its baseline driver/stub constraints.
+explicit runtime candidate install, use your consumer environment's Python and
+the locally built wheel (this path assumes `packages/cache`):
+
+```text
+python -m pip install './dist/semantix_cache-0.1.0-py3-none-any.whl[pgvector]' 'asyncpg==0.32.0'
+```
+
+Candidate typing is checked separately with asyncpg-stubs 0.32.0; the development
+extra keeps its baseline driver/stub constraints.
 
 Windows x86_64 experiments additionally passed PostgreSQL 16.15/0.8.7 on CPython
 3.11.15 and 17.10/0.8.5 and 18.6/0.8.7 on CPython 3.14.6 with both exact drivers.
@@ -575,8 +609,11 @@ available for providers/versions whose external APIs change independently.
 ## Validation and adapter-author evidence
 
 The [developer conformance kit](cache-store-conformance.md) runs against
-MemoryStore, PgVectorStore and the independent example through the maintained
-[store suite](../../packages/cache/tests/test_store_conformance.py). It covers empty/exact/similar
+all five maintained stores and the independent example. MemoryStore, PgVectorStore
+and the example use the [shared consumer](../../packages/cache/tests/test_store_conformance.py);
+[SQLite](../../packages/cache/tests/test_sqlite_conformance.py),
+[MySQL](../../packages/cache/tests/test_mysql_conformance.py) and
+[Redis](../../packages/cache/tests/test_redis.py) supply backend-owned consumers. It covers empty/exact/similar
 search, threshold misses, isolation, dimensional validation, expiry, revisions, scoped
 mutation, LRU, concurrency and close. PostgreSQL-specific
 [tests](../../packages/cache/tests/test_pgvector.py) exercise persistence, existing
