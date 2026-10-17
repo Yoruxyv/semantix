@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable
 from typing import cast
 
 from redis.asyncio import Redis
@@ -25,17 +26,21 @@ async def inspect_page(
     limit: int,
     sort: InspectionSort,
 ) -> InspectionPage:
-    raw = await client.eval_ro(
-        script,
-        3,
-        *keys,
-        *descriptor,
-        namespace or "",
-        cache_key or "",
-        json.dumps(namespaces),
-        offset,
-        limit,
-        sort,
+    # redis-py 7.4 shares sync/async Lua annotations; this client is asynchronous.
+    raw = await cast(
+        Awaitable[object],
+        client.eval_ro(
+            script,
+            3,
+            *keys,
+            *descriptor,
+            namespace or "",
+            cache_key or "",
+            json.dumps(namespaces),
+            offset,
+            limit,
+            sort,
+        ),
     )
     try:
         if not isinstance(raw, list):

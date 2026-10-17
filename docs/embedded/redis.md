@@ -12,7 +12,31 @@ python -m pip install 'dist/semantix_cache-0.1.0-py3-none-any.whl[redis]'
 
 Import `RedisStore` from `semantix_cache.stores.redis`. Root imports and unrelated
 stores require no Redis driver. The extra adds direct redis-py
-`>=8.1.0,<8.2`; it requires no hiredis, RedisVL, RedisJSON or provider framework.
+`>=7.4.1,<8.2,!=8.0.0`; it requires no hiredis, RedisVL, RedisJSON or provider framework.
+Runtime accepts exactly **7.4.1**, **8.0.1**, and canonical stable **8.1.x** patch
+versions. Development locks and the optional server keep the 8.1.x baseline
+(resolved to 8.1.0). Normal installation selects that newer baseline.
+
+The dependency interval cannot express the disjoint runtime policy. It explicitly
+excludes 8.0.0; other unverified 7.x/8.0.x releases and prerelease, development,
+post-release, vendor/local or malformed version strings fail runtime admission.
+The interval is not a claim that every intermediate or future release is supported.
+Pin an alternate explicitly in the same resolver transaction:
+
+```bash
+python -m pip install 'dist/semantix_cache-0.1.0-py3-none-any.whl[redis]' 'redis==7.4.1'
+# Or use redis==8.0.1. No --no-deps override is needed.
+```
+
+The package certifies Semantix's direct standalone Redis usage. [Upstream 8.0](https://github.com/redis/redis-py/releases/tag/v8.0.0)
+changed protocol, retry and response defaults; Semantix continues to require
+explicit binary RESP2, async Retry(NoBackoff(), 0), standard pools/parsers and
+finite socket deadlines on all admitted drivers. The older releases retain
+verified TLS defaults and the earlier connection-pool credential-repr fix.
+[Upstream 8.0.1](https://github.com/redis/redis-py/releases/tag/v8.0.1) fixes Pipeline.reset cancellation cleanup; Semantix does not use
+pipelines, PubSub, Cluster or MultiDB, so this compatibility evidence does not
+certify those driver features. Prefer the current 8.1.x baseline and review
+security updates; no upstream long-term backport guarantee was found.
 
 ## Supported deployment and work limits
 
@@ -24,7 +48,7 @@ Valkey and universal managed-provider compatibility remain outside this boundary
 ### Supported versions
 
 Server admission accepts only the release families and conservative patch floors
-below. All rows use **redis-py 8.1.0**; the accepted client policy remains 8.1.x.
+below. The server matrix uses **redis-py 8.1.0**; driver certification is listed separately.
 The required [Quality workflow](../../.github/workflows/quality.yml) checks the
 actual Redis identity and exact version before counting test results.
 
@@ -62,8 +86,27 @@ the [hash-field expiration commands](https://redis.io/docs/latest/commands/hpexp
 were introduced in Redis 7.4. A compatible-looking version cannot replace those
 checks. Redis 8.0 is intentionally excluded from the policy and the upstream
 security-supported list. Other unlisted families, malformed/vendor-suffixed
-versions and identified Redis forks are rejected. redis-py 7.4/8.0, Valkey,
-managed failover and clustered deployments require separate compatibility work.
+versions and identified Redis forks are rejected. Driver versions 7.4.1/8.0.1
+do not imply Redis 8.0 server support. Valkey, managed failover and clustered
+deployments require separate compatibility work.
+
+### Verified driver combinations
+
+| Client OS / CPython | Redis server | redis-py | Evidence |
+| --- | --- | --- | --- |
+| Linux / 3.11–3.14 | The six server targets above, with their listed Python coverage | 8.1.0 | Existing required jobs |
+| Linux / 3.14 | 8.10.2 | 7.4.1 | Required full Redis suite, AOF/OOM/read-only controls and independent wheel |
+| Linux / 3.14 | 8.10.2 | 8.0.1 | Required full Redis suite, AOF/OOM/read-only controls and independent wheel |
+| Windows default Proactor / 3.14 | 8.10.2 | 7.4.1, 8.0.1, 8.1.0 | Local disposable-server suite, faults and wheels |
+| Windows default Proactor / 3.11 | 7.4.11 | 7.4.1 | Local disposable-server suite, faults and wheel |
+
+These are x86-64 clients and Linux service containers, not a Cartesian
+server/driver/Python certification. Accepted later 8.1.x patches and other
+combinations require their own evidence. macOS, other CPU architectures,
+free-threaded Python and hosted Windows Redis jobs remain unverified.
+These runs use loopback redis:// connections. TLS defaults were inspected, but
+this is not a real TLS server/CA/hostname certification; validate the exact
+rediss:// deployment separately. Existing deployment limits remain unchanged.
 
 ### Exact search and work limits
 
