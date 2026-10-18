@@ -73,41 +73,14 @@ jobs:
         if: matrix.python-version == '3.11' || matrix.python-version == '3.14'
         shell: bash
         run: |
-          coverage="$PWD/.cache/mysql-coverage/.coverage.mysql"
-          cp "$coverage" "$RUNNER_TEMP/mysql-baseline.coverage"
-          case "${{ matrix.python-version }}" in
-            3.11) pairs=("8.4.12:1.2.1") ;;
-            3.14) pairs=("8.4.11:1.2.3" "8.4.12:1.2.2") ;;
-            *) exit 1 ;;
-          esac
-          for pair in "${pairs[@]}"; do
-            server="${pair%:*}"
-            driver="${pair#*:}"
-            target="$RUNNER_TEMP/mysql-$server-$driver"
-            compat_python="$PWD/.venv/bin/python"
-            if [[ "$driver" != "1.2.3" ]]; then
-              uv venv --python .venv/bin/python "$target/tests"
-              compat_python="$target/tests/bin/python"
-              # Preserve locked test tools; replace only the driver in this disposable environment.
-              uv export --locked --extra dev --no-emit-project --no-hashes --no-annotate |
-                sed "s/^pymysql==1.2.3$/pymysql==$driver/" > "$target/requirements.txt"
-              uv pip install --python "$compat_python" -r "$target/requirements.txt" --editable '.[mysql]'
-            fi
-            uv venv --python .venv/bin/python "$target/wheel"
-            wheel_python="$target/wheel/bin/python"
-            uv pip install --python "$wheel_python" "dist/semantix_cache-0.1.0-py3-none-any.whl[mysql]" "PyMySQL==$driver"
-            uv run --no-sync python ../../ops/ci/mysql_fixture.py --server-version "$server" --pull-image
-            uv run --no-sync python ../../ops/ci/mysql_fixture.py --server-version "$server" -- bash -euc '
-              "$1" -c "from importlib.metadata import version; import sys; assert version(\"PyMySQL\") == sys.argv[1]; print(\"Verified PyMySQL\", version(\"PyMySQL\"))" "$2"
-              "$1" -m pytest tests/test_mysql*.py --no-cov --junitxml="$4"
-              "$1" -c "from xml.etree.ElementTree import parse; import sys; cases=parse(sys.argv[1]).findall(\".//testcase\"); assert len(cases) >= 213 and all(all(c.find(tag) is None for tag in (\"skipped\", \"failure\", \"error\")) for c in cases), \"Mandatory compatibility cases missing, skipped or failed\"" "$4"
-              "$3" -c "from importlib.metadata import version; import sys; assert version(\"PyMySQL\") == sys.argv[1]" "$2"
-              cd "$RUNNER_TEMP"
-              "$3" -I "$GITHUB_WORKSPACE/packages/cache/tests/mysql_wheel_smoke.py"
-            ' -- "$compat_python" "$driver" "$wheel_python" "$target/tests.xml"
-          done
-          # Extra certification runs must not overwrite the baseline coverage handoff.
-          cmp "$coverage" "$RUNNER_TEMP/mysql-baseline.coverage"
+          (
+            cd ../..
+            uv run --project packages/cache --no-sync ruff check --config ruff.toml ops/ci/tests/test_mysql_compatibility_certification.py
+            uv run --project packages/cache --no-sync ruff format --config ruff.toml --check ops/ci/tests/test_mysql_compatibility_certification.py
+          )
+          uv run --no-sync mypy --strict ../../ops/ci/tests/test_mysql_compatibility_certification.py
+          uv run --no-sync pytest ../../ops/ci/tests/test_mysql_compatibility_certification.py
+          bash ../../ops/ci/mysql_compatibility_certification.sh "${{ matrix.python-version }}"
       # Coverage alone is not an independent low-threshold gate: embedded merges
       # this exact Python version before enforcing the unchanged 90% full-package gate.
       - name: Upload MySQL coverage for the existing package gate
