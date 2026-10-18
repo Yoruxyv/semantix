@@ -585,7 +585,12 @@ describe('application routing', () => {
 
     expect(screen.getByLabelText<HTMLTextAreaElement>('Query text').value).toBe('');
     expect(screen.queryByText('First principal content')).toBeNull();
-    expect(screen.getByText(/namespace tenant-two/i)).toBeTruthy();
+    expect(
+      within(screen.getByRole('group', { name: 'Request context' })).getByText(
+        'tenant-two',
+        { exact: true },
+      ),
+    ).toBeTruthy();
   });
 
   it('does not move focus on initial route rendering', async () => {

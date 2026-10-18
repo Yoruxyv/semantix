@@ -105,11 +105,11 @@ describe('QueryForm', () => {
     }
   });
 
-  it('keeps Advanced visible and shows only the selected mode description', () => {
+  it('keeps request context visible and shows only the selected mode description', () => {
     const onSubmit = vi.fn();
     render(<QueryForm isLoading={false} onSubmit={onSubmit} />);
     const trigger = screen.getByRole('button', { name: /Request cache mode/ });
-    expect(screen.getByRole('heading', { name: 'Advanced cache policy' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Request context' })).toBeTruthy();
     expect(document.querySelectorAll('details')).toHaveLength(0);
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
     expect(trigger.getAttribute('aria-haspopup')).toBe('listbox');
@@ -234,7 +234,7 @@ describe('QueryForm', () => {
     authenticateAs('single', 'operator', ['tenant-one']);
     const view = render(<QueryForm isLoading={false} onSubmit={onSubmit} />);
 
-    expect(screen.getByText(/namespace tenant-one/i)).toBeTruthy();
+    expect(screen.getByText('tenant-one', { exact: true })).toBeTruthy();
 
     view.unmount();
     authenticateAs('multiple', 'operator', ['tenant-one', 'tenant-two']);
@@ -295,12 +295,12 @@ describe('QueryForm', () => {
         }),
       ),
     );
-    expect(screen.getByText(/Effective request: namespace default/)).toBeTruthy();
+    expect(namespace.value).toBe('default');
     view.unmount();
     authenticateAs('single', 'operator', ['default']);
     render(<QueryForm isLoading={false} onSubmit={onSubmit} />);
     expect(screen.getByText('Default', { exact: true })).toBeTruthy();
-    expect(screen.getByText(/Effective request: namespace default/)).toBeTruthy();
+    expect(screen.queryByLabelText('Explicit namespace')).toBeNull();
   });
 
   it('requires wildcard principals to provide one valid explicit namespace', () => {
@@ -314,7 +314,9 @@ describe('QueryForm', () => {
     expect(
       screen.getByRole<HTMLButtonElement>('button', { name: 'Run query' }).disabled,
     ).toBe(true);
-    expect(screen.getByText(/namespace not selected/i)).toBeTruthy();
+    expect(
+      screen.getByText(/Choose one authorized cache namespace before running a query/),
+    ).toBeTruthy();
   });
 
   it('surfaces required namespace selection alongside visible policy controls', async () => {
@@ -388,6 +390,40 @@ describe('QueryForm', () => {
     });
     expect((submit as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(submit);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('rejects blank and overlong prompts with an announced error', () => {
+    const onSubmit = vi.fn();
+    render(<QueryForm isLoading={false} onSubmit={onSubmit} />);
+    const prompt = screen.getByLabelText<HTMLTextAreaElement>('Query text');
+    const form = prompt.closest('form');
+    if (form === null) throw new Error('Missing query form');
+    expect(prompt.maxLength).toBe(2_000);
+    fireEvent.change(prompt, { target: { value: '   ' } });
+    fireEvent.submit(form);
+    expect(screen.getByRole('alert').textContent).toContain('A blank prompt');
+    expect(prompt.getAttribute('aria-invalid')).toBe('true');
+    fireEvent.change(prompt, { target: { value: 'x'.repeat(2_001) } });
+    fireEvent.submit(form);
+    expect(screen.getByRole('alert').textContent).toContain('2,000 characters');
+    expect(prompt.getAttribute('aria-describedby')).toContain('prompt-error');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('blocks a repeated form submission while loading', () => {
+    const onSubmit = vi.fn();
+    const view = render(<QueryForm isLoading={false} onSubmit={onSubmit} />);
+    const prompt = screen.getByLabelText('Query text');
+    fireEvent.change(prompt, { target: { value: 'Pending query' } });
+    view.rerender(<QueryForm isLoading onSubmit={onSubmit} />);
+    const form = prompt.closest('form');
+    if (form === null) throw new Error('Missing query form');
+    fireEvent.submit(form);
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Embedding + lookup…' })
+        .disabled,
+    ).toBe(true);
     expect(onSubmit).not.toHaveBeenCalled();
   });
 });

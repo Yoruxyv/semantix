@@ -43,7 +43,7 @@ Subview evaluasi memakai tautan native dengan `aria-current` dan state URL:
 subview; nilai tidak dikenal menampilkan Runs. Redirect `/benchmarks`
 mempertahankan search dan hash.
 
-Sample probes Monitor berada di bawah teks query sebagai tombol native yang dapat
+Sample probes Monitor berada di bawah tombol Run query sebagai tombol native yang dapat
 membungkus. Enter, Space, atau klik mengisi prompt dan mengembalikan fokus ke input
 agar dapat diedit; memilih sampel tidak mengirim query. Kegagalan query diumumkan
 melalui alert dengan panduan pemulihan tetap, mempertahankan prompt, namespace,
@@ -52,16 +52,18 @@ berhasil atau menampilkan respons cache-hit saat ini. Panduan provider memakai
 kode error provider terstruktur, bukan HTTP 502 saja; detail error mentah serta
 informasi billing atau akun tidak ditampilkan.
 
-Kontrol namespace Monitor berada di luar Advanced cache policy. Pilihan wajib
-yang kosong atau tidak valid memiliki penjelasan terlihat yang terhubung ke tombol
+Kontrol namespace dan cache mode Monitor selalu terlihat di atas teks query.
+Keduanya berbagi baris jika ruang mencukupi dan menumpuk pada layar sempit.
+Pilihan wajib yang kosong atau tidak valid memiliki penjelasan terlihat yang terhubung ke tombol
 submit nonaktif dan input namespace. Tenant tidak dipilih diam-diam. Workspace
 dimuat ulang ketika permission principal berubah.
 Label pilihan namespace bawaan `default` tampil sebagai “Default”; identifier
 yang dapat diedit, payload request, metadata cache, dan diagnostik tetap memakai
 `default`. Label namespace lainnya tidak berubah.
 
-Advanced cache policy selalu terlihat di samping kontrol namespace. Request cache
-mode memakai tombol dan listbox milik fitur dengan style kontrol form yang ada.
+Request cache mode memakai tombol dan listbox milik fitur dengan style kontrol
+form yang ada. Urutan Tab mengikuti namespace, cache mode, teks query, Run query,
+lalu sample probes. Enter di textarea menambahkan baris baru tanpa mengirim query.
 Enter atau Space membuka daftar; panah serta Home/End memindahkan fokus tanpa
 memilih. Enter atau klik memilih opsi. Escape membatalkan, Tab menutup dan
 melanjutkan urutan fokus normal, serta interaksi di luar menutup tanpa merebut

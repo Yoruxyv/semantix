@@ -350,9 +350,7 @@ test('cache mode dropdown preserves keyboard focus, selection, and compact layou
   await page.goto('/');
   const trigger = page.getByRole('button', { name: /Request cache mode/ });
   const list = page.getByRole('listbox', { name: 'Request cache mode' });
-  await expect(
-    page.getByRole('heading', { name: 'Advanced cache policy' }),
-  ).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Request context' })).toBeVisible();
   await expect(page.locator('details')).toHaveCount(0);
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await trigger.focus();
@@ -397,9 +395,7 @@ test('cache mode dropdown preserves keyboard focus, selection, and compact layou
   await trigger.click();
   await page.keyboard.press('Tab');
   await expect(list).toBeHidden();
-  await expect(
-    page.getByRole('button', { name: 'Run query', exact: true }),
-  ).toBeFocused();
+  await expect(page.getByLabel('Query text', { exact: true })).toBeFocused();
   await trigger.click();
   await page.keyboard.press('Shift+Tab');
   await expect(list).toBeHidden();
@@ -411,8 +407,8 @@ test('cache mode dropdown preserves keyboard focus, selection, and compact layou
   await expect(trigger).toContainText('Private request');
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize(viewport);
-    const summary = page.getByText(/Effective request: namespace/);
-    const before = await summary.evaluate(
+    const prompt = page.getByLabel('Query text', { exact: true });
+    const before = await prompt.evaluate(
       (element) => element.getBoundingClientRect().top + window.scrollY,
     );
     await trigger.click();
@@ -426,7 +422,7 @@ test('cache mode dropdown preserves keyboard focus, selection, and compact layou
         .evaluate((element) => element.getBoundingClientRect().height),
     );
     expect(
-      await summary.evaluate(
+      await prompt.evaluate(
         (element) => element.getBoundingClientRect().top + window.scrollY,
       ),
     ).toBe(before);
@@ -588,11 +584,7 @@ test('Monitor policy evidence remains accessible and bounded at required widths'
     await test.step(`monitor-${viewport.name}`, async () => {
       await page.setViewportSize(viewport);
       await expect(page.getByLabel('Query text')).toBeVisible();
-      await expect(
-        page.getByText(`namespace ${namespace}`, {
-          exact: false,
-        }),
-      ).toBeVisible();
+      await expect(page.getByLabel('Explicit namespace')).toHaveValue(namespace);
       await expect(page.getByRole('button', { name: 'Run query' })).toBeVisible();
       const overflow = await page.evaluate(
         () =>
@@ -601,10 +593,14 @@ test('Monitor policy evidence remains accessible and bounded at required widths'
       expect(overflow).toBeLessThanOrEqual(1);
 
       if ([744, 768, 820, 834].includes(viewport.width)) {
-        const advancedColumns = await page
-          .locator('[aria-labelledby="advanced-cache-policy-heading"] > div')
-          .evaluate((element) => getComputedStyle(element).gridTemplateColumns);
-        expect(advancedColumns.trim().split(/\s+/)).toHaveLength(1);
+        const namespaceBox = await page.getByLabel('Explicit namespace').boundingBox();
+        const modeBox = await modeSelector.boundingBox();
+        expect(namespaceBox).not.toBeNull();
+        expect(modeBox).not.toBeNull();
+        expect(Math.abs(namespaceBox!.y - modeBox!.y)).toBeLessThanOrEqual(1);
+        expect(modeBox!.x).toBeGreaterThanOrEqual(
+          namespaceBox!.x + namespaceBox!.width,
+        );
       }
     });
   }

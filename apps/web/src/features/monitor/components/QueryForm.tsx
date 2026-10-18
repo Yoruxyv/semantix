@@ -13,12 +13,7 @@ import { formatCount } from '@/shared/lib/formatters';
 
 import { RequestCacheModeSelect } from './RequestCacheModeSelect';
 
-import {
-  QUERY_POLICY_LABELS,
-  type QueryPolicyMode,
-  type QueryRequest,
-  type QuerySubmission,
-} from '../types';
+import type { QueryPolicyMode, QueryRequest, QuerySubmission } from '../types';
 
 interface QueryFormProps {
   isLoading: boolean;
@@ -79,7 +74,7 @@ const CONTROL_CLASS =
  * or disabled-auth access starts at default and accepts valid concrete input.
  * The server independently enforces role and namespace access. Submit local mode
  * plus the wire request/flags, with no TTL field, and propagate callback rejection.
- * Loading disables selected controls but is not a guard inside handleSubmit.
+ * Loading disables selected controls and prevents repeated submissions.
  */
 export function QueryForm({
   isLoading,
@@ -113,7 +108,7 @@ export function QueryForm({
 
     const normalizedPrompt = prompt.trim();
 
-    if (!canSubmit) {
+    if (isLoading || !canSubmit) {
       return;
     }
 
@@ -176,6 +171,93 @@ export function QueryForm({
       />
 
       <form aria-busy={isLoading} onSubmit={(event) => void handleSubmit(event)}>
+        <fieldset className="mb-5 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+          <legend className="sr-only">Request context</legend>
+          <div className="min-w-0">
+            {hasWildcardNamespace && (
+              <label className="block">
+                <span className="text-sm text-(--text-soft)">Explicit namespace</span>
+                <input
+                  aria-describedby={
+                    namespaceValid
+                      ? 'query-namespace-note'
+                      : 'query-namespace-note query-namespace-required'
+                  }
+                  aria-invalid={!namespaceValid}
+                  className={CONTROL_CLASS}
+                  maxLength={MAX_CACHE_NAMESPACE_LENGTH}
+                  pattern={CACHE_NAMESPACE_PATTERN_SOURCE}
+                  spellCheck={false}
+                  value={namespace}
+                  onChange={(event) => {
+                    setNamespace(event.target.value);
+                    setNamespaceError(null);
+                  }}
+                />
+              </label>
+            )}
+
+            {!hasWildcardNamespace && explicitNamespaces.length > 1 && (
+              <label className="block">
+                <span className="text-sm text-(--text-soft)">Authorized namespace</span>
+                <select
+                  aria-describedby={
+                    namespaceValid
+                      ? 'query-namespace-note'
+                      : 'query-namespace-note query-namespace-required'
+                  }
+                  aria-invalid={!namespaceValid}
+                  className={CONTROL_CLASS}
+                  value={namespace}
+                  onChange={(event) => {
+                    setNamespace(event.target.value);
+                    setNamespaceError(null);
+                  }}
+                >
+                  <option value="">Choose a namespace</option>
+                  {explicitNamespaces.map((item) => (
+                    <option key={item} value={item}>
+                      {cacheNamespaceLabel(item)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {!hasWildcardNamespace && explicitNamespaces.length <= 1 && (
+              <div>
+                <p className="text-sm text-(--text-soft)">Namespace</p>
+                <p className={`${CONTROL_CLASS} font-data break-all`}>
+                  {cacheNamespaceLabel(normalizedNamespace) ||
+                    'No authorized namespace'}
+                </p>
+              </div>
+            )}
+
+            <p
+              className="font-data mt-2 text-[10px]/5 text-(--text-faint)"
+              id="query-namespace-note"
+            >
+              Use one authorized, concrete namespace.
+            </p>
+
+            {!namespaceValid && (
+              <output
+                className="font-data mt-2 block text-[10px]/5 text-(--coral-text)"
+                id="query-namespace-required"
+              >
+                {namespaceError ??
+                  'Choose one authorized cache namespace before running a query.'}
+              </output>
+            )}
+          </div>
+          <RequestCacheModeSelect
+            className={CONTROL_CLASS}
+            value={policyMode}
+            onChange={setPolicyMode}
+          />
+        </fieldset>
+
         <label className="ui-label mb-2 block text-(--text-muted)" htmlFor="prompt">
           Query text
         </label>
@@ -220,6 +302,24 @@ export function QueryForm({
           </p>
         )}
 
+        {!canSubmit && (
+          <p className="mt-4 text-xs/5 text-(--coral-text)" id="query-access-note">
+            Operator or administrator access is required to run live queries.
+          </p>
+        )}
+
+        <div className="mt-4 flex justify-end">
+          <Button
+            aria-describedby={submitDescription}
+            className="w-full disabled:opacity-55 lg:w-auto"
+            disabled={isLoading || !canSubmit || !namespaceValid}
+            type="submit"
+            variant="primary"
+          >
+            {submitLabel}
+          </Button>
+        </div>
+
         <fieldset className="mt-4 min-w-0">
           <legend className="ui-label mb-2 text-(--text-faint)">Sample probes</legend>
           <div className="flex flex-wrap gap-2">
@@ -240,130 +340,6 @@ export function QueryForm({
             ))}
           </div>
         </fieldset>
-
-        <div className="mt-5 border-t border-(--hairline) pt-5">
-          <p className="ui-label text-(--text-muted)">Cache namespace</p>
-
-          {hasWildcardNamespace && (
-            <label className="mt-3 block">
-              <span className="text-sm text-(--text-soft)">Explicit namespace</span>
-              <input
-                aria-describedby={
-                  namespaceValid
-                    ? 'query-namespace-note'
-                    : 'query-namespace-note query-namespace-required'
-                }
-                aria-invalid={!namespaceValid}
-                className={CONTROL_CLASS}
-                maxLength={MAX_CACHE_NAMESPACE_LENGTH}
-                pattern={CACHE_NAMESPACE_PATTERN_SOURCE}
-                spellCheck={false}
-                value={namespace}
-                onChange={(event) => {
-                  setNamespace(event.target.value);
-                  setNamespaceError(null);
-                }}
-              />
-            </label>
-          )}
-
-          {!hasWildcardNamespace && explicitNamespaces.length > 1 && (
-            <label className="mt-3 block">
-              <span className="text-sm text-(--text-soft)">Authorized namespace</span>
-              <select
-                aria-describedby={
-                  namespaceValid
-                    ? 'query-namespace-note'
-                    : 'query-namespace-note query-namespace-required'
-                }
-                aria-invalid={!namespaceValid}
-                className={CONTROL_CLASS}
-                value={namespace}
-                onChange={(event) => {
-                  setNamespace(event.target.value);
-                  setNamespaceError(null);
-                }}
-              >
-                <option value="">Choose a namespace</option>
-                {explicitNamespaces.map((item) => (
-                  <option key={item} value={item}>
-                    {cacheNamespaceLabel(item)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          {!hasWildcardNamespace && explicitNamespaces.length <= 1 && (
-            <p className="font-data mt-3 wrap-break-word text-xs text-(--text-soft)">
-              {cacheNamespaceLabel(normalizedNamespace) || 'No authorized namespace'}
-            </p>
-          )}
-
-          <p
-            className="font-data mt-2 text-[10px]/5 text-(--text-faint)"
-            id="query-namespace-note"
-          >
-            Requests use one authorized namespace. Wildcard access never sends the
-            global marker.
-          </p>
-
-          {!namespaceValid && (
-            <output
-              className="font-data mt-2 block text-[10px]/5 text-(--coral-text)"
-              id="query-namespace-required"
-            >
-              {namespaceError ??
-                'Choose one authorized cache namespace before running a query.'}
-            </output>
-          )}
-        </div>
-
-        <section
-          aria-labelledby="advanced-cache-policy-heading"
-          className="mt-5 border-t border-(--hairline) pt-5"
-        >
-          <h2
-            className="ui-label text-(--text-muted)"
-            id="advanced-cache-policy-heading"
-          >
-            Advanced cache policy
-          </h2>
-          <div className="mt-3">
-            <RequestCacheModeSelect
-              className={CONTROL_CLASS}
-              value={policyMode}
-              onChange={setPolicyMode}
-            />
-          </div>
-        </section>
-
-        <output
-          aria-live="polite"
-          className="font-data mt-4 block wrap-break-word border-l border-(--gold) pl-3 text-[11px]/5 text-(--text-muted)"
-        >
-          Effective request: namespace{' '}
-          {namespaceValid ? normalizedNamespace : 'not selected'} ·{' '}
-          {QUERY_POLICY_LABELS[policyMode]}.
-        </output>
-
-        {!canSubmit && (
-          <p className="mt-4 text-xs/5 text-(--coral-text)" id="query-access-note">
-            Operator or administrator access is required to run live queries.
-          </p>
-        )}
-
-        <div className="mt-6 flex justify-end">
-          <Button
-            aria-describedby={submitDescription}
-            className="w-full disabled:opacity-55 lg:w-auto"
-            disabled={isLoading || !canSubmit || !namespaceValid}
-            type="submit"
-            variant="primary"
-          >
-            {submitLabel}
-          </Button>
-        </div>
       </form>
     </section>
   );

@@ -48,7 +48,7 @@ async function expectNoOverflow(page: Page): Promise<void> {
   ).toBeLessThanOrEqual(1);
 }
 
-test('samples wrap beneath the prompt, support keyboard editing, and never submit', async ({
+test('query context precedes the prompt, submit stays adjacent, and samples never submit', async ({
   page,
 }, testInfo) => {
   test.setTimeout(60_000);
@@ -73,7 +73,20 @@ test('samples wrap beneath the prompt, support keyboard editing, and never submi
     expect(samplesBox).not.toBeNull();
     expect(namespaceBox).not.toBeNull();
     expect(samplesBox!.y).toBeGreaterThanOrEqual(promptBox!.y + promptBox!.height);
-    expect(samplesBox!.y + samplesBox!.height).toBeLessThan(namespaceBox!.y);
+    const runBox = await page
+      .getByRole('button', { name: 'Run query', exact: true })
+      .boundingBox();
+    const modeBox = await page
+      .getByRole('button', { name: /Request cache mode/ })
+      .boundingBox();
+    expect(runBox).not.toBeNull();
+    expect(modeBox).not.toBeNull();
+    expect(namespaceBox!.y + namespaceBox!.height).toBeLessThan(promptBox!.y);
+    expect(modeBox!.y + modeBox!.height).toBeLessThan(promptBox!.y);
+    expect(runBox!.y).toBeGreaterThanOrEqual(promptBox!.y + promptBox!.height);
+    expect(runBox!.y - promptBox!.y - promptBox!.height).toBeLessThan(100);
+    expect(samplesBox!.y).toBeGreaterThanOrEqual(runBox!.y + runBox!.height);
+    if (width >= 1024) expect(runBox!.y + runBox!.height).toBeLessThanOrEqual(900);
     for (const example of SAMPLE_PROMPTS) {
       await expect(samples.getByRole('button', { name: example })).toBeVisible();
     }
@@ -93,6 +106,10 @@ test('samples wrap beneath the prompt, support keyboard editing, and never submi
   }
   await prompt.focus();
   await page.keyboard.press('Tab');
+  await expect(
+    page.getByRole('button', { name: 'Run query', exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press('Tab');
   const first = samples.getByRole('button', { name: SAMPLE_PROMPTS[0] });
   await expect(first).toBeFocused();
   await expect(first).toHaveCSS('outline-width', '2px');
@@ -103,10 +120,13 @@ test('samples wrap beneath the prompt, support keyboard editing, and never submi
   await expect(prompt).toHaveValue(`${SAMPLE_PROMPTS[0]} with an edited detail`);
   await page.keyboard.press('Tab');
   await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
   await expect(samples.getByRole('button', { name: SAMPLE_PROMPTS[1] })).toBeFocused();
   await page.keyboard.press('Space');
   await expect(prompt).toBeFocused();
   await expect(prompt).toHaveValue(SAMPLE_PROMPTS[1]);
+  await page.keyboard.press('Enter');
+  await expect(prompt).toHaveValue(`${SAMPLE_PROMPTS[1]}\n`);
   expect(queries).toBe(0);
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '200%';
