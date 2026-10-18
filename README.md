@@ -205,6 +205,28 @@ TTL starts at the write and does not extend on hits. See
 See [context identity and migration](docs/embedded/context-identity-and-migration.md) for
 model/tenant/knowledge/output scopes, embedding revisions and safe migration recipes.
 
+### Prompt normalization
+
+Normalization transforms text for embedding-based lookup and newly computed write
+embeddings. Generation and cache entries retain the application prompt under the
+existing canonicalization rules. This can help matching; it does not verify answer
+correctness.
+
+The optional **server** corrects common English typos and accidental word splits with
+SymSpell, disabled by default. Enable it at startup with
+`PROMPT_TYPO_CORRECTION_ENABLED=true` and configure distance with
+`PROMPT_TYPO_MAX_EDIT_DISTANCE=2`. It generally preserves capitalization: typo
+correction is not case-insensitive matching, and capitalization alone guarantees
+neither a hit nor a miss. These settings are not editable from the dashboard.
+
+The standalone **semantix-cache** package exposes a synchronous `prompt_normalizer`
+callable; installing it alone does not install SymSpell or enable the server's
+correction behavior. See the [package hook](packages/cache/README.md#matching-text-preprocessing)
+and [normalization guide](docs/guides/prompt-typo-normalization.md) for examples,
+configuration and limitations. Preprocessing changes require compatible storage
+isolation and a coordinated transition; follow the
+[identity and migration guide](docs/embedded/context-identity-and-migration.md).
+
 ## Key capabilities
 
 - **Async API** — AsyncSemanticCache with explicit CachePolicy, CacheResult and CacheHit evidence.
