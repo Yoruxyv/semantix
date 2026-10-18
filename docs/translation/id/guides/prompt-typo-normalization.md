@@ -1,10 +1,10 @@
 # Normalisasi typo prompt (opsional)
 
-Semantix dapat mengoreksi kesalahan ejaan bahasa Inggris yang umum dan pemisahan kata yang tidak disengaja sebelum membuat embedding yang digunakan untuk semantic-cache matching. Feature ini dinonaktifkan secara default karena koreksi otomatis dapat mengubah nama yang tidak dikenal atau istilah khusus domain.
+Server Semantix opsional dapat mengoreksi kesalahan ejaan bahasa Inggris yang umum dan pemisahan kata yang tidak disengaja sebelum membuat embedding yang digunakan untuk semantic-cache matching. Feature ini dinonaktifkan secara default karena koreksi otomatis dapat mengubah nama yang tidak dikenal atau istilah khusus domain.
 
 ## Konfigurasi
 
-Atur nilai berikut di `apps/server/.env`:
+Untuk backend yang dijalankan langsung atau Compose development, atur nilai berikut di `apps/server/.env`:
 
 ```env
 PROMPT_TYPO_CORRECTION_ENABLED=true
@@ -19,7 +19,21 @@ cahcing         -> caching
 ex plain        -> explain
 ```
 
-Restart backend setelah mengubah salah satu pengaturan. Hapus cache entry yang sudah ada ketika mengaktifkan, menonaktifkan, atau mengubah correction distance agar setiap stored embedding menggunakan prompt-processing behavior yang sama.
+Pengaturan ini diterapkan saat startup; diagnostics admin di dashboard bersifat
+read-only. Compose production menerimanya melalui pemetaan environment eksplisit,
+bukan file `.env` development. Restart backend yang dijalankan langsung atau buat
+ulang container yang terdampak setelah perubahan konfigurasi; restart container
+saja tidak memperbarui environment yang dikonfigurasikan. Lihat
+[deployment](../operations/deployment.md).
+
+Perubahan preprocessing dapat membuat embedding tersimpan tidak kompatibel.
+Rencanakan transisi terkoordinasi antar-replica: drain pekerjaan aktif, pertahankan
+data yang dapat dipulihkan, pilih storage terisolasi yang kompatibel atau migrasi
+yang ditinjau secara eksplisit, verifikasi konfigurasi baru, dan tentukan rollback
+sebelum mengembalikan traffic. Fingerprint diagnostics saja tidak mengisolasi vektor
+lama. Penghapusan adalah keputusan terpisah yang memerlukan otorisasi, bukan langkah
+konfigurasi otomatis. Lihat [storage server](../../../guides/platform-storage.md) dan
+[identitas preprocessing dan migrasi](../../../embedded/context-identity-and-migration.md#embedding-revision-and-preprocessing).
 
 ## Behavior
 
@@ -46,3 +60,43 @@ dengan behavior berbeda.
 Normalizer menggunakan English frequency dictionary yang dibundel dengan `symspellpy`. Normalizer tidak pernah men-download dictionary data saat runtime. Ketika correction diaktifkan, Semantix memuat dictionary selama application startup dan menolak untuk memulai jika dictionary tidak tersedia atau tidak valid. Ketika correction dinonaktifkan, dictionary tidak dimuat.
 
 Semantix menambahkan protected vocabulary kecil untuk istilah umum project, termasuk `Semantix`, `pgvector`, `namespace`, `OpenAI`, dan `FastAPI`. Proper name yang tidak dikenal dan vocabulary khusus tetap dapat dikoreksi secara keliru, sehingga biarkan feature tetap dinonaktifkan ketika mempertahankan ejaan secara persis lebih penting daripada typo tolerance.
+
+## Kapitalisasi dan matching
+
+Server saat ini memakai `transfer_casing=True` milik SymSpell sehingga kapitalisasi
+input umumnya dipertahankan. Ini bukan case-insensitive matching. Pada edit distance
+2 dengan dictionary bawaan, matching text yang dihasilkan adalah:
+
+| Application prompt | Matching text |
+| --- | --- |
+| `Explain semantic caching` | `Explain semantic caching` |
+| `explain semantic caching` | `explain semantic caching` |
+| `expln semantic caching` | `explain semantic caching` |
+| `explainn semantic caching` | `explain semantic caching` |
+
+Dua input pertama dapat menghasilkan embedding dan similarity score yang berbeda.
+Kapitalisasi tidak selalu menyebabkan miss, dan koreksi ejaan tidak menjamin hit.
+Reuse tetap memerlukan threshold similarity yang dikonfigurasikan serta pemeriksaan
+kelayakan lain, termasuk namespace, space yang kompatibel, expiry, dan revisi aktif.
+Koreksi maupun similarity tidak membuktikan kompatibilitas jawaban. Dictionary tetap
+dapat mengubah nama yang tidak dikenal, identifier, atau text non-Inggris. Distance 0
+saat fitur aktif tetap memakai compound preprocessing; ini tidak sama dengan
+menonaktifkan koreksi.
+
+## Paket mandiri dan preprocessing kustom
+
+Paket independen `semantix-cache` menyediakan callable sinkron `prompt_normalizer`
+pada `AsyncSemanticCache`. Instalasi paket tidak memasang SymSpell, mengaktifkan
+pengaturan server ini, atau menyertakan protected vocabulary server. Hook hanya
+mengubah embedding text; generation dan cache entry tetap memakai application
+prompt yang sudah dikanonisasi. Lihat [kontrak paket](../../../../packages/cache/README.md#matching-text-preprocessing).
+
+Aplikasi dapat memasok transformasi casing, whitespace, atau vocabulary yang sudah
+dievaluasi melalui hook tersebut. Ini implementasi kustom, bukan mode bawaan.
+Jangan sembarang menghapus punctuation, stop word, negasi, angka, identifier,
+konteks tenant atau izin, system instruction, atau conversation history: informasi
+tersebut dapat menentukan jawaban yang sesuai. Pertahankan konteks yang diperlukan
+dalam request aplikasi dan identitas cache-nya. Buat preprocessing deterministik,
+versikan bersama embedding space, dan gunakan storage terisolasi yang kompatibel
+ketika mengubahnya. Ikuti panduan identitas/migrasi yang ditautkan, alih-alih sekadar
+mengganti label vektor yang sudah ada.

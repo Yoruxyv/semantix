@@ -388,6 +388,28 @@ Persistent stores use their documented authoritative clocks and precision; see t
 [storage guide](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md).
 Metadata timestamps are aware UTC. Candidate confirmation rechecks revision and expiry.
 
+### Matching-text preprocessing
+
+`AsyncSemanticCache` accepts the existing optional synchronous
+`prompt_normalizer: Callable[[str], str]` constructor argument. It transforms the
+canonical prompt for embedding-based lookup and newly computed write embeddings;
+generation, stored prompt text and key derivation keep the canonical application
+prompt. Return valid text and use deterministic behavior across reads and writes.
+
+Installing this package does not install SymSpell or enable typo correction. The
+optional server separately provides startup-configured SymSpell correction through
+`PROMPT_TYPO_CORRECTION_ENABLED` and `PROMPT_TYPO_MAX_EDIT_DISTANCE`; those variables
+do not configure this standalone facade. See the
+[server normalization guide](https://github.com/Yoruxyv/semantix/blob/main/docs/guides/prompt-typo-normalization.md).
+
+Applications can supply evaluated vocabulary, whitespace or casing transformations;
+these are custom implementations, not built-in presets. Preserve meaning-bearing
+content and application context. Represent preprocessing in `EmbeddingSpace.identity`
+and isolate incompatible stored vectors when changing it; the facade does not derive
+that identity from your callable. Normalization does not replace threshold, namespace,
+expiry or revision checks, or verify that an answer is appropriate. See
+[context identity and migration](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/context-identity-and-migration.md).
+
 ## Extension and ownership
 
 An EmbeddingAdapter structurally supplies `embedding_space: EmbeddingSpace`

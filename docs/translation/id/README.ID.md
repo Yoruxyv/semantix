@@ -1,4 +1,4 @@
-<!-- readme-source-sha256: 78c4cdb5c90ad50c0e1283a6c3e7d72629bb24affc66b38ffa59180c63612901 -->
+<!-- readme-source-sha256: 308de5cb6946198ecb1917cf55a56a58faaf8b84bb69526a6ede66182e00efef -->
 
 <div align="center">
 
@@ -210,6 +210,28 @@ TTL dimulai saat write dan tidak diperpanjang oleh hit. Lihat
 
 Lihat [identitas konteks dan migrasi](../../embedded/context-identity-and-migration.md)
 untuk contoh scope model/tenant/knowledge/output, revisi embedding, dan migrasi aman.
+
+### Normalisasi prompt
+
+Normalisasi mengubah text untuk lookup berbasis embedding dan embedding baru saat
+write. Generation dan cache entry tetap memakai application prompt sesuai aturan
+kanonisasi yang sudah berlaku. Proses ini dapat membantu matching, tetapi tidak
+memverifikasi kebenaran jawaban.
+
+**Server** opsional mengoreksi typo bahasa Inggris yang umum dan pemisahan kata yang
+tidak disengaja memakai SymSpell; fitur ini nonaktif secara default. Aktifkan saat
+startup dengan `PROMPT_TYPO_CORRECTION_ENABLED=true` dan atur distance memakai
+`PROMPT_TYPO_MAX_EDIT_DISTANCE=2`. Kapitalisasi umumnya dipertahankan: koreksi typo
+bukan case-insensitive matching, dan perbedaan kapitalisasi saja tidak menjamin hit
+ataupun miss. Pengaturan ini tidak dapat diedit dari dashboard.
+
+Paket **semantix-cache** mandiri menyediakan callable sinkron `prompt_normalizer`;
+instalasi paket saja tidak memasang SymSpell atau mengaktifkan behavior koreksi milik
+server. Lihat [hook paket](../../../packages/cache/README.md#matching-text-preprocessing)
+dan [panduan normalisasi](guides/prompt-typo-normalization.md) untuk contoh,
+konfigurasi, dan batasannya. Perubahan preprocessing memerlukan isolasi storage yang
+kompatibel dan transisi terkoordinasi; ikuti
+[panduan identitas dan migrasi](../../embedded/context-identity-and-migration.md).
 
 ## Kapabilitas utama
 
