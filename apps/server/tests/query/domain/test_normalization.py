@@ -22,6 +22,9 @@ def normalizer() -> SymSpellPromptNormalizer:
         ("semntic caching", "semantic caching"),
         ("cahcing", "caching"),
         ("ex plain", "explain"),
+        ("expln semantic caching", "explain semantic caching"),
+        ("explainn semantic caching", "explain semantic caching"),
+        ("Explain semantic caching", "Explain semantic caching"),
     ],
 )
 def test_normalizes_supported_typo_patterns(
@@ -144,3 +147,60 @@ def test_typo_edit_distance_is_bounded(
 
     with pytest.raises(ValidationError):
         Settings.model_validate(values)
+
+
+@pytest.mark.parametrize("distance", [0, 1, 2, 3])
+def test_preserves_prompt_when_unicode_lowercasing_splits_tokens(
+    distance: int,
+) -> None:
+    normalizer = SymSpellPromptNormalizer.load(max_edit_distance=distance)
+
+    for prompt in (
+        "İstanbul",
+        "İSTANBUL",
+        "İzmir",
+        "İZMİR",
+        "aİb",
+        "İ12",
+        "123İ456",
+        "  İstanbul semntic cahcing!  ",
+    ):
+        assert normalizer.normalize(prompt) == prompt
+
+
+@pytest.mark.parametrize(
+    ("prompt", "expected"),
+    [
+        ("İ", "İ"),
+        ("Istanbul", "Istanbul"),
+        ("istanbul", "istanbul"),
+        ("\u0131stanbul", "istanbul"),
+        ("i\u0307stanbul", "istanbul"),
+        ("I\u0307stanbul", "Istanbul"),
+        ("12İ", "12İ"),
+        ("Café", "Cafe"),
+        ("Cafe\u0301", "Cafe"),
+        ("🙂", "🙂"),
+    ],
+)
+def test_aligned_unicode_tokens_keep_existing_correction(
+    normalizer: SymSpellPromptNormalizer,
+    prompt: str,
+    expected: str,
+) -> None:
+    assert normalizer.normalize(prompt) == expected
+
+
+@pytest.mark.parametrize("error_type", [IndexError, RuntimeError])
+def test_unrelated_compound_lookup_errors_propagate(
+    normalizer: SymSpellPromptNormalizer,
+    monkeypatch: pytest.MonkeyPatch,
+    error_type: type[Exception],
+) -> None:
+    def fail_lookup(*args: object, **kwargs: object) -> None:
+        raise error_type("unrelated lookup failure")
+
+    monkeypatch.setattr(SymSpell, "lookup_compound", fail_lookup)
+
+    with pytest.raises(error_type, match="unrelated lookup failure"):
+        normalizer.normalize("semantic caching")

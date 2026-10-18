@@ -42,6 +42,17 @@ runs use the same configured normalizer as regular queries. SymSpell may also
 standardize punctuation and whitespace in the matching text; this does not
 alter the original prompt.
 
+When Unicode lowercasing changes SymSpell's token count, such as for `İstanbul`,
+Semantix uses the entire supplied prompt unchanged as matching text instead of
+passing misaligned token lists to compound correction. Lookup and newly computed
+write embeddings use the same deterministic fallback; other typos in that prompt
+are left uncorrected. Token-aligned inputs keep the existing correction behavior,
+including its limitations for non-English text. This guard adds no case folding,
+Unicode canonicalization, or answer-compatibility guarantee, and it does not clear
+retained entries. Deploy the same preprocessing behavior across replicas and follow
+the existing cache-transition precautions if retained embeddings used a different
+behavior.
+
 The normalizer uses the English frequency dictionary bundled with `symspellpy`.
 It never downloads dictionary data at runtime. When correction is enabled,
 Semantix loads the dictionary during application startup and refuses to start

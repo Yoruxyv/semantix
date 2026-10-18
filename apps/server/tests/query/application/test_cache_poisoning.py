@@ -184,8 +184,28 @@ def typo_normalizer() -> Callable[[str], str]:
         ("reset account for Alice", "reset account for Bob"),
         ("refund limit is 30 days", "refund limit is 90 days"),
         ("enable account sharing", "do not enable account sharing"),
+        ("İstanbul: enable sharing", "İstanbul: do not enable sharing"),
+        ("İstanbul: refund limit is 30 days", "İstanbul: refund limit is 90 days"),
+        ("İstanbul: admin only access", "İstanbul: all users access"),
+        ("İstanbul: prices today", "İstanbul: prices yesterday"),
+        ("İstanbul: reset account for Alice", "İstanbul: reset account for Bob"),
+        ("İstanbul", "istanbul"),
+        ("Polish", "polish"),
+        ("US", "us"),
     ],
-    ids=("entity", "numeric", "negation"),
+    ids=(
+        "entity",
+        "numeric",
+        "negation",
+        "unicode-negation",
+        "unicode-numeric",
+        "unicode-permission",
+        "unicode-freshness",
+        "unicode-entity",
+        "dotted-i-case",
+        "language-case",
+        "acronym-case",
+    ),
 )
 def test_identity_and_typo_normalization_preserve_material_distinctions(
     typo_normalizer: Callable[[str], str],
@@ -196,3 +216,38 @@ def test_identity_and_typo_normalization_preserve_material_distinctions(
 
     assert identity(first) != identity(second)
     assert typo_normalizer(first) != typo_normalizer(second)
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ("İstanbul: enable sharing", "İstanbul: do not enable sharing"),
+        ("İstanbul: refund limit is 30 days", "İstanbul: refund limit is 90 days"),
+        ("İstanbul", "istanbul"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_unicode_fallback_does_not_alias_incompatible_matching_text(
+    typo_normalizer: Callable[[str], str],
+    first: str,
+    second: str,
+) -> None:
+    provider = SyntheticProvider()
+    backend = memory_backend()
+    cache = SemanticCache(
+        SyntheticEmbeddings({first: unit_vector(), second: unit_vector(1)}),
+        backend,
+        0.92,
+        prompt_normalizer=typo_normalizer,
+    )
+    service = QueryService(cache, provider)
+    try:
+        initial = await service.execute(first)
+        incompatible = await service.execute(second)
+
+        assert initial.cache_hit is False
+        assert incompatible.cache_hit is False
+        assert incompatible.response == f"generated:{second}"
+        assert provider.prompts == [first, second]
+    finally:
+        await backend.store.aclose()

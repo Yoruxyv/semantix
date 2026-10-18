@@ -4,9 +4,11 @@ from collections.abc import Sequence
 import pytest
 
 from app.cache.application.service import SemanticCache
+from app.cache.domain.keys import prompt_cache_key
 from app.cache.domain.models import CacheCandidate
 from app.cache.infrastructure.backends.memory import InMemoryCacheBackend
 from app.core.limits import MAX_REQUEST_CACHE_TTL_SECONDS
+from app.query.domain.normalization import create_prompt_normalizer
 from tests.support import (
     TEST_EMBEDDING_DIMENSIONS,
     memory_backend,
@@ -219,3 +221,42 @@ async def test_overwritten_candidate_is_not_returned_as_a_hit() -> None:
 
     assert result.cache_hit is False
     assert result.response is None
+
+
+@pytest.mark.parametrize(
+    ("prompt", "matching_prompt"),
+    [
+        ("İstanbul semntic caching", "İstanbul semntic caching"),
+        ("i\u0307stanbul", "istanbul"),
+        ("semntic caching", "semantic caching"),
+        ("Compare OpenAI and FastAPI", "Compare OpenAI and FastAPI"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_unicode_normalization_is_consistent_for_lookup_and_both_write_paths(
+    prompt: str,
+    matching_prompt: str,
+) -> None:
+    embeddings = RecordingEmbeddings()
+    backend = memory_backend()
+    cache = SemanticCache(
+        embeddings,
+        backend,
+        0.92,
+        prompt_normalizer=create_prompt_normalizer(enabled=True, max_edit_distance=2),
+    )
+    try:
+        miss = await cache.lookup(prompt)
+        assert miss.cache_hit is False
+        assert await cache.store(prompt, "answer", miss.embedding) is True
+        assert embeddings.prompts == [matching_prompt]
+        assert await cache.store(prompt, "answer") is True
+        hit = await cache.lookup(prompt)
+
+        assert embeddings.prompts == [matching_prompt] * 3
+        assert hit.cache_hit is True
+        assert hit.matched_prompt == prompt
+        assert hit.matched_cache_key == prompt_cache_key(prompt)
+        assert (await cache.stats()).size == 1
+    finally:
+        await backend.store.aclose()

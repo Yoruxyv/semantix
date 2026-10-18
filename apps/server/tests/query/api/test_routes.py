@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.cache.application.service import SemanticCache
+from app.cache.domain.keys import prompt_cache_key
 from app.cache.domain.namespaces import DEFAULT_CACHE_NAMESPACE
 from app.core.config import Settings
 from app.core.exceptions import ProviderRequestError, ProviderRetryableError
@@ -24,9 +25,11 @@ class Embeddings:
 class Provider:
     def __init__(self) -> None:
         self.call_count = 0
+        self.prompts: list[str] = []
 
     async def generate(self, prompt: str) -> str:
         self.call_count += 1
+        self.prompts.append(prompt)
         return "answer"
 
 
@@ -312,3 +315,39 @@ def test_oversized_provider_response_uses_stable_upstream_error(
         "error": "invalid_upstream_response",
         "detail": "The AI service returned an invalid response.",
     }
+
+
+@pytest.mark.parametrize("prompt", ["İstanbul", "İZMİR", "İstanbul semntic caching"])
+def test_query_route_unicode_normalization_preserves_generation_and_storage(
+    settings: Settings,
+    prompt: str,
+) -> None:
+    app = create_app(
+        settings.model_copy(
+            update={
+                "embedding_provider": "mock",
+                "generation_provider": "mock",
+                "prompt_typo_correction_enabled": True,
+            }
+        )
+    )
+    provider = Provider()
+    with TestClient(app) as client:
+        app.state.query_service = QueryService(app.state.semantic_cache, provider)
+        miss = client.post("/api/v1/query", json={"prompt": prompt})
+        refresh = client.post(
+            "/api/v1/query",
+            json={
+                "prompt": prompt,
+                "cache_read_enabled": False,
+            },
+        )
+        hit = client.post("/api/v1/query", json={"prompt": prompt})
+
+    assert [response.status_code for response in (miss, refresh, hit)] == [200] * 3
+    assert miss.json()["cache_hit"] is False
+    assert refresh.json()["cache_hit"] is False
+    assert hit.json()["cache_hit"] is True
+    assert hit.json()["matched_prompt"] == prompt
+    assert hit.json()["matched_cache_key"] == prompt_cache_key(prompt)
+    assert provider.prompts == [prompt, prompt]

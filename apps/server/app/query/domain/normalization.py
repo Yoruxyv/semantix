@@ -11,6 +11,7 @@ from collections.abc import Callable
 from importlib.resources import as_file, files
 
 from symspellpy import SymSpell
+from symspellpy.helpers import parse_words
 
 DICTIONARY_FILENAME = "frequency_dictionary_en_82_765.txt"
 PROJECT_TERMS = (
@@ -97,8 +98,13 @@ class SymSpellPromptNormalizer:
             prompt: Matching text; this method does not mutate a generation request.
 
         Returns:
-            Stripped first suggestion, or the original prompt if absent or blank.
+            Original prompt when lowercase/preserved token counts differ; otherwise
+            the stripped first suggestion, or the original if absent or blank.
         """
+        # SymSpell pairs these lists by index; Unicode lowercasing can split a token.
+        if len(parse_words(prompt)) != len(parse_words(prompt, preserve_case=True)):
+            return prompt
+
         suggestions = self._sym_spell.lookup_compound(
             prompt,
             max_edit_distance=self._max_edit_distance,
