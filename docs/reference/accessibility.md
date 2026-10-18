@@ -27,7 +27,7 @@ Evaluation subviews use native links with `aria-current` and URL state:
 `?view=reuse-quality`. Refresh, sharing, and browser history preserve the view;
 unknown values display Runs. The `/benchmarks` redirect preserves search and hash.
 
-Monitor sample probes sit beneath the query text as wrapping native buttons. Enter,
+Monitor sample probes sit beneath Run query as wrapping native buttons. Enter,
 Space, or clicking a sample fills the prompt and returns focus to it for editing;
 selection never submits a query. Query failures use an alert with fixed recovery
 advice, retain the prompt, namespace and policy, and re-enable submission. Failed
@@ -35,7 +35,8 @@ queries do not add successful traces or display a current cache-hit response.
 Provider guidance uses structured provider error codes, never HTTP 502 alone;
 raw error details and billing/account information are not displayed.
 
-Monitor namespace controls remain outside Advanced cache policy. A required
+Monitor namespace and cache mode controls remain visible above the query text,
+sharing a compact row where space allows and stacking at narrow widths. A required
 missing or invalid selection has visible guidance associated with the disabled
 submit button and the namespace input. Selection never silently chooses a tenant.
 The surrounding workspace remounts when principal permissions change.
@@ -43,8 +44,8 @@ Namespace selection labels show the built-in `default` as “Default”; editabl
 identifiers, request payloads, cache metadata, and diagnostics retain `default`.
 Other namespace labels are unchanged.
 
-Advanced cache policy stays visible beside the namespace controls. Request cache
-mode uses a feature-owned button and listbox with the existing form-control style.
+Request cache mode uses a feature-owned button and listbox with the existing
+form-control style.
 Enter or Space opens it; arrows and Home/End move focus without selecting. Enter
 or clicking an option selects it. Escape cancels, Tab closes and continues normal
 focus order, and outside interaction dismisses it without stealing focus. Selected
@@ -108,9 +109,11 @@ Check the following at desktop and mobile widths:
 - malformed, missing, expired, deleted, and unauthorized live-entry links use
   a neutral announced state without disclosing foreign-key existence;
 - empty histogram bins have no visible bar.
-- Monitor Advanced cache policy stays visible and uses a button/listbox with
-  the selected mode's explanation; its namespace, policy, summary, and Submit flow
-  remains one column at 744, 768, 820, and 834 px portrait widths;
+- Monitor namespace and cache mode share a row at tablet/desktop widths and stack
+  at 320 px; selected mode explanations stay visible, Run query follows the textarea
+  and its helper/error text, and sample shortcuts follow the primary action;
+- Monitor Tab order follows namespace, cache mode, query text, Run query and samples;
+  Enter in the textarea inserts a newline without submitting;
 - private-mode trace behavior is described by the field's helper text, effective
   namespace and policy are announced with results, and the live-hit link has
   the descriptive name “Open matched live cache entry”;
