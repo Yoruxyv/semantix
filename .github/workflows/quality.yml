@@ -312,41 +312,14 @@ jobs:
           EXPECTED_POSTGRES_MAJOR: ${{ matrix.postgres-major }}
           EXPECTED_PGVECTOR_VERSION: ${{ matrix.pgvector-version }}
         run: |
-          target="$RUNNER_TEMP/asyncpg-032"
-          mkdir -p "$target"
-          cp .coverage "$target/baseline.coverage"
-          uv export --locked --extra dev --no-emit-project --no-hashes --no-annotate |
-            sed -e 's/^asyncpg==0.31.0$/asyncpg==0.32.0/' \
-                -e 's/^asyncpg-stubs==0.31.3$/asyncpg-stubs==0.32.0/' > "$target/requirements.txt"
-          uv venv --python .venv/bin/python "$target/driver"
-          driver_python="$target/driver/bin/python"
-          uv pip install --python "$driver_python" -r "$target/requirements.txt" --editable '.[pgvector]'
-          "$driver_python" - <<'PY'
-          import asyncio
-          import os
-          from importlib.metadata import version
-          import asyncpg
-          assert version("asyncpg") == version("asyncpg-stubs") == "0.32.0"
-          async def verify():
-              connection = await asyncpg.connect(os.environ["PGVECTOR_TEST_DATABASE_URL"], timeout=10, command_timeout=10)
-              try:
-                  major = int(await connection.fetchval("SHOW server_version_num")) // 10000
-                  vector = await connection.fetchval("SELECT extversion FROM pg_extension WHERE extname='vector'")
-                  assert str(major) == os.environ["EXPECTED_POSTGRES_MAJOR"]
-                  assert vector == os.environ["EXPECTED_PGVECTOR_VERSION"]
-                  print(f"Verified candidate asyncpg 0.32.0, PostgreSQL {major}, pgvector {vector}")
-              finally:
-                  await connection.close(timeout=10)
-          asyncio.run(verify())
-          PY
-          "$driver_python" -m mypy src examples
-          "$driver_python" ../../ops/ci/required_tests.py postgresql "$target/tests.xml" -- -m pgvector --no-cov
-          uv venv --python .venv/bin/python "$target/wheel"
-          wheel_python="$target/wheel/bin/python"
-          uv pip install --python "$wheel_python" 'dist/semantix_cache-0.1.0-py3-none-any.whl[pgvector]' 'asyncpg==0.32.0'
-          "$wheel_python" -c "import asyncpg; assert asyncpg.__version__ == '0.32.0'"
-          "$wheel_python" -I tests/pgvector_wheel_smoke.py
-          cmp .coverage "$target/baseline.coverage"
+          (
+            cd ../..
+            uv run --project packages/cache --no-sync ruff check --config ruff.toml ops/ci/postgresql_candidate_certification.py ops/ci/tests/test_postgresql_candidate_certification.py
+            uv run --project packages/cache --no-sync ruff format --config ruff.toml --check ops/ci/postgresql_candidate_certification.py ops/ci/tests/test_postgresql_candidate_certification.py
+          )
+          uv run --no-sync mypy --strict ../../ops/ci/postgresql_candidate_certification.py ../../ops/ci/tests/test_postgresql_candidate_certification.py
+          uv run --no-sync pytest ../../ops/ci/tests/test_postgresql_candidate_certification.py
+          uv run --no-sync python ../../ops/ci/postgresql_candidate_certification.py
       - name: Verify real TLS and direct ALPN on PostgreSQL 18
         if: matrix.python-version == '3.14'
         timeout-minutes: 4
