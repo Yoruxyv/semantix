@@ -26,6 +26,7 @@ from ._semantics import (
     valid_response,
     validate_ttl_policy,
 )
+from ._structural_guard import check as structural_check
 from .errors import (
     CacheConfigurationError,
     CacheStoreError,
@@ -90,9 +91,13 @@ class AsyncSemanticCache:
         operation_timeout_seconds: Positive finite total deadline per operation.
         collect_coalescing_metrics: Whether to collect optional numeric lifetime
             evidence. Collection defaults to False and may become unavailable.
+        experimental_structural_guard: Opt-in veto for conflicting exact-task
+            constraints in canonical prompts. Unsupported cases keep static
+            matching. This does not validate answers or adapt the threshold;
+            it can reject useful answers that were wrong for their source prompt.
 
     Raises:
-        CacheConfigurationError: If threshold, deadline, normalizer, metrics flag
+        CacheConfigurationError: If threshold, deadline, normalizer, either flag
             or the store's default TTL is invalid.
         EmbeddingSpaceError: If collaborator spaces are invalid or incompatible.
     """
@@ -106,10 +111,13 @@ class AsyncSemanticCache:
         prompt_normalizer: Callable[[str], str] | None = None,
         operation_timeout_seconds: float = 30.0,
         collect_coalescing_metrics: bool = False,
+        experimental_structural_guard: bool = False,
     ) -> None:
         try:
             if type(cast(object, collect_coalescing_metrics)) is not bool:
                 raise ValueError("Coalescing collection must be a bool")
+            if type(cast(object, experimental_structural_guard)) is not bool:
+                raise ValueError("Structural guard must be a bool")
             self._threshold = finite_number(
                 similarity_threshold, minimum=0.0, maximum=1.0
             )
@@ -128,6 +136,7 @@ class AsyncSemanticCache:
         self._embedder = embedder
         self._store = store
         self._normalizer = prompt_normalizer
+        self._structural_guard = experimental_structural_guard
         self._space = self._checked_space()
         self._state = Lifecycle()
         self._flights = Flights(collect_metrics=collect_coalescing_metrics)
@@ -234,6 +243,11 @@ class AsyncSemanticCache:
         # monotonic time, while UTC expires_at is metadata, not another deadline.
         if not threshold_eligible(match.similarity_score, self._threshold):
             return _Lookup(embedding, match.similarity_score, None)
+        if (
+            self._structural_guard
+            and structural_check(prompt, match.entry.prompt).status == "CONFLICT"
+        ):
+            return _Lookup(embedding, match.similarity_score, None)
         confirmed = await self._store.record_hit(
             match.entry.cache_key,
             namespace=namespace,
@@ -323,8 +337,9 @@ class AsyncSemanticCache:
         """Return a confirmed semantic hit, or None without generating.
 
         Search is restricted to the namespace and bound embedding space. A candidate
-        below the inclusive threshold, expired or replaced before confirmation is a
-        miss. Successful confirmation can update hit/access metadata and LRU order;
+        below the inclusive threshold, vetoed by the opt-in structural guard,
+        expired or replaced before confirmation is a miss. Successful confirmation
+        can update hit/access metadata and LRU order;
         this method is not side-effect-free inspection and does not extend TTL.
 
         Args:
