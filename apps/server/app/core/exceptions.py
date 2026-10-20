@@ -63,6 +63,14 @@ class AppError(Exception):
         self.issues = list(issues) if issues is not None else None
 
 
+class QueryShuttingDownError(AppError):
+    status_code, error_code, public_detail = (
+        503,
+        "query_shutting_down",
+        "Query service is shutting down.",
+    )
+
+
 class AuthenticationRequiredError(AppError):
     status_code, error_code, public_detail = (
         401,

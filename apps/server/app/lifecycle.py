@@ -39,6 +39,8 @@ from app.providers.registry import ResolvedProviderSelection
 from app.query.application.service import QueryService
 from app.query.domain.normalization import create_prompt_normalizer
 
+QUERY_SHUTDOWN_GRACE_SECONDS = 30.0
+
 Lifespan = Callable[
     [FastAPI],
     AbstractAsyncContextManager[None],
@@ -61,7 +63,10 @@ def create_lifespan(
     threshold, and enabled evaluation repositories borrow the shared pool.
     Finally, publish cache, query and benchmark services on application state.
 
-    On shutdown or startup failure, entered contexts unwind in order: cache
+    Shutdown first seals and drains queries (30 seconds graceful, then cancel/join).
+    Cancellation-resistant work keeps dependencies open until it settles; shutdown
+    cancellation and failures propagate after draining. Entered contexts then
+    unwind on shutdown or startup failure in order: cache
     store, database pool, HTTP client. Cleanup errors can propagate. Provider
     adapters borrow the HTTP client; this lifespan does not discover or close
     additional resources created by custom builders. Startup is not a provider
@@ -184,11 +189,12 @@ def create_lifespan(
                 application.state.generation_provider = providers.generation_provider
                 application.state.semantic_cache = semantic_cache
                 application.state.runtime_metrics = runtime_metrics
-                application.state.query_service = QueryService(
+                query_service = QueryService(
                     semantic_cache,
                     providers.generation_provider,
                     metrics=runtime_metrics,
                 )
+                application.state.query_service = query_service
                 application.state.benchmark_service = BenchmarkService(
                     embedding_service,
                     providers.generation_provider,
@@ -269,7 +275,12 @@ def create_lifespan(
                     history_repository=history_repository,
                 )
 
-                yield
+                try:
+                    yield
+                finally:
+                    await query_service.aclose(
+                        grace_seconds=QUERY_SHUTDOWN_GRACE_SECONDS
+                    )
 
     return lifespan
 

@@ -8,18 +8,21 @@ application prompt. Shared ordering helpers do not make this the embedded
 AsyncSemanticCache facade or a conversation/session service.
 """
 
+import asyncio
 import logging
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from math import isfinite
 from time import perf_counter
 from typing import Protocol
 
 from app.cache.application.service import SemanticCache
 from app.cache.domain.models import CacheLookupResult
+from app.core.exceptions import QueryShuttingDownError
 from app.providers.protocols import GenerationProvider
 from app.providers.shared.responses import validate_generation_response
 from app.query.api.schemas import QueryResponse
-from app.query.application.coalescing import RequestCoalescer
+from app.query.application.coalescing import RequestCoalescer, _join_shutdown
 from app.query.domain.policies import (
     DEFAULT_QUERY_CACHE_POLICY,
     QueryCachePolicy,
@@ -82,6 +85,10 @@ class QueryService:
         self._cache = cache
         self._generation_provider = generation_provider
         self._metrics = metrics
+        self._shutdown_task: asyncio.Task[None] | None = None
+        self._active_requests = 0
+        self._requests_drained = asyncio.Event()
+        self._requests_drained.set()
         self._coalescer: RequestCoalescer[_QueryResolution] = RequestCoalescer(
             None if metrics is None else metrics.record_coalesced_delta
         )
@@ -116,12 +123,17 @@ class QueryService:
         Raises:
             ValueError: TTL is invalid or specified when writes are disabled.
             InvalidProviderResponseError: Generated output fails the server text validator.
+            QueryShuttingDownError: Application shutdown has sealed new query admission.
         """
         started_at = perf_counter()
         failed = True
         if self._metrics is not None:
             self._metrics.record_request_started()
+        self._active_requests += 1
+        self._requests_drained.clear()
         try:
+            if self._shutdown_task is not None:
+                raise QueryShuttingDownError
             validate_ttl_policy(
                 policy.cache_ttl_seconds, write_enabled=policy.write_enabled
             )
@@ -179,11 +191,33 @@ class QueryService:
             failed = False
             return response
         finally:
+            self._active_requests -= 1
+            if self._active_requests == 0:
+                self._requests_drained.set()
             if self._metrics is not None:
                 self._metrics.record_request_completed(
                     (perf_counter() - started_at) * 1_000,
                     failed=failed,
                 )
+
+    async def aclose(self, *, grace_seconds: float) -> None:
+        """Seal admission and drain without closing borrowed cache/provider resources.
+
+        Include callers' response construction: bypass policies can still read the
+        shared threshold after their shared resolution completes. Cancelling this
+        close waits for the same owned shutdown before propagating cancellation.
+        """
+        if not isfinite(grace_seconds) or grace_seconds < 0:
+            raise ValueError("Shutdown grace must be finite and nonnegative")
+        if self._shutdown_task is None:
+            self._shutdown_task = asyncio.create_task(self._shutdown(grace_seconds))
+        await _join_shutdown(self._shutdown_task)
+
+    async def _shutdown(self, grace_seconds: float) -> None:
+        try:
+            await self._coalescer.aclose(grace_seconds=grace_seconds)
+        finally:
+            await self._requests_drained.wait()
 
     async def _resolve(
         self,
