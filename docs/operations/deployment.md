@@ -325,6 +325,23 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-
 
 Repeat for `backend-b` only after `backend-a` is serving traffic. The gateway is configured for retries on connection errors and timeouts; this does not guarantee that every failed request is replayed or that no gateway errors occur. See the [production runtime audit](production-runtime-audit.md) for residual failures and evidence limits. Its API read timeout is 330 seconds and the backend stop grace is 360 seconds, covering the default 300-second evaluation limit; size them together if that limit changes. The gateway access log records status, upstream address, URI path, and duration without query strings, prompts, tokens, or responses.
 
+Application lifespan teardown seals new query admission and gives already admitted
+shared query resolutions a 30-second graceful window. It then requests cancellation
+and joins those resolutions, their asynchronous cleanup, and any remaining query
+response construction before closing the cache store, database pool, and provider
+HTTP client. New queries reaching the service after the seal receive the existing
+error envelope with HTTP 503, `error: query_shutting_down`, and a fixed safe detail.
+Ordinary caller cancellation still leaves shared work shielded.
+
+The 30 seconds starts at lifespan teardown; it does not bound ASGI request draining
+or replace the evaluation timeout. Joining cancellation-resistant work can exceed
+that grace period and keeps dependencies open. Shutdown cancellation propagates
+only after draining; operation/cleanup failures remain visible as shutdown failures.
+No cancellation guarantees rollback of native/database/remote effects. The 360-second
+container stop grace is still a supervisor kill boundary, not a guarantee of safe
+application completion; account for request drain, query drain, and resource cleanup
+when sizing deployment termination limits. This policy adds no environment setting.
+
 Each replica owns its HTTP client, PostgreSQL pool, evaluation run lock and runtime metrics. Coalescing and `/api/v1/metrics` remain process-local; aggregate replica-labelled observations externally. Shared cache, datasets/history when enabled, and PostgreSQL coordination persist independently of replica lifetimes.
 
 At the default pool maximum of five connections per replica, the two backends can use up to ten PostgreSQL connections, plus migration, maintenance, and monitoring connections. Reserve server headroom accordingly. Provider calls, retries, and evaluation runs can also occur on both replicas at once. Set provider quotas against the aggregate demand before using real providers; the mock-provider CI burst measures concurrency but does not establish a remote-provider quota.

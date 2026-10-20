@@ -254,6 +254,24 @@ error gateway; lihat [audit runtime](../../../operations/production-runtime-audi
 untuk kegagalan residual dan batas buktinya. Prosedur rinci
 dan batas retry tersedia pada [panduan dua replika berbahasa Inggris](../../../operations/deployment.md#two-replica-operation).
 
+Saat teardown lifespan aplikasi dimulai, penerimaan query baru ditutup dan resolusi
+query bersama yang sudah diterima diberi waktu graceful selama 30 detik. Setelah itu,
+aplikasi meminta pembatalan lalu menunggu resolusi, cleanup asinkron, serta penyusunan
+respons query yang tersisa selesai sebelum menutup cache store, database pool, dan
+HTTP client provider. Query baru yang mencapai service setelah penutupan penerimaan
+mendapat envelope error yang sama dengan HTTP 503, `error: query_shutting_down`, dan
+detail tetap yang aman. Pembatalan caller biasa tetap tidak membatalkan shared work.
+
+Waktu 30 detik dimulai pada teardown lifespan; ini tidak membatasi drain request ASGI
+atau menggantikan timeout evaluasi. Menunggu work yang menolak pembatalan dapat
+melampaui waktu graceful tersebut dan dependency tetap terbuka. Pembatalan shutdown
+diteruskan setelah drain selesai; kegagalan operasi/cleanup tetap terlihat sebagai
+kegagalan shutdown. Pembatalan tidak menjamin rollback efek native/database/remote.
+Stop grace container 360 detik tetap merupakan batas penghentian paksa oleh supervisor,
+bukan jaminan penyelesaian aplikasi yang aman; perhitungkan drain request, drain query,
+dan cleanup resource saat menentukan batas terminasi deployment. Kebijakan ini tidak
+menambahkan environment setting.
+
 `DATABASE_POOL_MAX_SIZE=5` berlaku per replika, sehingga dua backend dapat memakai
 hingga sepuluh koneksi runtime, ditambah koneksi migrasi, pemeliharaan dan monitoring.
 Anggarkan kuota provider terhadap gabungan miss, retry dan run evaluasi dari kedua
