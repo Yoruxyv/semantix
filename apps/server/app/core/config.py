@@ -18,6 +18,7 @@ which immediate peers may supply a forwarded address, not user identity.
 import re
 from functools import lru_cache
 from ipaddress import ip_network
+from pathlib import Path
 from typing import Literal
 from urllib.parse import unquote, urlparse
 
@@ -53,7 +54,7 @@ from app.providers.shared.urls import (
     normalize_ollama_url,
 )
 
-CacheBackendName = Literal["memory", "pgvector", "redis"]
+CacheBackendName = Literal["memory", "pgvector", "redis", "sqlite"]
 CoordinationBackendName = Literal["memory", "postgres"]
 AuthMode = Literal["disabled", "token"]
 AuthRole = Literal["viewer", "operator", "admin"]
@@ -194,6 +195,16 @@ class Settings(BaseSettings):
     cache_pgvector_table_prefix: str = Field(
         default="workbench_", pattern=r"^[a-z_][a-z0-9_]{0,44}$"
     )
+    cache_sqlite_path: SecretStr | None = None
+    cache_sqlite_connect_timeout_seconds: float = Field(
+        default=10.0, gt=0, le=86_400, allow_inf_nan=False
+    )
+    cache_sqlite_operation_timeout_seconds: float = Field(
+        default=30.0, gt=0, le=86_400, allow_inf_nan=False
+    )
+    cache_sqlite_close_timeout_seconds: float = Field(
+        default=30.0, gt=0, le=86_400, allow_inf_nan=False
+    )
     redis_url: SecretStr | None = None
     redis_key_prefix: str = Field(
         default="semantix_workbench", pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
@@ -319,6 +330,9 @@ class Settings(BaseSettings):
                 "persistent caches"
             )
 
+        if self.cache_backend == "sqlite":
+            self._validate_sqlite_configuration()
+
         if self.cache_backend == "redis":
             self._validate_redis_configuration()
 
@@ -430,6 +444,7 @@ class Settings(BaseSettings):
             self.gemini_api_key,
             self.database_url,
             self.redis_url,
+            self.cache_sqlite_path,
         )
         configured = [
             secret.get_secret_value()
@@ -445,6 +460,17 @@ class Settings(BaseSettings):
             if parsed.password:
                 configured.extend((parsed.password, unquote(parsed.password)))
         return tuple(configured)
+
+    def _validate_sqlite_configuration(self) -> None:
+        self._require_secret(self.cache_sqlite_path, "CACHE_SQLITE_PATH")
+        if (
+            self.cache_sqlite_path is not None
+            and not Path(self.cache_sqlite_path.get_secret_value()).is_absolute()
+        ):
+            raise ValueError("CACHE_SQLITE_PATH must be an absolute local filename")
+        if self.max_cache_size > 5000:
+            raise ValueError("SQLite capacity must be <=5000")
+        # Resolved registry metadata is checked by SQLiteStore before opening.
 
     def _validate_redis_configuration(self) -> None:
         self._require_secret(self.redis_url, "REDIS_URL")

@@ -1,7 +1,7 @@
 # Server storage configuration
 
 The optional server/workbench selects the same official stores as the embedded
-package. `CACHE_BACKEND` accepts `memory`, `pgvector` or `redis`. Qdrant is not
+package. `CACHE_BACKEND` accepts `memory`, `pgvector`, `redis` or `sqlite`. Qdrant is not
 selectable. Monitor queries and Cache Inspector use the active official store;
 the server keeps no parallel cache entries, vectors, revisions, expiry or LRU
 index. Evaluations create a separate run-local MemoryStore and never use this live
@@ -13,12 +13,13 @@ store. Similarity matching is unchanged; see [accuracy limitations](../reference
 | --- | --- | --- |
 | `memory` | No storage credentials | Process-local MemoryStore; entries disappear when the process stops |
 | `pgvector` | `DATABASE_URL`; optional `CACHE_PGVECTOR_SCHEMA` and `CACHE_PGVECTOR_TABLE_PREFIX` | Explicit operator setup; one shared server PostgreSQL pool, borrowed by PgVectorStore |
+| `sqlite` | Absolute `CACHE_SQLITE_PATH`; optional `CACHE_SQLITE_*_TIMEOUT_SECONDS` | Explicit local setup; one native server process on trusted local disk |
 | `redis` | `REDIS_URL`; optional `REDIS_KEY_PREFIX` | Install the server `redis` extra and explicitly initialize the binding; server owns and closes the Redis client/pool |
 
-`MAX_CACHE_SIZE` and `CACHE_TTL_SECONDS` retain their existing semantics. Memory
-and Redis support at most 5,000 entries; Redis additionally limits the vector
+`MAX_CACHE_SIZE` and `CACHE_TTL_SECONDS` retain their existing semantics. Memory, SQLite
+and Redis support at most 5,000 entries; SQLite and Redis additionally limit the vector
 projection to 64 MiB (`max_size × dimensions × 8`). PostgreSQL uses the package's
-persisted binding capacity rules. Changing Redis capacity/default TTL for an
+persisted binding capacity rules. Changing SQLite or Redis capacity/default TTL for an
 existing binding fails validation rather than silently adopting new settings.
 Namespaces, embedding identities/dimensions, policy flags and final atomic
 revision/expiry confirmation remain authoritative in storage. Hits never renew TTL.
@@ -33,6 +34,73 @@ store kind only, never its URL, credentials or private model identity.
 From `apps/server`, `uv sync --locked --extra redis` installs Redis support for
 local server use. Container server images include it. The embedded core still
 does not import redis-py or asyncpg; the HTTP client gains no database dependency.
+
+## SQLite: explicit local setup and bounded shutdown
+
+SQLite uses the existing package-owned store, inspection and administration APIs.
+It is supported only for one native server process on trusted local disk. The
+bundled development Compose launcher rejects it; the hardened multi-replica
+Compose deployment remains PostgreSQL-based and does not configure SQLite.
+Do not use network mounts, multiple workers, reload mode or ephemeral container
+storage. Arbitrary ASGI launchers cannot be certified from application settings.
+
+Configure the same resolved embedding identity/dimensions, capacity and TTL for
+setup and runtime. Use an absolute filename under an existing operator-owned
+private directory, for example `C:/private/semantix/cache.db` or
+`/private/semantix/cache.db`. Set `CACHE_BACKEND=sqlite` and `CACHE_SQLITE_PATH`,
+then run from `apps/server` with the same server configuration:
+
+```text
+python -m app.cache.infrastructure.sqlite_setup
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+```
+
+Setup resolves provider metadata without constructing providers or calling them.
+Custom registrations can call `initialize_sqlite(settings, metadata=resolved_metadata)`
+from application-owned operator tooling. Normal startup calls only `connect()`;
+it never creates, adopts, repairs or reinitializes a file. No migration between
+backends occurs. Missing/incompatible storage fails startup rather than falling
+back. Changes to an existing binding's capacity/TTL must not be silently adopted.
+
+The [package runtime and filesystem restrictions](../embedded/storage.md#sqlite-local-file-persistence)
+remain authoritative. SQLite requires a supported linked library, not merely a
+supported Python version. Capacity is at most 5,000, dimensions at most 16,000 and
+`capacity × dimensions × 8 <= 64 MiB`; response/payload memory and disk costs are
+additional. The package checks path form, parents, symlinks/reparse points and
+binding integrity. It does not certify POSIX permissions or Windows ACL privacy.
+Operators must protect the database and WAL/SHM files. Paths stay out of public
+errors and diagnostics; clear is not secure erase.
+
+Connect, operation and close timeout defaults are 10, 30 and 30 seconds. Values
+must be positive finite seconds at most 86,400. The operator setup command uses
+the public package's operation timeout for its setup and owned cleanup; runtime
+connect/close settings are separate. SQLite shutdown starts after the existing
+QueryService drain. `CACHE_SQLITE_CLOSE_TIMEOUT_SECONDS` is one total application
+await budget covering pre-close busy waiting and subsequent public `aclose()`;
+it is not two consecutive full budgets. Only pre-close `CacheBusyError` is retried.
+Mutations and native-close errors are never retried.
+
+Budget expiry raises a sanitized terminal shutdown error. Cancellation propagates.
+Neither outcome establishes resource disposal. If native close has started, its
+existing package-owned shielded cleanup may outlive the application await budget;
+no server retry task is detached. If work remains busy, the connection/worker may
+remain alive without cleanup having started. Operator-controlled process
+disposition may be required, and a supervisor may need to force termination.
+This does not guarantee bounded process exit. The separately documented exceptional
+native-close terminal limitation is unchanged.
+
+Inspector operations retain exact totals or fail under the operation deadline;
+Unicode prompt search streams payloads and occupies the single SQLite worker.
+Bounded memory is not a maximum-scale completion-time guarantee. Lists and detail
+are observational; global clear affects only the active embedding binding.
+Hit/miss telemetry is process-local, including when independent PostgreSQL features
+are enabled. Entry hit/revision/TTL state remains package-owned and persistent.
+SQLite does not disable PostgreSQL coordination, datasets or run history.
+
+Readiness and diagnostics identify the backend as `sqlite` with unchanged response
+shapes. Older SDKs/frontends may reject this new enum value; use versions that
+recognize it. Real-browser, packaged-install and additional deployment certification
+are separate from the HTTP integration tests.
 
 ## PostgreSQL: setup and legacy transition
 
@@ -106,7 +174,7 @@ process-local telemetry; Inspector hit/access metadata comes from the actual sto
 
 ## Inspector and diagnostics
 
-The three concrete stores offer optional `inspect_entries` and `inspect_entry`
+The four concrete stores offer optional `inspect_entries` and `inspect_entry`
 observations. The mandatory `CacheStore` protocol is unchanged. These methods
 exclude expired entries without purging them, recording hits, renewing TTL or
 changing LRU. Redis may independently expire hash fields through its native TTL;
@@ -144,7 +212,7 @@ observations rather than a shared snapshot: insertion, deletion, hits and expiry
 can shift offsets. Redis search batches also observe separate snapshots, so
 concurrent changes can affect totals or repeat/omit entries. Refresh after mutations;
 do not use Inspector pages as a correctness or authorization lease. Search uses
-Python Unicode case folding in Memory/Redis and database `LOWER` in PostgreSQL;
+Python Unicode case folding in Memory/SQLite/Redis and database `LOWER` in PostgreSQL;
 non-ASCII matching depends on the PostgreSQL locale.
 
 Observability eviction/expiry counts are observed process events, not an exact

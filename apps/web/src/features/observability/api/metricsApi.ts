@@ -14,7 +14,12 @@ import {
 
 import type { RuntimeDiagnostics, RuntimeMetrics } from '../types';
 
-const isCacheBackend = createEnumGuard(['memory', 'pgvector', 'redis'] as const);
+const isCacheBackend = createEnumGuard([
+  'memory',
+  'pgvector',
+  'redis',
+  'sqlite',
+] as const);
 const isCacheReadiness = createEnumGuard(['ready', 'unavailable'] as const);
 const isNormalizationMode = createEnumGuard(['identity', 'typo_correction'] as const);
 const isNormalizationAlgorithmVersion = createEnumGuard([

@@ -40,8 +40,9 @@ from semantix_cache.inspection import InspectionEntry
 if TYPE_CHECKING:
     from semantix_cache.stores.pgvector import PgVectorStore
     from semantix_cache.stores.redis import RedisStore
+    from semantix_cache.stores.sqlite import SQLiteStore
 
-OfficialStore: TypeAlias = "MemoryStore | PgVectorStore | RedisStore"
+OfficialStore: TypeAlias = "MemoryStore | PgVectorStore | RedisStore | SQLiteStore"
 
 
 @dataclass(slots=True)

@@ -20,10 +20,11 @@ from app.cache.infrastructure.backends.pgvector import PgVectorCacheBackend
 from app.cache.infrastructure.database import create_database_pool
 from app.core.config import Settings
 from app.core.exceptions import CacheStorageError
-from semantix_cache import EmbeddingSpace, SemantixCacheError
+from semantix_cache import CacheBusyError, EmbeddingSpace, SemantixCacheError
 
 if TYPE_CHECKING:
     from semantix_cache.stores.redis import RedisStore
+    from semantix_cache.stores.sqlite import SQLiteStore
 
 
 @asynccontextmanager
@@ -40,7 +41,8 @@ async def cache_backend_lifespan(
     Memory creates a process-local store. PostgreSQL borrows a supplied pool or
     opens its own, validates the official schema, then separately reads server
     telemetry. Redis connect owns its client/pool and validates the existing marked
-    binding. Neither persistent branch installs or adopts a cache schema.
+    binding. SQLite owns its local worker and uses one total shutdown-await budget.
+    No persistent branch installs or adopts a cache schema.
 
     On exit or failed setup, close any assigned store first. A nested finally then
     attempts to close only a pool opened here, under the database command timeout;
@@ -67,6 +69,7 @@ async def cache_backend_lifespan(
     """
     owned_pool: Pool | None = None
     backend: OfficialStoreBackend | None = None
+    sqlite_store: SQLiteStore | None = None
     try:
         if settings.cache_backend == "memory":
             backend = InMemoryCacheBackend(
@@ -95,6 +98,9 @@ async def cache_backend_lifespan(
             await pg_backend.store.validate_schema()
             # Validate existing server telemetry separately; never adopt legacy entries.
             await backend.stats(None)
+        elif settings.cache_backend == "sqlite":
+            sqlite_store = await _connect_sqlite(settings, dimensions, embedding_space)
+            backend = OfficialStoreBackend(sqlite_store, events=events)
         elif settings.cache_backend == "redis":
             try:
                 redis_store = cast(
@@ -129,11 +135,15 @@ async def cache_backend_lifespan(
         ) from None
     finally:
         try:
-            if backend is not None:
-                try:
+            try:
+                if sqlite_store is not None:
+                    await _close_sqlite(
+                        sqlite_store, settings.cache_sqlite_close_timeout_seconds
+                    )
+                elif backend is not None:
                     await backend.store.aclose()
-                except SemantixCacheError:
-                    raise CacheStorageError("Official cache cleanup failed") from None
+            except SemantixCacheError:
+                raise CacheStorageError("Official cache cleanup failed") from None
         finally:
             if owned_pool is not None:
                 try:
@@ -144,3 +154,53 @@ async def cache_backend_lifespan(
                 except BaseException:
                     owned_pool.terminate()
                     raise
+
+
+async def _connect_sqlite(
+    settings: Settings, dimensions: int, embedding_space: str
+) -> "SQLiteStore":
+    """Construct only the selected backend; the package validates resolved metadata."""
+    try:
+        store_type = cast(
+            "type[SQLiteStore]",
+            import_module("semantix_cache.stores.sqlite").SQLiteStore,
+        )
+    except ImportError:
+        raise CacheStorageError("SQLite requires a supported sqlite3 runtime") from None
+    if settings.cache_sqlite_path is None:
+        raise CacheStorageError("CACHE_SQLITE_PATH is required")
+    return await store_type.connect(
+        settings.cache_sqlite_path.get_secret_value(),
+        embedding_space=EmbeddingSpace(identity=embedding_space, dimensions=dimensions),
+        max_size=settings.max_cache_size,
+        default_ttl_seconds=settings.cache_ttl_seconds,
+        connect_timeout_seconds=settings.cache_sqlite_connect_timeout_seconds,
+        operation_timeout_seconds=settings.cache_sqlite_operation_timeout_seconds,
+        close_timeout_seconds=settings.cache_sqlite_close_timeout_seconds,
+    )
+
+
+async def _close_sqlite(store: "SQLiteStore", budget_seconds: float) -> None:
+    """Bound the total await; expiry/cancellation never claims physical disposal.
+
+    Only documented pre-close busy refusal is retried. Once native cleanup starts,
+    the package owns its shielded task, which may outlive this application's budget.
+    No server cleanup/retry task is created. Cancellation propagates unchanged.
+    """
+    deadline = asyncio.timeout(budget_seconds)
+    try:
+        async with deadline:
+            while True:
+                try:
+                    await store.aclose()
+                    return
+                except CacheBusyError:
+                    # Poll only during shutdown; the outer deadline covers this wait too.
+                    await asyncio.sleep(0.01)
+    except TimeoutError:
+        if not deadline.expired():
+            raise
+        raise CacheStorageError(
+            "SQLite shutdown budget expired; cleanup is incomplete and requires "
+            "operator-controlled process disposition"
+        ) from None
