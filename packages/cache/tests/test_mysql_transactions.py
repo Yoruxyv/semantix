@@ -42,6 +42,7 @@ def persisted(name: str) -> list[list[tuple[Any, ...]]]:
         ("hit", "UPDATE semantix_bindings SET access_counter"),
         ("delete", "DELETE FROM semantix_entries"),
         ("clear", "DELETE FROM semantix_entries"),
+        ("clear_all", "DELETE FROM semantix_entries"),
     ],
 )
 async def test_business_failure_rolls_back_without_replay(
@@ -79,8 +80,10 @@ async def test_business_failure_rolls_back_without_replay(
                 )
             elif operation == "delete":
                 await mysql_store.delete_entry(value.cache_key, namespace="default")
-            else:
+            elif operation == "clear":
                 await mysql_store.clear(namespace="default")
+            else:
+                await mysql_store.clear_all()
 
         with pytest.raises(CacheStoreError) as caught:
             await mutate()

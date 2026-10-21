@@ -10,7 +10,14 @@ from typing import NoReturn, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from ...._semantics import normalized_vector
+from ...._semantics import (
+    cache_key_value,
+    canonical_prompt,
+    namespace_value,
+    normalized_vector,
+    prompt_cache_key,
+    valid_response,
+)
 from ....errors import CacheStoreError, SemantixCacheError
 from ....models import CacheEntry
 
@@ -102,14 +109,7 @@ def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
     return result
 
 
-def decode_entry(
-    payload: bytes,
-    vector: bytes,
-    key: str,
-    namespace: str,
-    revision: int,
-    dimensions: int,
-) -> CacheEntry:
+def decode_payload(payload: bytes, key: str, namespace: str) -> dict[str, str]:
     if not isinstance(payload, bytes) or len(payload) > MAX_PAYLOAD:
         raise ValueError("Invalid stored payload")
     decoded: object = json.loads(
@@ -125,11 +125,28 @@ def decode_entry(
         or values["namespace"] != namespace
     ):
         raise ValueError("Invalid stored payload fields")
-    result = CacheEntry(
-        **cast(dict[str, str], values),
+    checked = cast(dict[str, str], values)
+    prompt = canonical_prompt(checked["prompt"])
+    if prompt != checked["prompt"]:
+        raise ValueError("Noncanonical stored prompt")
+    if prompt_cache_key(
+        prompt, namespace=namespace_value(namespace)
+    ) != cache_key_value(key):
+        raise ValueError("Cache key does not match stored prompt and namespace")
+    valid_response(checked["response"])
+    return checked
+
+
+def decode_entry(
+    payload: bytes,
+    vector: bytes,
+    key: str,
+    namespace: str,
+    revision: int,
+    dimensions: int,
+) -> CacheEntry:
+    return CacheEntry(
+        **decode_payload(payload, key, namespace),
         embedding=tuple(decode_vector(vector, dimensions)),
         created_at=timestamp(revision),
     )
-    if result.prompt != values["prompt"]:
-        raise ValueError("Noncanonical stored prompt")
-    return result

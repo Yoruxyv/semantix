@@ -203,6 +203,11 @@ does not select MySQL. See [MySQL setup, limits and cleanup recovery](https://gi
 before use: full float64 scans are bounded, hits write, slow I/O can time out,
 and an uncertain mutation/COMMIT is never automatically replayed.
 
+Concrete MySQLStore instances also provide optional `inspect_entries()`, scoped
+`inspect_entry()` and binding-scoped `clear_all()`. Inspection is observational;
+Unicode prompt searches scan payloads under the existing deadline. Applications
+own authorization; these methods do not change the mandatory CacheStore protocol.
+
 ## Optional cold-miss coalescing
 
 Opt-in cold-miss coalescing can substantially reduce duplicate generation during

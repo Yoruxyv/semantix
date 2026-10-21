@@ -2,8 +2,9 @@
 
 `from semantix_cache.stores.mysql import MySQLStore` adds dedicated-database
 persistence to the embedded package. It implements the unchanged `CacheStore`
-contract with exact float64 cosine scoring. It does not add a server/dashboard
-backend, inspector, `clear_all`, native vector search or an approximate index.
+contract with exact float64 cosine scoring and optional inspection/administration.
+It does not add a server/dashboard backend, native vector search or an approximate
+index.
 
 ## Install and connect
 
@@ -241,6 +242,45 @@ failed close invalidates its handle, the receipt preserves uncertainty and
 refuses descriptor reuse. Arrange an **operator-controlled process restart** if
 explicit recovery cannot retire ownership. No daemon-thread substitution, GC
 disposal, automatic process exit or infinite retry is used.
+
+## Optional inspection and administration
+
+Concrete stores provide `inspect_entries()`, `inspect_entry()` and `clear_all()`;
+these are outside the mandatory `CacheStore` protocol. Applications must authorize
+namespace scope. List `namespace=None` observes all namespaces of the active
+embedding binding. Detail `namespaces=None` allows all, `()` allows none, and a
+tuple restricts the result to those namespaces; missing, expired and excluded
+keys return `None`. The package does not authenticate callers.
+
+Inspection uses one read-only repeatable-read transaction and one server UTC
+clock observation. It changes no entry, TTL, hit count, access order or binding
+ledger, and never purges expired entries. Lists return detached prompts, metadata
+and previews of at most 240 characters, without vectors or full response fields;
+authorized detail can include the full response. Previews remain sensitive.
+Sorting, tie handling, scoped recency and pagination follow the shared
+[inspection contract](storage.md#optional-inspection-and-administration). Later
+calls can observe changed entries, ordering and totals.
+
+Ordinary lists validate bounded metadata and decode only selected-page payloads.
+Unicode substring search applies `strip().casefold()` and scans scoped live
+payloads to obtain an exact filtered total. Each primary-key payload fetch returns
+at most one blob, accounting for PyMySQL's buffered cursor. The store retains
+bounded scalar metadata, a constant number of payloads and at most one output
+page; it does not buffer all matching responses or read vectors for inspection.
+
+Search still transfers and validates every scoped live payload, potentially a
+large byte volume. It serializes with other operations on this store and holds
+a database snapshot, which can retain old InnoDB row versions. Bounded memory
+is not a latency guarantee. Existing operation, statement and socket deadlines
+remain unchanged: receive the complete result or an error, never a partial total.
+No maximum-capacity inspection performance is certified by this implementation.
+
+`clear_all()` acquires the existing binding writer lock and atomically deletes
+entries and cascading payloads across that binding's namespaces. It reports the
+number live at its server-clock observation, also removes expired rows, and
+preserves other bindings, the revision ledger and access counter. Clear is not
+secure erasure. Existing cancellation, rollback and uncertain-COMMIT rules apply;
+an uncertain mutation is never automatically replayed.
 
 ## Exact search, retention and measured costs
 
