@@ -12,7 +12,8 @@ independently installable Python HTTP client. Applications can call the public H
 directly or use the SDK. The SDK is a remote client, not another cache engine.
 Configured embedding and generation providers are external to the cache service; the
 mock provider supports deterministic local use. The live cache delegates to the
-package-owned MemoryStore, PgVectorStore or RedisStore, according to settings.
+package-owned MemoryStore, SQLiteStore, PgVectorStore or RedisStore, according to settings.
+SQLite is restricted to a native single-process server on trusted local disk.
 
 An independently installable [semantix-cache](packages/cache/README.md) supplies the async
 embedded facade, bounded MemoryStore, local SQLite and optional MySQL, PostgreSQL/pgvector or Redis persistence
@@ -153,7 +154,7 @@ coalescer or fleet-wide metrics store.
 
 One backend pool serves enabled PostgreSQL features. With memory cache, session-only
 datasets, disabled run history, and memory coordination, no database pool is required.
-The live cache delegates to the package-owned MemoryStore, PgVectorStore or RedisStore.
+The live cache delegates to the package-owned MemoryStore, SQLiteStore, PgVectorStore or RedisStore.
 Storage setup is explicit; normal startup validates the selected binding rather than
 creating or converting cache tables. PgVectorStore owns its marked schema and migration
 ledger (by default, semantix_cache.workbench_*). Server cache migration 0001 preserves

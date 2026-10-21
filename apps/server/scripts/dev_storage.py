@@ -24,6 +24,10 @@ from semantix_cache.stores.redis import RedisStore
 
 def plan(settings: Settings) -> dict[str, bool]:
     """Validate additional launcher boundaries without network or provider calls."""
+    if settings.cache_backend == "sqlite":
+        raise ValueError(
+            "SQLite requires a single-process native server on trusted local disk; Compose is unsupported"
+        )
     if any(
         os.environ.get(name)
         for name in (
