@@ -68,6 +68,7 @@ def test_public_exports_and_signatures() -> None:
         "prompt_normalizer",
         "operation_timeout_seconds",
         "collect_coalescing_metrics",
+        "experimental_structural_guard",
     ]
     assert all(
         parameter.kind is inspect.Parameter.KEYWORD_ONLY
@@ -78,6 +79,7 @@ def test_public_exports_and_signatures() -> None:
         30.0
     )
     assert constructor.parameters["collect_coalescing_metrics"].default is False
+    assert constructor.parameters["experimental_structural_guard"].default is False
     snapshot = AsyncSemanticCache.coalescing_snapshot
     assert not inspect.iscoroutinefunction(snapshot)
     assert list(inspect.signature(snapshot).parameters) == ["self"]

@@ -202,6 +202,67 @@ does not select MySQL. See [MySQL setup, limits and cleanup recovery](https://gi
 before use: full float64 scans are bounded, hits write, slow I/O can time out,
 and an uncertain mutation/COMMIT is never automatically replayed.
 
+## Experimental structural guard (embedded only)
+
+Static similarity matching remains the default. Applications can explicitly opt
+into a local prompt-pair veto:
+
+~~~python
+cache = AsyncSemanticCache(
+    embedder=embedder,
+    store=store,
+    experimental_structural_guard=True,
+)
+~~~
+
+This is **not adaptive thresholding**. The configured cosine threshold stays
+unchanged. Only the nearest candidate is considered, with no second-candidate
+search. After validation and threshold eligibility, a supported structural
+`CONFLICT` makes `get` return `None` or `resolve` follow its ordinary miss policy.
+The candidate's similarity remains in the resolve result, but matched-entry
+fields are absent. A veto does not confirm/count a hit or promote its LRU position.
+Candidates not vetoed still require the same atomic namespace/revision/TTL
+confirmation. The guard is stateless and requires no extra dependency or model.
+
+The complete supported prompt forms are deliberately narrow (case and punctuation
+matter; `X`, `A` and `B` below stand for literal task operands):
+
+- `Copy identifier X exactly.` or `Copy the identifier X exactly.`
+- `Give the flag name X exactly.` or `Return the exact flag name X.`
+- `Copy the literal string "X" exactly. Return only the copied characters.`
+  (`the` may be omitted).
+- `Give UTF-8 hex bytes for 'X'.` or `Give Unicode code points for 'X'.`
+  (`the` may follow `Give`).
+- `Does literal 'A' equal 'B' by exact character comparison?` or
+  `By exact character comparison, does literal 'A' equal 'B'?`
+
+Identifiers are 1–64 ASCII identifier characters, beginning with a letter or
+underscore. Quoted operands are at most 256 characters and exclude the quote
+delimiter, backslashes and CR/LF. Different task kinds, unsupported wording,
+escaped literals and inconclusive comparisons retain ordinary static matching.
+Different equality operands with the same truth value are inconclusive because
+an accompanying explanation may not transfer. **Unsupported and no-conflict
+outcomes do not verify answer compatibility.** Internal checker statuses are not
+new public result fields or a general-purpose validation API.
+
+The guard compares the **canonical application prompts**, before the optional
+embedding-only normalizer. Existing canonicalization replaces controls, collapses
+horizontal whitespace and trims, including inside quoted operands. The guard
+cannot recover distinctions already removed there, such as tabs versus spaces.
+It adds no Unicode normalization or case folding. It cannot detect a wrong answer
+to identical prompts, validate instructions outside its grammar, or compensate
+for missing response context. Applications still own source-answer approval and
+namespace/context isolation.
+
+False vetoes are an expected trade-off: if a source asks for `MAX_BATCH_SIZE` but
+stores `max_batch_size`, that answer is useful for a new lower-case request, yet
+the guard rejects the conflicting prompts. A source with unwanted backticks can
+similarly contain the right answer for a new request explicitly asking for those
+backticks. Opt in only if this source-answer-soundness assumption and possible
+loss of useful hits suit the application. Controlled authored experiments show
+these mechanics, not real-world accuracy improvement. There is no server,
+environment-variable or dashboard control for this option.
+
 ## Optional cold-miss coalescing
 
 Opt-in cold-miss coalescing can substantially reduce duplicate generation during
