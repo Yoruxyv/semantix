@@ -17,6 +17,14 @@ from ...._semantics import (
     resolve_ttl,
 )
 from ....errors import CacheConfigurationError, CacheStoreError, CacheValidationError
+from ....inspection import (
+    PREVIEW_LIMIT,
+    InspectionEntry,
+    InspectionPage,
+    InspectionSort,
+    preview,
+    remaining,
+)
 from ....models import CacheEntry, CacheMatch
 from .format import (
     APPLICATION_ID,
@@ -29,6 +37,7 @@ from .format import (
     Configuration,
     checked_path,
     decode_entry,
+    decode_payload,
     decode_vector,
     encode_entry,
     micros,
@@ -37,11 +46,31 @@ from .format import (
     sqlite3,
     timestamp,
 )
-from .worker import Job
+from .worker import Job, Row
 
 
 def now_us() -> int:
     return time_ns() // 1000
+
+
+def inspection_entry(
+    row: Row, payload: dict[str, str], observed: int, *, detail: bool
+) -> InspectionEntry:
+    expiry = None if row[3] is None else timestamp(row[3])
+    return InspectionEntry(
+        cache_key=row[0],
+        namespace=row[1],
+        prompt=payload["prompt"],
+        response_preview=preview(payload["response"]),
+        response_preview_truncated=len(payload["response"]) > PREVIEW_LIMIT,
+        response=payload["response"] if detail else None,
+        created_at=timestamp(row[2]),
+        expires_at=expiry,
+        remaining_ttl_seconds=remaining(expiry, timestamp(observed)),
+        hit_count=row[4],
+        last_accessed_at=None if row[5] is None else timestamp(row[5]),
+        recency_rank=row[7],
+    )
 
 
 class Database:
@@ -393,3 +422,101 @@ class Database:
                 similarity_score=score,
                 expires_at=None if expiry is None else timestamp(expiry),
             )
+
+    def _inspection_metadata(
+        self, job: Job, binding: int, observed: int, namespace: str | None = None
+    ) -> list[Row]:
+        # Authority already bounds/validates the binding; no payload/vector projection.
+        return job.rows(
+            "SELECT cache_key,namespace,revision_us,expires_at_us,hit_count,last_accessed_at_us,access_seq FROM cache_entries WHERE binding_id=? AND (? IS NULL OR namespace=?) AND (expires_at_us IS NULL OR expires_at_us>?) ORDER BY access_seq DESC,revision_us DESC,cache_key",
+            (binding, namespace, namespace, observed),
+        )
+
+    def _inspection_payload(self, job: Job, binding: int, row: Row) -> dict[str, str]:
+        rows = job.rows(
+            "SELECT payload_blob FROM cache_payloads WHERE binding_id=? AND cache_key=?",
+            (binding, row[0]),
+        )
+        if len(rows) != 1:
+            raise ValueError("Missing inspection payload")
+        return decode_payload(rows[0][0], row[0], row[1])
+
+    def inspect_entries(
+        self,
+        job: Job,
+        namespace: str | None,
+        offset: int,
+        limit: int,
+        search: str | None,
+        sort: InspectionSort,
+    ) -> InspectionPage:
+        with job.transaction():
+            binding, _, _ = self.authority(job)
+            observed = now_us()
+            rows = [
+                (*row, rank)
+                for rank, row in enumerate(
+                    self._inspection_metadata(job, binding, observed, namespace), 1
+                )
+            ]
+            if sort == "oldest":
+                rows.sort(key=lambda row: (row[2], row[0]))
+            elif sort == "most_hit":
+                rows.sort(key=lambda row: (-row[4], -row[2], row[0]))
+            elif sort == "nearest_expiry":
+                rows.sort(key=lambda row: (row[3] is None, row[3], -row[2], row[0]))
+            else:
+                rows.sort(key=lambda row: (-row[2], row[0]))
+            needle = "" if search is None else search.strip().casefold()
+            items: list[InspectionEntry] = []
+            total = 0 if needle else len(rows)
+            # Keep bounded metadata and one output page; read payloads sequentially.
+            for row in rows if needle else rows[offset : offset + limit]:
+                job.check()
+                payload = self._inspection_payload(job, binding, row)
+                if needle:
+                    if needle not in payload["prompt"].casefold():
+                        continue
+                    selected = offset <= total < offset + limit
+                    total += 1
+                else:
+                    selected = True
+                if selected:
+                    items.append(inspection_entry(row, payload, observed, detail=False))
+            return InspectionPage(
+                items=tuple(items),
+                total=total,
+                offset=offset,
+                limit=limit,
+                has_more=offset + len(items) < total,
+            )
+
+    def inspect_entry(
+        self, job: Job, key: str, namespaces: tuple[str, ...] | None
+    ) -> InspectionEntry | None:
+        with job.transaction():
+            binding, _, _ = self.authority(job)
+            observed = now_us()
+            allowed = None if namespaces is None else frozenset(namespaces)
+            rank = 0
+            for row in self._inspection_metadata(job, binding, observed):
+                job.check()
+                if allowed is not None and row[1] not in allowed:
+                    continue
+                rank += 1
+                if row[0] == key:
+                    payload = self._inspection_payload(job, binding, row)
+                    return inspection_entry(
+                        (*row, rank), payload, observed, detail=True
+                    )
+        return None
+
+    def clear_all(self, job: Job) -> int:
+        with job.transaction(write=True):
+            binding, _, _ = self.authority(job)
+            count = job.rows(
+                "SELECT count(*) FROM cache_entries WHERE binding_id=? AND (expires_at_us IS NULL OR expires_at_us>?)",
+                (binding, now_us()),
+            )[0][0]
+            job.rows("DELETE FROM cache_entries WHERE binding_id=?", (binding,))
+        return cast(int, count)

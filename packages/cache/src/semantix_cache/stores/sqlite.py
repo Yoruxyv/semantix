@@ -11,6 +11,13 @@ from typing import Self
 
 from .._semantics import cache_key_value, namespace_value
 from ..errors import CacheConfigurationError, CacheStoreError, CacheValidationError
+from ..inspection import (
+    InspectionEntry,
+    InspectionPage,
+    InspectionSort,
+    inspection_arguments,
+    inspection_namespaces,
+)
 from ..models import CacheEntry, CacheMatch, EmbeddingSpace
 from ._backends.sqlite.database import Database
 from ._backends.sqlite.format import Configuration, micros, safe, timeout
@@ -55,12 +62,14 @@ class SQLiteStore:
                 lambda job: store._database.open(job, initialize=initialize),
                 budget_seconds=connect_timeout,
             )
-        except BaseException:
+        except BaseException as startup_error:
             cleanup = store._worker.start_cleanup(startup=True)
             try:
                 async with asyncio.timeout(configuration.close_timeout):
                     await asyncio.shield(cleanup)
-            except (asyncio.CancelledError, TimeoutError, CacheStoreError):
+            except CacheStoreError as cleanup_error:
+                raise startup_error from cleanup_error
+            except (asyncio.CancelledError, TimeoutError):
                 pass
             raise
         return store
@@ -190,11 +199,61 @@ class SQLiteStore:
         namespace = self._scope(namespace)
         return await self._worker.run(lambda job: self._database.clear(job, namespace))
 
+    async def inspect_entries(
+        self,
+        *,
+        namespace: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+        search: str | None = None,
+        sort: InspectionSort = "newest",
+    ) -> InspectionPage:
+        """Observe live metadata without hits, expiry purge or recency changes.
+
+        Lists decode only selected payloads unless prompt search requires a full
+        sequential scan. Search has bounded working memory and the existing
+        operation deadline; it returns an exact total or raises, never a partial page.
+        The caller authorizes scope. Pages are snapshots of individual operations.
+        """
+        inspection_arguments(namespace, offset, limit, search, sort)
+        return await self._worker.run(
+            lambda job: self._database.inspect_entries(
+                job, namespace, offset, limit, search, sort
+            )
+        )
+
+    async def inspect_entry(
+        self, cache_key: str, *, namespaces: tuple[str, ...] | None
+    ) -> InspectionEntry | None:
+        """Observe a live authorized detail; None scope is unrestricted, () is empty.
+
+        The caller authorizes namespace access. Missing, expired and out-of-scope
+        keys return None. Unlike lists, authorized detail includes the full answer.
+        """
+        try:
+            cache_key_value(cache_key)
+        except (ValueError, TypeError):
+            safe(CacheValidationError("Invalid SQLite inspection key"))
+        inspection_namespaces(namespaces)
+        return await self._worker.run(
+            lambda job: self._database.inspect_entry(job, cache_key, namespaces)
+        )
+
+    async def clear_all(self) -> int:
+        """Atomically clear this embedding binding, preserving its revision ledger.
+
+        Return the number of live entries removed. Other bindings are untouched.
+        This is an administrative mutation, not observation or secure erasure.
+        """
+        return await self._worker.run(self._database.clear_all)
+
     async def aclose(self) -> None:
         """Close an idle owned store; concurrent callers share shielded cleanup.
 
         Busy close rejects without sealing admission. A failed/timed-out close
-        never reports success or starts a second cleanup attempt.
+        never reports success or starts a second cleanup attempt. An unrecoverable
+        physical-close failure is terminal and may leave a connection alive until
+        operator-controlled process termination; that is not library cleanup success.
         """
         await self._worker.close()
 
