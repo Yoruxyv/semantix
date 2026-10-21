@@ -1,6 +1,7 @@
 import asyncio
 import os
 from contextlib import suppress
+from pathlib import Path
 from uuid import uuid4
 
 import asyncpg
@@ -13,24 +14,28 @@ from app.cache.infrastructure.backends.pgvector import PgVectorCacheBackend
 from app.cache.infrastructure.database import initialize_official_schema
 from app.cache.infrastructure.factory import cache_backend_lifespan
 from app.cache.infrastructure.setup import initialize_redis
+from app.cache.infrastructure.sqlite_setup import initialize_sqlite
 from app.core.config import Settings
 from app.core.exceptions import CacheStorageError
 from app.factory import create_app
+from app.providers.factory import create_default_provider_registry
 from semantix_cache import MemoryStore
 from semantix_cache.inspection import InspectionPage
 from semantix_cache.stores.pgvector import PgVectorStore
 from semantix_cache.stores.redis import RedisStore
+from semantix_cache.stores.sqlite import SQLiteStore
 from tests.cache.infrastructure.backends.support import cache_entry
 
 
 @pytest.fixture(
     params=[
         "memory",
+        "sqlite",
         pytest.param("pgvector", marks=pytest.mark.pgvector),
         pytest.param("redis", marks=pytest.mark.redis),
     ]
 )
-async def platform_settings(request: pytest.FixtureRequest) -> Settings:
+async def platform_settings(request: pytest.FixtureRequest, tmp_path: Path) -> Settings:
     kind = str(request.param)
     pg = os.environ.get("PGVECTOR_TEST_DATABASE_URL")
     redis = os.environ.get("REDIS_TEST_URL")
@@ -38,6 +43,7 @@ async def platform_settings(request: pytest.FixtureRequest) -> Settings:
         pytest.skip("Disposable integration service is not configured")
     settings = Settings(
         cache_backend=kind,
+        cache_sqlite_path=str(tmp_path / "platform.db"),
         embedding_provider="mock",
         generation_provider="mock",
         database_url=pg,
@@ -48,6 +54,11 @@ async def platform_settings(request: pytest.FixtureRequest) -> Settings:
         rate_limit="1000/minute",
         allowed_origins=["http://localhost:5173"],
     )
+    if kind == "sqlite":
+        selected = create_default_provider_registry(settings).resolve(
+            settings.embedding_provider, settings.generation_provider
+        )
+        await initialize_sqlite(settings, metadata=selected.embedding_metadata)
     if kind == "redis":
         assert redis is not None
         await initialize_redis(settings, initialization_url=redis)
@@ -62,6 +73,7 @@ async def test_live_query_inspector_policies_expiry_and_clear(
         backend = app.state.semantic_cache._backend
         expected = {
             "memory": MemoryStore,
+            "sqlite": SQLiteStore,
             "pgvector": PgVectorStore,
             "redis": RedisStore,
         }
@@ -77,6 +89,8 @@ async def test_live_query_inspector_policies_expiry_and_clear(
             assert diag["cache_backend"] == platform_settings.cache_backend
             assert "redis_url" not in diag
             assert "database_url" not in diag
+            assert "cache_sqlite_path" not in diag
+            assert "platform.db" not in str(diag)
 
             async def query(
                 prompt: str, namespace: str = "alpha", policy: str = "normal"

@@ -579,7 +579,7 @@ jobs:
           version: "0.11.32"
 
       - name: Sync locked backend dependencies
-        run: uv sync --locked --extra dev --extra redis
+        run: uv sync --locked --extra dev --extra redis --managed-python --python "3.14"
 
       - name: Run Ruff lint
         run: uv run --no-sync ruff check --config ../../ruff.toml --output-format=github .
@@ -607,7 +607,10 @@ jobs:
           --pythonpath .venv/bin/python app scripts ../../scripts/dev.py
 
       - name: Run backend unit tests with coverage
-        run: uv run --no-sync pytest -m "not pgvector and not redis" --cov=app
+        run: |
+          uv run --no-sync python -c "import sqlite3; print(sqlite3.sqlite_version, sqlite3.threadsafety)"
+          uv run --no-sync pytest -m "not pgvector and not redis" --cov=app --junitxml=.cache/backend.xml
+          uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/backend.xml').findall('.//testcase'); assert cases and all(c.find('skipped') is None for c in cases), 'Required backend tests skipped'; assert {'tests.cache.api.test_sqlite', 'tests.cache.infrastructure.test_sqlite'} <= {c.get('classname') for c in cases}, 'SQLite server tests not collected'; assert {'test_sqlite_native_work_settles_before_lifespan_exit[' + mode + ']' for mode in ('within_budget', 'expiry', 'cancel')} <= {c.get('name') for c in cases}, 'SQLite shutdown policy cases not collected'"
 
       - name: Verify required-test execution guard controls
         working-directory: .
@@ -656,10 +659,13 @@ jobs:
           version: "0.11.32"
 
       - name: Sync locked backend dependencies
-        run: uv sync --locked --extra dev --extra redis --python "${{ matrix.python-version }}"
+        run: uv sync --locked --extra dev --extra redis --managed-python --python "${{ matrix.python-version }}"
 
       - name: Run backend compatibility tests
-        run: uv run --no-sync --python "${{ matrix.python-version }}" pytest -m "not pgvector and not redis"
+        run: |
+          uv run --no-sync python -c "import sqlite3; print(sqlite3.sqlite_version, sqlite3.threadsafety)"
+          uv run --no-sync --python "${{ matrix.python-version }}" pytest -m "not pgvector and not redis" --junitxml=.cache/backend.xml
+          uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/backend.xml').findall('.//testcase'); assert cases and all(c.find('skipped') is None for c in cases), 'Required backend tests skipped'; assert {'tests.cache.api.test_sqlite', 'tests.cache.infrastructure.test_sqlite'} <= {c.get('classname') for c in cases}, 'SQLite server tests not collected'; assert {'test_sqlite_native_work_settles_before_lifespan_exit[' + mode + ']' for mode in ('within_budget', 'expiry', 'cancel')} <= {c.get('name') for c in cases}, 'SQLite shutdown policy cases not collected'"
 
       - name: Verify development launcher compatibility
         working-directory: .

@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import cast
 
 import pytest
@@ -20,6 +21,7 @@ class FakePool:
 
 def settings(
     *,
+    tmp_path: Path,
     cache_backend: str,
     evaluation_dataset_storage: str,
     evaluation_run_history_storage: str = "disabled",
@@ -34,6 +36,7 @@ def settings(
             "embedding_provider": "mock",
             "generation_provider": "mock",
             "cache_backend": cache_backend,
+            "cache_sqlite_path": str(tmp_path / "not-opened-by-pool-tests.db"),
             "evaluation_dataset_storage": evaluation_dataset_storage,
             "evaluation_run_history_storage": evaluation_run_history_storage,
             "evaluation_run_history_retention_days": 30,
@@ -50,8 +53,11 @@ def settings(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("cache_backend", ["memory", "sqlite"])
 async def test_memory_and_session_mode_open_no_database(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    cache_backend: str,
 ) -> None:
     async def unexpected_pool(*args: object, **kwargs: object) -> Pool:
         raise AssertionError("A session-only memory deployment must not open a pool")
@@ -60,7 +66,8 @@ async def test_memory_and_session_mode_open_no_database(
 
     async with database_pool_lifespan(
         settings(
-            cache_backend="memory",
+            tmp_path=tmp_path,
+            cache_backend=cache_backend,
             evaluation_dataset_storage="session",
         )
     ) as pool:
@@ -73,6 +80,8 @@ async def test_memory_and_session_mode_open_no_database(
     [
         ("memory", "postgres", "disabled", ["evaluation"]),
         ("memory", "session", "postgres", ["evaluation"]),
+        ("sqlite", "postgres", "disabled", ["evaluation"]),
+        ("sqlite", "session", "postgres", ["evaluation"]),
         ("pgvector", "session", "disabled", []),
         ("pgvector", "postgres", "disabled", ["evaluation"]),
         ("pgvector", "session", "postgres", ["evaluation"]),
@@ -80,6 +89,7 @@ async def test_memory_and_session_mode_open_no_database(
 )
 async def test_database_features_reuse_one_pool_and_apply_owned_migrations(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
     cache_backend: str,
     evaluation_storage: str,
     history_storage: str,
@@ -116,6 +126,7 @@ async def test_database_features_reuse_one_pool_and_apply_owned_migrations(
 
     async with database_pool_lifespan(
         settings(
+            tmp_path=tmp_path,
             cache_backend=cache_backend,
             evaluation_dataset_storage=evaluation_storage,
             evaluation_run_history_storage=history_storage,
