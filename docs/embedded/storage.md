@@ -11,7 +11,7 @@ The server/workbench delegates to MemoryStore, PgVectorStore and RedisStore. See
 
 ## Optional inspection and administration
 
-MemoryStore, PgVectorStore and RedisStore additionally offer optional `inspect_entries` and
+MemoryStore, SQLiteStore, PgVectorStore and RedisStore additionally offer optional `inspect_entries` and
 `inspect_entry` observations. They exclude expired entries without purging them,
 recording hits, extending TTL or changing LRU. Lists contain prompts, identifiers
 and bounded response previews (at most 240 characters), never vectors or complete
@@ -35,7 +35,7 @@ for authorization, search costs and pagination limitations.
 
 Call these methods on a concrete supported store, not on `AsyncSemanticCache` or
 the mandatory `CacheStore` protocol. Result types live in
-`semantix_cache.inspection`; SQLiteStore and MySQLStore do not implement this API.
+`semantix_cache.inspection`; MySQLStore does not implement this API.
 
 For an existing MemoryStore populated through your cache, inside an async function:
 
@@ -50,7 +50,7 @@ if page.items:
     # detail may be None if the entry expired or was deleted after the list read.
 ```
 
-The same calls apply to PgVectorStore and RedisStore. List `namespace=None`
+The same calls apply to SQLiteStore, PgVectorStore and RedisStore. List `namespace=None`
 (the default) observes all namespaces in the binding. Detail `namespaces=None`
 also allows all namespaces, while `namespaces=()` allows none; neither filter
 authenticates a caller. Avoid unrestricted scope in tenant-facing code.
@@ -106,8 +106,8 @@ recovery. MySQLStore is embedded-only and has no optional inspection/clear_all A
 
 `from semantix_cache.stores.sqlite import SQLiteStore` provides embedded persistence
 without a database service or an extra dependency. It is **package-only**: the
-server/dashboard does not accept `CACHE_BACKEND=sqlite`, and SQLiteStore does not
-implement the optional inspector or `clear_all` APIs.
+server/dashboard does not accept `CACHE_BACKEND=sqlite`. The concrete store offers
+the optional inspection and administration methods described above.
 
 Check the **linked** runtime, then run the offline example from `packages/cache`:
 
@@ -211,6 +211,19 @@ false confirmation changes no hit/LRU state. Every confirmed hit is a write.
 All bindings in one file share SQLite's single writer, so this suits small,
 low-contention local workloads rather than a distributed cache service.
 
+Inspection reads one transaction snapshot without confirming hits, renewing TTL,
+changing recency or purging expired rows. Ordinary lists count/sort bounded scalar
+metadata and decode only selected-page payloads; detail reads decode one authorized
+payload. No inspection call reads vectors. Prompt substring search uses Python
+Unicode `casefold`, scanning authorized live payloads sequentially for an exact
+filtered total. It retains bounded metadata, one payload and the output page,
+rather than all response bodies. Bounded memory does not guarantee fast completion:
+search holds this store's worker and retains the existing operation deadline,
+returning the complete result or an error. Concurrent writes or expiry can shift
+later pages. `clear_all()` atomically removes all namespaces of the active embedding
+binding, including expired rows, while reporting only live entries removed. Other
+bindings and revision history remain intact. Clearing is not secure erasure.
+
 TTL inherits/caps the configured default, starts from the host UTC wall clock at
 write, floors fractional durations to microseconds, and expires inclusively.
 Both TTL values `None` permit immortality; hits never slide expiry. Downtime
@@ -226,6 +239,14 @@ its result. **No mutation is automatically replayed.** Uncertain transaction
 cleanup faults the store; close and reopen it. Concurrent/repeated close shares
 one shielded cleanup task. A timed-out close leaves the wrapper sealed and cleanup
 tracked; Python cannot kill a native thread stuck in OS I/O.
+
+An exceptional native close failure is terminal: later operations fail closed and
+repeated close observes the same cleanup outcome without retrying. The connection
+may remain physically alive until operator-controlled process termination; that
+is not successful library disposal. If startup and its observed cleanup both fail,
+the original public startup exception remains primary with the safe cleanup error
+as its cause. This improves failure visibility, not resource recovery. Cleanup
+that exceeds the startup unwind budget remains subject to the existing limitation.
 
 Use a single host and trusted **local disk** with private permissions/ACLs.
 Memory databases, borrowed connections, caller-supplied URIs, detectable network

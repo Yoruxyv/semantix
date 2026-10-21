@@ -182,7 +182,14 @@ Complete float64 scans are bounded to 5,000 entries, 16,000 dimensions and
 `capacity * dimensions * 8 <= 64 MiB`, with larger total RSS. Every confirmed hit
 writes under the file-wide writer lock. See [SQLite setup and restrictions](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/storage.md#sqlite-local-file-persistence)
 for runtime/file safety, TTL, cancellation, restore and durability limits.
-SQLite is embedded-only; server/dashboard configuration and inspection do not use it.
+SQLite is embedded-only; server/dashboard configuration does not use it.
+Concrete `SQLiteStore` instances support optional `inspect_entries()`, scoped
+`inspect_entry()` and binding-scoped `clear_all()`. Inspection leaves TTL, hits and
+recency unchanged. Lists decode only the selected page; exact Unicode prompt
+search streams payloads under the existing deadline, so bounded memory does not
+imply bounded latency. An exceptional native-close failure remains terminal and
+may leave a connection alive until operator-controlled process termination;
+startup error chaining exposes observed cleanup failure without claiming recovery.
 
 ## Optional MySQL persistence
 
