@@ -11,7 +11,7 @@ The server/workbench delegates to MemoryStore, PgVectorStore and RedisStore. See
 
 ## Optional inspection and administration
 
-MemoryStore, SQLiteStore, PgVectorStore and RedisStore additionally offer optional `inspect_entries` and
+MemoryStore, SQLiteStore, MySQLStore, PgVectorStore and RedisStore additionally offer optional `inspect_entries` and
 `inspect_entry` observations. They exclude expired entries without purging them,
 recording hits, extending TTL or changing LRU. Lists contain prompts, identifiers
 and bounded response previews (at most 240 characters), never vectors or complete
@@ -35,7 +35,8 @@ for authorization, search costs and pagination limitations.
 
 Call these methods on a concrete supported store, not on `AsyncSemanticCache` or
 the mandatory `CacheStore` protocol. Result types live in
-`semantix_cache.inspection`; MySQLStore does not implement this API.
+`semantix_cache.inspection`. MySQL uses read-only snapshots and sequential
+primary-key payload fetches; see [MySQL inspection costs](mysql.md#optional-inspection-and-administration).
 
 For an existing MemoryStore populated through your cache, inside an async function:
 
@@ -50,7 +51,7 @@ if page.items:
     # detail may be None if the entry expired or was deleted after the list read.
 ```
 
-The same calls apply to SQLiteStore, PgVectorStore and RedisStore. List `namespace=None`
+The same calls apply to SQLiteStore, MySQLStore, PgVectorStore and RedisStore. List `namespace=None`
 (the default) observes all namespaces in the binding. Detail `namespaces=None`
 also allows all namespaces, while `namespaces=()` allows none; neither filter
 authenticates a caller. Avoid unrestricted scope in tenant-facing code.

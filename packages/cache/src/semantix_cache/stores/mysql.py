@@ -9,6 +9,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Self
 
+from .. import inspection as _inspection
 from .._semantics import cache_key_value, namespace_value
 from ..errors import (
     CacheConfigurationError,
@@ -241,7 +242,8 @@ class MySQLStore:
         Create the store in its using process/event loop. Capacity is 1â€“5,000,
         dimensions 1â€“16,000, capacity*dimensions*8 <=64MiB. RSS exceeds this matrix
         bound; full exact searches transfer every candidate vector. Hits acquire
-        the binding-wide InnoDB writer lock. There is no inspection/clear_all API.
+        the binding-wide InnoDB writer lock. Optional inspection is read-only;
+        clear_all removes entries only from this embedding binding.
         TTL uses server UTC microseconds and never slides; clock rollback can
         extend retention. Restore requires a new binding generation to avoid
         historical revision reuse. Namespace partitioning is not authorization.
@@ -353,6 +355,56 @@ class MySQLStore:
     async def clear(self, *, namespace: str) -> int:
         namespace = self._scope(namespace)
         return await self._worker.run(lambda job: self._database.clear(job, namespace))
+
+    async def inspect_entries(
+        self,
+        *,
+        namespace: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+        search: str | None = None,
+        sort: _inspection.InspectionSort = "newest",
+    ) -> _inspection.InspectionPage:
+        """Observe a live snapshot without confirming hits or changing retention.
+
+        The caller authorizes namespace scope. Lists contain previews, not vectors
+        or full answers. Unicode prompt search scans payloads one at a time for an
+        exact total; it shares the worker/deadline and returns a complete page or
+        an error. Later requests may observe changed entries, ordering and totals.
+        """
+        _inspection.inspection_arguments(namespace, offset, limit, search, sort)
+        return await self._worker.run(
+            lambda job: self._database.inspect_entries(
+                job, namespace, offset, limit, search, sort
+            ),
+            readonly=True,
+        )
+
+    async def inspect_entry(
+        self, cache_key: str, *, namespaces: tuple[str, ...] | None
+    ) -> _inspection.InspectionEntry | None:
+        """Observe a scoped live detail, including its full answer but no vector.
+
+        The caller authorizes scope: None is unrestricted and () permits none.
+        Missing, expired and out-of-scope keys return None without exposing payloads.
+        """
+        try:
+            cache_key_value(cache_key)
+        except (ValueError, TypeError):
+            safe(CacheValidationError("Invalid MySQL inspection key"))
+        _inspection.inspection_namespaces(namespaces)
+        return await self._worker.run(
+            lambda job: self._database.inspect_entry(job, cache_key, namespaces),
+            readonly=True,
+        )
+
+    async def clear_all(self) -> int:
+        """Atomically clear this binding, preserving unrelated bindings and revisions.
+
+        Return the live-entry removal count; expired rows are also removed. This
+        administrative mutation is not secure erasure and is never replayed.
+        """
+        return await self._worker.run(self._database.clear_all)
 
     async def aclose(self) -> None:
         """Close idle ownership once; cancellation/deadline retains shared cleanup."""

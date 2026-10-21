@@ -198,8 +198,10 @@ async def test_cancel_before_commit_has_no_committed_mutation(
         await until(lambda: not worker.pending)
 
 
+@pytest.mark.parametrize("operation", ["put", "clear_all"])
 async def test_actual_commit_acknowledgement_loss_is_terminal(
     monkeypatch: pytest.MonkeyPatch,
+    operation: str,
 ) -> None:
     name = await new_database()
     config = options(name) | {"embedding_space": SPACE, "default_ttl_seconds": None}
@@ -207,6 +209,9 @@ async def test_actual_commit_acknowledgement_loss_is_terminal(
     fixture = settings()
     relay = Relay((fixture["address"], fixture["port"]))
     store = await MySQLStore.connect(**(config | {"port": relay.port}))
+    value = entry("lost acknowledgement")
+    if operation == "clear_all":
+        await store.put(value)
     original = pymysql.Connection.commit
     dispatches = []
 
@@ -216,8 +221,9 @@ async def test_actual_commit_acknowledgement_loss_is_terminal(
         original(connection)
 
     monkeypatch.setattr(pymysql.Connection, "commit", commit)
-    value = entry("lost acknowledgement")
-    task = asyncio.create_task(store.put(value))
+    task = asyncio.create_task(
+        store.put(value) if operation == "put" else store.clear_all()
+    )
     try:
         await until(relay.upstream_after_block.is_set)
         with pytest.raises(CacheTimeoutError):
@@ -228,9 +234,12 @@ async def test_actual_commit_acknowledgement_loss_is_terminal(
         rows = await asyncio.to_thread(
             admin, "SELECT cache_key FROM semantix_entries", name=name
         )
-        assert rows == [(value.cache_key.encode("ascii"),)]
+        assert rows == (
+            [(value.cache_key.encode("ascii"),)] if operation == "put" else []
+        )
+        retry = store.put(value) if operation == "put" else store.clear_all()
         with pytest.raises(CacheStoreError):
-            await store.put(value)
+            await retry
         assert dispatches == [1]
     finally:
         await asyncio.gather(task, return_exceptions=True)
@@ -238,8 +247,10 @@ async def test_actual_commit_acknowledgement_loss_is_terminal(
         await asyncio.to_thread(relay.close)
 
 
+@pytest.mark.parametrize("operation", ["put", "clear_all"])
 async def test_cancel_after_commit_dispatch_preserves_uncertainty(
     monkeypatch: pytest.MonkeyPatch,
+    operation: str,
 ) -> None:
     name = await new_database()
     config = options(name) | {"embedding_space": SPACE, "default_ttl_seconds": None}
@@ -247,6 +258,9 @@ async def test_cancel_after_commit_dispatch_preserves_uncertainty(
     fixture = settings()
     relay = Relay((fixture["address"], fixture["port"]))
     store = await MySQLStore.connect(**(config | {"port": relay.port}))
+    value = entry("cancel after dispatch")
+    if operation == "clear_all":
+        await store.put(value)
     original = pymysql.Connection.commit
     dispatches = []
 
@@ -256,8 +270,9 @@ async def test_cancel_after_commit_dispatch_preserves_uncertainty(
         original(connection)
 
     monkeypatch.setattr(pymysql.Connection, "commit", commit)
-    value = entry("cancel after dispatch")
-    task = asyncio.create_task(store.put(value))
+    task = asyncio.create_task(
+        store.put(value) if operation == "put" else store.clear_all()
+    )
     try:
         await until(relay.upstream_after_block.is_set)
         task.cancel()
@@ -269,7 +284,9 @@ async def test_cancel_after_commit_dispatch_preserves_uncertainty(
         rows = await asyncio.to_thread(
             admin, "SELECT cache_key FROM semantix_entries", name=name
         )
-        assert rows == [(value.cache_key.encode("ascii"),)]
+        assert rows == (
+            [(value.cache_key.encode("ascii"),)] if operation == "put" else []
+        )
     finally:
         await asyncio.gather(task, return_exceptions=True)
         await store.aclose()
