@@ -1,7 +1,11 @@
 import asyncio
-from collections.abc import AsyncIterator
+import json
+import sqlite3
+import threading
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from types import TracebackType
 from typing import cast
 
@@ -11,6 +15,7 @@ from fastapi import FastAPI
 
 from app import lifecycle
 from app.cache.application.service import SemanticCache
+from app.cache.infrastructure.backends.official import OfficialStoreBackend
 from app.core.config import Settings
 from app.core.exceptions import (
     CacheStorageError,
@@ -27,6 +32,11 @@ from app.providers.registry import (
 )
 from app.query.application.service import QueryService
 from app.query.domain.policies import QueryCachePolicy
+from semantix_cache import CacheEntry as PackageEntry
+from semantix_cache import EmbeddingSpace
+from semantix_cache.stores._backends.sqlite.database import Database
+from semantix_cache.stores._backends.sqlite.worker import Job, Worker
+from semantix_cache.stores.sqlite import SQLiteStore
 
 
 @dataclass
@@ -64,7 +74,9 @@ class RetainedProvider:
 
 
 @asynccontextmanager
-async def running_app(provider: RetainedProvider) -> AsyncIterator[FastAPI]:
+async def running_app(
+    provider: RetainedProvider, *, backend_settings: dict[str, object] | None = None
+) -> AsyncIterator[FastAPI]:
     registry = ProviderRegistry()
 
     def build(context: ProviderBuildContext) -> RetainedProvider:
@@ -94,6 +106,7 @@ async def running_app(provider: RetainedProvider) -> AsyncIterator[FastAPI]:
             "auth_mode": "disabled",
             "allowed_origins": ["http://localhost"],
             "log_level": "ERROR",
+            **(backend_settings or {}),
         }
     )
     application = create_app(settings, provider_registry=registry)
@@ -438,3 +451,139 @@ async def test_cancellation_resistant_write_settles_before_store_close(
     assert provider.task is not None
     provider.task.result()
     assert provider.client.is_closed
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["within_budget", "expiry", "cancel"])
+async def test_sqlite_native_work_settles_before_lifespan_exit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    record_testsuite_property: Callable[[str, object], None],
+    outcome: str,
+) -> None:
+    """Preserve the original held-worker regression under the approved terminal policy."""
+    space = EmbeddingSpace(identity="shutdown-fixture", dimensions=4)
+    path = tmp_path / "owned.db"
+    await SQLiteStore.initialize_schema(path, embedding_space=space)
+    close_budget = 0.05 if outcome == "expiry" else 5.0
+    monkeypatch.setattr(lifecycle, "QUERY_SHUTDOWN_GRACE_SECONDS", 0)
+    loop = asyncio.get_running_loop()
+    entered, closing = asyncio.Event(), asyncio.Event()
+    release = threading.Event()
+    put = Database.put
+    close = SQLiteStore.aclose
+    physical_close = Worker._close_connection
+    native_owner: list[int] = []
+    disposed: list[int] = []
+    close_attempts: list[int] = []
+
+    def verify_physical_close(worker: Worker) -> None:
+        connection = worker.connection
+        assert connection is not None
+        physical_close(worker)
+        with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+            _ = connection.in_transaction
+        disposed.append(threading.get_ident())
+
+    def blocked_write(
+        database: Database, job: Job, entry: PackageEntry, ttl: float | None
+    ) -> None:
+        _ = job.connection.in_transaction
+        native_owner.append(threading.get_ident())
+        loop.call_soon_threadsafe(entered.set)
+        if not release.wait(10):
+            raise RuntimeError("Native-work test barrier was not released")
+        put(database, job, entry, ttl)
+
+    async def observed_close(active: SQLiteStore) -> None:
+        close_attempts.append(1)
+        closing.set()
+        await close(active)
+
+    monkeypatch.setattr(Database, "put", blocked_write)
+    monkeypatch.setattr(Worker, "_close_connection", verify_physical_close)
+    monkeypatch.setattr(SQLiteStore, "aclose", observed_close)
+    provider = RetainedProvider()
+    provider.release.set()
+    context = running_app(
+        provider,
+        backend_settings={
+            "cache_backend": "sqlite",
+            "cache_sqlite_path": str(path),
+            "cache_sqlite_close_timeout_seconds": close_budget,
+        },
+    )
+    application = await context.__aenter__()
+    service = cast(QueryService, application.state.query_service)
+    cache = cast(SemanticCache, application.state.semantic_cache)
+    store = cast(OfficialStoreBackend, cache._backend).store
+    assert isinstance(store, SQLiteStore)
+    caller = asyncio.create_task(service.execute("fixture-native-write"))
+    shutdown: asyncio.Task[bool | None] | None = None
+    try:
+        await asyncio.wait_for(entered.wait(), 5)
+        caller.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await caller
+        shutdown = asyncio.create_task(context.__aexit__(None, None, None))
+        await asyncio.wait_for(closing.wait(), 5)
+        assert store._worker.pending
+        assert store._worker.cleanup is None
+        assert not store._worker.pool._shutdown
+        assert provider.client is not None
+        assert not shutdown.done()
+        assert not provider.client.is_closed
+        assert service._shutdown_task is not None
+        assert not service._coalescer._in_flight
+        if outcome == "within_budget":
+            release.set()
+            await shutdown
+            assert store._worker.connection is None
+            assert not store._worker.pending
+        else:
+            if outcome == "cancel":
+                shutdown.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await shutdown
+            else:
+                with pytest.raises(CacheStorageError, match="shutdown budget expired"):
+                    await shutdown
+            assert store._worker.pending
+            assert store._worker.connection is not None
+            assert store._worker.cleanup is None
+            assert not store._worker.pool._shutdown
+            assert not disposed
+        record_testsuite_property(
+            "sqlite_shutdown_" + outcome,
+            json.dumps(
+                {
+                    "native_pending": len(store._worker.pending),
+                    "query_tasks": len(service._coalescer._in_flight),
+                    "http_client_closed": provider.client.is_closed,
+                    "close_attempts": len(close_attempts),
+                    "physical_close_count": len(disposed),
+                    "outcome": outcome,
+                },
+                sort_keys=True,
+            ),
+        )
+    finally:
+        release.set()
+        await asyncio.gather(caller, return_exceptions=True)
+        if shutdown is not None:
+            await asyncio.gather(shutdown, return_exceptions=True)
+        attempts_at_settlement = len(close_attempts)
+        pending = tuple(store._worker.pending)
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+            assert (await store.inspect_entries()).total == 0
+        assert len(close_attempts) == attempts_at_settlement
+        await close(store)
+        assert store._worker.connection is None
+        assert store._worker.cleanup is not None
+        assert store._worker.cleanup.done()
+        assert all(not thread.is_alive() for thread in store._worker.pool._threads)
+        assert disposed == native_owner
+        record_testsuite_property(
+            "fixture_cleanup_" + outcome, "CLOSED on original worker; executor joined"
+        )

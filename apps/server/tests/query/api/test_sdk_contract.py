@@ -114,7 +114,12 @@ def test_sdk_openapi_subset() -> None:
         assert health[name]["pattern"] == "^[A-Za-z0-9][A-Za-z0-9._:-]{0,49}$"
     ready = schemas["ReadinessResponse"]["properties"]
     assert ready["status"]["const"] == "ready"
-    assert set(ready["cache_backend"]["enum"]) == {"memory", "pgvector", "redis"}
+    assert set(ready["cache_backend"]["enum"]) == {
+        "memory",
+        "pgvector",
+        "redis",
+        "sqlite",
+    }
     assert set(ready["evaluation_dataset_storage"]["enum"]) == {"session", "postgres"}
 
 

@@ -3,6 +3,7 @@ import os
 import threading
 from collections.abc import AsyncGenerator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from pathlib import Path
 from uuid import uuid4
 
 import numpy as np
@@ -18,8 +19,10 @@ from app.cache.infrastructure.backends.memory import InMemoryCacheBackend
 from app.cache.infrastructure.backends.official import OfficialStoreBackend
 from app.cache.infrastructure.factory import cache_backend_lifespan
 from app.cache.infrastructure.setup import initialize_redis
+from app.cache.infrastructure.sqlite_setup import initialize_sqlite
 from app.core.config import Settings
 from app.core.exceptions import CacheStorageError
+from app.providers.registry import EmbeddingMetadata
 from semantix_cache import CacheMatch
 from tests.cache.infrastructure.backends.support import cache_entry
 from tests.support import TEST_EMBEDDING_DIMENSIONS, unit_vector
@@ -33,6 +36,7 @@ BackendBuilder = Callable[
 @pytest.fixture(
     params=[
         "memory",
+        "sqlite",
         pytest.param(
             "pgvector",
             marks=pytest.mark.pgvector,
@@ -42,6 +46,7 @@ BackendBuilder = Callable[
 )
 def backend_builder(
     request: pytest.FixtureRequest,
+    tmp_path: Path,
 ) -> BackendBuilder:
     backend_name = str(request.param)
     database_url = os.getenv("PGVECTOR_TEST_DATABASE_URL")
@@ -58,6 +63,7 @@ def backend_builder(
     ) -> AsyncGenerator[CacheBackend, None]:
         settings = Settings(
             cache_backend=backend_name,
+            cache_sqlite_path=str(tmp_path / (uuid4().hex + ".db")),
             database_url=database_url,
             redis_url=redis_url,
             redis_key_prefix="server_contract_" + uuid4().hex,
@@ -68,6 +74,13 @@ def backend_builder(
             hf_embedding_dimensions=TEST_EMBEDDING_DIMENSIONS,
             allowed_origins=["http://localhost:5173"],
         )
+        if backend_name == "sqlite":
+            await initialize_sqlite(
+                settings,
+                metadata=EmbeddingMetadata(
+                    dimensions=TEST_EMBEDDING_DIMENSIONS, space=settings.embedding_space
+                ),
+            )
         if backend_name == "redis":
             assert redis_url is not None
             await initialize_redis(settings, initialization_url=redis_url)

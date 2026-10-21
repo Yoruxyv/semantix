@@ -164,7 +164,7 @@ describe('runtime diagnostics API', () => {
 });
 
 describe('official store diagnostics', () => {
-  it.each(['memory', 'pgvector', 'redis'])('decodes %s', async (backend) => {
+  it.each(['memory', 'pgvector', 'redis', 'sqlite'])('decodes %s', async (backend) => {
     vi.stubGlobal(
       'fetch',
       vi
