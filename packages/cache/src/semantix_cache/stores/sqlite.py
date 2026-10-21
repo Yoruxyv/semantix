@@ -9,15 +9,9 @@ from datetime import datetime
 from types import TracebackType
 from typing import Self
 
+from .. import inspection as _inspection
 from .._semantics import cache_key_value, namespace_value
 from ..errors import CacheConfigurationError, CacheStoreError, CacheValidationError
-from ..inspection import (
-    InspectionEntry,
-    InspectionPage,
-    InspectionSort,
-    inspection_arguments,
-    inspection_namespaces,
-)
 from ..models import CacheEntry, CacheMatch, EmbeddingSpace
 from ._backends.sqlite.database import Database
 from ._backends.sqlite.format import Configuration, micros, safe, timeout
@@ -206,8 +200,8 @@ class SQLiteStore:
         offset: int = 0,
         limit: int = 20,
         search: str | None = None,
-        sort: InspectionSort = "newest",
-    ) -> InspectionPage:
+        sort: _inspection.InspectionSort = "newest",
+    ) -> _inspection.InspectionPage:
         """Observe live metadata without hits, expiry purge or recency changes.
 
         Lists decode only selected payloads unless prompt search requires a full
@@ -215,7 +209,7 @@ class SQLiteStore:
         operation deadline; it returns an exact total or raises, never a partial page.
         The caller authorizes scope. Pages are snapshots of individual operations.
         """
-        inspection_arguments(namespace, offset, limit, search, sort)
+        _inspection.inspection_arguments(namespace, offset, limit, search, sort)
         return await self._worker.run(
             lambda job: self._database.inspect_entries(
                 job, namespace, offset, limit, search, sort
@@ -224,7 +218,7 @@ class SQLiteStore:
 
     async def inspect_entry(
         self, cache_key: str, *, namespaces: tuple[str, ...] | None
-    ) -> InspectionEntry | None:
+    ) -> _inspection.InspectionEntry | None:
         """Observe a live authorized detail; None scope is unrestricted, () is empty.
 
         The caller authorizes namespace access. Missing, expired and out-of-scope
@@ -234,7 +228,7 @@ class SQLiteStore:
             cache_key_value(cache_key)
         except (ValueError, TypeError):
             safe(CacheValidationError("Invalid SQLite inspection key"))
-        inspection_namespaces(namespaces)
+        _inspection.inspection_namespaces(namespaces)
         return await self._worker.run(
             lambda job: self._database.inspect_entry(job, cache_key, namespaces)
         )
