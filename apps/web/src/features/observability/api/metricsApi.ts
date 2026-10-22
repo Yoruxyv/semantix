@@ -19,6 +19,7 @@ const isCacheBackend = createEnumGuard([
   'pgvector',
   'redis',
   'sqlite',
+  'mysql',
 ] as const);
 const isCacheReadiness = createEnumGuard(['ready', 'unavailable'] as const);
 const isNormalizationMode = createEnumGuard(['identity', 'typo_correction'] as const);

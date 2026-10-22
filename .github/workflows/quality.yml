@@ -44,6 +44,9 @@ jobs:
           version: "0.11.32"
       - name: Sync locked embedded dependencies
         run: uv sync --locked --extra dev --managed-python --python "${{ matrix.python-version }}"
+      - name: Sync locked MySQL server consumer
+        working-directory: apps/server
+        run: uv sync --locked --extra dev --extra mysql --extra redis --managed-python --python "${{ matrix.python-version }}"
       - name: Verify fixture secret handling and cleanup ownership
         working-directory: .
         run: |
@@ -61,6 +64,10 @@ jobs:
             uv run --no-sync python -c "from importlib.metadata import version; assert version(\"PyMySQL\") == \"1.2.3\"; print(\"Verified PyMySQL\", version(\"PyMySQL\"))"
             uv run --no-sync pytest tests/test_mysql*.py --cov=semantix_cache --cov-report= --cov-fail-under=0 --junitxml=.cache/mysql.xml
             uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse(\".cache/mysql.xml\").findall(\".//testcase\"); assert len(cases) >= 213 and all(all(c.find(tag) is None for tag in (\"skipped\", \"failure\", \"error\")) for c in cases), \"Mandatory MySQL cases missing, skipped or failed\""
+            (
+              cd ../../apps/server
+              env -u COVERAGE_FILE uv run --no-sync python ../../ops/ci/required_tests.py mysql-server .cache/mysql-server.xml -- -m mysql
+            )
             uv run --no-sync python -m build
             uv venv --python .venv/bin/python "$RUNNER_TEMP/mysql-wheel"
             wheel_python="$RUNNER_TEMP/mysql-wheel/bin/python"
@@ -579,7 +586,7 @@ jobs:
           version: "0.11.32"
 
       - name: Sync locked backend dependencies
-        run: uv sync --locked --extra dev --extra redis --managed-python --python "3.14"
+        run: uv sync --locked --extra dev --extra redis --extra mysql --managed-python --python "3.14"
 
       - name: Run Ruff lint
         run: uv run --no-sync ruff check --config ../../ruff.toml --output-format=github .
@@ -609,7 +616,7 @@ jobs:
       - name: Run backend unit tests with coverage
         run: |
           uv run --no-sync python -c "import sqlite3; print(sqlite3.sqlite_version, sqlite3.threadsafety)"
-          uv run --no-sync pytest -m "not pgvector and not redis" --cov=app --junitxml=.cache/backend.xml
+          uv run --no-sync pytest -m "not pgvector and not redis and not mysql" --cov=app --junitxml=.cache/backend.xml
           uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/backend.xml').findall('.//testcase'); assert cases and all(c.find('skipped') is None for c in cases), 'Required backend tests skipped'; assert {'tests.cache.api.test_sqlite', 'tests.cache.infrastructure.test_sqlite'} <= {c.get('classname') for c in cases}, 'SQLite server tests not collected'; assert {'test_sqlite_native_work_settles_before_lifespan_exit[' + mode + ']' for mode in ('within_budget', 'expiry', 'cancel')} <= {c.get('name') for c in cases}, 'SQLite shutdown policy cases not collected'"
 
       - name: Verify required-test execution guard controls
@@ -659,12 +666,12 @@ jobs:
           version: "0.11.32"
 
       - name: Sync locked backend dependencies
-        run: uv sync --locked --extra dev --extra redis --managed-python --python "${{ matrix.python-version }}"
+        run: uv sync --locked --extra dev --extra redis --extra mysql --managed-python --python "${{ matrix.python-version }}"
 
       - name: Run backend compatibility tests
         run: |
           uv run --no-sync python -c "import sqlite3; print(sqlite3.sqlite_version, sqlite3.threadsafety)"
-          uv run --no-sync --python "${{ matrix.python-version }}" pytest -m "not pgvector and not redis" --junitxml=.cache/backend.xml
+          uv run --no-sync --python "${{ matrix.python-version }}" pytest -m "not pgvector and not redis and not mysql" --junitxml=.cache/backend.xml
           uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/backend.xml').findall('.//testcase'); assert cases and all(c.find('skipped') is None for c in cases), 'Required backend tests skipped'; assert {'tests.cache.api.test_sqlite', 'tests.cache.infrastructure.test_sqlite'} <= {c.get('classname') for c in cases}, 'SQLite server tests not collected'; assert {'test_sqlite_native_work_settles_before_lifespan_exit[' + mode + ']' for mode in ('within_budget', 'expiry', 'cancel')} <= {c.get('name') for c in cases}, 'SQLite shutdown policy cases not collected'"
 
       - name: Verify development launcher compatibility
@@ -710,7 +717,7 @@ jobs:
 
       - name: Sync locked backend dependencies
         working-directory: apps/server
-        run: uv sync --locked --extra dev --extra redis
+        run: uv sync --locked --extra dev --extra redis --extra mysql
 
       - name: Run SDK Ruff lint
         run: uv run --no-sync ruff check --config ../../ruff.toml --output-format=github .
@@ -1076,7 +1083,7 @@ jobs:
           version: "0.11.32"
 
       - name: Sync locked backend dependencies
-        run: uv sync --locked --extra dev --extra redis
+        run: uv sync --locked --extra dev --extra redis --extra mysql
 
       - name: Run required PostgreSQL and Redis integration tests
         env:

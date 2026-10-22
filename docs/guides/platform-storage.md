@@ -1,7 +1,7 @@
 # Server storage configuration
 
 The optional server/workbench selects the same official stores as the embedded
-package. `CACHE_BACKEND` accepts `memory`, `pgvector`, `redis` or `sqlite`. Qdrant is not
+package. `CACHE_BACKEND` accepts `memory`, `pgvector`, `redis`, `sqlite` or `mysql`. Qdrant is not
 selectable. Monitor queries and Cache Inspector use the active official store;
 the server keeps no parallel cache entries, vectors, revisions, expiry or LRU
 index. Evaluations create a separate run-local MemoryStore and never use this live
@@ -13,13 +13,14 @@ store. Similarity matching is unchanged; see [accuracy limitations](../reference
 | --- | --- | --- |
 | `memory` | No storage credentials | Process-local MemoryStore; entries disappear when the process stops |
 | `pgvector` | `DATABASE_URL`; optional `CACHE_PGVECTOR_SCHEMA` and `CACHE_PGVECTOR_TABLE_PREFIX` | Explicit operator setup; one shared server PostgreSQL pool, borrowed by PgVectorStore |
+| `mysql` | `CACHE_MYSQL_*` endpoint, TLS, database and runtime credentials | Install the server `mysql` extra; separate explicit operator setup; one owned connection/worker per store |
 | `sqlite` | Absolute `CACHE_SQLITE_PATH`; optional `CACHE_SQLITE_*_TIMEOUT_SECONDS` | Explicit local setup; one native server process on trusted local disk |
 | `redis` | `REDIS_URL`; optional `REDIS_KEY_PREFIX` | Install the server `redis` extra and explicitly initialize the binding; server owns and closes the Redis client/pool |
 
-`MAX_CACHE_SIZE` and `CACHE_TTL_SECONDS` retain their existing semantics. Memory, SQLite
-and Redis support at most 5,000 entries; SQLite and Redis additionally limit the vector
+`MAX_CACHE_SIZE` and `CACHE_TTL_SECONDS` retain their existing semantics. Memory, SQLite, MySQL
+and Redis support at most 5,000 entries; SQLite, MySQL and Redis additionally limit the vector
 projection to 64 MiB (`max_size × dimensions × 8`). PostgreSQL uses the package's
-persisted binding capacity rules. Changing SQLite or Redis capacity/default TTL for an
+persisted binding capacity rules. Changing SQLite, MySQL or Redis capacity/default TTL for an
 existing binding fails validation rather than silently adopting new settings.
 Namespaces, embedding identities/dimensions, policy flags and final atomic
 revision/expiry confirmation remain authoritative in storage. Hits never renew TTL.
@@ -102,6 +103,65 @@ shapes. Older SDKs/frontends may reject this new enum value; use versions that
 recognize it. Real-browser, packaged-install and additional deployment certification
 are separate from the HTTP integration tests.
 
+## MySQL: explicit setup and owned connections
+
+Install with `uv sync --locked --extra mysql` from `apps/server`. Server Docker
+images include the extra, but this does not certify a MySQL Compose topology.
+The bundled development launcher rejects MySQL rather than claiming setup validation;
+use explicit operator setup and native server startup for this integration.
+Use a dedicated single-primary MySQL Community 8.4.x database with InnoDB and
+verified TLS; the [package compatibility boundary and grants](../embedded/mysql.md)
+remain authoritative. No MariaDB, managed variants, replicas/failover, DNS dialing
+or new server-version claims are implied. The hardened deployment stays PostgreSQL.
+
+Set `CACHE_BACKEND=mysql`, canonical numeric IPv4 `CACHE_MYSQL_ADDRESS`, port
+(default 3306), separately verified `CACHE_MYSQL_TLS_HOSTNAME`, absolute trusted
+`CACHE_MYSQL_CA_FILE`, dedicated lowercase-ASCII `CACHE_MYSQL_DATABASE` and explicit
+runtime `CACHE_MYSQL_USER` / `CACHE_MYSQL_PASSWORD`. Do not reuse `DATABASE_URL`.
+Endpoints, CA paths and credentials are secret settings and stay out of diagnostics.
+Provision the database, locked verifier account and privileges using the package
+guide. Runtime has table DML and verifier EXECUTE, without DDL authority.
+
+For setup only, supply independent `CACHE_MYSQL_SETUP_USER` and
+`CACHE_MYSQL_SETUP_PASSWORD`, then run:
+
+```text
+python -m app.cache.infrastructure.mysql_setup
+```
+
+Remove setup credentials before launching the server. There is no runtime-credential
+fallback. Setup resolves embedding metadata without inference/provider construction;
+custom operator tooling can call `initialize_mysql(settings, metadata=..., setup_user=...,
+setup_password=...)`. Keep embedding identity/dimensions, capacity and TTL identical
+at setup and runtime. Startup only connects and validates; missing/incompatible
+storage fails closed without initialization, migration, repair or memory fallback.
+
+Connect, operation and close budgets default to 10, 30 and 30 positive finite seconds
+(at most 86,400). Setup uses the public package's operation budget for construction
+and disposal. After QueryService draining, the server gives public `aclose()` one
+total application-await budget (`CACHE_MYSQL_CLOSE_TIMEOUT_SECONDS`), retrying only
+documented pre-close busy rejection. Cancellation propagates; expiry is an observable
+terminal shutdown error, never successful cleanup. No mutations, uncertain COMMITs
+or native-close failures are retried. Package-owned shielded cleanup can outlive the
+await budget; no server retry task is detached. Operator-controlled process disposition
+may be needed; this is not a bound on native completion or whole-process termination.
+Failed construction retains the package's existing bounded cleanup diagnostics and
+explicit recovery contract; the server does not automatically retry setup or recovery.
+
+Each store owns a thread-affine synchronous connection/worker; no new pool is added.
+Cancelled/expired read transactions can retire the connection; later independent calls
+may reopen it under the package contract. Uncertain mutations fault the store rather
+than replaying them. Hit/miss telemetry and cold-miss coalescing remain process-local.
+Independent PostgreSQL coordination, datasets and history remain configurable.
+
+Inspector uses package-owned read-only consistent snapshots, exact totals, Unicode
+casefold search and selected-page decoding. Prompt search streams one payload at a
+time but occupies the worker and can require a full bounded-capacity scan. Bounded
+memory is not a maximum-scale latency guarantee. Global clear is active-binding-scoped.
+Readiness and diagnostics add only the `mysql` identifier; use SDK/frontend versions
+that recognize it. Browser, deployment and installed-artifact certification remain
+separate from these HTTP integration tests.
+
 ## PostgreSQL: setup and legacy transition
 
 Normal startup validates the package-owned schema; it never initializes or adopts
@@ -174,7 +234,7 @@ process-local telemetry; Inspector hit/access metadata comes from the actual sto
 
 ## Inspector and diagnostics
 
-The four concrete stores offer optional `inspect_entries` and `inspect_entry`
+The five concrete stores offer optional `inspect_entries` and `inspect_entry`
 observations. The mandatory `CacheStore` protocol is unchanged. These methods
 exclude expired entries without purging them, recording hits, renewing TTL or
 changing LRU. Redis may independently expire hash fields through its native TTL;
@@ -212,7 +272,7 @@ observations rather than a shared snapshot: insertion, deletion, hits and expiry
 can shift offsets. Redis search batches also observe separate snapshots, so
 concurrent changes can affect totals or repeat/omit entries. Refresh after mutations;
 do not use Inspector pages as a correctness or authorization lease. Search uses
-Python Unicode case folding in Memory/SQLite/Redis and database `LOWER` in PostgreSQL;
+Python Unicode case folding in Memory/SQLite/MySQL/Redis and database `LOWER` in PostgreSQL;
 non-ASCII matching depends on the PostgreSQL locale.
 
 Observability eviction/expiry counts are observed process events, not an exact
@@ -242,4 +302,6 @@ uv run --locked --extra dev --extra redis pytest -m "pgvector or redis"
 ```
 
 Required CI integration jobs assert that both store parameters run and that no
-selected integration test skips. Unit runs exclude those two integration markers.
+selected integration test skips. Unit runs exclude `pgvector`, `redis` and `mysql`. The MySQL matrix runs server
+HTTP/security/lifecycle tests with the repository-owned verified-TLS fixture;
+required-test validation rejects missing cases and unexpected skips.

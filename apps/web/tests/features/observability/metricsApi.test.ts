@@ -164,22 +164,25 @@ describe('runtime diagnostics API', () => {
 });
 
 describe('official store diagnostics', () => {
-  it.each(['memory', 'pgvector', 'redis', 'sqlite'])('decodes %s', async (backend) => {
-    vi.stubGlobal(
-      'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({ ...diagnosticsPayload, cache_backend: backend }),
-            { status: 200 },
+  it.each(['memory', 'pgvector', 'redis', 'sqlite', 'mysql'])(
+    'decodes %s',
+    async (backend) => {
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response(
+              JSON.stringify({ ...diagnosticsPayload, cache_backend: backend }),
+              { status: 200 },
+            ),
           ),
-        ),
-    );
-    expect(await getRuntimeDiagnostics()).toEqual({
-      ok: true,
-      data: { ...diagnosticsPayload, cache_backend: backend },
-    });
-    vi.unstubAllGlobals();
-  });
+      );
+      expect(await getRuntimeDiagnostics()).toEqual({
+        ok: true,
+        data: { ...diagnosticsPayload, cache_backend: backend },
+      });
+      vi.unstubAllGlobals();
+    },
+  );
 });

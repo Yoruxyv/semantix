@@ -3,8 +3,9 @@
 `from semantix_cache.stores.mysql import MySQLStore` adds dedicated-database
 persistence to the embedded package. It implements the unchanged `CacheStore`
 contract with exact float64 cosine scoring and optional inspection/administration.
-It does not add a server/dashboard backend, native vector search or an approximate
-index.
+The official server also consumes this store through explicit
+[server configuration](../guides/platform-storage.md#mysql-explicit-setup-and-owned-connections).
+It adds neither native vector search nor an approximate index.
 
 ## Install and connect
 

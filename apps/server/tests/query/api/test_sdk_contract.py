@@ -119,6 +119,7 @@ def test_sdk_openapi_subset() -> None:
         "pgvector",
         "redis",
         "sqlite",
+        "mysql",
     }
     assert set(ready["evaluation_dataset_storage"]["enum"]) == {"session", "postgres"}
 

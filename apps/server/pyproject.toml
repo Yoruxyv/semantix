@@ -22,6 +22,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+mysql = ["semantix-cache[mysql]==0.1.0"]
 redis = ["semantix-cache[redis]==0.1.0"]
 dev = [
   "asyncpg-stubs>=0.31.3,<0.32",
@@ -30,6 +31,7 @@ dev = [
   "pytest-asyncio>=1.4.0,<2",
   "pytest-cov>=7.1.0,<8",
   "ruff>=0.16.3,<0.17",
+  "types-PyMySQL==1.2.0.20260923",
 ]
 
 [tool.setuptools.packages.find]
@@ -51,6 +53,7 @@ pythonpath = ["."]
 testpaths = ["tests"]
 cache_dir = ".cache/pytest"
 markers = [
+  "mysql: requires an explicitly owned verified-TLS MySQL 8.4 fixture",
   "pgvector: requires a PostgreSQL database with the pgvector extension",
   "redis: requires disposable standalone Redis 8.10.2",
 ]

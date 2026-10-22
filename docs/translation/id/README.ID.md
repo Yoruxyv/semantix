@@ -1,4 +1,4 @@
-<!-- readme-source-sha256: 5151d092370146a2aa0fdbc3131ef2585b08f19fa502dedc8b6ed7e8966cdf93 -->
+<!-- readme-source-sha256: 92a3e683d9045398469518a8a776293f7908b2bdb1f64ddfa580cd56c4c2a0c5 -->
 
 <div align="center">
 
@@ -134,7 +134,7 @@ Tautan backend di bawah menjelaskan persyaratan setup dan rincian sertifikasi le
 | --- | --- | --- | --- |
 | [MemoryStore](../../embedded/storage.md#choose-a-store) | In-process, tidak persisten; tanpa database eksternal | Termasuk dalam core minimal; tanpa driver database | Embedded + server/dashboard opsional |
 | [SQLiteStore](../../embedded/storage.md#sqlite-local-file-persistence) | SQLite yang ditautkan ke Python dan mendukung thread: **>=3.51.3, kecuali 3.52.0 yang ditarik**, atau hanya rilis upstream berpatch WAL **3.44.6 / 3.50.7** | `sqlite3` dari standard library Python; tanpa paket driver tambahan | Embedded + server satu proses |
-| [MySQLStore](../../embedded/mysql.md#verified-compatibility) | Runtime: MySQL Community **8.4.x**; tersertifikasi di CI: **8.4.11 / 8.4.12** | `[mysql]`: PyMySQL versi persis **1.2.1, 1.2.2, atau 1.2.3** | Hanya embedded |
+| [MySQLStore](../../embedded/mysql.md#verified-compatibility) | Runtime: MySQL Community **8.4.x**; tersertifikasi di CI: **8.4.11 / 8.4.12** | `[mysql]`: PyMySQL versi persis **1.2.1, 1.2.2, atau 1.2.3** | Embedded + server resmi |
 | [PgVectorStore](../../embedded/storage.md#verified-postgresql-combinations) | Pasangan PostgreSQL / pgvector terverifikasi: **16.15 / 0.8.7**, **17.10 / 0.8.5**, **18.6 / 0.8.7** | `[pgvector]`: `asyncpg>=0.31,<=0.32.0`; tersertifikasi **0.31.0 / 0.32.0** dalam kombinasi CI yang berbeda | Embedded + server/dashboard opsional |
 | [RedisStore — Redis Open Source](../../embedded/redis.md#supported-versions) | Keluarga versi minor yang diterima dan batas patch minimumnya: **7.4.x >=7.4.11; 8.2.x >=8.2.10; 8.4.x >=8.4.7; 8.6.x >=8.6.7; 8.8.x >=8.8.3; 8.10.x >=8.10.2** | `[redis]`: redis-py versi persis **7.4.1**, versi persis **8.0.1**, atau rilis stabil **8.1.x** | Embedded + server/dashboard opsional |
 | [RedisStore — Valkey](../../embedded/redis.md#valkey-912) | Produk server terpisah; versi persis **Valkey 9.1.2** | RedisStore dan extra `[redis]` yang sama; redis-py **8.1.0** terverifikasi, tanpa dependensi khusus Valkey | Embedded tersertifikasi; jalur server `redis` yang sudah ada (lihat di bawah) |
@@ -161,9 +161,10 @@ failover tetap mengikuti panduan masing-masing; migrasi file data Redis/Valkey
 belum terverifikasi.
 
 [Server/dashboard opsional](../../guides/platform-storage.md) hanya menerima
-`CACHE_BACKEND=memory`, `pgvector`, `redis`, atau `sqlite`. SQLite memerlukan
+`CACHE_BACKEND=memory`, `pgvector`, `redis`, `sqlite`, atau `mysql`. SQLite memerlukan
 server native satu proses pada disk lokal tepercaya dan setup eksplisit; Compose
-bawaan tidak didukung. MySQL tetap khusus embedded. Valkey memakai jalur `redis` yang sudah ada, tanpa ValkeyStore atau
+bawaan tidak didukung. MySQL memerlukan setup eksplisit, akun runtime terbatas, dan TLS terverifikasi;
+lihat [konfigurasi server MySQL](../../guides/platform-storage.md#mysql-explicit-setup-and-owned-connections). Valkey memakai jalur `redis` yang sudah ada, tanpa ValkeyStore atau
 selector `valkey` terpisah. Deployment dashboard Valkey secara end-to-end belum
 tersertifikasi secara terpisah.
 

@@ -48,6 +48,17 @@ REDIS_REQUIRED = frozenset(
         "tests/test_inspection.py::test_redis_small_page_does_not_decode_unselected_payloads",
     }
 )
+MYSQL_SERVER_REQUIRED = frozenset(
+    {
+        "tests/cache/api/test_mysql.py::test_concurrent_cold_requests_use_existing_coalescing",
+        "tests/cache/api/test_mysql.py::test_revision_invalidated_at_actual_confirmation_boundary",
+        "tests/cache/api/test_mysql.py::test_inspection_authorization_exact_totals_and_no_side_effects",
+        "tests/cache/infrastructure/test_mysql.py::test_runtime_permissions_connect_only_and_cleanup",
+        "tests/cache/infrastructure/test_mysql.py::test_mysql_native_work_settles_before_lifespan_exit[within_budget]",
+        "tests/cache/infrastructure/test_mysql.py::test_mysql_native_work_settles_before_lifespan_exit[expiry]",
+        "tests/cache/infrastructure/test_mysql.py::test_mysql_native_work_settles_before_lifespan_exit[cancel]",
+    }
+)
 SDK_REQUIRED = frozenset(
     {
         "tests/test_integration.py::test_sync_client_crosses_real_http_query_boundary",
@@ -110,7 +121,9 @@ def validate(scope: str, expected: Sequence[str], report: Path) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("scope", choices=("embedded", "postgresql", "redis", "sdk"))
+    parser.add_argument(
+        "scope", choices=("embedded", "postgresql", "redis", "sdk", "mysql-server")
+    )
     parser.add_argument("report", type=Path)
     parser.add_argument("pytest_args", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
@@ -132,6 +145,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "embedded": EMBEDDED_REQUIRED,
             "postgresql": POSTGRES_REQUIRED,
             "redis": REDIS_REQUIRED,
+            "mysql-server": MYSQL_SERVER_REQUIRED,
         }.get(args.scope, frozenset())
         if not set(collection.expected) >= anchors:
             raise ValueError(
