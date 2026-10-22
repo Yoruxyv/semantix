@@ -24,10 +24,12 @@ from semantix_cache.stores.redis import RedisStore
 
 def plan(settings: Settings) -> dict[str, bool]:
     """Validate additional launcher boundaries without network or provider calls."""
-    if settings.cache_backend == "sqlite":
-        raise ValueError(
-            "SQLite requires a single-process native server on trusted local disk; Compose is unsupported"
-        )
+    unsupported = {
+        "sqlite": "SQLite requires a single-process native server on trusted local disk; Compose is unsupported",
+        "mysql": "MySQL requires explicit operator setup and validated native startup; development Compose is not certified",
+    }.get(settings.cache_backend)
+    if unsupported is not None:
+        raise ValueError(unsupported)
     if any(
         os.environ.get(name)
         for name in (

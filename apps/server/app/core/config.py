@@ -17,7 +17,7 @@ which immediate peers may supply a forwarded address, not user identity.
 
 import re
 from functools import lru_cache
-from ipaddress import ip_network
+from ipaddress import IPv4Address, ip_network
 from pathlib import Path
 from typing import Literal
 from urllib.parse import unquote, urlparse
@@ -30,6 +30,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from pydantic_core import PydanticCustomError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.limits import (
@@ -54,7 +55,7 @@ from app.providers.shared.urls import (
     normalize_ollama_url,
 )
 
-CacheBackendName = Literal["memory", "pgvector", "redis", "sqlite"]
+CacheBackendName = Literal["memory", "pgvector", "redis", "sqlite", "mysql"]
 CoordinationBackendName = Literal["memory", "postgres"]
 AuthMode = Literal["disabled", "token"]
 AuthRole = Literal["viewer", "operator", "admin"]
@@ -205,6 +206,22 @@ class Settings(BaseSettings):
     cache_sqlite_close_timeout_seconds: float = Field(
         default=30.0, gt=0, le=86_400, allow_inf_nan=False
     )
+    cache_mysql_address: SecretStr | None = None
+    cache_mysql_port: int = Field(default=3306, ge=1, le=65535)
+    cache_mysql_tls_hostname: SecretStr | None = None
+    cache_mysql_ca_file: SecretStr | None = None
+    cache_mysql_database: SecretStr | None = None
+    cache_mysql_user: SecretStr | None = None
+    cache_mysql_password: SecretStr | None = None
+    cache_mysql_connect_timeout_seconds: float = Field(
+        default=10.0, gt=0, le=86_400, allow_inf_nan=False
+    )
+    cache_mysql_operation_timeout_seconds: float = Field(
+        default=30.0, gt=0, le=86_400, allow_inf_nan=False
+    )
+    cache_mysql_close_timeout_seconds: float = Field(
+        default=30.0, gt=0, le=86_400, allow_inf_nan=False
+    )
     redis_url: SecretStr | None = None
     redis_key_prefix: str = Field(
         default="semantix_workbench", pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
@@ -336,6 +353,9 @@ class Settings(BaseSettings):
         if self.cache_backend == "redis":
             self._validate_redis_configuration()
 
+        if self.cache_backend == "mysql":
+            self._validate_mysql_configuration()
+
         if self.database_required:
             self._require_secret(self.database_url, "DATABASE_URL")
             self._validate_database_url()
@@ -445,6 +465,12 @@ class Settings(BaseSettings):
             self.database_url,
             self.redis_url,
             self.cache_sqlite_path,
+            self.cache_mysql_address,
+            self.cache_mysql_tls_hostname,
+            self.cache_mysql_ca_file,
+            self.cache_mysql_database,
+            self.cache_mysql_user,
+            self.cache_mysql_password,
         )
         configured = [
             secret.get_secret_value()
@@ -460,6 +486,73 @@ class Settings(BaseSettings):
             if parsed.password:
                 configured.extend((parsed.password, unquote(parsed.password)))
         return tuple(configured)
+
+    @field_validator("cache_mysql_port", mode="before")
+    @classmethod
+    def validate_mysql_port(cls, value: object) -> object:
+        if isinstance(value, (bool, float)):
+            raise PydanticCustomError(
+                "mysql_port_type", "MySQL port must be an integer"
+            )
+        return value
+
+    @field_validator(
+        "cache_mysql_connect_timeout_seconds",
+        "cache_mysql_operation_timeout_seconds",
+        "cache_mysql_close_timeout_seconds",
+        mode="before",
+    )
+    @classmethod
+    def validate_mysql_timeout(cls, value: object) -> object:
+        if isinstance(value, bool):
+            raise PydanticCustomError(
+                "mysql_timeout_type", "MySQL timeout must be numeric"
+            )
+        return value
+
+    def _validate_mysql_configuration(self) -> None:
+        required = {
+            "CACHE_MYSQL_ADDRESS": self.cache_mysql_address,
+            "CACHE_MYSQL_TLS_HOSTNAME": self.cache_mysql_tls_hostname,
+            "CACHE_MYSQL_CA_FILE": self.cache_mysql_ca_file,
+            "CACHE_MYSQL_DATABASE": self.cache_mysql_database,
+            "CACHE_MYSQL_USER": self.cache_mysql_user,
+            "CACHE_MYSQL_PASSWORD": self.cache_mysql_password,
+        }
+        values: dict[str, str] = {}
+        for name, secret in required.items():
+            self._require_secret(secret, name)
+            if secret is not None:
+                values[name] = secret.get_secret_value()
+        try:
+            address, hostname, database = (
+                values[name]
+                for name in (
+                    "CACHE_MYSQL_ADDRESS",
+                    "CACHE_MYSQL_TLS_HOSTNAME",
+                    "CACHE_MYSQL_DATABASE",
+                )
+            )
+            if (
+                str(IPv4Address(address)) != address
+                or len(hostname) > 253
+                or re.fullmatch(r"[a-z][a-z0-9_]{0,63}", database, re.ASCII) is None
+                or database
+                in {"mysql", "information_schema", "performance_schema", "sys"}
+                or not Path(values["CACHE_MYSQL_CA_FILE"]).is_absolute()
+                or any("\0" in value for value in values.values())
+            ):
+                raise ValueError
+            hostname.encode("ascii")
+            values["CACHE_MYSQL_USER"].encode("utf-8")
+            values["CACHE_MYSQL_PASSWORD"].encode("utf-8")
+        except ValueError:
+            raise ValueError(
+                "Invalid MySQL endpoint, TLS or database configuration"
+            ) from None
+        if self.max_cache_size > 5000:
+            raise ValueError("MySQL capacity must be <=5000")
+        # Resolved registry identity/dimensions are validated by the public store.
 
     def _validate_sqlite_configuration(self) -> None:
         self._require_secret(self.cache_sqlite_path, "CACHE_SQLITE_PATH")

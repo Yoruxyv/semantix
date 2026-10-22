@@ -40,14 +40,14 @@ def junit(path: Path, cases: list[tuple[str, str, str]]) -> Path:
     return path
 
 
-@pytest.mark.parametrize("scope", ["embedded", "postgresql", "redis"])
+@pytest.mark.parametrize("scope", ["embedded", "postgresql", "redis", "mysql-server"])
 def test_required_shared_case_passes(tmp_path: Path, scope: str) -> None:
     report = junit(tmp_path / "report.xml", [(REQUIRED, "", "")])
     guard.validate(scope, [REQUIRED], report)
 
 
 @pytest.mark.parametrize("outcome", ["skipped", "failure", "error"])
-@pytest.mark.parametrize("scope", ["embedded", "postgresql", "redis"])
+@pytest.mark.parametrize("scope", ["embedded", "postgresql", "redis", "mysql-server"])
 def test_required_outcomes_rejected(tmp_path: Path, outcome: str, scope: str) -> None:
     report = junit(tmp_path / "report.xml", [(REQUIRED, outcome, "unavailable")])
     with pytest.raises(ValueError, match="Required test"):
@@ -201,7 +201,7 @@ def test_sdk_runner_rejects_uncollected_expected_cases(tmp_path: Path) -> None:
     assert "SDK integration cases not collected" in result.stderr
 
 
-@pytest.mark.parametrize("scope", ["embedded", "postgresql", "redis"])
+@pytest.mark.parametrize("scope", ["embedded", "postgresql", "redis", "mysql-server"])
 def test_runner_rejects_missing_owned_paths(tmp_path: Path, scope: str) -> None:
     (tmp_path / "test_other.py").write_text(
         "def test_other(): pass\n", encoding="utf-8"
@@ -292,21 +292,33 @@ def test_non_embedded_scopes_reject_optional_skips(
 
 
 @pytest.mark.parametrize(
-    "node_id",
+    ("scope", "node_id"),
     [
-        "tests/test_redis_scripts.py::test_initialization_accepts_explicit_server_identity[valkey]",
-        "tests/test_redis_faults.py::test_real_suppressed_acknowledgement_never_replays[hit]",
+        (
+            "redis",
+            "tests/test_redis_scripts.py::test_initialization_accepts_explicit_server_identity[valkey]",
+        ),
+        (
+            "redis",
+            "tests/test_redis_faults.py::test_real_suppressed_acknowledgement_never_replays[hit]",
+        ),
+        *(("mysql-server", node) for node in sorted(guard.MYSQL_SERVER_REQUIRED)),
     ],
 )
 @pytest.mark.parametrize(
     "outcome", ["passed", "uncollected", "missing", "skipped", "failure", "error"]
 )
-def test_redis_certification_anchors(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, node_id: str, outcome: str
+def test_certification_anchors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    scope: str,
+    node_id: str,
+    outcome: str,
 ) -> None:
-    assert node_id in guard.REDIS_REQUIRED
-    expected = sorted(guard.REDIS_REQUIRED)
-    report = tmp_path / "redis.xml"
+    anchors = guard.REDIS_REQUIRED if scope == "redis" else guard.MYSQL_SERVER_REQUIRED
+    assert node_id in anchors
+    expected = sorted(anchors)
+    report = tmp_path / "certification.xml"
 
     def invoke(args: list[str], *, plugins: list[guard.Collection]) -> int:
         plugins[0].expected = [
@@ -329,4 +341,4 @@ def test_redis_certification_anchors(
         return 0
 
     monkeypatch.setattr(guard.pytest, "main", invoke)
-    assert guard.main(["redis", str(report)]) == (0 if outcome == "passed" else 1)
+    assert guard.main([scope, str(report)]) == (0 if outcome == "passed" else 1)

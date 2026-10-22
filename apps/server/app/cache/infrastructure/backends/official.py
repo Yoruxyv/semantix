@@ -38,11 +38,14 @@ from semantix_cache import MemoryStore, SemantixCacheError
 from semantix_cache.inspection import InspectionEntry
 
 if TYPE_CHECKING:
+    from semantix_cache.stores.mysql import MySQLStore
     from semantix_cache.stores.pgvector import PgVectorStore
     from semantix_cache.stores.redis import RedisStore
     from semantix_cache.stores.sqlite import SQLiteStore
 
-OfficialStore: TypeAlias = "MemoryStore | PgVectorStore | RedisStore | SQLiteStore"
+OfficialStore: TypeAlias = (
+    "MemoryStore | PgVectorStore | RedisStore | SQLiteStore | MySQLStore"
+)
 
 
 @dataclass(slots=True)

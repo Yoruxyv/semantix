@@ -199,7 +199,7 @@ startup error chaining exposes observed cleanup failure without claiming recover
 verified TLS and an owned synchronous worker. Setup is explicit on a dedicated
 MySQL Community 8.4.x database (verified patches 8.4.11/8.4.12); runtime uses
 restricted table grants plus a fixed locked-definer verifier. The server/dashboard
-does not select MySQL. See [MySQL setup, limits and cleanup recovery](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/mysql.md)
+can select it explicitly; see the [server configuration](https://github.com/Yoruxyv/semantix/blob/main/docs/guides/platform-storage.md#mysql-explicit-setup-and-owned-connections). See [MySQL setup, limits and cleanup recovery](https://github.com/Yoruxyv/semantix/blob/main/docs/embedded/mysql.md)
 before use: full float64 scans are bounded, hits write, slow I/O can time out,
 and an uncertain mutation/COMMIT is never automatically replayed.
 

@@ -142,7 +142,7 @@ def test_blank_or_header_unsafe_token_is_rejected_without_echoing_it() -> None:
             assert token not in str(caught.value)
 
 
-@pytest.mark.parametrize("backend", ["memory", "pgvector", "redis", "sqlite"])
+@pytest.mark.parametrize("backend", ["memory", "pgvector", "redis", "sqlite", "mysql"])
 def test_health_and_readiness_are_typed(backend: str) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/health":

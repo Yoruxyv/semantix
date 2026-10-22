@@ -130,7 +130,7 @@ Backend links below lead to setup requirements and complete certification detail
 | --- | --- | --- | --- |
 | [MemoryStore](docs/embedded/storage.md#choose-a-store) | In-process, non-durable; no external database | Included in the minimal core; no database driver | Embedded + optional server/dashboard |
 | [SQLiteStore](docs/embedded/storage.md#sqlite-local-file-persistence) | Thread-capable linked SQLite **>=3.51.3, except withdrawn 3.52.0**, or exact upstream WAL-patched **3.44.6 / 3.50.7** | Python's standard-library `sqlite3`; no extra driver package | Embedded + single-process server |
-| [MySQLStore](docs/embedded/mysql.md#verified-compatibility) | Runtime: MySQL Community **8.4.x**; CI-certified: **8.4.11 / 8.4.12** | `[mysql]`: exact PyMySQL **1.2.1, 1.2.2 or 1.2.3** | Embedded only |
+| [MySQLStore](docs/embedded/mysql.md#verified-compatibility) | Runtime: MySQL Community **8.4.x**; CI-certified: **8.4.11 / 8.4.12** | `[mysql]`: exact PyMySQL **1.2.1, 1.2.2 or 1.2.3** | Embedded + official server |
 | [PgVectorStore](docs/embedded/storage.md#verified-postgresql-combinations) | Verified PostgreSQL / pgvector: **16.15 / 0.8.7**, **17.10 / 0.8.5**, **18.6 / 0.8.7** | `[pgvector]`: `asyncpg>=0.31,<=0.32.0`; certified **0.31.0 / 0.32.0** in different CI combinations | Embedded + optional server/dashboard |
 | [RedisStore — Redis Open Source](docs/embedded/redis.md#supported-versions) | Admitted minor families and patch floors: **7.4.x >=7.4.11; 8.2.x >=8.2.10; 8.4.x >=8.4.7; 8.6.x >=8.6.7; 8.8.x >=8.8.3; 8.10.x >=8.10.2** | `[redis]`: exact redis-py **7.4.1**, exact **8.0.1**, or stable **8.1.x** | Embedded + optional server/dashboard |
 | [RedisStore — Valkey](docs/embedded/redis.md#valkey-912) | Separate server product; exact **Valkey 9.1.2** | Same RedisStore and `[redis]` extra; verified redis-py **8.1.0**, no Valkey-specific dependency | Embedded certified; existing server `redis` path (see below) |
@@ -155,9 +155,10 @@ individually certified. TLS, managed-service and failover limits remain specific
 to each guide; Redis/Valkey data-file migration remains unverified.
 
 The [optional server/dashboard](docs/guides/platform-storage.md) accepts only
-`CACHE_BACKEND=memory`, `pgvector`, `redis` or `sqlite`. SQLite requires a native
+`CACHE_BACKEND=memory`, `pgvector`, `redis`, `sqlite` or `mysql`. SQLite requires a native
 single-process server on trusted local disk with explicit setup; bundled Compose
-is unsupported. MySQL remains embedded-only.
+is unsupported. MySQL requires explicit setup, restricted runtime credentials and verified TLS;
+see [server MySQL configuration](docs/guides/platform-storage.md#mysql-explicit-setup-and-owned-connections).
 Valkey uses the existing `redis` path, with no separate ValkeyStore or `valkey`
 selector. An end-to-end Valkey dashboard deployment has not been separately certified.
 

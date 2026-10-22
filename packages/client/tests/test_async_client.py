@@ -69,7 +69,7 @@ async def test_async_query_serializes_requested_cache_ttl() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("backend", ["memory", "pgvector", "redis", "sqlite"])
+@pytest.mark.parametrize("backend", ["memory", "pgvector", "redis", "sqlite", "mysql"])
 async def test_async_health_and_readiness(backend: str) -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/health":

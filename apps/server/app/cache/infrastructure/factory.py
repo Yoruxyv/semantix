@@ -6,8 +6,9 @@ presentation and telemetry while the package store remains authoritative.
 """
 
 import asyncio
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from functools import partial
 from importlib import import_module
 from typing import TYPE_CHECKING, cast
 
@@ -23,6 +24,7 @@ from app.core.exceptions import CacheStorageError
 from semantix_cache import CacheBusyError, EmbeddingSpace, SemantixCacheError
 
 if TYPE_CHECKING:
+    from semantix_cache.stores.mysql import MySQLStore
     from semantix_cache.stores.redis import RedisStore
     from semantix_cache.stores.sqlite import SQLiteStore
 
@@ -41,7 +43,8 @@ async def cache_backend_lifespan(
     Memory creates a process-local store. PostgreSQL borrows a supplied pool or
     opens its own, validates the official schema, then separately reads server
     telemetry. Redis connect owns its client/pool and validates the existing marked
-    binding. SQLite owns its local worker and uses one total shutdown-await budget.
+    binding. SQLite and MySQL each own their worker and have separate close policies
+    under one total application shutdown-await budget.
     No persistent branch installs or adopts a cache schema.
 
     On exit or failed setup, close any assigned store first. A nested finally then
@@ -69,7 +72,7 @@ async def cache_backend_lifespan(
     """
     owned_pool: Pool | None = None
     backend: OfficialStoreBackend | None = None
-    sqlite_store: SQLiteStore | None = None
+    close_store: Callable[[], Awaitable[None]] | None = None
     try:
         if settings.cache_backend == "memory":
             backend = InMemoryCacheBackend(
@@ -100,7 +103,16 @@ async def cache_backend_lifespan(
             await backend.stats(None)
         elif settings.cache_backend == "sqlite":
             sqlite_store = await _connect_sqlite(settings, dimensions, embedding_space)
+            close_store = partial(
+                _close_sqlite, sqlite_store, settings.cache_sqlite_close_timeout_seconds
+            )
             backend = OfficialStoreBackend(sqlite_store, events=events)
+        elif settings.cache_backend == "mysql":
+            mysql_store = await _connect_mysql(settings, dimensions, embedding_space)
+            close_store = partial(
+                _close_mysql, mysql_store, settings.cache_mysql_close_timeout_seconds
+            )
+            backend = OfficialStoreBackend(mysql_store, events=events)
         elif settings.cache_backend == "redis":
             try:
                 redis_store = cast(
@@ -136,10 +148,8 @@ async def cache_backend_lifespan(
     finally:
         try:
             try:
-                if sqlite_store is not None:
-                    await _close_sqlite(
-                        sqlite_store, settings.cache_sqlite_close_timeout_seconds
-                    )
+                if close_store is not None:
+                    await close_store()
                 elif backend is not None:
                     await backend.store.aclose()
             except SemantixCacheError:
@@ -203,4 +213,69 @@ async def _close_sqlite(store: "SQLiteStore", budget_seconds: float) -> None:
         raise CacheStorageError(
             "SQLite shutdown budget expired; cleanup is incomplete and requires "
             "operator-controlled process disposition"
+        ) from None
+
+
+async def _connect_mysql(
+    settings: Settings, dimensions: int, embedding_space: str
+) -> "MySQLStore":
+    try:
+        store_type = cast(
+            "type[MySQLStore]", import_module("semantix_cache.stores.mysql").MySQLStore
+        )
+    except ImportError:
+        raise CacheStorageError(
+            "Install the server mysql extra for CACHE_BACKEND=mysql"
+        ) from None
+    secrets = (
+        settings.cache_mysql_address,
+        settings.cache_mysql_tls_hostname,
+        settings.cache_mysql_ca_file,
+        settings.cache_mysql_database,
+        settings.cache_mysql_user,
+        settings.cache_mysql_password,
+    )
+    if any(value is None for value in secrets):
+        raise CacheStorageError("MySQL configuration is incomplete")
+    address, hostname, ca_file, database, user, password = (
+        value.get_secret_value() for value in secrets if value is not None
+    )
+    return await store_type.connect(
+        address=address,
+        port=settings.cache_mysql_port,
+        tls_hostname=hostname,
+        ca_file=ca_file,
+        database=database,
+        user=user,
+        password=password,
+        embedding_space=EmbeddingSpace(identity=embedding_space, dimensions=dimensions),
+        max_size=settings.max_cache_size,
+        default_ttl_seconds=settings.cache_ttl_seconds,
+        connect_timeout_seconds=settings.cache_mysql_connect_timeout_seconds,
+        operation_timeout_seconds=settings.cache_mysql_operation_timeout_seconds,
+        close_timeout_seconds=settings.cache_mysql_close_timeout_seconds,
+    )
+
+
+async def _close_mysql(store: "MySQLStore", budget_seconds: float) -> None:
+    """Retry only pre-close busy refusal; one deadline covers every await.
+
+    Once disposal starts, the package owns it. Cancellation/expiry can leave that
+    cleanup active and never proves physical disposal or process termination.
+    Native cleanup errors and uncertain mutations are never retried here.
+    """
+    deadline = asyncio.timeout(budget_seconds)
+    try:
+        async with deadline:
+            while True:
+                try:
+                    await store.aclose()
+                    return
+                except CacheBusyError:
+                    await asyncio.sleep(0.01)
+    except TimeoutError:
+        if not deadline.expired():
+            raise
+        raise CacheStorageError(
+            "MySQL shutdown budget expired; cleanup is incomplete and requires operator-controlled process disposition"
         ) from None

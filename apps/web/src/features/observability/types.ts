@@ -24,7 +24,7 @@ export interface RuntimeDiagnostics {
   embedding_dimensions: number;
   embedding_space_fingerprint: string;
   generation_configuration_fingerprint: string;
-  cache_backend: 'memory' | 'pgvector' | 'redis' | 'sqlite';
+  cache_backend: 'memory' | 'pgvector' | 'redis' | 'sqlite' | 'mysql';
   cache_readiness: 'ready' | 'unavailable';
   normalization_mode: 'identity' | 'typo_correction';
   normalization_algorithm_version: 'identity-v1' | 'symspell-compound-v1';

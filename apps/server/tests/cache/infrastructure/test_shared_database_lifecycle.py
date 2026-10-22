@@ -36,6 +36,12 @@ def settings(
             "embedding_provider": "mock",
             "generation_provider": "mock",
             "cache_backend": cache_backend,
+            "cache_mysql_address": "127.0.0.1",
+            "cache_mysql_tls_hostname": "localhost",
+            "cache_mysql_ca_file": str(tmp_path / "not-opened-by-pool-tests.pem"),
+            "cache_mysql_database": "test_cache",
+            "cache_mysql_user": "test_runtime",
+            "cache_mysql_password": "fixture-only",
             "cache_sqlite_path": str(tmp_path / "not-opened-by-pool-tests.db"),
             "evaluation_dataset_storage": evaluation_dataset_storage,
             "evaluation_run_history_storage": evaluation_run_history_storage,
@@ -53,7 +59,7 @@ def settings(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("cache_backend", ["memory", "sqlite"])
+@pytest.mark.parametrize("cache_backend", ["memory", "sqlite", "mysql"])
 async def test_memory_and_session_mode_open_no_database(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -82,6 +88,8 @@ async def test_memory_and_session_mode_open_no_database(
         ("memory", "session", "postgres", ["evaluation"]),
         ("sqlite", "postgres", "disabled", ["evaluation"]),
         ("sqlite", "session", "postgres", ["evaluation"]),
+        ("mysql", "postgres", "disabled", ["evaluation"]),
+        ("mysql", "session", "postgres", ["evaluation"]),
         ("pgvector", "session", "disabled", []),
         ("pgvector", "postgres", "disabled", ["evaluation"]),
         ("pgvector", "session", "postgres", ["evaluation"]),

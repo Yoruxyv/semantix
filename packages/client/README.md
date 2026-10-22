@@ -286,8 +286,8 @@ by supporting servers because those policies cannot write a cache entry.
 
 ## Health and readiness
 
-Readiness recognizes `memory`, `pgvector`, `redis` and `sqlite`. Older client
-versions may reject a readiness response identifying SQLite; response fields and
+Readiness recognizes `memory`, `pgvector`, `redis`, `sqlite` and `mysql`. Older client
+versions may reject a readiness response identifying SQLite or MySQL; response fields and
 query behavior are otherwise unchanged.
 
 The clients expose two public probes. `health()` returns an immutable

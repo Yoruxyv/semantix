@@ -12,7 +12,7 @@ independently installable Python HTTP client. Applications can call the public H
 directly or use the SDK. The SDK is a remote client, not another cache engine.
 Configured embedding and generation providers are external to the cache service; the
 mock provider supports deterministic local use. The live cache delegates to the
-package-owned MemoryStore, SQLiteStore, PgVectorStore or RedisStore, according to settings.
+package-owned MemoryStore, SQLiteStore, MySQLStore, PgVectorStore or RedisStore, according to settings.
 SQLite is restricted to a native single-process server on trusted local disk.
 
 An independently installable [semantix-cache](packages/cache/README.md) supplies the async
@@ -41,13 +41,14 @@ search and uses fixed Lua scripts for revision confirmation, TTL and LRU.
 Initialization is explicit; borrowed clients remain caller-owned. See the
 [Redis storage guide](docs/embedded/redis.md) for its single-primary support boundary.
 
-The embedded-only MySQLStore lives in `semantix_cache.stores.mysql`, with pinned
+The optional MySQLStore lives in `semantix_cache.stores.mysql`, with pinned
 optional PyMySQL, one owned synchronous worker/connection, complete exact float64
 scoring and transactional revisions/TTL/LRU. Explicit setup installs immutable
 migrations and a fixed locked-definer schema verifier; runtime uses restricted
 table DML plus verifier EXECUTE. Failed construction has bounded process-local
-cleanup ownership and explicit recovery. It does not change the structural port
-or server backend selection. See [MySQL storage](docs/embedded/mysql.md).
+cleanup ownership and explicit recovery. It does not change the structural port. The server selects it explicitly through
+`CACHE_BACKEND=mysql`, with setup, credentials and bounded cleanup at composition;
+routes and QueryService stay backend-independent. See [MySQL storage](docs/embedded/mysql.md).
 
 Private MySQL and SQLite helpers live in their respective
 `semantix_cache.stores._backends.mysql` and `._backends.sqlite` packages. Redis Lua
