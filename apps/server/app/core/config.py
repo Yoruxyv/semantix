@@ -584,13 +584,11 @@ class Settings(BaseSettings):
             raise ValueError(
                 "REDIS_URL must identify a direct standalone Redis primary"
             )
-        if (
-            self.max_cache_size > 5000
-            or self.max_cache_size * self.embedding_dimensions * 8 > 64 * 1024 * 1024
-        ):
+        if self.max_cache_size > 5000:
             raise ValueError(
                 "Redis capacity must be <=5000 and vector projection <=64 MiB"
             )
+        # RedisStore checks resolved registry dimensions/projection before connecting.
 
     def _validate_database_url(self) -> None:
         if self.database_url is None:
