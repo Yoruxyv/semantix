@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type JSX, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 
 import { APP_PATHS } from '@/app/navigation/navigationConfig';
@@ -17,6 +17,7 @@ import { cacheEntryKeys } from '@/shared/query/queryKeys';
 
 import { deleteCacheEntry, getCacheEntry } from '../api/cacheApi';
 import { useCacheControl } from '../hooks/useCacheControl';
+import { mutationFailure, mutationRefreshWarning } from '../mutationFeedback';
 
 const CACHE_KEY_PATTERN = /^[a-f0-9]{64}$/;
 const UNAVAILABLE_MESSAGE =
@@ -75,20 +76,33 @@ export function CacheEntryDetailPage(): JSX.Element {
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const activeDeletion = useRef(false);
+  const generation = useRef(0);
   const isValidKey = CACHE_KEY_PATTERN.test(cacheKey);
   const returnTo = `${APP_PATHS.cache}${returnSearchFromState(location.state)}`;
   const canDelete = canDeleteCacheEntries(auth.status, auth.session);
+  useEffect(() => {
+    setConfirmDelete(false);
+    setDeleteError(null);
+    setIsDeleting(false);
+    activeDeletion.current = false;
+    return () => {
+      generation.current += 1;
+    };
+  }, [auth.status, auth.session, cacheKey]);
+  const deleteMutation = useMutation({
+    mutationFn: async (key: string) => dataFromApiResult(await deleteCacheEntry(key)),
+  });
+  const isDeleted = deleteMutation.isSuccess && deleteMutation.variables === cacheKey;
 
   const entryQuery = useQuery({
     queryKey: cacheEntryKeys.detail(cacheKey),
     queryFn: async ({ signal }) =>
       dataFromApiResult(await getCacheEntry(cacheKey, signal)),
-    enabled: isValidKey,
+    enabled: isValidKey && !isDeleted,
     staleTime: 20_000,
     gcTime: 5 * 60_000,
-  });
-  const deleteMutation = useMutation({
-    mutationFn: async () => dataFromApiResult(await deleteCacheEntry(cacheKey)),
   });
 
   async function copyCacheKey(): Promise<void> {
@@ -100,29 +114,44 @@ export function CacheEntryDetailPage(): JSX.Element {
     }
   }
 
-  /**
-   * After confirmed DELETE, remove detail, await list invalidation and cache-state
-   * refresh together, then navigate with a local notice. Follow-up rejection can
-   * prevent navigation and show failure after the server has already deleted.
-   */
+  /** Confirmed deletion survives refresh failure; only the current page may navigate. */
   async function confirmEntryDeletion(): Promise<void> {
+    if (!canDelete || activeDeletion.current) return;
+    activeDeletion.current = true;
+    const owner = generation.current;
+    setIsDeleting(true);
     setDeleteError(null);
     try {
-      await deleteMutation.mutateAsync();
+      try {
+        await deleteMutation.mutateAsync(cacheKey);
+      } catch (error: unknown) {
+        if (owner === generation.current)
+          setDeleteError(mutationFailure(error, 'delete'));
+        return;
+      }
+      if (owner === generation.current) setConfirmDelete(false);
       queryClient.removeQueries({
         queryKey: cacheEntryKeys.detail(cacheKey),
         exact: true,
       });
-      await Promise.all([
+      const results = await Promise.allSettled([
         queryClient.invalidateQueries({ queryKey: cacheEntryKeys.lists() }),
-        refreshCacheState(false),
+        ...(owner === generation.current ? [refreshCacheState(false)] : []),
       ]);
+      if (owner !== generation.current) return;
       void navigate(returnTo, {
         replace: true,
-        state: { cacheMutationNotice: 'Cache entry deleted.' },
+        state: {
+          cacheMutationNotice: results.some((result) => result.status === 'rejected')
+            ? mutationRefreshWarning('delete')
+            : 'Cache entry deleted.',
+        },
       });
-    } catch {
-      setDeleteError('The cache entry was not deleted.');
+    } finally {
+      if (owner === generation.current) {
+        activeDeletion.current = false;
+        setIsDeleting(false);
+      }
     }
   }
 
@@ -155,7 +184,16 @@ export function CacheEntryDetailPage(): JSX.Element {
         </Alert>
       )}
 
-      {isValidKey && entryQuery.isPending && (
+      {isDeleted && (
+        <output
+          aria-live="polite"
+          className="font-data block py-8 text-[11px] text-(--teal)"
+        >
+          Cache entry deleted. Updating the cache view...
+        </output>
+      )}
+
+      {isValidKey && !isDeleted && entryQuery.isPending && (
         <output
           aria-live="polite"
           className="font-data block animate-pulse border-y border-(--hairline) py-8 text-[11px] text-(--text-faint)"
@@ -164,7 +202,7 @@ export function CacheEntryDetailPage(): JSX.Element {
         </output>
       )}
 
-      {isValidKey && entryQuery.isError && (
+      {isValidKey && !isDeleted && entryQuery.isError && (
         <Alert
           action={
             <Button
@@ -183,7 +221,7 @@ export function CacheEntryDetailPage(): JSX.Element {
         </Alert>
       )}
 
-      {entry !== undefined && (
+      {entry !== undefined && !isDeleted && (
         <article className="min-w-0 border-t border-(--hairline) pt-7">
           <header className="flex flex-wrap items-start justify-between gap-5">
             <div className="min-w-0">
@@ -261,7 +299,7 @@ export function CacheEntryDetailPage(): JSX.Element {
               ariaLabel={`Confirm deletion of cache entry ${shortCacheKey(entry.cache_key)} in namespace ${entry.namespace}`}
               className="mt-8"
               confirmLabel="Confirm delete"
-              isPending={deleteMutation.isPending}
+              isPending={isDeleting}
               message={
                 <>
                   Delete <code>{shortCacheKey(entry.cache_key)}</code> from namespace{' '}

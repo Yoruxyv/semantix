@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -9,6 +9,7 @@ import { cacheEntryKeys } from '@/shared/query/queryKeys';
 
 import { clearCache, deleteCacheEntry, listCacheEntries } from '../api/cacheApi';
 import type { CacheEntryListResponse, CacheEntrySort } from '../types';
+import { mutationFailure, mutationRefreshWarning } from '../mutationFeedback';
 
 const PAGE_SIZE = 10;
 
@@ -20,6 +21,7 @@ interface UseCacheInspectorOptions {
 
 export interface CacheInspectorController {
   actionError: string | null;
+  actionWarning: string | null;
   canDelete: boolean;
   canClearAll: boolean;
   cancelClear: () => void;
@@ -88,12 +90,23 @@ export function useCacheInspector({
   const offset =
     Number.isSafeInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0;
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionWarning, setActionWarning] = useState<string | null>(null);
+  const [mutation, setMutation] = useState<string | null>(null);
+  const activeMutation = useRef(false);
+  const generation = useRef(0);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => {
     setPendingDelete(null);
     setConfirmClear(false);
+    setActionError(null);
+    setActionWarning(null);
+    setMutation(null);
+    activeMutation.current = false;
+    return () => {
+      generation.current += 1;
+    };
   }, [auth.status, auth.session]);
 
   const params = {
@@ -111,31 +124,14 @@ export function useCacheInspector({
     staleTime: 20 * 1_000,
     gcTime: 5 * 60 * 1_000,
   });
-  /** Remote success removes detail queries then awaits list invalidation before mutateAsync settles. */
+  /** Mutation settlement records only the server response; follow-up work is separate. */
   const deleteMutation = useMutation({
     mutationFn: async (cacheKey: string) =>
       dataFromApiResult(await deleteCacheEntry(cacheKey)),
-    onSuccess: async (_response, cacheKey) => {
-      queryClient.removeQueries({
-        queryKey: cacheEntryKeys.detail(cacheKey),
-        exact: true,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: cacheEntryKeys.lists(),
-      });
-    },
   });
   const clearMutation = useMutation({
     mutationFn: async (selectedNamespace: string | undefined) =>
       dataFromApiResult(await clearCache(selectedNamespace)),
-    onSuccess: async () => {
-      queryClient.removeQueries({
-        queryKey: cacheEntryKeys.details(),
-      });
-      await queryClient.invalidateQueries({
-        queryKey: cacheEntryKeys.lists(),
-      });
-    },
   });
 
   /** Pending manual refreshes are deduplicated; refetch does not cancel an active read. */
@@ -152,12 +148,6 @@ export function useCacheInspector({
     data !== null && entriesQuery.isError
       ? errorDetail(entriesQuery.error, 'Cache inspector data could not be refreshed.')
       : null;
-  let mutation: string | null = null;
-  if (clearMutation.isPending) {
-    mutation = 'clear';
-  } else if (deleteMutation.isPending) {
-    mutation = deleteMutation.variables ?? null;
-  }
 
   function refresh(): void {
     if (!manualRefresh.isPending) {
@@ -252,21 +242,40 @@ export function useCacheInspector({
     setPendingDelete(null);
   }
 
-  /**
-   * After mutation/invalidation, dismiss confirmation, reset offset, then await the
-   * supplied callback. A later rejection does not undo a successful server delete.
-   */
+  /** Follow-up failures cannot change the confirmed remote outcome. */
   async function confirmDeleteEntry(cacheKey: string): Promise<void> {
-    if (!canDelete) return;
+    if (!canDelete || activeMutation.current) return;
+    activeMutation.current = true;
+    const owner = generation.current;
+    setMutation(cacheKey);
     setActionError(null);
+    setActionWarning(null);
 
     try {
-      await deleteMutation.mutateAsync(cacheKey);
+      try {
+        await deleteMutation.mutateAsync(cacheKey);
+      } catch (error: unknown) {
+        if (owner === generation.current)
+          setActionError(mutationFailure(error, 'delete'));
+        return;
+      }
+      queryClient.removeQueries({
+        queryKey: cacheEntryKeys.detail(cacheKey),
+        exact: true,
+      });
+      await queryClient.invalidateQueries({ queryKey: cacheEntryKeys.lists() });
+      if (owner !== generation.current) return;
       setPendingDelete(null);
       updateOffset(0);
       await onMutation('delete');
-    } catch (error: unknown) {
-      setActionError(errorDetail(error, 'The cache entry was not deleted.'));
+    } catch {
+      if (owner === generation.current)
+        setActionWarning(mutationRefreshWarning('delete'));
+    } finally {
+      if (owner === generation.current) {
+        activeMutation.current = false;
+        setMutation(null);
+      }
     }
   }
 
@@ -275,20 +284,39 @@ export function useCacheInspector({
    * clearing. Follow-up/callback errors do not prove the remote clear was undone.
    */
   async function confirmClearCache(): Promise<void> {
-    if (!canDelete) return;
+    if (!canDelete || activeMutation.current) return;
+    activeMutation.current = true;
+    const owner = generation.current;
+    setMutation('clear');
     setActionError(null);
+    setActionWarning(null);
 
     const selectedNamespace = namespace.trim();
     try {
-      await clearMutation.mutateAsync(
-        selectedNamespace === '' ? undefined : selectedNamespace,
-      );
+      try {
+        await clearMutation.mutateAsync(
+          selectedNamespace === '' ? undefined : selectedNamespace,
+        );
+      } catch (error: unknown) {
+        if (owner === generation.current)
+          setActionError(mutationFailure(error, 'clear'));
+        return;
+      }
+      queryClient.removeQueries({ queryKey: cacheEntryKeys.details() });
+      await queryClient.invalidateQueries({ queryKey: cacheEntryKeys.lists() });
+      if (owner !== generation.current) return;
       setConfirmClear(false);
       setPendingDelete(null);
       updateOffset(0);
       await onMutation('clear');
-    } catch (error: unknown) {
-      setActionError(errorDetail(error, 'The cache was not cleared.'));
+    } catch {
+      if (owner === generation.current)
+        setActionWarning(mutationRefreshWarning('clear'));
+    } finally {
+      if (owner === generation.current) {
+        activeMutation.current = false;
+        setMutation(null);
+      }
     }
   }
 
@@ -298,6 +326,7 @@ export function useCacheInspector({
 
   return {
     actionError,
+    actionWarning,
     canDelete,
     canClearAll,
     cancelClear,

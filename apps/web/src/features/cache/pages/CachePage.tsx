@@ -22,13 +22,12 @@ function cacheMutationNotice(state: unknown): string | null {
 export function CachePage(): JSX.Element {
   const location = useLocation();
   const mutationNotice = cacheMutationNotice(location.state);
-  const { refreshCacheState } = useCacheControl();
+  const { cacheState, refreshCacheState } = useCacheControl();
   const { clearTraces } = useMonitor();
 
   /**
    * Inspector reports the mutation; clear removes only local Monitor traces.
-   * Both actions request cache-state refresh. The JSX wrapper discards this promise,
-   * so the inspector cannot await this refresh or catch its rejection.
+   * Return the refresh promise so the Inspector owns any unexpected rejection.
    */
   async function handleMutation(mutation: CacheMutation): Promise<void> {
     if (mutation === 'clear') {
@@ -55,7 +54,17 @@ export function CachePage(): JSX.Element {
         </Alert>
       )}
 
-      <CacheInspector onMutation={(mutation) => void handleMutation(mutation)} />
+      {cacheState.status === 'ready' && cacheState.refreshError !== undefined && (
+        <Alert
+          className="font-data mb-6 border-l border-(--gold) pl-4 text-[11px]/5"
+          role="alert"
+          tone="warning"
+        >
+          Cache statistics and threshold could not be refreshed. Showing the last
+          confirmed readings.
+        </Alert>
+      )}
+      <CacheInspector onMutation={handleMutation} />
     </>
   );
 }

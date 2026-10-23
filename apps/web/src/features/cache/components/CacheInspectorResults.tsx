@@ -13,6 +13,7 @@ export function CacheInspectorResults({
 }: Readonly<CacheInspectorResultsProps>): JSX.Element {
   const {
     actionError,
+    actionWarning,
     cancelDelete,
     confirmDeleteEntry,
     data,
@@ -75,6 +76,16 @@ export function CacheInspectorResults({
           tone="error"
         >
           {actionError}
+        </Alert>
+      )}
+
+      {actionWarning !== null && (
+        <Alert
+          className="font-data mt-5 border-l border-(--gold) pl-4 text-[11px]/5"
+          role="alert"
+          tone="warning"
+        >
+          {actionWarning}
         </Alert>
       )}
 

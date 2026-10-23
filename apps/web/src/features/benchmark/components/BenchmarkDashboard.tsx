@@ -87,12 +87,24 @@ export function BenchmarkDashboard(): JSX.Element {
 
         {error !== null && (
           <Alert
-            className="mt-6 border-l-2 border-(--coral) bg-[rgba(194,96,74,0.06)] px-4 py-3"
+            className={`mt-6 border-l-2 px-4 py-3 ${error.kind === 'workload_limit' ? 'border-(--teal) bg-[rgba(91,156,148,0.06)]' : 'border-(--coral) bg-[rgba(194,96,74,0.06)]'}`}
             role="alert"
-            title="Evaluation failed"
-            tone="error"
+            title={
+              error.kind === 'workload_limit'
+                ? 'Evaluation limit reached'
+                : 'Evaluation failed'
+            }
+            tone={error.kind === 'workload_limit' ? 'info' : 'error'}
           >
-            <p className="font-data mt-1 text-[11px]/5 text-(--text-soft)">{error}</p>
+            <p className="font-data mt-1 text-[11px]/5 text-(--text-soft)">
+              {error.message}
+            </p>
+            {error.kind === 'workload_limit' && (
+              <p className="font-data mt-1 text-[11px]/5 text-(--text-soft)">
+                Reduce the number of repetitions or select a smaller dataset, then try
+                again.
+              </p>
+            )}
           </Alert>
         )}
 
