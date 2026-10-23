@@ -91,6 +91,21 @@ ANTHROPIC_BASE_URL=https://api.anthropic.com
 ANTHROPIC_GENERATION_MODEL=
 ```
 
+Generation Anthropic menerima teks tidak kosong dengan `stop_reason="end_turn"`
+atau `"stop_sequence"`. Reason yang tidak disertakan tetap kompatibel, tetapi
+tidak membuktikan kelengkapan respons. Reason eksplisit lainnya, termasuk
+`max_tokens`, `model_context_window_exceeded`, `tool_use`, `pause_turn`, `refusal`,
+null, nilai tidak dikenal, atau nilai dengan format salah, ditolak. Refusal adalah
+hasil keselamatan upstream yang valid, tetapi adapter khusus teks ini tidak
+mengembalikannya sebagai jawaban biasa yang dapat disimpan di cache. Blok
+`tool_use` untuk klien ditolak meskipun bercampur teks dengan reason terminal atau
+tanpa reason. Blok nonteks lainnya, termasuk thinking/redacted thinking, dilewati;
+hanya blok teks yang dipangkas spasinya lalu digabungkan menjadi jawaban.
+Penolakan memakai HTTP 502 `invalid_upstream_response` yang telah disanitasi,
+sebelum penulisan cache query. Adapter tidak mengonfigurasi stop sequence,
+menjalankan tool, atau melanjutkan turn yang dijeda. Jawaban yang sudah tersimpan
+di cache tidak otomatis dihapus oleh validasi ini.
+
 ### Gemini
 
 ```env

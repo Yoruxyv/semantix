@@ -72,16 +72,17 @@ class AnthropicProvider:
 
         Send the configured model and ``max_tokens`` with ``x-api-key`` and
         ``anthropic-version`` headers. Extract nonblank text only from content
-        blocks whose type is ``text``; other blocks are skipped. This server
-        decoder does not validate ``stop_reason`` or reject a mixed tool-use
-        response. Shared server text validation follows in calling workflows.
+        blocks whose type is ``text``. Explicit ``stop_reason`` must be
+        ``end_turn`` or ``stop_sequence``; omission stays compatible. Reject
+        client ``tool_use`` blocks even alongside text; skip other non-text
+        blocks. Shared server text validation follows in calling workflows.
 
         Returns:
             Trimmed text blocks joined with newlines.
 
         Raises:
-            InvalidProviderResponseError: Content is missing/invalid or contains
-                no nonblank text blocks.
+            InvalidProviderResponseError: Output is incomplete/nonterminal,
+                refused, requires client tools or contains no nonblank text.
         """
         payload = await post_json(
             self._client,
@@ -109,7 +110,12 @@ class AnthropicProvider:
                 "Invalid message response",
             )
 
-        content = cast("dict[str, object]", payload).get("content")
+        message = cast("dict[str, object]", payload)
+        if message.get("stop_reason", "end_turn") not in ("end_turn", "stop_sequence"):
+            raise InvalidProviderResponseError(
+                "Message generation did not complete with final text",
+            )
+        content = message.get("content")
         if not isinstance(content, list) or not content:
             raise InvalidProviderResponseError(
                 "Message response contained no content",
@@ -117,12 +123,16 @@ class AnthropicProvider:
 
         text_blocks: list[str] = []
         for block in cast("list[object]", content):
-            if (
-                not isinstance(block, dict)
-                or cast("dict[str, object]", block).get("type") != "text"
-            ):
+            if not isinstance(block, dict):
                 continue
-            text = cast("dict[str, object]", block).get("text")
+            block = cast("dict[str, object]", block)
+            if block.get("type") == "tool_use":
+                raise InvalidProviderResponseError(
+                    "Message generation requires client tool handling",
+                )
+            if block.get("type") != "text":
+                continue
+            text = block.get("text")
             if isinstance(text, str) and text.strip():
                 text_blocks.append(text.strip())
 
