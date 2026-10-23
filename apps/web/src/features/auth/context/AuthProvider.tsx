@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type JSX,
   type ReactNode,
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>): JSX.Ele
   const [error, setError] = useState<string | null>(null);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [policyRequest, setPolicyRequest] = useState(0);
+  const operationGeneration = useRef(0);
 
   /** Remove only registered protected query roots; feature-local state is separate. */
   const clearProtectedQueries = useCallback((): void => {
@@ -54,11 +56,12 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>): JSX.Ele
    * clear that principal/queries. Only authentication_required removes the token;
    * lockout and transient failures retain it. Retry-After or 30 seconds supplies
    * the local lockout deadline, not the server's authoritative clock.
-   * No generation guard follows the await, so an older result can still apply
-   * after logout, policy retry or another authenticate. Setup rejections propagate.
+   * Only the current operation may apply a verification result, including token
+   * removal and query cleanup. Storage/header setup rejections still propagate.
    */
   const authenticate = useCallback(
     async (token: string): Promise<boolean> => {
+      const operation = ++operationGeneration.current;
       const normalized = token.trim();
 
       if (normalized === '') {
@@ -70,6 +73,10 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>): JSX.Ele
       setError(null);
 
       const response = await getAuthSession();
+
+      if (operation !== operationGeneration.current) {
+        return false;
+      }
 
       if (!response.ok) {
         clearProtectedQueries();
@@ -107,8 +114,9 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>): JSX.Ele
     [clearProtectedQueries],
   );
 
-  /** Clear stored credential, protected queries and local auth state, without invalidating pending verification. */
+  /** Invalidate pending work and clear credential, protected queries and auth state. */
   const logout = useCallback((): void => {
+    operationGeneration.current += 1;
     clearAuthToken();
     clearProtectedQueries();
     setSession(null);
@@ -119,6 +127,7 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>): JSX.Ele
 
   /** Re-enter loading and rediscover policy with the stored token retained. */
   const retryAccessPolicy = useCallback((): void => {
+    operationGeneration.current += 1;
     setError(null);
     setSession(null);
     setLockedUntil(null);
@@ -129,16 +138,16 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>): JSX.Ele
   /**
    * Discover policy first: disabled mode permits configured local access; token
    * mode verifies a stored credential or shows the unauthenticated gate. A handled
-   * config failure becomes error. Cleanup guards the config response only, not a
-   * session verification already delegated to authenticate.
+   * config failure becomes error. Discovery and delegated verification lose
+   * ownership on a newer operation or effect cleanup, including StrictMode replay.
    */
   useEffect(() => {
-    let active = true;
+    const operation = ++operationGeneration.current;
 
     async function initialize(): Promise<void> {
       const config = await getAuthConfig();
 
-      if (!active) {
+      if (operation !== operationGeneration.current) {
         return;
       }
 
@@ -175,7 +184,7 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>): JSX.Ele
     void initialize();
 
     return () => {
-      active = false;
+      operationGeneration.current += 1;
     };
   }, [authenticate, clearProtectedQueries, policyRequest]);
 
