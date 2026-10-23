@@ -52,6 +52,7 @@ from app.benchmark.domain.protocols import (
     EvaluationRunHistoryRepository,
 )
 from app.cache.domain.namespaces import AuthorizedNamespaceScope
+from app.core.exceptions import EvaluationWorkloadLimitError
 from app.providers.protocols import EmbeddingGenerator, GenerationProvider
 
 
@@ -158,10 +159,11 @@ class BenchmarkService:
             Measured run evidence and frozen-candidate threshold rows.
 
         Raises:
+            EvaluationWorkloadLimitError: Planned queries exceed the per-run limit.
             EvaluationTimeoutError: Lock waiting or execution raises a timeout.
         """
         dataset = get_dataset(request.dataset_id)
-        accepted_run = self._accept_run(dataset)
+        accepted_run = self._accept_run(dataset, repetitions=request.repetitions)
         return await self._run_executor.execute(request, dataset, accepted_run)
 
     def validate_dataset(
@@ -190,10 +192,11 @@ class BenchmarkService:
     ) -> BenchmarkRunResponse:
         """Resolve a source, accept it, then execute with isolated cache state.
 
-        Source validation or authorized lookup must succeed before a run ID is
-        allocated. Resolution precedes the executor's lock and timeout. Inline runs
-        have no retained-history namespace; persisted runs can inherit the dataset's
-        namespace and expiry. Eligibility does not guarantee a history write.
+        Source validation or authorized lookup and the per-run workload gate must
+        succeed before a run ID is allocated. Admission precedes the executor's
+        lock and timeout. Inline runs have no retained-history namespace; persisted
+        runs can inherit the dataset's namespace and expiry. Eligibility does not
+        guarantee a history write.
 
         Args:
             request: Validated source and execution options, including call consent.
@@ -210,6 +213,7 @@ class BenchmarkService:
             EvaluationDatasetPersistenceDisabledError: A persisted source has no repo.
             EvaluationDatasetNotFoundError: A persisted source is missing or invisible.
             ValueError: Enabled built-in history lacks a resolved namespace.
+            EvaluationWorkloadLimitError: Planned queries exceed the per-run limit.
             EvaluationTimeoutError: Lock waiting or execution raises a timeout.
         """
         resolved = await self._dataset_catalog.resolve_for_run(
@@ -222,6 +226,7 @@ class BenchmarkService:
         )
         accepted_run = self._accept_run(
             resolved.dataset,
+            repetitions=request.repetitions,
             history_namespace=resolved.history_namespace,
             source_dataset_expires_at=resolved.source_dataset_expires_at,
         )
@@ -335,14 +340,20 @@ class BenchmarkService:
         self,
         dataset: BenchmarkDataset,
         *,
+        repetitions: int,
         history_namespace: str | None = None,
         source_dataset_expires_at: datetime | None = None,
     ) -> AcceptedEvaluationRunContext:
-        """Allocate a run ID and UTC acceptance time after source gates pass.
+        """Apply the current run budget, then allocate acceptance metadata.
 
         Carry the resolved summary, optional history scope and source expiry into
         execution. This creates metadata only; it does not persist an acceptance row.
         """
+        if (
+            len(dataset.cases) * repetitions
+            > self._runtime_configuration.evaluation_max_workload_queries
+        ):
+            raise EvaluationWorkloadLimitError
         return AcceptedEvaluationRunContext(
             run_id=uuid4().hex,
             accepted_at=datetime.now(UTC),

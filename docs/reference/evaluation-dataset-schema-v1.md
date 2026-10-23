@@ -99,12 +99,15 @@ Four independent server limits apply:
 - `EVALUATION_DATASET_MAX_DECODED_BYTES` limits the UTF-8 bytes of the
   canonical decoded dataset object;
 - `EVALUATION_DATASET_MAX_CASES` limits case count;
-- `EVALUATION_MAX_WORKLOAD_QUERIES` limits `cases × repetitions`.
+- `EVALUATION_MAX_WORKLOAD_QUERIES` limits `cases × repetitions` during import
+  validation and admission of every run, including persisted and built-in sources.
 
 Defaults are 65,536 request bytes, 49,152 decoded dataset bytes, 50 cases, and
 250 query executions. The decoded-content default intentionally leaves room
 for the validation/run envelope beneath the existing 64 KiB request boundary.
-Threshold projections do not replay provider work.
+The workload setting accepts 1–2,500 queries. Threshold projections do not replay
+provider work or multiply the query-execution budget. Cache hits can reduce actual
+generation calls but do not reduce the planned-query admission count.
 
 ### Dataset sizing profile
 
@@ -174,6 +177,21 @@ server always revalidates inline content at execution; a preview is not
 authorization or an integrity token. Persisted content was revalidated at save
 time and is reconstructed in deterministic case order. Every source uses the
 same fresh, isolated, bounded cache.
+
+After authorized resolution, the server requires
+`len(resolved_dataset.cases) × repetitions <= EVALUATION_MAX_WORKLOAD_QUERIES`
+before allocating a run ID or entering execution. Exactly at the limit is allowed.
+Over-budget resolved runs return HTTP 422 with the top-level
+`error="evaluation_workload_limit_exceeded"` and a fixed safe `detail`; no run-local
+cache, provider calls or retained history are created. Inline import validation
+continues to use `evaluation_dataset_invalid` with issue `workload_limit_exceeded`.
+Authorization and source-resolution errors retain precedence over the run budget.
+
+This intentionally tightens the former persisted/built-in exemption. Saved
+datasets still validate at one repetition on save. A lower current limit can
+reject their future runs without modifying or deleting any saved data or digest.
+It also applies to the legacy built-in execution endpoint below. Explicit
+provider-call consent remains required independently of the budget.
 
 The legacy `/api/v1/benchmarks/datasets` and `/api/v1/benchmarks/run`
 contracts remain available for built-in clients. Enabling persistent storage

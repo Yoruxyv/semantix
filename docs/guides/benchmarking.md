@@ -107,6 +107,24 @@ Leaving the Evaluations workspace aborts the browser request and prevents a late
 response from updating the unmounted page. It does not guarantee that provider
 work already accepted by the backend has stopped.
 
+### Per-run query budget
+
+`EVALUATION_MAX_WORKLOAD_QUERIES` (default 250, range 1–2,500) limits planned
+query executions for every source: `len(resolved_dataset.cases) × repetitions`.
+The exact boundary is allowed. The server checks the current limit after authorized
+source resolution and before accepting a run or creating execution resources.
+This includes legacy `/api/v1/benchmarks/run` clients. It intentionally restricts
+previously exempt built-in and persisted runs: a saved dataset can become too large
+to run after the limit is lowered, without changing its contents or digest.
+Reduce repetitions, choose a smaller dataset, or review the deployment limit.
+
+Over-budget resolved runs return HTTP 422, `evaluation_workload_limit_exceeded`,
+with a safe explanatory detail. Inline definitions retain import validation's
+`evaluation_dataset_invalid` / `workload_limit_exceeded` issue. Saving still checks
+the import at one repetition. Cache hits may reduce actual generation calls but
+do not reduce planned queries; threshold projections do not multiply them.
+Explicit `allow_external_provider_calls=true` remains independently required.
+
 ### Session-local custom datasets
 
 Custom JSON files are parsed locally, then sent to the server validation

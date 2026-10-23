@@ -39,15 +39,25 @@ the serialized run and discards its run-local cache on timeout. Size it for the
 bounded built-in dataset and configured provider latency without treating it as
 proof that remote provider work was cancelled.
 
-The remaining settings independently bound session-local JSON imports: case
-count, canonical decoded UTF-8 content, and `cases × repetitions` query work.
-Accepted ranges are 1–500 cases, 1,024–1,048,576 decoded bytes, and 1–2,500
-query executions. Keep these limits within the capacity and data-handling
-policy of the deployment; threshold projections do not repeat provider work.
-The requested `cases × repetitions` cap is checked for inline sources. Built-in
-and persisted sources do not reapply that same check at the requested repetition
-count; saving a dataset validates it at one repetition. Budget their requested
-work explicitly rather than treating this setting as a universal run-admission cap.
+Import limits independently bound case count (1–500) and canonical decoded UTF-8
+content (1,024–1,048,576 bytes). `EVALUATION_MAX_WORKLOAD_QUERIES` also sets a
+per-run query budget: default 250, accepted range 1–2,500. Every inline, persisted
+and built-in run must satisfy `len(resolved_dataset.cases) × repetitions <= limit`,
+including legacy `/api/v1/benchmarks/run` requests. Equality is allowed. Admission
+follows authorized source resolution and precedes run ID allocation, executor
+entry, cache creation, provider calls and retained history.
+
+This deliberately tightens admission for previously exempt persisted and built-in
+runs. Lowering the setting can reject a new run of an already saved dataset;
+its contents, UUID and digest remain unchanged. Saving still validates the import
+at one repetition. Over-budget resolved runs return HTTP 422 with
+`error="evaluation_workload_limit_exceeded"`; inline import validation retains
+`evaluation_dataset_invalid` with issue `workload_limit_exceeded`.
+Cache hits can reduce actual generation calls but never the planned-query count.
+Threshold projections do not multiply query work, and explicit provider-call
+consent remains mandatory. This is a per-run execution bound, not a monetary or
+deployment-wide quota. Keep it within the deployment's resource policy.
+
 The `session` dataset-storage default does not itself require PostgreSQL. A memory
 live cache with session datasets, disabled history and memory coordination opens
 no PostgreSQL pool. Production PostgreSQL coordination still requires that pool. Set dataset storage to `postgres` only

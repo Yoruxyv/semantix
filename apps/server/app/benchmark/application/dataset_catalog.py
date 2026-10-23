@@ -177,8 +177,8 @@ class EvaluationDatasetCatalog:
         and unretained. Persisted lookup requires a repository and authorized scope;
         its namespace is used for enabled history and its expiry is always forwarded.
         Built-ins use the local catalog and require an already resolved history
-        namespace when history is enabled. Built-in and persisted branches do not
-        reapply imported-dataset workload validation at the requested repetitions.
+        namespace when history is enabled. The facade applies the common per-run
+        budget to the resolved cases before accepting any source for execution.
 
         Args:
             source: Validated built-in, inline or persisted source selection.

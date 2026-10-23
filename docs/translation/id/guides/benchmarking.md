@@ -85,6 +85,27 @@ Invoke-RestMethod `
 
 `allow_external_provider_calls=true` wajib digunakan. Ini mencegah benchmark secara tidak sengaja membuat provider traffic tanpa diketahui.
 
+## Anggaran query per run
+
+`EVALUATION_MAX_WORKLOAD_QUERIES` (default 250, rentang 1–2.500) membatasi
+`len(resolved_dataset.cases) × repetitions` untuk sumber inline, tersimpan, dan
+built-in, termasuk klien lama `/api/v1/benchmarks/run`. Nilai tepat pada batas
+diterima. Server memakai batas konfigurasi saat ini setelah resolusi sumber yang
+terotorisasi dan sebelum menerima run atau membuat resource eksekusi.
+
+Ini sengaja memperketat penerimaan run tersimpan dan built-in yang sebelumnya
+dikecualikan. Dataset yang sudah disimpan dapat ditolak untuk run baru setelah
+batas diturunkan tanpa mengubah isi atau digest-nya. Kurangi repetisi, pilih
+dataset lebih kecil, atau tinjau batas deployment.
+
+Run hasil resolusi yang melampaui batas menerima HTTP 422 dengan
+`evaluation_workload_limit_exceeded` dan detail aman. Definisi inline tetap memakai
+validasi impor `evaluation_dataset_invalid` dengan issue `workload_limit_exceeded`.
+Penyimpanan tetap memvalidasi satu repetisi. Cache hit bisa mengurangi panggilan
+generation aktual, tetapi tidak mengurangi query yang direncanakan. Proyeksi
+threshold tidak melipatgandakan query. Persetujuan eksplisit
+`allow_external_provider_calls=true` tetap wajib secara terpisah.
+
 ## Interpretasi metric
 
 * **Provider calls avoided** sama dengan jumlah query yang dilayani dari benchmark cache.

@@ -196,6 +196,15 @@ class EvaluationDatasetRetentionError(AppError):
     )
 
 
+class EvaluationWorkloadLimitError(AppError):
+    status_code, error_code, public_detail = (
+        422,
+        "evaluation_workload_limit_exceeded",
+        "The planned evaluation queries exceed the configured per-run limit. "
+        "Reduce repetitions or use a smaller dataset.",
+    )
+
+
 class EvaluationDatasetNotFoundError(AppError):
     status_code, error_code, public_detail = (
         404,
