@@ -27,10 +27,23 @@ request `MAX_REQUEST_BODY_BYTES=65536` terpisah dari batas waktu dan ukuran kont
 Validasi dataset inline memakai `EVALUATION_DATASET_MAX_CASES` (default 50, rentang
 1–500), `EVALUATION_DATASET_MAX_DECODED_BYTES` (default 49.152, rentang 1.024–1.048.576
 byte UTF-8 terdekode), dan `EVALUATION_MAX_WORKLOAD_QUERIES` (default 250, rentang
-1–2.500) untuk `cases × repetitions`. Proyeksi threshold tidak mengulang request
-provider. Sumber built-in dan tersimpan tidak mengulangi pemeriksaan batas workload
-yang sama pada jumlah repetisi yang diminta; penyimpanan dataset memvalidasi satu
-repetisi. Anggarkan pekerjaan yang diminta secara eksplisit.
+1–2.500). Batas workload tersebut juga menjadi anggaran query per run untuk semua
+sumber: inline, tersimpan, dan built-in, termasuk endpoint lama
+`/api/v1/benchmarks/run`. Syaratnya
+`len(resolved_dataset.cases) × repetitions <= batas`; nilai tepat pada batas diterima.
+Pemeriksaan dilakukan setelah resolusi sumber yang terotorisasi, sebelum alokasi
+run ID, masuk executor, pembuatan cache, panggilan provider, atau penulisan histori.
+
+Ini sengaja memperketat penerimaan run tersimpan dan built-in yang sebelumnya
+dikecualikan. Penurunan konfigurasi dapat menolak run baru dari dataset yang sudah
+disimpan tanpa mengubah isi, UUID, atau digest-nya. Penyimpanan tetap memvalidasi
+impor pada satu repetisi. Run hasil resolusi yang melampaui batas menerima HTTP 422
+dengan `error="evaluation_workload_limit_exceeded"`; validasi impor inline tetap
+memakai `evaluation_dataset_invalid` dengan issue `workload_limit_exceeded`.
+Cache hit dapat mengurangi panggilan generation aktual, tetapi tidak mengurangi
+jumlah query yang direncanakan. Proyeksi threshold tidak menambah eksekusi query,
+dan persetujuan eksplisit panggilan provider tetap wajib. Batas ini berlaku per run,
+bukan kuota biaya atau kuota seluruh deployment.
 
 `EVALUATION_DATASET_STORAGE=session` tidak menyimpan impor secara otomatis. Operator
 harus menyimpan dokumen yang berhasil divalidasi secara eksplisit agar persisten.
