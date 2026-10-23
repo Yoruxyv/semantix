@@ -125,6 +125,19 @@ Pernah diuji secara lokal; bukti verifikasi rilis saat ini belum lengkap. Contoh
 konfigurasi berikut bukan catatan model yang telah diverifikasi. Lihat
 [cakupan verifikasi provider](../../../embedded/providers.md#010-verification).
 
+Generation Ollama memakai `/api/generate` dengan `stream=false`. Nilai `done`
+eksplisit harus berupa boolean `true`; `done_reason` eksplisit harus `"stop"`
+atau null. Marker yang tidak disertakan dan reason null tetap diterima demi
+kompatibilitas, tetapi tidak membuktikan kelengkapan respons. Reason `"length"`,
+reason tidak dikenal/berformat salah (termasuk string kosong), `"load"`/`"unload"`,
+serta nilai `done` nonterminal/tidak valid ditolak. Load/unload mengakui operasi
+pengelolaan model, bukan teks jawaban hasil generation. Field `error` ditolak
+kecuali tidak disertakan, null, atau string kosong; `response` kosong atau bukan
+string tetap tidak valid. Penolakan memakai HTTP 502 `invalid_upstream_response`
+yang telah disanitasi sebelum penulisan cache query dan tidak di-retry. Perilaku
+embedding tidak berubah. Jawaban yang sudah tersimpan di cache tidak otomatis
+dihapus oleh validasi ini.
+
 Hugging Face merupakan default yang direkomendasikan untuk sebagian besar pengguna karena tidak memerlukan download model lokal dan hardware inference. Pilih Ollama ketika local inference memang diperlukan dan mesin memiliki kapasitas disk, memory, dan compute yang memadai.
 
 Instal dan jalankan Ollama secara terpisah dari Semantix, lalu pull model yang ingin dikonfigurasi secara persis:
