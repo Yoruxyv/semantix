@@ -1,4 +1,4 @@
-<!-- readme-source-sha256: 92a3e683d9045398469518a8a776293f7908b2bdb1f64ddfa580cd56c4c2a0c5 -->
+<!-- readme-source-sha256: fae8d5b6f39514be2e21b32fc500c3d31b50477f2af30dd7eac21d6e27f89064 -->
 
 <div align="center">
 
@@ -137,7 +137,7 @@ Tautan backend di bawah menjelaskan persyaratan setup dan rincian sertifikasi le
 | [MySQLStore](../../embedded/mysql.md#verified-compatibility) | Runtime: MySQL Community **8.4.x**; tersertifikasi di CI: **8.4.11 / 8.4.12** | `[mysql]`: PyMySQL versi persis **1.2.1, 1.2.2, atau 1.2.3** | Embedded + server resmi |
 | [PgVectorStore](../../embedded/storage.md#verified-postgresql-combinations) | Pasangan PostgreSQL / pgvector terverifikasi: **16.15 / 0.8.7**, **17.10 / 0.8.5**, **18.6 / 0.8.7** | `[pgvector]`: `asyncpg>=0.31,<=0.32.0`; tersertifikasi **0.31.0 / 0.32.0** dalam kombinasi CI yang berbeda | Embedded + server/dashboard opsional |
 | [RedisStore — Redis Open Source](../../embedded/redis.md#supported-versions) | Keluarga versi minor yang diterima dan batas patch minimumnya: **7.4.x >=7.4.11; 8.2.x >=8.2.10; 8.4.x >=8.4.7; 8.6.x >=8.6.7; 8.8.x >=8.8.3; 8.10.x >=8.10.2** | `[redis]`: redis-py versi persis **7.4.1**, versi persis **8.0.1**, atau rilis stabil **8.1.x** | Embedded + server/dashboard opsional |
-| [RedisStore — Valkey](../../embedded/redis.md#valkey-912) | Produk server terpisah; versi persis **Valkey 9.1.2** | RedisStore dan extra `[redis]` yang sama; redis-py **8.1.0** terverifikasi, tanpa dependensi khusus Valkey | Embedded tersertifikasi; jalur server `redis` yang sudah ada (lihat di bawah) |
+| [RedisStore — Valkey](../../embedded/redis.md#valkey-912) | Produk server terpisah; versi persis **Valkey 9.1.2** | RedisStore dan extra `[redis]` yang sama; redis-py **8.1.0** terverifikasi, tanpa dependensi khusus Valkey | Embedded + jalur server/dashboard resmi yang telah divalidasi (lihat di bawah) |
 
 Versi yang **diterima saat runtime** lolos kebijakan kompatibilitas implementasi.
 Kombinasi yang **diverifikasi di CI** adalah target persis yang dijalankan dalam
@@ -165,8 +165,11 @@ belum terverifikasi.
 server native satu proses pada disk lokal tepercaya dan setup eksplisit; Compose
 bawaan tidak didukung. MySQL memerlukan setup eksplisit, akun runtime terbatas, dan TLS terverifikasi;
 lihat [konfigurasi server MySQL](../../guides/platform-storage.md#mysql-explicit-setup-and-owned-connections). Valkey memakai jalur `redis` yang sudah ada, tanpa ValkeyStore atau
-selector `valkey` terpisah. Deployment dashboard Valkey secara end-to-end belum
-tersertifikasi secara terpisah.
+selector `valkey` terpisah. FastAPI resmi, SDK HTTP Python, dan dashboard React hasil
+build produksi telah divalidasi terhadap container Valkey Linux x86-64 yang dipin,
+dengan host klien/server aplikasi Windows CPython 3.14.6 dan redis-py 8.1.0. Lihat
+[catatan validasi terbatas dan batas operasional](../../operations/valkey-validation.md);
+hasil ini tidak menyertifikasi TLS, HA/failover, beban produksi, atau platform host aplikasi lainnya.
 
 ## Mengapa Semantix?
 
@@ -551,7 +554,9 @@ readiness storage, dan sinyal reproduksibilitas lainnya.
 Kapabilitas inti:
 
 - embedding provider dan generation provider yang independen;
-- penyimpanan MemoryStore, PostgreSQL/pgvector, atau RedisStore;
+- penyimpanan MemoryStore, SQLiteStore, MySQLStore, PostgreSQL/pgvector, atau RedisStore
+  (termasuk target Valkey persis yang didukung), dengan mengikuti
+  [batas deployment server](../../guides/platform-storage.md);
 - TTL, eviction LRU, namespace, request privat, dan kebijakan read/write;
 - kontrol Monitor sesuai peran, minimisasi trace privat, dan tautan hit langsung
   ke detail Cache yang diotorisasi;

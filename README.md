@@ -133,7 +133,7 @@ Backend links below lead to setup requirements and complete certification detail
 | [MySQLStore](docs/embedded/mysql.md#verified-compatibility) | Runtime: MySQL Community **8.4.x**; CI-certified: **8.4.11 / 8.4.12** | `[mysql]`: exact PyMySQL **1.2.1, 1.2.2 or 1.2.3** | Embedded + official server |
 | [PgVectorStore](docs/embedded/storage.md#verified-postgresql-combinations) | Verified PostgreSQL / pgvector: **16.15 / 0.8.7**, **17.10 / 0.8.5**, **18.6 / 0.8.7** | `[pgvector]`: `asyncpg>=0.31,<=0.32.0`; certified **0.31.0 / 0.32.0** in different CI combinations | Embedded + optional server/dashboard |
 | [RedisStore — Redis Open Source](docs/embedded/redis.md#supported-versions) | Admitted minor families and patch floors: **7.4.x >=7.4.11; 8.2.x >=8.2.10; 8.4.x >=8.4.7; 8.6.x >=8.6.7; 8.8.x >=8.8.3; 8.10.x >=8.10.2** | `[redis]`: exact redis-py **7.4.1**, exact **8.0.1**, or stable **8.1.x** | Embedded + optional server/dashboard |
-| [RedisStore — Valkey](docs/embedded/redis.md#valkey-912) | Separate server product; exact **Valkey 9.1.2** | Same RedisStore and `[redis]` extra; verified redis-py **8.1.0**, no Valkey-specific dependency | Embedded certified; existing server `redis` path (see below) |
+| [RedisStore — Valkey](docs/embedded/redis.md#valkey-912) | Separate server product; exact **Valkey 9.1.2** | Same RedisStore and `[redis]` extra; verified redis-py **8.1.0**, no Valkey-specific dependency | Embedded + validated official server/dashboard path (see below) |
 
 **Runtime-admitted** versions pass the implementation's compatibility policy.
 **CI-verified** combinations are the exact targets exercised in maintained tests,
@@ -160,7 +160,11 @@ single-process server on trusted local disk with explicit setup; bundled Compose
 is unsupported. MySQL requires explicit setup, restricted runtime credentials and verified TLS;
 see [server MySQL configuration](docs/guides/platform-storage.md#mysql-explicit-setup-and-owned-connections).
 Valkey uses the existing `redis` path, with no separate ValkeyStore or `valkey`
-selector. An end-to-end Valkey dashboard deployment has not been separately certified.
+selector. The official FastAPI, Python HTTP SDK and production-built React dashboard
+were validated against the pinned Linux x86-64 Valkey container with a Windows
+CPython 3.14.6 client/server host and redis-py 8.1.0. See the
+[bounded validation record and operational limits](docs/operations/valkey-validation.md);
+this does not certify TLS, HA/failover, production load or other application host platforms.
 
 ## Why Semantix?
 
@@ -527,7 +531,9 @@ storage readiness, and other reproducibility signals.
 Core capabilities:
 
 - independent embedding and generation providers;
-- MemoryStore, PostgreSQL/pgvector or RedisStore storage;
+- MemoryStore, SQLiteStore, MySQLStore, PostgreSQL/pgvector or RedisStore storage
+  (including the exact supported Valkey target), within the
+  [server deployment restrictions](docs/guides/platform-storage.md);
 - TTL, LRU eviction, namespaces, private requests, and read/write policies;
 - role-aware Monitor controls, private trace minimization, and live-hit links to
   authorized Cache detail;

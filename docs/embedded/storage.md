@@ -101,14 +101,19 @@ explicit setup, TTL/LRU, failure handling and persistence boundary.
 See [MySQL storage](mysql.md#verified-compatibility) for tested server/driver/Python/OS
 combinations, verified TLS, the locked schema verifier,
 explicit least-privileged setup, exact-search costs and failed-construction
-recovery. MySQLStore is embedded-only and has no optional inspection/clear_all API.
+recovery. MySQLStore also supplies `inspect_entries()`, `inspect_entry()` and
+binding-scoped `clear_all()` outside the mandatory CacheStore protocol. The
+official server uses the same store through `CACHE_BACKEND=mysql`; see
+[server setup, verified TLS and deployment limits](../guides/platform-storage.md#mysql-explicit-setup-and-owned-connections).
 
 ## SQLite: local file persistence
 
 `from semantix_cache.stores.sqlite import SQLiteStore` provides embedded persistence
-without a database service or an extra dependency. It is **package-only**: the
-server/dashboard does not accept `CACHE_BACKEND=sqlite`. The concrete store offers
-the optional inspection and administration methods described above.
+without a database service or an extra dependency. The official server/dashboard
+also supports `CACHE_BACKEND=sqlite` through the same package-owned store and its
+optional inspection/administration methods. Server use requires explicit setup,
+one native process and trusted local disk; bundled Compose is unsupported. See
+[server setup and shutdown limits](../guides/platform-storage.md#sqlite-explicit-local-setup-and-bounded-shutdown).
 
 Check the **linked** runtime, then run the offline example from `packages/cache`:
 
