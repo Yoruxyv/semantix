@@ -130,17 +130,19 @@ class OllamaProvider:
     async def generate(self, prompt: str) -> str:
         """POST ``model`` and ``prompt`` to ``/api/generate`` with ``stream=False``.
 
-        Set ``options.num_predict`` and extract nonblank ``response`` text. This
-        server decoder does not inspect ``done``, ``done_reason`` or a separate
-        provider error field; HTTP failures follow shared transport classification.
-        The embedded integration independently checks completion markers.
+        Set ``options.num_predict`` and extract nonblank ``response`` text.
+        Explicit ``done`` must be true; ``done_reason`` must be ``"stop"``, null
+        or omitted. Missing markers stay compatible. Reject non-neutral ``error``
+        fields; HTTP failures follow shared transport classification. The embedded
+        integration independently checks completion markers.
 
         Returns:
             Response text with surrounding whitespace removed.
 
         Raises:
             RuntimeError: A generation model is not configured.
-            InvalidProviderResponseError: The response object or text is invalid.
+            InvalidProviderResponseError: Invalid/incomplete output or a reported
+                error cannot be returned as completed text.
         """
         if self._generation_model is None:
             raise RuntimeError("Ollama generation provider is not configured")
@@ -165,7 +167,19 @@ class OllamaProvider:
                 "Invalid Ollama generation response",
             )
 
-        response = cast("dict[str, object]", payload).get("response")
+        message = cast("dict[str, object]", payload)
+        if message.get("error") not in (None, ""):
+            raise InvalidProviderResponseError(
+                "Ollama generation response reported an error",
+            )
+        if message.get("done", True) is not True or message.get("done_reason") not in (
+            None,
+            "stop",
+        ):
+            raise InvalidProviderResponseError(
+                "Ollama generation did not finish with completed text",
+            )
+        response = message.get("response")
         if not isinstance(response, str) or not response.strip():
             raise InvalidProviderResponseError(
                 "Ollama generation response contained no text",

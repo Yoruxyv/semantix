@@ -138,6 +138,18 @@ Previously exercised locally; current release-verification evidence is incomplet
 The following setup examples are not a record of verified models. See the
 [provider verification scope](../embedded/providers.md#010-verification).
 
+Ollama generation uses `/api/generate` with `stream=false`. Explicit `done` must
+be the boolean `true`; an explicit `done_reason` must be `"stop"` or null.
+Missing markers and a null reason remain accepted for compatibility, but cannot
+establish completeness. Explicit `"length"`, unknown/malformed reasons (including
+an empty string), `"load"`/`"unload"` and nonterminal/invalid `done` values are
+rejected. Load/unload acknowledges model management, not generated answer text.
+An `error` field is rejected unless absent, null or an empty string; blank or
+non-string `response` text remains invalid. Rejections use the existing sanitized
+HTTP 502 `invalid_upstream_response` before query cache writes and are not retried.
+Embedding behavior is unchanged. Previously cached answers are not automatically
+invalidated by this validation.
+
 Hugging Face is the recommended default for most users because it avoids local
 model downloads and inference hardware requirements. Choose Ollama when local
 inference is specifically required and the machine has sufficient disk,
