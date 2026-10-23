@@ -17,13 +17,14 @@ import type {
 import {
   EVALUATION_IMPORT_FILE_MAX_BYTES,
   type BenchmarkForm,
+  type EvaluationError,
 } from './benchmarkController';
 
 interface EvaluationDatasetWorkflowOptions {
   authIdentity: string;
   canSaveImport: boolean;
   form: BenchmarkForm;
-  setError: Dispatch<SetStateAction<string | null>>;
+  setError: Dispatch<SetStateAction<EvaluationError | null>>;
   setForm: Dispatch<SetStateAction<BenchmarkForm>>;
   setResult: Dispatch<SetStateAction<BenchmarkRunResponse | null>>;
   setShowWarning: Dispatch<SetStateAction<boolean>>;
@@ -261,7 +262,10 @@ export function useEvaluationDatasetWorkflow({
         return null;
       }
       if (!response.ok) {
-        setError(response.error.detail ?? 'The validated dataset could not be saved.');
+        setError({
+          kind: 'failure',
+          message: response.error.detail ?? 'The validated dataset could not be saved.',
+        });
         setStatusMessage('Dataset save failed.');
         return null;
       }

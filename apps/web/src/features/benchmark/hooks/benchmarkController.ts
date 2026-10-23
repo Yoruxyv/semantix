@@ -19,6 +19,11 @@ export const BENCHMARK_DATASET_STALE_TIME_MS = 10 * 60 * 1_000;
 export const BENCHMARK_DATASET_GC_TIME_MS = 30 * 60 * 1_000;
 export const EVALUATION_IMPORT_FILE_MAX_BYTES = 65_536;
 
+export interface EvaluationError {
+  kind: 'failure' | 'workload_limit';
+  message: string;
+}
+
 export interface BenchmarkForm {
   datasetId: BenchmarkDatasetId;
   datasetSource: 'builtin' | 'custom' | 'persisted';
@@ -40,7 +45,7 @@ export interface BenchmarkController {
   datasetsLoading: boolean;
   canRun: boolean;
   canSaveImport: boolean;
-  error: string | null;
+  error: EvaluationError | null;
   form: BenchmarkForm;
   historyNamespaceRequired: boolean;
   historyNamespaceValid: boolean;

@@ -3,7 +3,11 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import { runBenchmark } from '../api/benchmarkApi';
 import type { ThresholdSweep } from '../lib/thresholdSweep';
 import type { BenchmarkRunResponse, EvaluationDatasetPreview } from '../types';
-import { requestFromForm, type BenchmarkForm } from './benchmarkController';
+import {
+  requestFromForm,
+  type BenchmarkForm,
+  type EvaluationError,
+} from './benchmarkController';
 
 interface EvaluationRunWorkflowOptions {
   authIdentity: string;
@@ -12,7 +16,7 @@ interface EvaluationRunWorkflowOptions {
   hasRunnableDataset: boolean;
   historyNamespaceValid: boolean;
   importedDefinition: unknown;
-  setError: Dispatch<SetStateAction<string | null>>;
+  setError: Dispatch<SetStateAction<EvaluationError | null>>;
   setResult: Dispatch<SetStateAction<BenchmarkRunResponse | null>>;
   setShowWarning: Dispatch<SetStateAction<boolean>>;
   setStatusMessage: Dispatch<SetStateAction<string>>;
@@ -135,8 +139,27 @@ export function useEvaluationRunWorkflow({
       }
 
       if (!response.ok) {
-        setError(response.error.detail ?? 'The evaluation run failed.');
-        setStatusMessage('Evaluation run failed.');
+        const isWorkloadLimit =
+          response.error.code === 'evaluation_workload_limit_exceeded' ||
+          (response.error.code === 'evaluation_dataset_invalid' &&
+            response.error.issues?.some(
+              (issue) => issue.code === 'workload_limit_exceeded',
+            ) === true);
+        setError(
+          isWorkloadLimit
+            ? {
+                kind: 'workload_limit',
+                message:
+                  'This evaluation exceeds the maximum number of queries allowed per run.',
+              }
+            : {
+                kind: 'failure',
+                message: response.error.detail ?? 'The evaluation run failed.',
+              },
+        );
+        setStatusMessage(
+          isWorkloadLimit ? 'Evaluation limit reached.' : 'Evaluation run failed.',
+        );
         return;
       }
       setResult(response.data);

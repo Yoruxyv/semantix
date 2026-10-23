@@ -21,6 +21,7 @@ import {
   persistedSummary,
   type BenchmarkController,
   type BenchmarkForm,
+  type EvaluationError,
 } from './benchmarkController';
 import { useEvaluationDatasetWorkflow } from './useEvaluationDatasetWorkflow';
 import { useEvaluationRunWorkflow } from './useEvaluationRunWorkflow';
@@ -42,7 +43,7 @@ export function useBenchmark(): BenchmarkController {
   const auth = useAuth();
   const [form, setForm] = useState<BenchmarkForm>(DEFAULT_BENCHMARK_FORM);
   const [result, setResult] = useState<BenchmarkRunResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<EvaluationError | null>(null);
   const [showWarning, setShowWarning] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const hasAppliedDefaultDataset = useRef(false);
@@ -177,7 +178,9 @@ export function useBenchmark(): BenchmarkController {
     datasetsLoading,
     canRun,
     canSaveImport,
-    error: error ?? datasetError,
+    error:
+      error ??
+      (datasetError === null ? null : { kind: 'failure', message: datasetError }),
     form,
     historyNamespaceRequired,
     historyNamespaceValid,

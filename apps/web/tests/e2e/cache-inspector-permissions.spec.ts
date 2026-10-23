@@ -109,6 +109,7 @@ for (const width of [320, 1280]) {
         const clear = page.getByRole('button', {
           name: role === 'restricted' ? 'Clear cache' : 'Clear all entries',
         });
+        await expect(clear).toBeEnabled();
         await clear.focus();
         await clear.press('Enter');
         if (role === 'restricted') {
