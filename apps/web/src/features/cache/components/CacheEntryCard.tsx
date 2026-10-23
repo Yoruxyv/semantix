@@ -16,6 +16,7 @@ import { cacheEntryKeys } from '@/shared/query/queryKeys';
 import type { CacheEntryMetadata } from '../types';
 
 interface CacheEntryCardProps {
+  canDelete: boolean;
   entry: CacheEntryMetadata;
   isDeleting: boolean;
   isPendingDelete: boolean;
@@ -54,6 +55,7 @@ function EntryMetricItem({
  * Row expiry/hit/recency are snapshots; inspection does not confirm a cache hit.
  */
 export function CacheEntryCard({
+  canDelete,
   entry,
   isDeleting,
   isPendingDelete,
@@ -153,7 +155,7 @@ export function CacheEntryCard({
               View entry details
             </Link>
 
-            {!isPendingDelete && (
+            {canDelete && !isPendingDelete && (
               <button
                 aria-label={`Delete ${entry.prompt}`}
                 className="ui-label min-h-9 border-b border-(--coral) px-1 py-2 text-(--coral-text) transition-colors hover:text-(--text) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--coral) active:translate-y-px disabled:opacity-50"
@@ -245,7 +247,7 @@ export function CacheEntryCard({
           ))}
         </dl>
 
-        {isPendingDelete && (
+        {canDelete && isPendingDelete && (
           <InlineConfirmation
             ariaLabel={`Confirm deletion of ${entry.prompt}`}
             className="mt-4"

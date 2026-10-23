@@ -22,6 +22,8 @@ export function CacheInspector({
     >
       <CacheInspectorControls
         canClear={inspector.data !== null}
+        canClearAll={inspector.canClearAll}
+        canDelete={inspector.canDelete}
         confirmClear={inspector.confirmClear}
         isClearing={inspector.isClearing}
         isLoading={inspector.isLoading}
