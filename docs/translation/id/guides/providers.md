@@ -36,6 +36,23 @@ Base URL hosted provider harus berupa URL HTTPS absolut tanpa kredensial, query,
 
 ### Hugging Face
 
+Generation Hugging Face memakai `/chat/completions` melalui routing dengan
+`stream=false`. `finish_reason="length"` eksplisit (terpotong karena batas token)
+dan `"tool_calls"` ditolak sebelum penulisan cache query. `message.tool_calls`
+yang tidak kosong atau berformat salah juga menolak respons, sekalipun disertai
+teks biasa; marker tool yang tidak disertakan, null, atau list kosong tetap
+kompatibel. Adapter tidak mengeksekusi tool. `"stop"` dan finish metadata yang
+tidak disertakan tetap menerima teks valid yang tidak kosong. Reason eksplisit
+berupa null/bukan string tidak valid untuk kontrak non-streaming ini.
+Reason string lain, termasuk string kosong, tetap kompatibel; makna terminalnya
+belum diverifikasi untuk semua provider/model hasil routing. Tidak ada allowlist
+sukses menyeluruh atau interpretasi tambahan atas ekstensi refusal yang tidak
+didokumentasikan. Kalimat penolakan biasa tetap berupa teks; content assistant
+kosong/bukan string tetap tidak valid. Penolakan memakai HTTP 502
+`invalid_upstream_response` yang telah disanitasi dan tidak di-retry. Konfigurasi
+embedding/request tidak berubah, dan jawaban yang sudah tersimpan di cache tidak
+otomatis dihapus.
+
 ```env
 EMBEDDING_PROVIDER=huggingface
 GENERATION_PROVIDER=huggingface

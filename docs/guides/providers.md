@@ -53,6 +53,21 @@ deployment secret store.
 
 ### Hugging Face
 
+Hugging Face generation uses routed `/chat/completions` with `stream=false`.
+Explicit `finish_reason="length"` (token-limit truncation) and `"tool_calls"` are
+rejected before query cache writes. Nonempty or malformed `message.tool_calls`
+also rejects the response, even with ordinary text; missing, null and empty-list
+tool markers stay compatible. The adapter does not execute tools.
+`"stop"` and omitted finish metadata preserve valid nonblank text behavior.
+Explicit null/non-string reasons are invalid for this non-streaming contract.
+Other string reasons, including empty strings, retain existing compatibility;
+their terminal meaning is not certified across routed providers/models. There is
+no exhaustive success allowlist or added interpretation of undocumented refusal
+extensions. Ordinary refusal prose remains text; blank/non-string assistant content
+remains invalid. Rejections use the existing sanitized HTTP 502
+`invalid_upstream_response` and are not retried. Embedding/request configuration is
+unchanged, and existing cached answers are not automatically invalidated.
+
 ```env
 EMBEDDING_PROVIDER=huggingface
 GENERATION_PROVIDER=huggingface
