@@ -44,7 +44,7 @@ live in [reference/](reference/), and procedures/evidence workflows in
 | [Getting started](guides/getting-started.md) | Environment files, local toolchains, Docker workflows, and troubleshooting |
 | [Providers](guides/providers.md) | Hugging Face, OpenAI, Anthropic, Gemini, Ollama, and mock configuration |
 | [Custom provider adapters](guides/provider-extensions.md) | Explicit trusted server-side adapter registration and lifecycle contract |
-| [Server storage](guides/platform-storage.md) | Official MemoryStore, PgVectorStore and RedisStore configuration, explicit setup and legacy transition |
+| [Server storage](guides/platform-storage.md) | Official Memory, SQLite, MySQL, PostgreSQL/pgvector and Redis/Valkey configuration, explicit setup and deployment limits |
 | [pgvector](guides/pgvector.md) | Persistent cache storage, ports, migrations, and database verification |
 | [Cache policies](guides/cache-policies.md) | Thresholds, TTL, LRU, namespaces, privacy, and request coalescing |
 | [Benchmarking](guides/benchmarking.md) | Datasets, metrics, safeguards, projections, and exports |
@@ -78,5 +78,6 @@ live in [reference/](reference/), and procedures/evidence workflows in
 | [Operations and recovery](operations/recovery.md) | Credential rotation, backup, restore, cache rebuild, rollback, and incidents |
 | [Load testing](operations/load-testing.md#capacity-baseline-on-the-local-docker-host) | Capacity baseline, safe k6 scenarios, and runtime observability |
 | [Production runtime audit](operations/production-runtime-audit.md) | Exact-topology safety, recovery, load evidence, and release verdict |
+| [Valkey application validation](operations/valkey-validation.md) | Exact tested profile, setup/runtime boundaries, retained evidence and operational limitations |
 | [Multi-replica coordination](operations/multi-replica-readiness.md) | Historical findings, current shared authorities and bounded two-replica verification |
 | [Supply-chain security](operations/supply-chain.md) | Image pins, security scans, SBOM/provenance artifacts, and dependency updates |

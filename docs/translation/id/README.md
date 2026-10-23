@@ -45,6 +45,7 @@ di [operations/](../../operations/).
 | [Getting started](guides/getting-started.md)                | Environment file, local toolchain, workflow Docker, dan troubleshooting          |
 | [Providers](guides/providers.md)                            | Konfigurasi Hugging Face, OpenAI, Anthropic, Gemini, Ollama, dan mock            |
 | [Adapter provider kustom (Inggris)](../../guides/provider-extensions.md) | Registrasi adapter server tepercaya dan kontrak lifecycle |
+| [Storage server (Inggris)](../../guides/platform-storage.md) | Konfigurasi resmi Memory, SQLite, MySQL, PostgreSQL/pgvector, dan Redis/Valkey, setup eksplisit, serta batas deployment |
 | [pgvector](guides/pgvector.md)                              | Persistent cache storage, port, migrasi, dan verifikasi database                 |
 | [Cache policies](guides/cache-policies.md)                  | Threshold, TTL, LRU, namespace, privacy, dan request coalescing                  |
 | [Benchmarking](guides/benchmarking.md)                      | Dataset, metric, safeguard, projection, dan export                               |
@@ -73,6 +74,7 @@ di [operations/](../../operations/).
 
 | Runbook                                             | Gunakan untuk                                                             |
 | --------------------------------------------------- | ------------------------------------------------------------------------- |
+| [Validasi aplikasi Valkey (Inggris)](../../operations/valkey-validation.md) | Profil yang diuji, batas setup/runtime, bukti tersimpan, dan batasan operasional |
 | [Hardened deployment](operations/deployment.md)     | Autentikasi, role, proxy, TLS, request limit, dan database permission     |
 | [Kesiapan autoscaling terkelola (Inggris)](../../operations/autoscaling-readiness.md) | Kebijakan replika terbatas, kapasitas, readiness, draining, dan bukti perubahan skala |
 | [Operations and recovery](operations/recovery.md)   | Rotasi credential, backup, restore, cache rebuild, rollback, dan incident |

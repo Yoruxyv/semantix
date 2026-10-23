@@ -206,10 +206,14 @@ for ownership and maintenance details.
 
 ## Redis: setup, permissions and recovery
 
-Use a direct standalone server from the [tested Redis version matrix](../embedded/redis.md#supported-versions)
-with `noeviction`; hosted/cluster/replica
-support is not inferred from a URL. Read the [Redis store contract](../embedded/redis.md)
-for the supported version range, exact scan ceiling and ACL commands.
+Use a directly addressed writable standalone primary with `noeviction`: either
+a server from the [tested Redis version matrix](../embedded/redis.md#supported-versions)
+or [exact Valkey 9.1.2](../embedded/redis.md#valkey-912). Both use
+`CACHE_BACKEND=redis`, the server `redis` extra and package-owned RedisStore.
+Hosted/cluster/replica support is not inferred from a URL. Read the
+[Redis store contract](../embedded/redis.md) for the exact scan ceiling and ACL
+commands. The [application validation record](../operations/valkey-validation.md)
+separates tested Valkey behavior from unverified deployment claims.
 
 Configure the same provider metadata, dimensions, prefix, capacity and TTL as the
 runtime. Supply `REDIS_INITIALIZATION_URL` separately to the operator command:
@@ -218,19 +222,53 @@ runtime. Supply `REDIS_INITIALIZATION_URL` separately to the operator command:
 python -m app.cache.infrastructure.setup
 ```
 
-It resolves configured embedding metadata without calling a provider. It creates
-the binding explicitly using initialization authority, then closes its client.
+The command resolves **built-in** provider registry metadata without constructing
+providers or doing inference. It creates the binding explicitly using
+initialization authority, then closes its client.
 Remove the initialization URL from the runtime environment. Ordinary server
 startup uses `REDIS_URL`, validates the descriptor and performs no initialization.
-Wrong capacity, TTL, version or unowned keys fail rather than falling back to memory.
+Wrong capacity, TTL or unowned binding keys fail rather than falling back to memory.
+Server product/version, primary role, noeviction and required-command probes belong
+to explicit operator setup; runtime binding validation does not repeat them.
 `REDIS_OPERATION_TIMEOUT_SECONDS` and `REDIS_CLOSE_TIMEOUT_SECONDS` bound network
 operations and cleanup. The server propagates cancellation; caller-supplied package
 clients remain borrowed and must be closed by their owner.
+
+For a [custom registered provider](provider-extensions.md), the built-in setup CLI
+does not load the deployment's registry. Use a deployment-owned operator bootstrap:
+resolve the selected capabilities with `ProviderRegistry.resolve()`, construct an
+`EmbeddingSpace` from the resolved identity/dimensions, and call public
+`RedisStore.initialize_schema(initialization_client=...)` with separate setup
+authority. Match runtime endpoint/database, prefix, capacity and TTL, close owned
+setup resources, and pass the corresponding registry to `create_app()` at runtime.
+Metadata resolution needs no inference. Keep registry identity and dimension
+validation intact; dimensions and the 64-MiB vector projection are checked by
+RedisStore before network resources open.
 
 Redis persistence is operator-managed. AOF/RDB retention, backup, restore, ACLs,
 TLS and eviction configuration remain deployment responsibilities. Redis does not
 become an authoritative query counter service: its server hit/miss totals are
 process-local telemetry; Inspector hit/access metadata comes from the actual store.
+
+### Readiness and failure boundaries
+
+`/ready` probes cache statistics and other enabled application stores; diagnostics
+reports that cache-stats observation. OOM, replica/read-only mode or eviction-policy
+drift can leave these read-only checks green while writes or hit confirmation fail.
+Operators must maintain the setup deployment constraints; readiness is not continuous
+proof of write availability or supported server configuration.
+
+A lost acknowledgement can produce HTTP 500 `cache_error` after a put or hit-counter
+mutation has committed. An unsuccessful response is not proof of rollback. The
+store does not automatically replay these mutations or promise exactly-once effects.
+Inspect uncertain outcomes before deciding whether another application operation is safe.
+
+Application shutdown seals and drains shared query work before closing its owned
+store. If retained work settles, cleanup can succeed. A numerical scoring worker
+still active at the terminal close boundary can instead produce explicit
+`CacheStorageError` with Redis resources not fully disposed. There is no automatic
+busy-close retry or guarantee of clean termination; operator-controlled process
+disposition may be needed. Do not treat that failure as successful cleanup.
 
 ## Inspector and diagnostics
 

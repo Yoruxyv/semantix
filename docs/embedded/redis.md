@@ -131,6 +131,14 @@ direction. No separate store, fork abstraction, migration or runtime dependency
 is introduced. Other driver/Python combinations, ARM64, macOS, Valkey TLS and
 managed Valkey offerings remain unverified; Cluster/failover remain unsupported.
 
+Separate [official application validation](../operations/valkey-validation.md)
+covers the existing FastAPI `CACHE_BACKEND=redis` path, HTTP SDK and React dashboard
+against this container from a Windows CPython 3.14.6 / redis-py 8.1.0 host. Fresh
+wheel/sdist checks also confirmed that semantix-cache remains independently
+installable without the server. This local application evidence is separate from
+the package CI matrix above; it does not certify other application host platforms,
+production load, TLS or HA. See [server setup and operational limits](../guides/platform-storage.md#redis-setup-permissions-and-recovery).
+
 ### Verified driver combinations
 
 | Client OS / CPython | Redis server | redis-py | Evidence |
