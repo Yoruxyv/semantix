@@ -136,16 +136,18 @@ class OpenAIProvider:
         """POST a user message to ``/chat/completions`` with streaming disabled.
 
         Uses ``max_completion_tokens`` and returns the first choice's message
-        content. This decoder requires nonblank text but does not check
-        ``finish_reason``, tool calls or refusals. Server workflows apply shared
-        text validation afterward; this is not the embedded completion parser.
+        content. An explicit ``finish_reason`` must be ``stop``; omission remains
+        accepted for compatible endpoints. Reject nonempty tool/function calls or
+        refusals before returning nonblank text. Server workflows apply shared text
+        validation afterward; this is not the embedded completion parser.
 
         Returns:
             The first choice's text with surrounding whitespace removed.
 
         Raises:
             RuntimeError: A generation model is not configured.
-            InvalidProviderResponseError: Choices, message or text are invalid.
+            InvalidProviderResponseError: Invalid/incomplete output, tool-directed
+                generation or refusal cannot be returned as completed text.
         """
         if self._generation_model is None:
             raise RuntimeError("OpenAI generation provider is not configured")
@@ -183,12 +185,25 @@ class OpenAIProvider:
             raise InvalidProviderResponseError(
                 "Invalid chat choice",
             )
+        if cast("dict[str, object]", first).get("finish_reason", "stop") != "stop":
+            raise InvalidProviderResponseError(
+                "Chat generation did not finish with completed text",
+            )
         message = cast("dict[str, object]", first).get("message")
         if not isinstance(message, dict):
             raise InvalidProviderResponseError(
                 "Chat response contained no message",
             )
-        content = cast("dict[str, object]", message).get("content")
+        message = cast("dict[str, object]", message)
+        if message.get("tool_calls") or message.get("function_call"):
+            raise InvalidProviderResponseError(
+                "Chat generation requires tool handling",
+            )
+        if message.get("refusal"):
+            raise InvalidProviderResponseError(
+                "Chat generation was refused",
+            )
+        content = message.get("content")
         if not isinstance(content, str) or not content.strip():
             raise InvalidProviderResponseError(
                 "Chat response contained no text",

@@ -78,6 +78,16 @@ OPENAI_GENERATION_MODEL=
 OPENAI_EMBEDDING_DIMENSIONS=
 ```
 
+OpenAI generation accepts nonblank first-choice text with `finish_reason="stop"`.
+An explicit different reason (including `length`, `content_filter`, tool/function
+calls, `null` or an unknown value) is rejected. Nonempty `tool_calls`,
+`function_call` or `refusal` fields are also rejected, even with `stop`.
+These outcomes require handling outside this text-only adapter; they raise the
+existing sanitized HTTP 502 `invalid_upstream_response` before query cache writes.
+An omitted `finish_reason` remains accepted for compatible endpoints, which cannot
+establish completeness. Empty/null tool and refusal markers remain compatible.
+Previously cached answers are not automatically invalidated by this validation.
+
 ### Anthropic
 
 Anthropic generation is implemented and covered by deterministic contract and
