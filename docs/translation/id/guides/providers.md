@@ -108,6 +108,20 @@ di cache tidak otomatis dihapus oleh validasi ini.
 
 ### Gemini
 
+Generation Gemini hanya menerima `finishReason` eksplisit berupa `"STOP"`.
+`"MAX_TOKENS"`, `"CONTINUATION"`, hasil safety/filtering, dan semua reason eksplisit
+lain ditolak, termasuk null, string kosong, nilai tidak dikenal, atau format salah.
+`finishReason` yang tidak disertakan tetap diterima demi kompatibilitas, tetapi
+tidak membuktikan kelengkapan respons. Part `functionCall` atau `toolCall` menolak
+candidate, sekalipun disertai teks; adapter khusus teks ini tidak menjalankan turn
+tambahan untuk tool atau continuation. Teks bertanda `thought: true` dikecualikan,
+dan teks jawaban akhir yang tidak kosong tetap wajib tersedia. `thoughtSignature`
+saja tidak mengecualikan teks biasa. Part lain yang berformat salah/bukan teks
+tetap dilewati; teks yang dapat digunakan di-trim dan digabung dengan newline.
+Penolakan memakai HTTP 502 `invalid_upstream_response` yang telah disanitasi
+sebelum penulisan cache query dan tidak di-retry. Konfigurasi request dan embedding
+tidak berubah. Jawaban yang sudah tersimpan di cache tidak otomatis dihapus.
+
 ```env
 EMBEDDING_PROVIDER=gemini
 GENERATION_PROVIDER=gemini

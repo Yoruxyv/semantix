@@ -146,18 +146,18 @@ class GeminiProvider:
         """POST user text parts to the encoded model's ``:generateContent`` endpoint.
 
         Sets ``generationConfig.maxOutputTokens``. Require a first candidate with
-        content and a parts list, then collect its nonblank string text parts.
-        Malformed/nontext parts are skipped. This server decoder does not check
-        ``finishReason``, exclude thought-marked text or reject function-call parts;
-        the embedded Gemini completion parser has separate, stricter checks.
+        content and a parts list. Explicit ``finishReason`` must be ``"STOP"``;
+        omission stays compatible. Reject function/tool calls, exclude text marked
+        ``thought=True`` and collect nonblank final text. Other malformed/nontext
+        parts are skipped. The embedded parser has an independent contract.
 
         Returns:
             Trimmed text parts from the first candidate, joined with newlines.
 
         Raises:
             RuntimeError: A generation model is not configured.
-            InvalidProviderResponseError: Candidate/content/parts are invalid or
-                contain no nonblank text.
+            InvalidProviderResponseError: Invalid/incomplete or action-directed
+                output cannot be returned as completed nonblank text.
         """
         if self._generation_model is None:
             raise RuntimeError("Gemini generation provider is not configured")
@@ -203,7 +203,12 @@ class GeminiProvider:
             raise InvalidProviderResponseError(
                 "Invalid generation candidate",
             )
-        content = cast("dict[str, object]", first).get("content")
+        candidate = cast("dict[str, object]", first)
+        if candidate.get("finishReason", "STOP") != "STOP":
+            raise InvalidProviderResponseError(
+                "Gemini generation did not finish with completed text",
+            )
+        content = candidate.get("content")
         if not isinstance(content, dict):
             raise InvalidProviderResponseError(
                 "Generation response contained no content",
@@ -218,7 +223,14 @@ class GeminiProvider:
         for part in cast("list[object]", parts):
             if not isinstance(part, dict):
                 continue
-            text = cast("dict[str, object]", part).get("text")
+            item = cast("dict[str, object]", part)
+            if "functionCall" in item or "toolCall" in item:
+                raise InvalidProviderResponseError(
+                    "Gemini generation requires additional handling",
+                )
+            if item.get("thought") is True:
+                continue
+            text = item.get("text")
             if isinstance(text, str) and text.strip():
                 text_parts.append(text.strip())
 

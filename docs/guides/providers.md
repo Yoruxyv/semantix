@@ -121,6 +121,19 @@ or continue paused turns. Previously cached answers are not automatically invali
 
 ### Gemini
 
+Gemini generation accepts an explicit `finishReason` only when it is `"STOP"`.
+`"MAX_TOKENS"`, `"CONTINUATION"`, safety/filtering outcomes and every other explicit
+reason are rejected, including null, empty, unknown or malformed values. Omitted
+`finishReason` remains accepted for compatibility, but cannot prove completeness.
+Any `functionCall` or `toolCall` part rejects the candidate, even alongside text;
+this text-only adapter does not perform additional tool or continuation turns.
+Text marked `thought: true` is excluded, and nonblank final text is still required.
+A `thoughtSignature` alone does not exclude ordinary text. Other malformed/nontext
+parts retain their existing skip behavior; usable text is trimmed and joined with
+newlines. Rejections use the existing sanitized HTTP 502 `invalid_upstream_response`
+before query cache writes and are not retried. Embedding and request configuration
+are unchanged. Previously cached answers are not automatically invalidated.
+
 ```env
 EMBEDDING_PROVIDER=gemini
 GENERATION_PROVIDER=gemini
