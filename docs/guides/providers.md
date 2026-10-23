@@ -106,6 +106,19 @@ ANTHROPIC_BASE_URL=https://api.anthropic.com
 ANTHROPIC_GENERATION_MODEL=
 ```
 
+Anthropic generation accepts nonblank text with `stop_reason="end_turn"` or
+`"stop_sequence"`. An omitted reason remains compatible, but cannot establish
+completeness. Other explicit reasons, including `max_tokens`,
+`model_context_window_exceeded`, `tool_use`, `pause_turn`, `refusal`, null,
+unknown or malformed values, are rejected. A refusal is a valid upstream safety
+outcome, but is not returned as an ordinary cacheable answer by this text-only
+adapter. Client `tool_use` blocks are rejected even alongside text with a terminal
+or omitted reason. Other non-text blocks, including thinking/redacted thinking,
+are skipped; only trimmed text blocks are joined into the answer.
+Rejections use the existing sanitized HTTP 502 `invalid_upstream_response` before
+query cache writes. The adapter does not configure stop sequences, execute tools
+or continue paused turns. Previously cached answers are not automatically invalidated.
+
 ### Gemini
 
 ```env
