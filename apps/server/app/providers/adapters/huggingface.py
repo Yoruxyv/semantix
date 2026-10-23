@@ -193,16 +193,18 @@ class HuggingFaceProvider:
         """POST a user message to the chat root's ``/chat/completions`` endpoint.
 
         Sends ``max_tokens`` and ``stream=False``. Decode only the first choice's
-        message content, requiring nonblank text. This provider owns its decoder
-        independently of OpenAI and does not check finish reasons, tool calls or
-        refusals here. Server workflows validate returned text afterward.
+        message content, requiring nonblank text. Reject ``length``, ``tool_calls``
+        and non-string explicit finish reasons. Omission and other strings remain
+        compatible without proving completeness. Reject non-neutral tool calls;
+        unrecognized extensions have no added semantics in this text-only decoder.
 
         Returns:
             The first choice's text with surrounding whitespace removed.
 
         Raises:
             RuntimeError: Chat URL or generation model is not configured.
-            InvalidProviderResponseError: Choices, message or text are invalid.
+            InvalidProviderResponseError: Invalid, truncated or tool-directed
+                output cannot be returned as ordinary answer text.
         """
         if self._chat_base_url is None or self._generation_model is None:
             raise RuntimeError("Hugging Face generation provider is not configured")
@@ -241,13 +243,27 @@ class HuggingFaceProvider:
                 "Invalid chat choice",
             )
 
-        message = cast("dict[str, object]", first_choice).get("message")
+        choice = cast("dict[str, object]", first_choice)
+        finish_reason = choice.get("finish_reason", "stop")
+        if not isinstance(finish_reason, str) or finish_reason in (
+            "length",
+            "tool_calls",
+        ):
+            raise InvalidProviderResponseError(
+                "Hugging Face generation did not finish with answer text",
+            )
+        message = choice.get("message")
         if not isinstance(message, dict):
             raise InvalidProviderResponseError(
                 "Chat response contained no message",
             )
 
-        content = cast("dict[str, object]", message).get("content")
+        assistant = cast("dict[str, object]", message)
+        if assistant.get("tool_calls") not in (None, []):
+            raise InvalidProviderResponseError(
+                "Hugging Face generation requires tool handling",
+            )
+        content = assistant.get("content")
         if not isinstance(content, str) or not content.strip():
             raise InvalidProviderResponseError(
                 "Chat response contained no text",
