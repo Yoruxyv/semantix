@@ -61,6 +61,17 @@ OPENAI_GENERATION_MODEL=
 OPENAI_EMBEDDING_DIMENSIONS=
 ```
 
+Generation OpenAI menerima teks pilihan pertama yang tidak kosong dengan
+`finish_reason="stop"`. Reason eksplisit lainnya (termasuk `length`, `content_filter`,
+panggilan tool/function, `null`, atau nilai yang tidak dikenal) ditolak. Field
+`tool_calls`, `function_call`, atau `refusal` yang tidak kosong juga ditolak,
+meskipun reason bernilai `stop`. Hasil tersebut memerlukan penanganan di luar
+adapter khusus teks ini; error HTTP 502 `invalid_upstream_response` yang telah
+disanitasi dikembalikan sebelum penulisan cache query. `finish_reason` yang tidak
+disertakan tetap diterima untuk endpoint kompatibel, tetapi tidak membuktikan
+kelengkapan respons. Marker tool dan refusal kosong/null tetap kompatibel.
+Jawaban yang sudah tersimpan di cache tidak otomatis dihapus oleh validasi ini.
+
 ### Anthropic
 
 Generation Anthropic telah diimplementasikan dan dicakup pengujian kontrak serta
