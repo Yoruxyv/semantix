@@ -9,6 +9,8 @@ import type { JSX } from 'react';
 
 interface CacheInspectorControlsProps {
   canClear: boolean;
+  canClearAll: boolean;
+  canDelete: boolean;
   confirmClear: boolean;
   isClearing: boolean;
   isLoading: boolean;
@@ -28,6 +30,8 @@ interface CacheInspectorControlsProps {
 
 export function CacheInspectorControls({
   canClear,
+  canClearAll,
+  canDelete,
   confirmClear,
   isClearing,
   isLoading,
@@ -46,6 +50,16 @@ export function CacheInspectorControls({
 }: Readonly<CacheInspectorControlsProps>): JSX.Element {
   const selectedNamespace = namespace.trim();
   const isNamespaceSelected = selectedNamespace !== '';
+  let clearLabel = 'Clear cache';
+  let clearMessage =
+    'Clear cache entries and reset statistics in your authorized namespace? Select a namespace first if your account has more than one.';
+  if (isNamespaceSelected) {
+    clearLabel = 'Clear namespace';
+    clearMessage = `Clear every entry and reset statistics for ${selectedNamespace}?`;
+  } else if (canClearAll) {
+    clearLabel = 'Clear all entries';
+    clearMessage = 'Clear every cache entry and reset all backend cache statistics?';
+  }
 
   const controlClass =
     'font-data mt-2 min-h-11 w-full min-w-0 border border-(--hairline) bg-(--surface) px-3 py-2.5 text-xs text-(--text) outline-none transition-colors hover:border-(--text-faint) focus-visible:border-(--teal) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--teal)';
@@ -75,30 +89,28 @@ export function CacheInspectorControls({
             {isLoading || isRefreshing ? 'Refreshing' : 'Refresh'}
           </Button>
 
-          <Button
-            className="border-(--hairline) text-(--coral-text) hover:border-(--coral) focus-visible:outline-(--coral) disabled:opacity-50"
-            disabled={isMutating || !canClear}
-            size="compact"
-            variant="secondary"
-            onClick={onRequestClear}
-          >
-            {isNamespaceSelected ? 'Clear namespace' : 'Clear all entries'}
-          </Button>
+          {canDelete && (
+            <Button
+              className="border-(--hairline) text-(--coral-text) hover:border-(--coral) focus-visible:outline-(--coral) disabled:opacity-50"
+              disabled={isMutating || !canClear}
+              size="compact"
+              variant="secondary"
+              onClick={onRequestClear}
+            >
+              {clearLabel}
+            </Button>
+          )}
         </div>
       </header>
 
-      {confirmClear && (
+      {canDelete && confirmClear && (
         <InlineConfirmation
           actionsClassName="gap-5"
           ariaLabel="Confirm clear cache"
           className="mt-5"
           confirmLabel="Confirm clear cache"
           isPending={isClearing}
-          message={
-            isNamespaceSelected
-              ? `Clear every entry and reset statistics for ${selectedNamespace}?`
-              : 'Clear every cache entry and reset all backend cache statistics?'
-          }
+          message={clearMessage}
           pendingLabel="Clearing"
           onCancel={onCancelClear}
           onConfirm={onConfirmClear}

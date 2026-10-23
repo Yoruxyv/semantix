@@ -126,6 +126,7 @@ export function CacheInspectorResults({
           {data.items.map((entry) => (
             <CacheEntryCard
               key={entry.cache_key}
+              canDelete={inspector.canDelete}
               entry={entry}
               isDeleting={mutation === entry.cache_key}
               isPendingDelete={pendingDelete === entry.cache_key}

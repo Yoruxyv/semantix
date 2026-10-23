@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { canDeleteCacheEntries } from '@/features/auth/permissions';
 import { apiErrorFromUnknown, dataFromApiResult } from '@/shared/query/apiResult';
 import { cacheEntryKeys } from '@/shared/query/queryKeys';
 
@@ -18,6 +20,8 @@ interface UseCacheInspectorOptions {
 
 export interface CacheInspectorController {
   actionError: string | null;
+  canDelete: boolean;
+  canClearAll: boolean;
   cancelClear: () => void;
   cancelDelete: () => void;
   confirmClear: boolean;
@@ -59,10 +63,16 @@ function errorDetail(error: unknown, fallback: string): string {
  * pagination identify list queries, without becoming durable server filter state.
  * Search/sort changes reset offset and pending deletion; namespace also cancels
  * clear confirmation. Previously loaded data survives refresh errors.
+ * Session changes dismiss confirmations; capability checks are UI hints only.
  */
 export function useCacheInspector({
   onMutation,
 }: Readonly<UseCacheInspectorOptions>): CacheInspectorController {
+  const auth = useAuth();
+  const canDelete = canDeleteCacheEntries(auth.status, auth.session);
+  const canClearAll =
+    canDelete &&
+    (auth.status === 'disabled' || auth.session?.namespaces.includes('*') === true);
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get('search') ?? '';
@@ -80,6 +90,11 @@ export function useCacheInspector({
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+
+  useEffect(() => {
+    setPendingDelete(null);
+    setConfirmClear(false);
+  }, [auth.status, auth.session]);
 
   const params = {
     offset,
@@ -218,6 +233,7 @@ export function useCacheInspector({
   }
 
   function requestClear(): void {
+    if (!canDelete) return;
     setPendingDelete(null);
     setConfirmClear(true);
   }
@@ -227,6 +243,7 @@ export function useCacheInspector({
   }
 
   function requestDelete(cacheKey: string): void {
+    if (!canDelete) return;
     setConfirmClear(false);
     setPendingDelete(cacheKey);
   }
@@ -240,6 +257,7 @@ export function useCacheInspector({
    * supplied callback. A later rejection does not undo a successful server delete.
    */
   async function confirmDeleteEntry(cacheKey: string): Promise<void> {
+    if (!canDelete) return;
     setActionError(null);
 
     try {
@@ -257,6 +275,7 @@ export function useCacheInspector({
    * clearing. Follow-up/callback errors do not prove the remote clear was undone.
    */
   async function confirmClearCache(): Promise<void> {
+    if (!canDelete) return;
     setActionError(null);
 
     const selectedNamespace = namespace.trim();
@@ -279,6 +298,8 @@ export function useCacheInspector({
 
   return {
     actionError,
+    canDelete,
+    canClearAll,
     cancelClear,
     cancelDelete,
     confirmClear,
