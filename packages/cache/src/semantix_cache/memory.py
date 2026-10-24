@@ -100,8 +100,9 @@ def _query_vector(values: Sequence[float], *, dimensions: int) -> NDArray[np.flo
     Raises:
         ValueError: If dimensions, components or magnitude are invalid.
     """
+    values_type = type(values)
     if (
-        type(values) is not tuple
+        values_type is not tuple
         or len(values) != dimensions
         or not all(type(value) is float for value in values)
     ):
