@@ -1,4 +1,5 @@
 import asyncio
+import math
 from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
@@ -84,6 +85,36 @@ class _Snapshot:
             self.used = True
             return matrix, norms
         return self.matrix, self.norms
+
+
+def _query_vector(values: Sequence[float], *, dimensions: int) -> NDArray[np.float64]:
+    """Normalize plain float tuples without repeated numeric ABC checks.
+
+    Args:
+        values: Query components; other sequences use the shared validator.
+        dimensions: Required embedding-space dimensionality.
+
+    Returns:
+        A detached vector using the original float64 normalization arithmetic.
+
+    Raises:
+        ValueError: If dimensions, components or magnitude are invalid.
+    """
+    values_type = type(values)
+    if (
+        values_type is not tuple
+        or len(values) != dimensions
+        or not all(type(value) is float for value in values)
+    ):
+        return normalized_vector(values, dimensions=dimensions)
+    with np.errstate(over="ignore", invalid="ignore"):
+        vector = np.asarray(values, dtype=np.float64)
+        if not np.isfinite(vector).all():
+            raise ValueError("Embedding contains invalid components")
+        norm = float(np.linalg.norm(vector))
+    if not math.isfinite(norm) or norm <= np.finfo(np.float64).eps:
+        raise ValueError("Embedding has zero or invalid magnitude")
+    return vector / norm
 
 
 def _nearest(
@@ -231,7 +262,7 @@ class MemoryStore:
         with self._state.operation():
             try:
                 namespace = namespace_value(namespace)
-                query = normalized_vector(embedding, dimensions=self._space.dimensions)
+                query = _query_vector(embedding, dimensions=self._space.dimensions)
             except ValueError:
                 raise CacheValidationError(
                     "Invalid query vector or namespace"
