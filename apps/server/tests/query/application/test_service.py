@@ -1,11 +1,13 @@
 import asyncio
 import logging
 from collections.abc import Sequence
+from unittest.mock import patch
 
 import pytest
 
 from app.cache.application.service import SemanticCache
 from app.cache.domain.keys import prompt_cache_key
+from app.cache.domain.models import CacheLookupResult
 from app.core.exceptions import (
     InvalidProviderResponseError,
     ProviderRequestError,
@@ -14,8 +16,10 @@ from app.core.exceptions import (
 from app.core.limits import MAX_RESPONSE_LENGTH
 from app.observability.metrics import RuntimeMetrics
 from app.providers.protocols import GenerationProvider
+from app.query.api.schemas import QueryResponse
 from app.query.application.service import QueryService
 from app.query.domain.policies import QueryCachePolicy
+from semantix_cache import MemoryStore
 from tests.support import memory_backend, unit_vector
 
 
@@ -88,6 +92,19 @@ class DeadlineProvider:
             await self.release.wait()
             raise ProviderRetryableError("Network failure")
         return "recovered"
+
+
+class JoiningMetrics(RuntimeMetrics):
+    """Observe follower registration through the production metrics callback."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.joined = asyncio.Event()
+
+    def record_coalesced_delta(self, delta: int) -> None:
+        super().record_coalesced_delta(delta)
+        if delta == 1:
+            self.joined.set()
 
 
 def query_service(provider: GenerationProvider) -> QueryService:
@@ -529,3 +546,265 @@ async def test_write_bypass_does_not_create_cache_entry() -> None:
     assert cached.response == "stored response"
     assert cached.cache_hit is True
     assert provider.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_shared_lookup_keeps_threshold_snapshot_until_independent_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Share the captured threshold, then independently apply the updated value."""
+    embeddings, provider, metrics = Embeddings(), Provider(), JoiningMetrics()
+    backend = memory_backend()
+    store = backend.store
+    assert isinstance(store, MemoryStore)
+    cache = SemanticCache(embeddings, backend, 0.9, events=metrics)
+    service = QueryService(cache, provider, metrics=metrics)
+    policy = QueryCachePolicy(namespace="threshold-snapshot", write_enabled=False)
+    key = prompt_cache_key("seed", namespace=policy.namespace)
+    entered, release = asyncio.Event(), asyncio.Event()
+    embed = embeddings.embed
+    embedding_calls = 0
+    callers: list[asyncio.Task[QueryResponse]] = []
+
+    async def held_embedding(text: str) -> Sequence[float]:
+        nonlocal embedding_calls
+        embedding_calls += 1
+        entered.set()
+        await release.wait()
+        return await embed(text)
+
+    monkeypatch.setattr(embeddings, "embed", held_embedding)
+    async with store:
+        try:
+            async with asyncio.timeout(5):
+                await cache.store(
+                    "seed",
+                    "stored answer",
+                    [0.8, 0.6, 0.0, 0.0],
+                    namespace=policy.namespace,
+                )
+                original = await store.inspect_entry(
+                    key, namespaces=(policy.namespace,)
+                )
+                assert original is not None
+                assert original.hit_count == 0
+                with (
+                    patch.object(store, "put", wraps=store.put) as put,
+                    patch.object(
+                        store, "record_hit", wraps=store.record_hit
+                    ) as confirm,
+                ):
+                    callers.append(
+                        asyncio.create_task(service.execute("query", policy=policy))
+                    )
+                    await entered.wait()  # lookup has captured 0.9 before embedding.
+                    callers.append(
+                        asyncio.create_task(service.execute("query", policy=policy))
+                    )
+                    await metrics.joined.wait()
+                    assert (
+                        metrics.snapshot(cache_size=1).in_flight_coalesced_requests == 1
+                    )
+                    assert await cache.write_similarity_threshold(
+                        0.75
+                    ) == pytest.approx(0.75)
+                    release.set()
+                    responses = await asyncio.gather(*callers)
+
+                    assert embedding_calls == 1
+                    assert [
+                        (r.provider_called, r.generation_skipped) for r in responses
+                    ] == [(True, False), (False, True)]
+                    for response in responses:
+                        assert response.cache_hit is False
+                        assert response.response == "answer"
+                        assert response.similarity_score == pytest.approx(0.8)
+                        assert response.similarity_threshold == pytest.approx(0.9)
+                        assert response.matched_prompt is None
+                        assert response.matched_cache_key is None
+                        assert response.cache_entry_created_at is None
+                    confirm.assert_not_awaited()
+                    unchanged = await store.inspect_entry(
+                        key, namespaces=(policy.namespace,)
+                    )
+                    assert unchanged is not None
+                    assert unchanged.hit_count == 0
+                    assert unchanged.created_at == original.created_at
+                    assert unchanged.expires_at == original.expires_at
+                    assert unchanged.response == "stored answer"
+                    stats = await backend.stats(policy.namespace)
+                    assert (stats.size, stats.hits, stats.misses) == (1, 0, 1)
+
+                    later = await service.execute("query", policy=policy)
+                    assert later.cache_hit is True
+                    assert later.provider_called is False
+                    assert later.generation_skipped is True
+                    assert later.response == "stored answer"
+                    assert later.similarity_score == pytest.approx(0.8)
+                    assert later.similarity_threshold == pytest.approx(0.75)
+                    assert later.matched_cache_key == key
+                    assert later.cache_entry_created_at == original.created_at
+                    assert embedding_calls == 2
+                    assert provider.call_count == 1
+                    confirm.assert_awaited_once_with(
+                        key,
+                        namespace=policy.namespace,
+                        expected_created_at=original.created_at,
+                    )
+                    put.assert_not_awaited()
+                    current = await store.inspect_entry(
+                        key, namespaces=(policy.namespace,)
+                    )
+                    assert current is not None
+                    assert current.hit_count == 1
+                    assert current.created_at == original.created_at
+                    assert current.expires_at == original.expires_at
+                    stats = await backend.stats(policy.namespace)
+                    assert (stats.size, stats.hits, stats.misses) == (1, 1, 1)
+        finally:
+            release.set()
+            await service.aclose(grace_seconds=1)
+            await asyncio.gather(*callers, return_exceptions=True)
+    assert all(caller.done() for caller in callers)
+    assert service._active_requests == 0
+    assert not service._coalescer._in_flight
+    assert not service._coalescer._cleanup_tasks
+    assert metrics.snapshot(cache_size=0).in_flight_coalesced_requests == 0
+
+
+@pytest.mark.asyncio
+async def test_shared_confirmed_hit_survives_replacement_before_delivery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Deliver the confirmed snapshot, then independently confirm its replacement."""
+    provider, metrics = Provider(), JoiningMetrics()
+    backend = memory_backend()
+    store = backend.store
+    assert isinstance(store, MemoryStore)
+    cache = SemanticCache(Embeddings(), backend, 0.92, events=metrics)
+    service = QueryService(cache, provider, metrics=metrics)
+    policy = QueryCachePolicy(namespace="revision-snapshot")
+    key = prompt_cache_key("seed", namespace=policy.namespace)
+    confirmed, release = asyncio.Event(), asyncio.Event()
+    lookup = cache.lookup
+    lookups = 0
+    callers: list[asyncio.Task[QueryResponse]] = []
+
+    async def held_lookup(prompt: str, *, namespace: str) -> CacheLookupResult:
+        nonlocal lookups
+        lookups += 1
+        resolved = await lookup(prompt, namespace=namespace)
+        assert resolved.cache_hit is True
+        confirmed.set()
+        await release.wait()
+        return resolved
+
+    async with store:
+        try:
+            async with asyncio.timeout(5):
+                await cache.store(
+                    "seed", "original answer", unit_vector(), namespace=policy.namespace
+                )
+                candidate = await store.find_nearest(
+                    unit_vector(), namespace=policy.namespace
+                )
+                assert candidate is not None
+                original = await store.inspect_entry(
+                    key, namespaces=(policy.namespace,)
+                )
+                assert original is not None
+                assert original.hit_count == 0
+                with (
+                    patch.object(store, "put", wraps=store.put) as put,
+                    patch.object(
+                        store, "record_hit", wraps=store.record_hit
+                    ) as confirm,
+                ):
+                    with monkeypatch.context() as scheduling:
+                        scheduling.setattr(cache, "lookup", held_lookup)
+                        callers.append(
+                            asyncio.create_task(service.execute("seed", policy=policy))
+                        )
+                        await confirmed.wait()
+                        counted = await store.inspect_entry(
+                            key, namespaces=(policy.namespace,)
+                        )
+                        assert counted is not None
+                        assert counted.hit_count == 1
+                        assert counted.created_at == original.created_at
+                        confirm.assert_awaited_once_with(
+                            key,
+                            namespace=policy.namespace,
+                            expected_created_at=original.created_at,
+                        )
+                        callers.append(
+                            asyncio.create_task(service.execute("seed", policy=policy))
+                        )
+                        await metrics.joined.wait()
+                        replacement = candidate.entry.model_copy(
+                            update={"response": "replacement answer"}
+                        )
+                        await store.put(replacement)
+                        updated = await store.inspect_entry(
+                            key, namespaces=(policy.namespace,)
+                        )
+                        assert updated is not None
+                        assert updated.hit_count == 0
+                        assert updated.created_at > original.created_at
+                        release.set()
+                        responses = await asyncio.gather(*callers)
+
+                    assert lookups == 1
+                    for response in responses:
+                        assert response.cache_hit is True
+                        assert response.provider_called is False
+                        assert response.generation_skipped is True
+                        assert response.response == "original answer"
+                        assert response.similarity_threshold == pytest.approx(0.92)
+                        assert response.matched_cache_key == key
+                        assert response.cache_entry_created_at == original.created_at
+                    assert confirm.await_count == 1
+                    assert provider.call_count == 0
+                    untouched = await store.inspect_entry(
+                        key, namespaces=(policy.namespace,)
+                    )
+                    assert untouched is not None
+                    assert untouched.hit_count == 0
+                    assert untouched.created_at == updated.created_at
+                    assert untouched.expires_at == updated.expires_at
+                    stats = await backend.stats(policy.namespace)
+                    assert (stats.size, stats.hits, stats.misses) == (1, 1, 0)
+
+                    later = await service.execute("seed", policy=policy)
+                    assert later.cache_hit is True
+                    assert later.provider_called is False
+                    assert later.generation_skipped is True
+                    assert later.response == "replacement answer"
+                    assert later.matched_cache_key == key
+                    assert later.cache_entry_created_at == updated.created_at
+                    assert confirm.await_count == 2
+                    assert provider.call_count == 0
+                    confirm.assert_awaited_with(
+                        key,
+                        namespace=policy.namespace,
+                        expected_created_at=updated.created_at,
+                    )
+                    put.assert_awaited_once_with(replacement)
+                    current = await store.inspect_entry(
+                        key, namespaces=(policy.namespace,)
+                    )
+                    assert current is not None
+                    assert current.hit_count == 1
+                    assert current.created_at == updated.created_at
+                    assert current.expires_at == updated.expires_at
+                    stats = await backend.stats(policy.namespace)
+                    assert (stats.size, stats.hits, stats.misses) == (1, 2, 0)
+        finally:
+            release.set()
+            await service.aclose(grace_seconds=1)
+            await asyncio.gather(*callers, return_exceptions=True)
+    assert all(caller.done() for caller in callers)
+    assert service._active_requests == 0
+    assert not service._coalescer._in_flight
+    assert not service._coalescer._cleanup_tasks
+    assert metrics.snapshot(cache_size=0).in_flight_coalesced_requests == 0
