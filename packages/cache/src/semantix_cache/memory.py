@@ -2,8 +2,10 @@ import asyncio
 import math
 from collections import OrderedDict
 from collections.abc import Sequence
+from contextvars import copy_context
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from time import monotonic
 from types import TracebackType
 from typing import Self, cast
@@ -193,7 +195,7 @@ class MemoryStore:
         self._expirations = 0
         self._lock = asyncio.Lock()
         self._slot = asyncio.Semaphore(1)
-        self._workers: set[asyncio.Task[CacheMatch]] = set()
+        self._workers: set[asyncio.Future[CacheMatch]] = set()
         self._state = Lifecycle()
 
     @property
@@ -225,12 +227,21 @@ class MemoryStore:
         except ValueError:
             raise CacheValidationError("Invalid cache key or namespace") from None
 
-    def _worker_done(self, worker: asyncio.Task[CacheMatch]) -> None:
+    def _worker_done(
+        self, result: asyncio.Future[CacheMatch], worker: asyncio.Future[CacheMatch]
+    ) -> None:
         self._workers.remove(worker)
         self._slot.release()
-        # Retrieve errors even when the caller was cancelled. Awaiters still see them.
-        if not worker.cancelled():
-            worker.exception()
+        if worker.cancelled():
+            if not result.done():
+                result.cancel()
+            return
+        error = worker.exception()
+        if not result.done():
+            if error is None:
+                result.set_result(worker.result())
+            else:
+                result.set_exception(error)
 
     async def find_nearest(
         self,
@@ -268,7 +279,7 @@ class MemoryStore:
                     "Invalid query vector or namespace"
                 ) from None
             await self._slot.acquire()
-            worker: asyncio.Task[CacheMatch] | None = None
+            worker: asyncio.Future[CacheMatch] | None = None
             try:
                 async with self._lock:
                     self._purge()
@@ -283,12 +294,14 @@ class MemoryStore:
                             return None
                         snapshot = _Snapshot(items)
                         self._snapshots[namespace] = snapshot
-                worker = asyncio.create_task(
-                    asyncio.to_thread(_nearest, query, snapshot)
-                )
+                loop = asyncio.get_running_loop()
+                # Completion must clear ownership before waking even a fast caller.
+                result: asyncio.Future[CacheMatch] = loop.create_future()
+                search = partial(_nearest, query, snapshot)
+                worker = loop.run_in_executor(None, copy_context().run, search)
                 self._workers.add(worker)
-                worker.add_done_callback(self._worker_done)
-                match = await asyncio.shield(worker)
+                worker.add_done_callback(partial(self._worker_done, result))
+                match = await result
             finally:
                 # A running numerical worker owns the slot, including cancellation.
                 if worker is None:

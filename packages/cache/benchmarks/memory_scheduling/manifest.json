@@ -1,0 +1,148 @@
+{
+  "status": "DRAFT: reproducible single-reader P50 regressions block release",
+  "date": "2026-10-25",
+  "main": "4fdc884e876ef370b5c16c19a705138575a6226f",
+  "baseline_memory_sha256": "c6c13c8ba3d2e394f0a8fa5f83e1065533abaa4ae9c296fb6e3872abfb5cf4a7",
+  "final_memory_sha256": "3c733129296bf0afa89a11192dd7a9d35539d1aef1020b1ce627e396a9b13e73",
+  "earlier_prototype_memory_sha256": "3bcc138c02013ef02c812d83bc79abc40f1637a60208f04835153b689e63ce85",
+  "vectors_sha256": "c45c65575d0cc2ddcf5be16cdcd2bb69dc2fc13218314ede4e570113f852ed26",
+  "canonical_corpus_sha256": "2850b2e6afb07edecd15ab76a0d94d0e1ee93c5351a52ea44afe4eaa4a2d8181",
+  "corpus_file_sha256": "b7f5580a5125dc54e604642ff0199bca748bc9828c86dee465fef5bad69328e4",
+  "final_matrix": {
+    "entries": 4000,
+    "readers": [
+      1,
+      4,
+      16
+    ],
+    "pairs_per_cell": 5,
+    "processes": 30,
+    "requests": 24000,
+    "operations_per_path_process": 200,
+    "queue_observation": true,
+    "wrong": 0,
+    "errors": 0,
+    "pending_tasks": 0
+  },
+  "earlier_prototype_matrix": {
+    "entries": [
+      100,
+      1000,
+      4000
+    ],
+    "readers": [
+      1,
+      2,
+      4,
+      8,
+      16
+    ],
+    "pairs_per_cell": 5,
+    "processes": 150,
+    "requests": 120000,
+    "queue_observation": false,
+    "warning": "Different completion transport; these timings do not validate the corrected source across the full matrix."
+  },
+  "configuration": {
+    "embedding_dimensions": 1536,
+    "dtype": "float64",
+    "max_size": 5000,
+    "ttl": null,
+    "strict_threshold": 0.9691803520567825,
+    "semantic_threshold": 0.8,
+    "seed": 20261024,
+    "blas_threads": 1,
+    "warmup_exact_requests": 10,
+    "four_thousand": "Four copies of 1000 real vectors under explicit compatible-answer stress aliases; not4000 independently embedded strings.",
+    "mixed": "70/30 default-namespace exact hits / unique miss namespaces; native resolve,generation with zero delay,and admission. Not the unsafe unpartitioned V2 mixed workload."
+  },
+  "runtime": {
+    "python": "3.14.6",
+    "numpy": "2.4.6",
+    "pydantic": "2.13.4",
+    "os": "Windows x64",
+    "logical_cpus": 16,
+    "physical_cpus": 8,
+    "processor": "AMD64 Family25 Model80 Stepping0",
+    "affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "priority": "normal",
+    "openblas_readback": [
+      {
+        "dll": "libscipy_openblas64_-63c857e738469261263c764a36be9436.dll",
+        "getter": "scipy_openblas_get_num_threads64_",
+        "num_threads": 1
+      }
+    ]
+  },
+  "regression_criteria": {
+    "tails": "pairedmedianP95/P99 increase>10% AND>0.5ms with>=4/5adversepairs",
+    "one_reader": "pairedmedianP50 increase>5% AND>0.2ms with>=4/5adversepairs",
+    "cpu": "repeated pairedmedianCPU/request increase>15%",
+    "rss": "increase>max20%,64MiB",
+    "correctness": "any wrong result, leaked task, stale confirmation, lifecycle violation or unbounded resource use blocks release"
+  },
+  "confirmed_final_blockers": [
+    {
+      "size": 4000,
+      "workers": 1,
+      "phase": "exact",
+      "blocking": [
+        "single_reader_p50"
+      ],
+      "p50_pct": 6.755617045874507,
+      "p50_ms": 0.3564499999999997,
+      "adverse_pairs": 5
+    },
+    {
+      "size": 4000,
+      "workers": 1,
+      "phase": "semantic",
+      "blocking": [
+        "single_reader_p50"
+      ],
+      "p50_pct": 8.44189137865552,
+      "p50_ms": 0.44454999999999956,
+      "adverse_pairs": 5
+    }
+  ],
+  "artifact_sha256": {
+    "corrected-final-manifest.json": "35f3602e7661f6a060c4b23d0eb3653590632252f69638cc078c0a97be46aab6",
+    "corrected-final-plan.json": "37a21fb1bc23f9f7b8080b3a95a4f18da901bddc9571c1f32d29d3e788637774",
+    "corrected-final-verification.json": "03fcbbd6ccd876d562c59d55d5db47d5bed20ec76c289f3e954ad6e94441d881",
+    "corrected-final-assessment.json": "3a3f77281f54aa6768759b9503580d79a934c10007dca154ce9677dc4d4b5d84",
+    "confirmation-manifest.json": "c45ac9fcb8a9701fd62049fc483b86f8895d187c576cb6a5c4badd5394d37c78",
+    "confirmation-assessment.json": "6ec9a1cfae180ba2875ccb5c92275968b4b39b5e37b0e716011b6de81d04cfc3",
+    "experiment-plan.json": "d592b5f40e1dd9ec6c47f3a226514cdeaf00cd4fa7556c709eacf5dabc91c78f",
+    "provenance.json": "69e034e4fa5ce1a9bda2d0abfe686c5ceb00678c997d72230db1722d84b57906"
+  },
+  "harness_sha256": {
+    "bench.py": "204a71aca9b47c643a7537bf5c989955f4219d47824123dd2ccc23b78b23a476",
+    "corrected_bench.py": "474bcdb5cb7f0986784c73e56e43a32ffaba1f7638a01572a4ee06cde99f7324",
+    "corrected_final_matrix.py": "b695fa2a8f996e913479dba6ef292e32c46e4f717a5a5f29bc738f9224e5acf3",
+    "confirm_bench.py": "561acfceb4111db6865a4fc4234b78d674da2d7a9a6367bde53f44ba017d7a40",
+    "profiling.py": "baede7a34a8c904343985e58ee8b7059b0dcae0c107f8f151a324f36674c72e6",
+    "config.json": "09bf2b47189cb6dadfb4b04ea26afdb57b471b47a494c402bc0387630c007357"
+  },
+  "published_csv_sha256": {
+    "final-summary.csv": "f1929dc58fd3f9cf9e37230f3abd0a5de93bf60d91eb93bcc90d925ee0ae29bc",
+    "prototype-summary.csv": "beb0bdca5734ab1cf14f397405c21dcce73cd0b37afed82ce29cff26219d8356"
+  },
+  "raw_evidence": "Maintainer-owned Phase02 workspace Semantix_Memory_P2_20261025_b3836049; raw per-request CSVs,fresh-process JSONs,harnesses,and source variants retained there. Saved V2 vectors are required for replay; this folder contains derived summaries,not a standalone replacement benchmark."
+}
