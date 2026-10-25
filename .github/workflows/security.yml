@@ -83,6 +83,16 @@ jobs:
           --tag "${{ matrix.image }}"
           "${{ matrix.context }}"
 
+      - name: Verify patched frontend runtime
+        if: matrix.name == 'frontend'
+        run: |
+          docker run --rm --entrypoint sh "${{ matrix.image }}" -ec '
+            test "$(id -u)" = 101
+            apk info --exists "brotli-libs>=1.2.1-r0"
+            apk info --version brotli-libs
+            nginx -t
+          '
+
       - name: Scan image for actionable high-severity vulnerabilities
         uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
         with:
