@@ -1,41 +1,124 @@
-# MemoryStore Phase 02: reader scheduling and expiry bookkeeping
+# MemoryStore: selected combined implementation and shipping evidence
 
-**Publication decision: update existing PR #234 as draft. The implementation is useful for review; it is not merge-ready.** The selected follow-up preserves safe immediate dispatch and skips redundant expiry scans using one conservative deadline. It removes the original 4,000-entry single-reader P50 penalty: paired exact/semantic gains are 23.7%/23.9% versus the normalization baseline. All eight primary warm-hit concurrent benefit targets pass.
+**Selection: ship the conservative expiry deadline and immediate scheduling together.** The bounded four-implementation comparison found no repeatable material small-cache tail regression. Keep the existing implementation and all regression tests; no size-dependent scheduling shortcut, extra executor or expiry index is justified. Code and performance requirements pass. Final merge readiness requires green checks for the exact PR head; the PR description records that head and run. This report does not authorize an automatic merge.
 
-The remaining concern is the 100-entry/four-reader exact-hit tail: primary P99 +17.8% (+4.53 ms), 4/5 adverse; longer confirmation +26.2% (+4.55 ms), 3/5 adverse. The longer study does not satisfy the four-of-five material-regression repetition rule, but it does not establish that the substantial residual cost is harmless. Host-load differences confound attribution. Both studies remain visible; no claim of a resolved small-cache trade-off or merge readiness is made. Semantic P99 in the longer check was nearly flat (+0.21%, +0.03 ms).
+The selected runtime SHA256 is `38df02ddecc985f2bddae568f0ea2acbf52cea33a1ae72a10c2ac6b358d65201`. Main `5044c050b7f7a5ce57fa86158071b2fddac9e013` has the same cache package as the measured PR #233 normalization baseline `4fdc884e876ef370b5c16c19a705138575a6226f`, MemoryStore SHA256 `c6c13c8ba3d2e394f0a8fa5f83e1065533abaa4ae9c296fb6e3872abfb5cf4a7`. A normal merge synchronized current main without rewriting PR history. The cache runtime did not change during synchronization.
 
-CPU/RSS and correctness/resource gates pass locally. Finite-TTL sixteen-reader semantic benefit is less consistent (3/5 improving), despite favorable medians. This bounded phase ends with an updated draft and a specific remaining performance concern, not another open-ended campaign. Current main has advanced to `5044c050b7f7a5ce57fa86158071b2fddac9e013`; its cache package is unchanged from the measured baseline. Rebase remains deferred as requested.
+## Actual shipped behavior
 
-## Change and bottleneck attribution
+Numerical work is submitted immediately to the existing executor with the caller's context. One numerical worker remains admitted. A private completion future wakes the caller after ownership and admission are released, including already-finished success/error/cancellation. Cancelling a caller leaves started work owned until it drains; abandoned exceptions are consumed. Numerical scoring stays off the event loop.
 
-Baseline is merged PR #233, main `4fdc884e876ef370b5c16c19a705138575a6226f`, MemoryStore SHA256 `c6c13c8ba3d2e394f0a8fa5f83e1065533abaa4ae9c296fb6e3872abfb5cf4a7`. Final MemoryStore SHA256 is `38df02ddecc985f2bddae568f0ea2acbf52cea33a1ae72a10c2ac6b358d65201`. All final measurements below import and verify that exact source. Main has PR #233's normalization optimization already.
+One conservative monotonic expiry bound avoids global scans until some deadline is due. A due scan removes every expired entry, increments its counter and rebuilds the bound. Writes lower it when needed; removal/replacement may leave an early bound and cause an extra scan, never postpone expiry. Clear-all and close reset it. No heap/index, dependency, threshold, public API, numerical arithmetic or snapshot policy changes are introduced. Float64/ties, namespaces, revision confirmation, LRU and lifecycle contracts remain protected.
 
-The PR submits numerical work immediately to the existing executor, preserving each caller's context. One worker remains admitted at a time. A private completion future wakes the caller only after the worker's ownership and admission are released. Cancellation detaches the caller while the worker retains admission until it finishes; abandoned exceptions are consumed. No completion bypass or contention-sensitive ownership shortcut was adopted.
+Earlier diagnostics measured about 1.0–1.15 ms of aggregate expiry bookkeeping per request at 4,000 entries. Future/context/callback component spans were microseconds and did not explain the earlier single-reader penalty. Immediate submission reduced measured concurrent dispatch delay; the deadline bound removes redundant GIL-held metadata work. Instrumented spans overlap and are not additive latency estimates. Serialized admission and facade embedding/candidate validation remain bottlenecks.
 
-Separate profiles attributed material delay to scheduling and GIL-held expiry bookkeeping. At 1,000 entries the earlier matched profile measured submission-to-worker-entry around 2.9 ms on main versus 1.7–1.8 ms with immediate dispatch, while state-lock wait and warm snapshot preparation were small. At 4,000 entries, repeated global expiry scans consumed roughly 1.0–1.15 ms per request in aggregate. All instrumented future creation was about 4.6–4.8 microseconds, context copying about 1 microsecond, executor submission about 32 microseconds, and completion callbacks about 9 microseconds. These diagnostic spans overlap, include instrumentation, and are not additive. They do not establish that completion handling caused the historical 350–445 microsecond single-reader penalty.
+## Bounded small-cache isolation
 
-The selected follow-up removes that measured redundant metadata work. One conservative monotonic deadline lets `_purge` return before any expiry is due. A due scan removes all expired entries, increments their counters and rebuilds the next bound in the same pass. Writes lower the bound as needed. Removal/replacement can leave an early bound and cause one extra scan, but cannot postpone expiration. Clear-all and close reset the bound. No heap, expiry-index abstraction, additional worker, dependency, scoring change or public API change was introduced. This uses the preserved P1 expiry work as a read-only algorithm reference and evaluates it afresh with the current scheduling transport; old P1 timings are not evidence for this implementation.
+The plan was frozen before measurement. All four source variants use the same package, vectors, jobs, namespaces, thresholds and storage policy:
 
-Numerical scoring, `_query_vector`, `_Snapshot` and `_Item` ASTs match merged main exactly. Float64 reduction, tie ordering, snapshot retention and namespace/revision confirmation remain unchanged. Numerical search stays off the event loop. Search admission is still serialized, so queueing and facade embedding/candidate validation remain important limits.
+- **M:** current main after PR #233; original scheduling and full expiry scans.
+- **E:** deadline bound only, with main's scheduling/ownership methods unchanged.
+- **S:** immediate scheduling only, without the bound; preserved source `3c733129...`.
+- **C:** selected combined PR runtime `38df02dd...`.
 
-## Final acceptance experiment
+AST checks verify that M/E and S/C have matching scheduling methods, E/C and M/S have matching expiry methods, and all four share identical numerical/query/snapshot/item ASTs. E is an isolated comparison variant, not a shipped alternative or new public option.
 
-The plan and criteria were written before timing. Primary matrix: 100/1,000/4,000 entries × 1/4/16 readers × five paired fresh-process repetitions × two sources, **90 processes and 72,000 end-to-end requests**. Every process measures 200 requests on each of four native paths. Sources alternate order; every pair has identical vectors, labels, namespaces, seeds, thresholds, cache policies and observation wrappers. No samples were excluded for host load.
+Exactly 100 entries/four readers; exact and semantic native paths; 1,000 requests/path; eight matched blocks; four fresh processes per block: **32 processes / 64,000 requests**. Williams balanced orders and their reversals put every implementation in each trial position twice and balance predecessor order. Both four-block epochs and all per-block effects are retained. No host-load filtering, discarded timing sample, posthoc adjustment or threshold tuning was used. Local test/build activity was idle during timing.
 
-A separate default-TTL sensitivity uses 3,600 seconds, 1,000 entries and 1/4/16 readers, five pairs: **30 processes and 24,000 requests**. TTL policy is identical within each pair. This measures finite deadlines before they become due; it is not an expiry-storm performance claim. Exact expiry behavior, including equality at the deadline, is covered by clock-controlled tests and the original-scan differential oracle.
+Material small-cell criteria: paired median P95/P99 >10% **and** >0.5 ms, with at least 6/8 adverse pairs; CPU/request >15% with at least 6/8 adverse; RSS increase >max(20%,64 MiB) with at least 6/8 adverse; any wrong result, error, leak or invariant violation blocks. Six of eight is a slightly more conservative adverse-fraction rule than the earlier four of five. Remaining large inconsistent costs must be reported rather than automatically waived.
 
-Material criteria, unchanged after timing:
+### Small-cache latency
 
-- One-reader P50: median paired increase >5% **and** >0.2 ms, with at least 4/5 adverse pairs.
-- P95/P99: median paired increase >10% **and** >0.5 ms, with at least 4/5 adverse pairs.
-- CPU per request: median paired increase >15%, with at least 4/5 adverse pairs.
-- Peak RSS: median paired increase >max(20% of baseline, 64 MiB), with at least 4/5 adverse pairs.
-- Any incorrect result, error, stale confirmation, TTL/counter violation, leaked work or unbounded resource use blocks publication as a ready implementation.
-- Benefit target: at least 10% lower P50 and 10% higher throughput on warm exact/semantic hits at 1,000/4,000 entries and both 4/16 readers, with at least 4/5 pairs improving. Target misses are reported separately from harmful-regression gates.
+Values are medians of process measurements. Percentages are medians of matched per-block effects, which can differ from ratios of column medians. P99 has 1,000 observations per process.
 
-Values below are medians of process measurements, main → final PR source. Percentages are medians of paired effects, which can differ from ratios of column medians. CPU seconds cover exactly 200 requests per phase. Queue is numerical admission wait; it does not include all executor or event-loop scheduling. Peak RSS is process high-water memory and includes setup.
+| Implementation | Path | P50 ms | P95 ms | P99 ms | Requests/s | Paired P99 vs main | Adverse P99 pairs |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Main | exact | 12.160 | 12.890 | 13.370 | 327.119 | — | — |
+| Main | semantic | 12.268 | 13.100 | 14.270 | 324.670 | — | — |
+| Expiry only | exact | 12.093 | 12.930 | 13.606 | 329.415 | +1.69% | 5/8 |
+| Expiry only | semantic | 12.160 | 12.905 | 13.726 | 327.686 | -1.92% | 2/8 |
+| Scheduling only | exact | 12.099 | 12.713 | 13.102 | 329.381 | -3.09% | 2/8 |
+| Scheduling only | semantic | 12.111 | 12.902 | 13.437 | 327.644 | -4.13% | 2/8 |
+| Combined (selected) | exact | 11.993 | 12.697 | 13.346 | 331.654 | -2.62% | 2/8 |
+| Combined (selected) | semantic | 11.997 | 12.667 | 13.324 | 331.481 | -7.41% | 1/8 |
 
-### Primary latency and throughput
+### Small-cache CPU, RSS and numerical admission wait
+
+CPU totals cover **1,000 requests per path**. Queue is semaphore admission wait, not all executor/event-loop scheduling.
+
+| Implementation | Path | CPU s / 1,000 | Paired CPU vs main | End RSS MiB | Queue P50/P95/P99 ms |
+|---|---|---:|---:|---:|---|
+| Main | exact | 3.070 | — | 59.861 | 6.329/6.905/7.174 |
+| Main | semantic | 3.102 | — | 61.475 | 6.393/7.049/7.671 |
+| Expiry only | exact | 3.039 | -0.51% | 59.920 | 6.295/6.894/7.282 |
+| Expiry only | semantic | 3.055 | -0.76% | 61.479 | 6.333/6.894/7.409 |
+| Scheduling only | exact | 3.148 | +3.06% | 59.918 | 6.110/6.615/6.835 |
+| Scheduling only | semantic | 3.156 | +1.76% | 61.451 | 6.114/6.661/6.981 |
+| Combined (selected) | exact | 3.125 | +2.27% | 59.885 | 6.058/6.581/6.957 |
+| Combined (selected) | semantic | 3.141 | +0.00% | 61.404 | 6.049/6.583/6.882 |
+
+### Factorial effects and attribution
+
+E−M measures expiry with main scheduling; S−M measures scheduling without the bound; C−E measures scheduling with the bound; C−S measures expiry with immediate scheduling. These are source-factor comparisons, not claims about a particular callback or GIL mechanism.
+
+| Contrast | Path | Paired P50 | Paired P95 | Paired P99 | P99 delta ms | Adverse P99 | Material flags |
+|---|---|---:|---:|---:|---:|---:|---|
+| E-M | exact | -0.57% | +0.51% | +1.69% | +0.222 | 5/8 | None |
+| E-M | semantic | -1.01% | -1.44% | -1.92% | -0.271 | 2/8 | None |
+| S-M | exact | -0.55% | -0.97% | -3.09% | -0.414 | 2/8 | None |
+| S-M | semantic | -1.08% | -1.64% | -4.13% | -0.601 | 2/8 | None |
+| C-M | exact | -1.22% | -0.85% | -2.62% | -0.354 | 2/8 | None |
+| C-M | semantic | -2.06% | -3.66% | -7.41% | -1.075 | 1/8 | None |
+| C-E | exact | -0.59% | -2.32% | -1.15% | -0.153 | 4/8 | None |
+| C-E | semantic | -1.03% | -2.21% | -4.10% | -0.578 | 2/8 | None |
+| C-S | exact | -0.89% | +0.22% | +2.47% | +0.320 | 6/8 | None |
+| C-S | semantic | -1.10% | -1.62% | -1.42% | -0.185 | 3/8 | None |
+
+Combined exact P50/P95 improved in all eight blocks; P99 improved in six. Exact P99 paired median was −2.62% (−0.354 ms), with both epoch medians negative; its two adverse pairs were +3.24% and +7.83%, neither individually above the relative material threshold. Semantic P99 median was −7.41% (−1.075 ms), improving in seven blocks and in both epochs. No contrast met a material regression rule. Combined versus expiry-only P99 medians were −1.15% exact and −4.10% semantic; expiry-only has no demonstrated tail advantage that warrants discarding scheduling.
+
+**Small costs are retained:** combined exact CPU/request increased a median 2.27% in 8/8 blocks (about 0.070 s per 1,000 requests as a paired absolute effect), below the 15% gate. Scheduling-only exact CPU increased 3.06% in 8/8. Combined versus scheduling-only exact P99 increased 2.47% (+0.320 ms) in 6/8, below both material limits. This modest cost is justified by the verified latency/throughput gains and bounded resource use; it is not hidden or relabeled as an improvement.
+
+Host CPU medians for M/C were 8.94%/8.62% on exact and 9.58%/8.83% on semantic; exact paired host differences ranged −3.73 to +2.77 percentage points. These conditions were quieter and more closely matched than earlier studies. The experiment supports no repeatable material implementation effect under its conditions. It does not prove host load alone caused earlier spikes or guarantee behavior at every host load/frequency/thermal state.
+
+## Earlier adverse evidence and the engineering decision
+
+The earlier five-pair 100-entry/four-reader comparison had exact P99 +17.8% (+4.53 ms), 4/5 adverse, and semantic P99 +11.8%, 4/5 adverse. Its longer exact confirmation retained +26.2% (+4.55 ms), 3/5 adverse; longer semantic P99 was nearly flat (+0.21%). The exact direction was adverse in 7/10 old process pairs. Those data, failed/positive observations and reports remain immutable outside the repository.
+
+Those studies had substantial source-correlated host differences: exact host medians 40.7%→55.1% in the primary study and 16.2%→23.3% in the longer check. They established uncertainty and justified the draft; they did not establish a single implementation cause. The new source-isolating, position-balanced eight-block evidence does not reproduce their material latency effect in C−M, S−M or C−E. Removing scheduling would sacrifice large measured benefits without evidence of a remaining unacceptable small-cache cost. **Retain C and ship when exact-head CI passes**, with the small CPU cost and historical host-dependent uncertainty disclosed. No new broad audit, artificial workload tuning or further timing campaign was started.
+
+## Final-source representative sanity checks
+
+After selection and main synchronization, only 1,000/16 and 4,000/16 cells were measured again: three alternating fresh pairs, unchanged four native paths, 200 requests/path, **12 processes / 9,600 requests**. This is a supplement to the same-source five-pair full matrix below, not a replacement. Any wrong/error/leak blocks; repeated all-three tail/CPU/RSS effects beyond the unchanged numerical limits would prevent merge readiness. No alerts occurred; zero wrong results, errors, pending tasks or unexpected stderr. Maximum child peak RSS was 402.6 MiB.
+
+| Entries | Readers | Path | P50 ms | P95 ms | P99 ms | Requests/s | Paired P50 | Adverse P50 pairs |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|
+| 1000 | 16 | exact | 54.967 → 48.981 | 58.197 → 50.428 | 58.804 → 50.941 | 289.792 → 324.562 | -11.3% | 0/5 |
+| 1000 | 16 | miss | 52.965 → 48.272 | 58.469 → 49.000 | 58.823 → 49.422 | 300.953 → 329.893 | -9.1% | 0/5 |
+| 1000 | 16 | mixed | 57.837 → 54.338 | 62.919 → 59.605 | 65.850 → 61.093 | 273.928 → 292.373 | -6.0% | 0/5 |
+| 1000 | 16 | semantic | 55.373 → 49.473 | 57.379 → 50.868 | 57.645 → 51.357 | 287.186 → 320.501 | -10.2% | 0/5 |
+| 4000 | 16 | exact | 88.790 → 52.446 | 93.301 → 54.835 | 94.442 → 55.173 | 180.061 → 300.777 | -40.2% | 0/5 |
+| 4000 | 16 | miss | 83.835 → 53.271 | 86.056 → 55.969 | 86.622 → 56.882 | 190.247 → 295.670 | -36.7% | 0/5 |
+| 4000 | 16 | mixed | 85.196 → 65.222 | 93.868 → 71.282 | 96.361 → 73.739 | 184.517 → 243.538 | -21.4% | 0/5 |
+| 4000 | 16 | semantic | 89.722 → 52.670 | 92.430 → 55.081 | 93.385 → 55.815 | 177.850 → 297.260 | -41.1% | 0/5 |
+
+CPU totals below cover **200 requests per path**. The 1,000-entry miss CPU median increases 6.8%, below its material criterion; all metrics and individual effects remain in the external assessment.
+
+| Entries | Readers | Path | CPU s / 200 | End RSS MiB | Peak RSS MiB | Queue P50 ms | Queue P95 ms | Queue P99 ms |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|
+| 1000 | 16 | exact | 0.703 → 0.719 | 136.082 → 136.344 | 146.836 → 146.848 | 48.590 → 42.939 | 51.247 → 44.429 | 52.463 → 44.717 |
+| 1000 | 16 | miss | 0.688 → 0.703 | 139.164 → 139.543 | 146.836 → 146.848 | 46.842 → 42.350 | 51.894 → 43.161 | 52.424 → 43.632 |
+| 1000 | 16 | mixed | 0.734 → 0.703 | 142.957 → 142.918 | 146.836 → 146.848 | 51.619 → 48.805 | 56.319 → 53.523 | 58.396 → 54.433 |
+| 1000 | 16 | semantic | 0.719 → 0.656 | 139.559 → 139.855 | 146.836 → 146.848 | 49.017 → 43.462 | 50.956 → 44.725 | 51.295 → 45.174 |
+| 4000 | 16 | exact | 1.125 → 0.953 | 357.113 → 356.973 | 402.559 → 402.539 | 79.371 → 46.188 | 83.792 → 48.590 | 84.871 → 49.286 |
+| 4000 | 16 | miss | 1.062 → 0.875 | 360.148 → 360.305 | 402.559 → 402.539 | 75.153 → 47.059 | 77.399 → 49.679 | 77.680 → 50.589 |
+| 4000 | 16 | mixed | 1.125 → 0.969 | 361.918 → 361.781 | 402.559 → 402.539 | 77.341 → 58.648 | 83.382 → 64.426 | 86.567 → 66.082 |
+| 4000 | 16 | semantic | 1.094 → 0.906 | 360.637 → 360.504 | 402.559 → 402.539 | 80.298 → 46.407 | 82.837 → 48.727 | 83.816 → 49.570 |
+
+## Preserved same-source full matrix
+
+The runtime hash is unchanged, so the previously verified 90-process/72,000-request five-pair matrix remains valid source-specific evidence: 100/1,000/4,000 entries, 1/4/16 readers, four paths, 200 requests/path. Main's cache package is unchanged. Do not splice its absolute timings with the newer session. All eight 1,000/4,000-entry warm exact/semantic concurrent benefit targets passed: ≥10% lower P50 and ≥10% higher throughput, at least 4/5 pairs improving.
+
+The original gates remain: one-reader P50 >5% and >0.2 ms with ≥4/5 adverse; P95/P99 >10% and >0.5 ms with ≥4/5 adverse; CPU/request >15% with ≥4/5 adverse; peak RSS >max(20%,64 MiB) with ≥4/5 adverse; any correctness/resource violation blocks. The two historical small-cache tail flags are investigated above, not erased.
 
 | Entries | Readers | Path | P50 ms | P95 ms | P99 ms | Requests/s | Paired P50 | Adverse P50 pairs |
 |---:|---:|---|---:|---:|---:|---:|---:|---:|
@@ -76,8 +159,6 @@ Values below are medians of process measurements, main → final PR source. Perc
 | 4000 | 16 | mixed | 143.438 → 103.529 | 160.012 → 118.965 | 164.700 → 123.042 | 110.043 → 152.763 | -27.0% | 0/5 |
 | 4000 | 16 | semantic | 147.160 → 94.253 | 161.925 → 107.783 | 163.928 → 110.697 | 107.552 → 166.689 | -35.7% | 0/5 |
 
-### Primary CPU, memory and queue wait
-
 | Entries | Readers | Path | CPU s / 200 | End RSS MiB | Peak RSS MiB | Queue P50 ms | Queue P95 ms | Queue P99 ms |
 |---:|---:|---|---:|---:|---:|---:|---:|---:|
 | 100 | 1 | exact | 0.875 → 0.875 | 58.992 → 59.027 | 59.027 → 59.027 | 0.004 → 0.004 | 0.006 → 0.006 | 0.008 → 0.008 |
@@ -117,140 +198,28 @@ Values below are medians of process measurements, main → final PR source. Perc
 | 4000 | 16 | mixed | 1.812 → 1.562 | 361.805 → 361.871 | 402.516 → 403.438 | 129.389 → 93.452 | 143.227 → 106.045 | 148.591 → 108.734 |
 | 4000 | 16 | semantic | 1.844 → 1.625 | 360.578 → 361.477 | 402.516 → 403.438 | 131.815 → 83.324 | 144.755 → 96.307 | 149.125 → 98.657 |
 
-### Every adverse primary latency median
+The same-source finite-TTL sensitivity has 30 processes/24,000 requests at 1,000 entries, 1/4/16 readers and 3,600s TTL. No material regression rule was met. Sixteen-reader semantic benefit was less consistent: median P50 −22.8% and throughput +23.5%, but only 3/5 improving, short of the 4/5 benefit target. Its two adverse P50 effects were +12.4%/+23.5%, P99 +21.8%/+39.4%. These are a documented consistency limit, not a fully qualified finite-TTL benefit claim. No expiry-storm performance claim is made.
 
-All positive paired latency medians are retained, including small or inconsistent ones. An isolated unfavorable pair is uncertainty, not automatically a demonstrated regression. Repeated material effects use the criteria above.
+## Correctness, compatibility and CI
 
-| Entries | Readers | Path | Metric | Paired change | Absolute change ms | Adverse pairs | Material blocker |
-|---:|---:|---|---|---:|---:|---:|---|
-| 100 | 1 | exact | P50 | +3.25% | +0.138 | 3/5 | No |
-| 100 | 1 | exact | P99 | +6.22% | +0.318 | 3/5 | No |
-| 100 | 4 | exact | P50 | +6.96% | +1.534 | 3/5 | No |
-| 100 | 4 | exact | P95 | +13.12% | +3.167 | 5/5 | YES |
-| 100 | 4 | exact | P99 | +17.80% | +4.530 | 4/5 | YES |
-| 100 | 4 | miss | P50 | +11.88% | +1.740 | 4/5 | No |
-| 100 | 4 | miss | P95 | +8.09% | +1.619 | 4/5 | No |
-| 100 | 4 | miss | P99 | +7.40% | +1.292 | 4/5 | No |
-| 100 | 4 | mixed | P95 | +3.19% | +0.767 | 3/5 | No |
-| 100 | 4 | mixed | P99 | +20.94% | +5.279 | 3/5 | No |
-| 100 | 4 | semantic | P50 | +2.62% | +0.438 | 5/5 | No |
-| 100 | 4 | semantic | P95 | +19.42% | +4.194 | 5/5 | YES |
-| 100 | 4 | semantic | P99 | +11.77% | +2.863 | 4/5 | YES |
-| 100 | 16 | mixed | P99 | +3.47% | +3.011 | 3/5 | No |
-| 100 | 16 | semantic | P95 | +0.70% | +0.515 | 3/5 | No |
-| 100 | 16 | semantic | P99 | +1.12% | +0.845 | 3/5 | No |
-| 1000 | 1 | mixed | P99 | +16.17% | +1.385 | 3/5 | No |
-| 1000 | 1 | semantic | P99 | +3.56% | +0.250 | 3/5 | No |
+The selected synchronized source passed configured Ruff/format, strict mypy and pinned Pyright; the full offline suite passed **1,572 tests, with 80 skipped and 401 service-dependent cases deselected**. Source-checked Python 3.14 memory/inspection validation passed **108 tests, 66 deselected**; server embedded parity passed **24**; reuse-quality validation and both custom examples passed. Four-factor preflight passed all 77 existing memory tests on M/S and all 85 including expiry on E/C. Existing assertions remain unchanged.
 
-### One targeted longer confirmation: 100 entries, four readers
+The deadline tests cover exact monotonic equality, finite/no expiry, global cleanup across namespaces, counters, replacement/removal with early bounds, clear-all/close, and three seeded 240-operation histories against main's original full-scan oracle. Scheduling barriers protect waiting/running cancellation, already-finished results/errors/cancellation, submission failures, abandoned errors, cold snapshot ownership, context, stale revisions and shutdown. Numerical/query/snapshot/item ASTs are identical across variants and current main.
 
-The primary 100-entry/four-reader exact and semantic tails crossed the predefined material threshold. Candidate phases also had higher host CPU load: exact medians 40.7% → 55.1%, and semantic paired differences +2.7 to +21.0 percentage points. That is a measured confound, not grounds to discard those samples. Before further timing, the permitted single longer check was fixed: the same 100-entry/four-reader cell, five paired fresh processes per source, 2,000 requests each on exact and semantic hits, 10 processes and 40,000 requests. Criteria and resource limits stayed unchanged. Both paths run in order on the same store, and no samples are excluded. This isolates the affected hit paths rather than rerunning the full matrix.
+The existing exact-source resource proof remains applicable: 5,000 entries, 32 cancelled callers, 128 replacement writes, 100 store cycles, maximum one active numerical worker, 480.3 MiB peak, no owned work after drainage and threads returning after executor shutdown. Source/dependencies/ownership are unchanged, so it was not needlessly repeated.
 
-**The exact-hit tail risk remains unresolved; keep the PR draft.** Longer exact P95/P99 effects are +11.5%/+26.2% (+1.78/+4.55 ms), adverse in 3/5 pairs. This does not satisfy the predeclared >=4/5 rule in the confirmation, but the P99 direction was adverse in 7/10 process pairs across the two separately reported studies. It is not an isolated unfavorable sample. Exact throughput fell a median 4.8%; CPU/request rose 6.6%, below its material threshold. Longer semantic P95/P99 were +0.61%/+0.21%, neither material. Exact host CPU medians were 16.2% → 23.3%, so a causal implementation regression is not established. No host adjustment, sample exclusion or pooling of the two studies is used. The evidence is insufficient to recommend merging this small-cache trade-off; no second confirmation or new campaign was run.
+Actual current-runtime CI on `f2dee6d` previously passed all 39 Quality jobs, including embedded Python 3.11–3.14, live-store coverage, wheel/certification checks and 94.74% combined coverage on Python 3.14. Synchronization adopted only main's already-approved frontend/security changes; **fresh required checks for the final PR head must also pass**. The PR description records the exact new run/head and outcome; historical CI is not presented as a current-head pass. Local service skips are not passing integration evidence. The unchanged 90% coverage and security gates remain in force.
 
-| Entries | Readers | Path | P50 ms | P95 ms | P99 ms | Requests/s | Paired P50 | Adverse P50 pairs |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 100 | 4 | exact | 13.914 → 14.406 | 15.490 → 17.275 | 17.395 → 21.946 | 283.840 → 270.272 | +3.5% | 3/5 |
-| 100 | 4 | semantic | 14.194 → 13.641 | 17.004 → 15.761 | 19.658 → 18.177 | 273.924 → 287.483 | +0.5% | 3/5 |
+An earlier untouched Windows mocked-provider timer test failed on main 2/5 in bounded isolation versus candidate 0/5; subsequent full suites, including this final run, passed. Provider code is unchanged; that separate uncertainty remains recorded, without broadening this task.
 
-The following CPU totals cover **2,000 requests** per phase, unlike the 200-request primary table.
+## Reproduction and limits
 
-| Entries | Readers | Path | CPU s / 2,000 | End RSS MiB | Peak RSS MiB | Queue P50 ms | Queue P95 ms | Queue P99 ms |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 100 | 4 | exact | 7.156 → 7.625 | 60.738 → 60.668 | 60.738 → 60.668 | 7.305 → 7.300 | 8.284 → 8.823 | 9.895 → 11.568 |
-| 100 | 4 | semantic | 7.312 → 7.203 | 62.824 → 62.754 | 62.824 → 62.859 | 7.433 → 6.912 | 8.993 → 8.061 | 10.596 → 9.949 |
+Saved V2 `text-embedding-3-small` vectors are 1,325×1,536D float64; zero new provider calls. Strict threshold 0.9691803520567825; 13 frozen development semantic queries at threshold 0.8; capacity 5,000; seed 20261024; ten exact warmups. Primary timing TTL is disabled; finite-TTL evidence is separate. The 4,000-entry stress repeats 1,000 real vectors using compatible-answer aliases, not 4,000 independently embedded prompts. Four paths are exact hit, populated-scope read-only miss, semantic hit and qualified 70/30 native mixed resolution with unique miss namespaces and zero-delay generation. Fixture correctness is not proof of general semantic-reuse safety.
 
-| Entries | Readers | Path | Metric | Paired change | Absolute change ms | Adverse pairs | Material blocker |
-|---:|---:|---|---|---:|---:|---:|---|
-| 100 | 4 | exact | P50 | +3.54% | +0.492 | 3/5 | No |
-| 100 | 4 | exact | P95 | +11.52% | +1.785 | 3/5 | No |
-| 100 | 4 | exact | P99 | +26.17% | +4.552 | 3/5 | No |
-| 100 | 4 | semantic | P50 | +0.54% | +0.068 | 3/5 | No |
-| 100 | 4 | semantic | P95 | +0.61% | +0.082 | 3/5 | No |
-| 100 | 4 | semantic | P99 | +0.21% | +0.030 | 3/5 | No |
+Windows x64, CPython 3.14.6, NumPy 2.4.6, Pydantic 2.13.4, 8 physical/16 logical CPUs. BLAS limits are one before import and the loaded getter reads back one. No affinity, priority, power, GC or production BLAS changes were made. Host busy is measured, not CPU frequency/thermals; Linux performance and behavior under every host state are not established. Historical 1,000-entry GPTCache P50 6.001/10.759 ms at 4/16 readers is a reference only; no fresh head-to-head or competitive victory is claimed.
 
-### Finite-TTL sensitivity: latency and throughput
+The narrow rule `/packages/cache/benchmarks/memory_scheduling/*.csv` remains. Only this narrative and [the provenance manifest](manifest.json) are tracked here. Original CSVs remain untracked with their recorded hashes and local copies intact. Full raw CSVs, process JSONs, source variants, frozen plans, assessments, harnesses, failed/positive records and old reports remain in maintainer workspace `Semantix_Memory_P2_20261025_b3836049`. Saved V2 vectors and P1 research are preserved. This PR alone is not independently reproducible without that external evidence; the manifest records the access limitation and hashes.
 
-| Entries | Readers | Path | P50 ms | P95 ms | P99 ms | Requests/s | Paired P50 | Adverse P50 pairs |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 1000 | 1 | exact | 6.222 → 5.574 | 7.127 → 6.597 | 7.584 → 7.405 | 158.411 → 176.528 | -9.5% | 0/5 |
-| 1000 | 1 | miss | 5.942 → 5.492 | 7.071 → 6.600 | 7.753 → 7.365 | 166.856 → 178.955 | -9.9% | 0/5 |
-| 1000 | 1 | mixed | 6.237 → 5.609 | 7.239 → 6.889 | 7.707 → 7.392 | 158.143 → 173.853 | -11.4% | 0/5 |
-| 1000 | 1 | semantic | 6.169 → 5.472 | 7.460 → 6.643 | 7.807 → 7.515 | 159.186 → 178.775 | -11.5% | 0/5 |
-| 1000 | 4 | exact | 24.660 → 20.362 | 28.197 → 22.882 | 32.595 → 24.788 | 160.295 → 194.447 | -18.4% | 0/5 |
-| 1000 | 4 | miss | 24.567 → 20.091 | 27.002 → 22.216 | 28.528 → 24.923 | 161.464 → 196.604 | -15.3% | 0/5 |
-| 1000 | 4 | mixed | 25.160 → 22.603 | 32.629 → 30.899 | 34.262 → 32.575 | 154.944 → 171.561 | -10.2% | 0/5 |
-| 1000 | 4 | semantic | 26.843 → 20.569 | 32.481 → 22.623 | 33.593 → 24.197 | 144.426 → 193.605 | -20.6% | 0/5 |
-| 1000 | 16 | exact | 109.010 → 93.677 | 120.895 → 109.958 | 126.321 → 114.846 | 146.147 → 166.550 | -20.0% | 1/5 |
-| 1000 | 16 | miss | 102.523 → 92.681 | 119.439 → 102.300 | 121.765 → 103.407 | 151.918 → 169.134 | -19.6% | 1/5 |
-| 1000 | 16 | mixed | 112.758 → 95.080 | 133.466 → 132.424 | 137.793 → 137.696 | 138.567 → 165.172 | -24.4% | 1/5 |
-| 1000 | 16 | semantic | 110.989 → 104.539 | 138.989 → 133.441 | 142.117 → 139.095 | 141.116 → 146.519 | -22.8% | 2/5 |
+`ship_small.py` replays the fixed 32-process Williams comparison using preserved `corrected_bench.launch`; `ship_assess.py` verifies source hashes, all labels/jobs/namespaces/generation counts, task drainage and stderr before calculating factorial/epoch effects. `ship_sanity.py` records the two selected-source larger cells. Replays must use fresh IDs/manifests and the frozen environment/config/network guard, never overwrite historical evidence.
 
-### Finite-TTL sensitivity: CPU, memory and queue wait
-
-| Entries | Readers | Path | CPU s / 200 | End RSS MiB | Peak RSS MiB | Queue P50 ms | Queue P95 ms | Queue P99 ms |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 1000 | 1 | exact | 1.266 → 1.141 | 136.059 → 136.145 | 146.922 → 146.910 | 0.005 → 0.005 | 0.007 → 0.007 | 0.009 → 0.009 |
-| 1000 | 1 | miss | 1.188 → 1.125 | 139.227 → 139.285 | 146.922 → 146.910 | 0.005 → 0.005 | 0.007 → 0.007 | 0.009 → 0.009 |
-| 1000 | 1 | mixed | 1.266 → 1.156 | 141.805 → 141.836 | 146.922 → 146.910 | 0.005 → 0.005 | 0.007 → 0.007 | 0.009 → 0.009 |
-| 1000 | 1 | semantic | 1.266 → 1.141 | 139.531 → 139.598 | 146.922 → 146.910 | 0.005 → 0.005 | 0.007 → 0.007 | 0.009 → 0.009 |
-| 1000 | 4 | exact | 1.266 → 1.172 | 136.285 → 136.398 | 146.973 → 146.938 | 13.585 → 10.505 | 15.709 → 12.150 | 17.564 → 13.275 |
-| 1000 | 4 | miss | 1.203 → 1.109 | 139.469 → 139.566 | 146.973 → 146.938 | 13.526 → 10.333 | 15.382 → 11.613 | 16.152 → 13.382 |
-| 1000 | 4 | mixed | 1.312 → 1.188 | 142.199 → 142.141 | 146.973 → 146.938 | 14.502 → 12.752 | 20.650 → 18.915 | 21.878 → 20.041 |
-| 1000 | 4 | semantic | 1.328 → 1.188 | 139.895 → 139.887 | 146.973 → 146.938 | 14.772 → 10.551 | 17.452 → 12.304 | 19.231 → 12.889 |
-| 1000 | 16 | exact | 1.391 → 1.297 | 136.820 → 137.004 | 146.812 → 146.984 | 96.515 → 82.653 | 106.444 → 97.569 | 114.993 → 101.549 |
-| 1000 | 16 | miss | 1.328 → 1.344 | 140.148 → 140.219 | 146.812 → 146.984 | 90.897 → 81.630 | 105.714 → 90.794 | 108.796 → 91.467 |
-| 1000 | 16 | mixed | 1.453 → 1.281 | 143.156 → 143.051 | 146.812 → 146.984 | 101.104 → 85.777 | 120.511 → 120.142 | 128.695 → 123.407 |
-| 1000 | 16 | semantic | 1.438 → 1.406 | 140.699 → 140.488 | 146.812 → 146.984 | 98.808 → 92.357 | 123.437 → 118.899 | 126.204 → 123.908 |
-
-### Every adverse finite-TTL latency median
-
-No positive median paired P50/P95/P99 effects in this comparison.
-
-All eight primary warm-hit benefit targets passed. The finite-TTL sixteen-reader semantic cell missed the four-of-five repetition target: median paired P50 −22.8% and throughput +23.5%, but two of five pairs were adverse (P50 +12.4%/+23.5%, P99 +21.8%/+39.4%). Its median tails and CPU improved and it did not meet the repeated material-regression rule. This is a disclosed consistency limit, not a fully qualified finite-TTL benefit claim.
-
-The external assessments additionally retain every per-pair ratio and absolute difference, CPU/RSS effects, host CPU busy and thread counts, and explicit material blockers and benefit-target misses. Full raw per-request evidence is preserved outside Git.
-
-## Implemented and rejected candidates
-
-The current candidate first passed a three-pair scout against both merged main and the previously published PR source at 4,000 entries and 1/4/16 readers: 27 fresh processes, 21,600 requests. Compared with the published implementation, one-reader exact/semantic P50 improved 18.3%/17.4%; four-reader exact improved 31.5%, sixteen-reader exact 20.2%. Four-reader mixed P95/P99 worsened 5.5%/4.3% in two of three pairs; those observations remain in the scout assessment and did not meet the predefined obvious-harm rule. These are scouting results, not substitutes for the five-pair final matrix above.
-
-Previously implemented alternatives remain preserved externally: admission caps 2/4 and four-request batching worsened mixed tails; a one-turn yield and deferred `to_thread` task did not pass their paired scout. They were not repeated or adopted. No extra executor, cap 8, event-loop numerical fast path, mandatory dependency, Rust or FAISS was added.
-
-The original private-future source `3c733129296bf0afa89a11192dd7a9d35539d1aef1020b1ce627e396a9b13e73` had one-reader exact/semantic P50 regressions of 6.8%/8.4%, adverse in all five original pairs. Its concurrent exact gains were 21.1%/24.7% at 4/16 readers. Those source-specific results remain unchanged externally; they do not describe the new source. A later unchanged-source three-pair scout did not reproduce that single-reader cost, which adds uncertainty rather than erasing the original evidence. An earlier 150-process matrix and longer confirmation used source `3bcc138c02013ef02c812d83bc79abc40f1637a60208f04835153b689e63ce85`, a different completion transport; they are explicitly historical, not final-source qualification. Original reports are archived in the maintainer workspace.
-
-## Correctness, failure paths and CI
-
-The new deadline tests cover reads without scans, finite/non-expiring entries, exact monotonic equality, foreign-namespace cleanup, revision confirmation, replacement/deletion with conservative early bounds, counters, clear-all and close. Three seeded 240-operation histories compare against main's original full-scan algorithm, including TTL writes, eviction, namespace clear, deletion, nearest lookup and hit confirmation. Keys, LRU ordering, revisions, entries, expiry deadlines and counters must match exactly. No production assertions or existing regression tests were removed.
-
-The inspection fixture formerly rewrote private entry expiry directly. It now writes a genuine finite TTL and advances the monotonic clock to the stored deadline, leaving UTC metadata independent. The existing assertions are retained, the read-only state snapshot also includes the deadline bound, and all 23 memory inspection tests pass against original main with this fixture.
-
-Local final-source evidence:
-
-- 85 numerical/snapshot/scheduling/expiry tests pass on Python 3.11 and 3.14 with source-import assertions, including existing cancellation, already-finished success/error/cancellation, executor failure, context, stale revisions, namespace isolation and shutdown checks.
-- Full offline package suite: **1,572 passed, 80 skipped, 401 deselected**. MySQL/PostgreSQL/Redis live-service coverage is not represented as passing locally.
-- Server embedded parity: 24 passed with source-import assertions. Reuse-quality validation and both custom integration/store examples pass.
-- Configured Ruff/format, strict mypy and pinned Pyright pass. Wheel/sdist build, Twine and archive validation pass.
-- Near-capacity resource proof: 5,000 entries, 32 cancelled callers, 128 replacement writes and 100 new-store cycles. Maximum active numerical workers remains one; peak RSS 480.3 MiB; thread count returns to the starting count after executor and monitor shutdown. Drained workers and snapshots are empty after cancellation/mutation; resource ownership stays bounded.
-
-Initial offline validation exposed the inspection fixture issue above, which was corrected without weakening assertions. A subsequent full run hit the untouched mocked provider test `test_swallowed_deadline_still_fails_safely`. In ten bounded isolation processes, unchanged main failed 2/5 and this candidate failed 0/5; the provider implementation is byte-identical. The final full run passed. This remains a disclosed Windows timer-dependent provider uncertainty, not a passing live-provider test or a reason to alter provider code in this PR. Earlier failed logs/XML remain preserved.
-
-The current-source CI status and exact run/head are recorded in the PR description and GitHub checks; the manifest records required CI gates separately from local evidence. Earlier runtime commit `2bc156d` passed embedded Python 3.11–3.14, MySQL/PostgreSQL/Redis compatibility and certification checks; the 3.14 embedded job had 94.75% combined coverage. That receipt does not validate this new source. Actual GitHub full-service CI and the unchanged 90% coverage gate must qualify the current head. The frontend security/base updates are handled separately by the maintainer; no scan threshold, ignore list or CI assertion is weakened here. Rebase is deferred until those main updates are ready, as requested. No merge is authorized.
-
-## Workload and interpretation limits
-
-Saved V2 `text-embedding-3-small` vectors: 1,325 × 1,536D float64; zero new model calls. The 4,000-entry stress case repeats 1,000 real vectors four times under explicit compatible-answer aliases; it is not 4,000 independently embedded prompts. The semantic path uses 13 frozen development queries at threshold 0.8, strict threshold is 0.9691803520567825. Capacity 5,000; seed 20261024; ten exact warmups; 200 measured requests per path per process. Primary TTL is disabled; the finite-TTL sensitivity is separate.
-
-Four native paths: exact hit; read-only populated-scope miss; semantic hit; qualified 70/30 mixed resolution with default-namespace exact hits, unique miss namespaces, zero-delay generation and native admission. This differs from unsafe unpartitioned ID-heavy V2 mixing. Fixture correctness is checked for every result and generation count; it is not proof of general semantic-reuse safety or a cached answer's correctness.
-
-Windows x64, CPython 3.14.6, NumPy 2.4.6, Pydantic 2.13.4, 8 physical/16 logical CPUs, normal priority and full affinity. OMP/OPENBLAS/MKL limits are one before NumPy import; the loaded OpenBLAS getter reads back one. No affinity, power policy, GC or production BLAS default was changed. Host load is retained per phase; process order alternates and effect sizes use matched pairs. Historical and current-session absolute times are not spliced together. P99 uses 200 observations per process; platform and expiry-storm performance were not independently established. Windows per-thread CPU ticks were too coarse to attribute short numerical kernels; CPU figures are process measurements.
-
-No fresh comparable GPTCache head-to-head was run. Historical 1,000-entry GPTCache P50 targets of 6.001/10.759 ms at 4/16 readers remain reference points, not a current victory claim. Serialized numerical admission, facade validation and embedding conversion remain limits. No Phase 03, SQLite, adaptive threshold or PR #212 changes are included.
-
-## Artifacts and reproduction
-
-Only this narrative and [the provenance manifest](manifest.json) are tracked in this benchmark folder. The root rule is narrowly scoped: `/packages/cache/benchmarks/memory_scheduling/*.csv`. The original `final-summary.csv` and `prototype-summary.csv` remain on disk with their recorded hashes and are untracked. No generated CSV or broken CSV download link is added.
-
-Full raw per-request CSVs, fresh-process JSONs, source variants, frozen plans, assessments, logs and rejected candidates remain in the maintainer-owned `Semantix_Memory_P2_20261025_b3836049` workspace, outside the product repository. Saved V2 vectors and P1 research remain preserved. This PR alone is not independently reproducible without that external evidence; the manifest records source/input/harness/assessment hashes and this access limitation.
-
-Replay with the preserved `corrected_bench.launch(variant, size, readers, rep, queue_only=True, phases=['exact','miss','semantic','mixed'])`, sizes 100/1,000/4,000, readers 1/4/16, five repetitions, alternating baseline/frozen `p2expiry1` source order. The sensitivity adds `ttl_seconds=3600.0` at 1,000 entries. Verify source and vector hashes first, use the preserved environment and network guard, and generate fresh IDs/manifests rather than overwriting any existing evidence. `completion_final.py` records the exact controller and `completion_assess.py` verifies all job/namespace/label signatures, generation counts, source hashes, task drainage and stderr before applying the frozen criteria.
+The pre-sync head is retained as `perf/memory-reader-scheduling-research` and in an incremental verified Git bundle. No branch/history was discarded, no protected branch pushed, and no PR was automatically merged. No Phase 03, SQLite, adaptive thresholds, PR #212, mandatory dependency, Rust/FAISS or unrelated implementation work is included.
