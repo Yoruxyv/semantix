@@ -89,7 +89,7 @@ jobs:
           docker run --rm --entrypoint sh "${{ matrix.image }}" -ec '
             test "$(id -u)" = 101
             apk info --exists "brotli-libs>=1.2.1-r0"
-            apk info --version brotli-libs
+            apk list --installed brotli-libs
             nginx -t
           '
 
