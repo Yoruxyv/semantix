@@ -140,9 +140,68 @@
     "profiling.py": "baede7a34a8c904343985e58ee8b7059b0dcae0c107f8f151a324f36674c72e6",
     "config.json": "09bf2b47189cb6dadfb4b04ea26afdb57b471b47a494c402bc0387630c007357"
   },
-  "published_csv_sha256": {
+  "raw_evidence": "Maintainer-owned Phase02 workspace Semantix_Memory_P2_20261025_b3836049; raw per-request CSVs,fresh-process JSONs,harnesses,and source variants retained there. Saved V2 vectors are required for replay; this folder contains derived summaries,not a standalone replacement benchmark.",
+  "untracked_local_csv_sha256": {
     "final-summary.csv": "f1929dc58fd3f9cf9e37230f3abd0a5de93bf60d91eb93bcc90d925ee0ae29bc",
     "prototype-summary.csv": "beb0bdca5734ab1cf14f397405c21dcce73cd0b37afed82ce29cff26219d8356"
   },
-  "raw_evidence": "Maintainer-owned Phase02 workspace Semantix_Memory_P2_20261025_b3836049; raw per-request CSVs,fresh-process JSONs,harnesses,and source variants retained there. Saved V2 vectors are required for replay; this folder contains derived summaries,not a standalone replacement benchmark."
+  "artifact_policy": {
+    "tracked": [
+      "RESULTS.md",
+      "manifest.json"
+    ],
+    "generated_csvs_tracked": false,
+    "local_csvs_preserved": true,
+    "independent_reproduction": "Requires maintainer-owned Phase02 workspace, raw traces, source variants, harnesses and unchanged saved V2 vectors; these are not all distributed by this PR."
+  },
+  "followup": {
+    "decision": "KEEP_EXISTING_DRAFT: neither candidate passed predefined scout",
+    "runtime_changed": false,
+    "selected": null,
+    "scout_verification": {
+      "children": 12,
+      "requests": 9600,
+      "wrong": 0,
+      "errors": 0,
+      "pending_tasks": 0,
+      "unexpected_stderr": 0,
+      "source_imports_and_hashes_verified": true,
+      "identical_jobs_and_expected_labels": true
+    },
+    "diagnostic_processes": 4,
+    "conditional_final_run": false,
+    "candidate_sources_sha256": {
+      "published234": "3c733129296bf0afa89a11192dd7a9d35539d1aef1020b1ce627e396a9b13e73",
+      "yield234": "198abdfd43ef8176efa7cd635865e717902bce8f31c290c6fabcc10e9c743b79",
+      "task234": "061e541a75c0a0dc1ebfcd79ff41ed783ff8522e2dcd9ddd8045c41f6b30356e"
+    },
+    "external_evidence_sha256": {
+      "pr234-followup-plan.json": "e23891e66ba4fa7aad8b3c5bd2c689cfa57492297a2e0d4bba218d110c726b5d",
+      "pr234-scout-manifest.json": "354f210ee6fb25b3131afa456a8c637ccb1306b78e198cfc4fcfe43cb3bdc925",
+      "pr234-scout-assessment.json": "5e9b3812d44a444f5bc9779ce21bd91efe2868de95fdd52627cb30ec1f452ae2",
+      "pr234-diagnostic-summary.json": "97c24b41dffd99ce16ef64f9d8fa09002430f20167368f25c3c492aff12d80fa"
+    },
+    "external_harness_sha256": {
+      "followup_profile.py": "e67415e0d74089cc8900a3e636d686c2ef9577d214d7eac20bfadc0265f681fd",
+      "followup_profile_bench.py": "1ffd1e061e3400ab09a947942cd66f1556027917d1b5c4bef7c54c7779b1117c",
+      "followup_run_verified.py": "8e17052fec6d8b6b67672ab08a3268b9a131550e08dc6d7944b4a99ffbb61c76",
+      "followup_assess.py": "a1e7ee2e2e744f1d05246fdc6f79580af9a170180c03f98c3932fccd5cc2e902"
+    },
+    "caution": "New three-pair unchanged-source versus main results did not reproduce earlier single-reader cost; this is uncertainty, not an implemented fix. Original five-pair evidence remains unchanged."
+  },
+  "verified_ci": {
+    "head": "2bc156df975d8e0685e1c887967e80e0a6e66bc9",
+    "run": 40159585505,
+    "embedded_python": [
+      "3.11",
+      "3.12",
+      "3.13",
+      "3.14"
+    ],
+    "embedded": "PASS",
+    "coverage314_pct": 94.75,
+    "overall": "FAIL: frontend image vulnerability and dependent quality gate",
+    "main_inherited_run": 40152041542,
+    "out_of_scope_fix": "Frontend/dependency changes explicitly excluded by latest user scope."
+  }
 }
