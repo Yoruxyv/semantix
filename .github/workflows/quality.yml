@@ -361,7 +361,7 @@ jobs:
       - name: Require SQLite conformance without skips
         run: |
           uv run --no-sync python -c "import sqlite3; print(sqlite3.sqlite_version, sqlite3.threadsafety)"
-          uv run --no-sync pytest tests/test_sqlite.py tests/test_sqlite_faults.py tests/test_sqlite_processes.py tests/test_sqlite_conformance.py tests/test_sqlite_inspection.py tests/test_sqlite_cleanup.py --junitxml=.cache/sqlite.xml
+          uv run --no-sync pytest tests/test_sqlite.py tests/test_sqlite_faults.py tests/test_sqlite_processes.py tests/test_sqlite_conformance.py tests/test_sqlite_inspection.py tests/test_sqlite_cleanup.py tests/test_sqlite_search_snapshots.py --junitxml=.cache/sqlite.xml
           uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/sqlite.xml').findall('.//testcase'); assert cases and all(c.find('skipped') is None for c in cases), 'Required SQLite tests skipped'"
           uv run --no-sync python -m examples.sqlite_cache
       - name: Build and verify a clean installed SQLite consumer
@@ -412,7 +412,7 @@ jobs:
           LD_LIBRARY_PATH: /tmp/sqlite-min
         run: |
           uv run --no-sync python -c "import sqlite3; print(sqlite3.sqlite_version, sqlite3.threadsafety); assert sqlite3.sqlite_version == '3.51.3'"
-          uv run --no-sync pytest tests/test_sqlite.py tests/test_sqlite_faults.py tests/test_sqlite_processes.py tests/test_sqlite_conformance.py tests/test_sqlite_inspection.py tests/test_sqlite_cleanup.py --junitxml=.cache/sqlite.xml
+          uv run --no-sync pytest tests/test_sqlite.py tests/test_sqlite_faults.py tests/test_sqlite_processes.py tests/test_sqlite_conformance.py tests/test_sqlite_inspection.py tests/test_sqlite_cleanup.py tests/test_sqlite_search_snapshots.py --junitxml=.cache/sqlite.xml
           uv run --no-sync python -c "from xml.etree.ElementTree import parse; cases=parse('.cache/sqlite.xml').findall('.//testcase'); assert cases and all(c.find('skipped') is None for c in cases), 'Required SQLite tests skipped'"
           uv run --no-sync python -m examples.sqlite_cache
 

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Sequence
+from dataclasses import dataclass
 from time import monotonic, time_ns
 from typing import cast
 
 import numpy as np
+from numpy.typing import NDArray
 
 from ...._semantics import (
     cache_key_value,
@@ -73,10 +75,50 @@ def inspection_entry(
     )
 
 
+@dataclass(frozen=True, repr=False)
+class _SearchSnapshot:
+    namespace: str
+    observed: int
+    next_expiry: int | None
+    matrix: NDArray[np.float64]
+    metadata: tuple[tuple[str, int], ...]
+
+    def live_at(self, observed: int) -> bool:
+        return self.observed <= observed and (
+            self.next_expiry is None or observed < self.next_expiry
+        )
+
+
 class Database:
     def __init__(self, config: Configuration) -> None:
         self.config = config
         self.schema_version: int | None = None
+        self._validated: tuple[int, int] | None = None
+        self._snapshot: _SearchSnapshot | None = None
+
+    def invalidate(self) -> None:
+        """Drop derived state on the worker, or after owned cleanup completes."""
+        self._validated = None
+        self._snapshot = None
+
+    @staticmethod
+    def _change_token(job: Job) -> tuple[int, int]:
+        rows = job.rows("PRAGMA data_version")
+        if len(rows) != 1 or len(rows[0]) != 1 or type(rows[0][0]) is not int:
+            raise ValueError("Invalid SQLite change token")
+        return rows[0][0], job.connection.total_changes
+
+    def _retain_after_hit(self, job: Job, before: tuple[int, int] | None) -> None:
+        after = self._change_token(job)
+        # Only our confirmed metadata pair can preserve the validated vectors.
+        if (
+            before is not None
+            and self._validated == before
+            and after == (before[0], before[1] + 2)
+        ):
+            self._validated = after
+        else:
+            self.invalidate()
 
     def open(self, job: Job, *, initialize: bool = False) -> None:
         path = checked_path(self.config.path)
@@ -166,7 +208,9 @@ class Database:
                 raise CacheStoreError("SQLite schema shape is invalid")
             self.schema_version = version
 
-    def binding(self, job: Job, *, create: bool = False) -> tuple[int, int | None, int]:
+    def binding(
+        self, job: Job, *, create: bool = False, validated: bool = False
+    ) -> tuple[int, int | None, int]:
         identity, dimensions, capacity, ttl = self.config.descriptor
         rows = job.rows(
             "SELECT binding_id,capacity,default_ttl_hex,last_revision_us,access_counter FROM binding_state WHERE identity=? AND dimensions=?",
@@ -195,6 +239,8 @@ class Database:
             raise ValueError("Invalid binding ledger")
         if revision is not None:
             timestamp(revision)
+        if validated:
+            return binding_id, revision, access
         # Inspect only bounded metadata, never foreign namespace payload contents.
         entries = job.rows(
             "SELECT e.cache_key,e.namespace,e.revision_us,e.expires_at_us,e.hit_count,e.last_accessed_at_us,e.access_seq,length(e.vector_blob),length(p.payload_blob) FROM cache_entries e LEFT JOIN cache_payloads p USING(binding_id,cache_key) WHERE e.binding_id=? LIMIT ?",
@@ -241,8 +287,14 @@ class Database:
         return binding_id, revision, access
 
     def authority(self, job: Job) -> tuple[int, int | None, int]:
+        # The pragma participates in this transaction's WAL read snapshot.
+        change = self._change_token(job)
+        if change != self._validated:
+            self.invalidate()
         self.validate_schema(job)
-        return self.binding(job)
+        result = self.binding(job, validated=self._validated == change)
+        self._validated = change
+        return result
 
     def put(self, job: Job, entry: CacheEntry, ttl: float | None) -> None:
         entry, vector, payload = encode_entry(entry, self.config.space.dimensions)
@@ -253,6 +305,7 @@ class Database:
             safe(CacheStoreError("Invalid SQLite entry TTL or revision"))
         with job.transaction(write=True):
             binding, last, access = self.authority(job)
+            self.invalidate()
             revision = requested if last is None else max(requested, last + 1)
             if revision > MAX_US or access == MAX_INT:
                 raise ValueError("Revision or recency exhausted")
@@ -306,6 +359,7 @@ class Database:
         changed = False
         with job.transaction(write=True):
             binding, _, access = self.authority(job)
+            before = self._validated
             row = job.rows(
                 "SELECT hit_count FROM cache_entries WHERE binding_id=? AND namespace=? AND cache_key=? AND revision_us=?",
                 (binding, namespace, key, expected),
@@ -329,11 +383,14 @@ class Database:
                             "UPDATE binding_state SET access_counter=? WHERE binding_id=?",
                             (access + 1, binding),
                         )
+        if changed:
+            self._retain_after_hit(job, before)
         return changed
 
     def delete(self, job: Job, key: str, namespace: str) -> bool:
         with job.transaction(write=True):
             binding, _, _ = self.authority(job)
+            self.invalidate()
             live = bool(
                 job.rows(
                     "SELECT 1 FROM cache_entries WHERE binding_id=? AND namespace=? AND cache_key=? AND (expires_at_us IS NULL OR expires_at_us>semantix_now_us())",
@@ -349,6 +406,7 @@ class Database:
     def clear(self, job: Job, namespace: str) -> int:
         with job.transaction(write=True):
             binding, _, _ = self.authority(job)
+            self.invalidate()
             count = job.rows(
                 "SELECT count(*) FROM cache_entries WHERE binding_id=? AND namespace=? AND (expires_at_us IS NULL OR expires_at_us>?)",
                 (binding, namespace, now_us()),
@@ -358,6 +416,60 @@ class Database:
                 (binding, namespace),
             )
         return cast(int, count)
+
+    def _search_snapshot(
+        self, job: Job, binding: int, namespace: str, observed: int
+    ) -> _SearchSnapshot | None:
+        snapshot = self._snapshot
+        if snapshot is not None:
+            if not snapshot.live_at(observed):
+                self._snapshot = None
+                snapshot = None
+            elif snapshot.namespace == namespace:
+                return snapshot
+        parameters = (binding, namespace, observed)
+        count = job.rows(
+            "SELECT count(*) FROM cache_entries WHERE binding_id=? AND namespace=? AND (expires_at_us IS NULL OR expires_at_us>?)",
+            parameters,
+        )[0][0]
+        if not 0 <= count <= self.config.capacity:
+            raise ValueError("Invalid snapshot size")
+        if count == 0:
+            return None
+        # Release the previous scope before allocating another bounded matrix.
+        self._snapshot = None
+        snapshot = None
+        matrix = np.empty((count, self.config.space.dimensions), dtype=np.float64)
+        metadata: list[tuple[str, int]] = []
+        next_expiry: int | None = None
+        job.prepare()
+        cursor = job.connection.execute(
+            "SELECT cache_key,revision_us,vector_blob,expires_at_us FROM cache_entries WHERE binding_id=? AND namespace=? AND (expires_at_us IS NULL OR expires_at_us>?) ORDER BY revision_us,cache_key",
+            parameters,
+        )
+        try:
+            while batch := cursor.fetchmany(64):
+                job.check()
+                for key, revision, blob, expiry in batch:
+                    if len(metadata) >= count:
+                        raise ValueError("Inconsistent snapshot")
+                    matrix[len(metadata)] = decode_vector(
+                        blob, self.config.space.dimensions
+                    )
+                    metadata.append((key, revision))
+                    if expiry is not None and (
+                        next_expiry is None or expiry < next_expiry
+                    ):
+                        next_expiry = expiry
+        finally:
+            cursor.close()
+        if len(metadata) != count:
+            raise ValueError("Incomplete snapshot")
+        job.check()
+        matrix.setflags(write=False)
+        return _SearchSnapshot(
+            namespace, observed, next_expiry, matrix, tuple(metadata)
+        )
 
     def find(
         self, job: Job, embedding: tuple[float, ...], namespace: str
@@ -370,41 +482,16 @@ class Database:
             safe(CacheValidationError("Invalid SQLite query embedding"))
         with job.transaction():
             binding, _, _ = self.authority(job)
-            observed = now_us()
-            parameters = (binding, namespace, observed)
-            count = job.rows(
-                "SELECT count(*) FROM cache_entries WHERE binding_id=? AND namespace=? AND (expires_at_us IS NULL OR expires_at_us>?)",
-                parameters,
-            )[0][0]
-            if not 0 <= count <= self.config.capacity:
-                raise ValueError("Invalid snapshot size")
-            matrix = np.empty((count, self.config.space.dimensions), dtype=np.float64)
-            metadata: list[tuple[str, int]] = []
-            job.prepare()
-            cursor = job.connection.execute(
-                "SELECT cache_key,revision_us,vector_blob FROM cache_entries WHERE binding_id=? AND namespace=? AND (expires_at_us IS NULL OR expires_at_us>?) ORDER BY revision_us,cache_key",
-                parameters,
-            )
-            try:
-                while batch := cursor.fetchmany(64):
-                    job.check()
-                    for key, revision, blob in batch:
-                        if len(metadata) >= count:
-                            raise ValueError("Inconsistent snapshot")
-                        matrix[len(metadata)] = decode_vector(
-                            blob, self.config.space.dimensions
-                        )
-                        metadata.append((key, revision))
-            finally:
-                cursor.close()
-            if len(metadata) != count:
-                raise ValueError("Incomplete snapshot")
-        if count == 0:
+            snapshot = self._search_snapshot(job, binding, namespace, now_us())
+        if snapshot is None:
             return None
-        # End the WAL snapshot before the full shared float64 numerical kernel.
-        index, score = nearest_index(query, cast(Sequence[Sequence[float]], matrix))
+        # Publish only a complete, successfully committed read snapshot.
+        self._snapshot = snapshot
+        index, score = nearest_index(
+            query, cast(Sequence[Sequence[float]], snapshot.matrix)
+        )
         job.check()
-        key, revision = metadata[index]
+        key, revision = snapshot.metadata[index]
         with job.transaction():
             current_binding, _, _ = self.authority(job)
             rows = job.rows(
@@ -514,6 +601,7 @@ class Database:
     def clear_all(self, job: Job) -> int:
         with job.transaction(write=True):
             binding, _, _ = self.authority(job)
+            self.invalidate()
             count = job.rows(
                 "SELECT count(*) FROM cache_entries WHERE binding_id=? AND (expires_at_us IS NULL OR expires_at_us>?)",
                 (binding, now_us()),

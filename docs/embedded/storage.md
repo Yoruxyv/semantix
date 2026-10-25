@@ -207,6 +207,23 @@ substantially larger than 64 MiB. Entry capacity is not a disk quota; large vali
 responses, WAL and free pages can dominate file size. Prefer the default capacity
 and measure your workload before selecting the upper bounds.
 
+Each store retains at most one immutable namespace search matrix, bounded by
+`max_size * dimensions * 8`, plus its key/revision metadata. Warm searches reuse
+the matrix and validated binding metadata while the same connection observes no
+unaccounted database changes. Schema, binding configuration and the selected
+key/revision/TTL still receive authoritative checks; reuse does not certify an
+answer is correct. Local mutations and commits from other connections/processes
+invalidate derived state. Confirmed hits on this connection can retain it because
+their only changes are the existing hit/LRU metadata pair. External hit-only
+commits invalidate it conservatively, so multiple active store instances can
+rebuild often. Alternating populated namespaces also rebuilds this single slot.
+
+The next included expiry or a clock earlier than matrix capture forces a rebuild.
+A cold search, reopen, mutation or external commit therefore pays the bounded
+full scan again. No derived vectors are persisted and no SQLite schema, durability
+or acceptance policy changes. Closing releases the matrix after owned cleanup,
+including tracked cleanup following cancellation or timeout.
+
 Each store owns one connection and one single-thread worker. One complete
 operation occupies that worker through rollback/cleanup, with at most 32 admitted
 operations including waiters. Mutations acquire `BEGIN IMMEDIATE`; revision,

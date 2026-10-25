@@ -66,6 +66,9 @@ transactions, schema setup and dynamic hooks; inspection receives its already
 borrowed connection inside the same read-only transaction. Frozen migration
 resources live under each SQL provider's private migrations package; SQL/JSON
 bytes and database migration identities remain unchanged.
+SQLite retains one worker-owned, immutable namespace search matrix qualified by
+the connection transaction change token and live TTL window. SQLite remains
+authoritative for binding validation, winner revision and atomic hit metadata.
 
 In the hardened Compose deployment, the browser and other HTTP clients reach the
 frontend Nginx gateway, which serves the browser assets and balances API requests across

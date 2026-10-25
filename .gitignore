@@ -46,3 +46,6 @@ ops/load-testing/results/
 
 # Generated MemoryStore scheduling measurements; preserve locally.
 /packages/cache/benchmarks/memory_scheduling/*.csv
+
+# Generated SQLite search measurements remain outside tracked evidence.
+/packages/cache/benchmarks/sqlite_search/*.csv
