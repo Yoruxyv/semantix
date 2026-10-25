@@ -1,48 +1,15 @@
 {
-  "status": "DRAFT: reproducible single-reader P50 regressions block release",
+  "status": "DRAFT_FOR_REVIEW: intended workload gains; unresolved 100-entry/four-reader exact-tail risk",
   "date": "2026-10-25",
   "main": "4fdc884e876ef370b5c16c19a705138575a6226f",
   "baseline_memory_sha256": "c6c13c8ba3d2e394f0a8fa5f83e1065533abaa4ae9c296fb6e3872abfb5cf4a7",
-  "final_memory_sha256": "3c733129296bf0afa89a11192dd7a9d35539d1aef1020b1ce627e396a9b13e73",
-  "earlier_prototype_memory_sha256": "3bcc138c02013ef02c812d83bc79abc40f1637a60208f04835153b689e63ce85",
+  "final_memory_sha256": "38df02ddecc985f2bddae568f0ea2acbf52cea33a1ae72a10c2ac6b358d65201",
+  "current_main_at_publication": "5044c050b7f7a5ce57fa86158071b2fddac9e013",
+  "cache_package_unchanged_since_measured_baseline": true,
+  "starting_pr_head": "596ae871050587973368fd2213d5c037e50c1974",
   "vectors_sha256": "c45c65575d0cc2ddcf5be16cdcd2bb69dc2fc13218314ede4e570113f852ed26",
   "canonical_corpus_sha256": "2850b2e6afb07edecd15ab76a0d94d0e1ee93c5351a52ea44afe4eaa4a2d8181",
   "corpus_file_sha256": "b7f5580a5125dc54e604642ff0199bca748bc9828c86dee465fef5bad69328e4",
-  "final_matrix": {
-    "entries": 4000,
-    "readers": [
-      1,
-      4,
-      16
-    ],
-    "pairs_per_cell": 5,
-    "processes": 30,
-    "requests": 24000,
-    "operations_per_path_process": 200,
-    "queue_observation": true,
-    "wrong": 0,
-    "errors": 0,
-    "pending_tasks": 0
-  },
-  "earlier_prototype_matrix": {
-    "entries": [
-      100,
-      1000,
-      4000
-    ],
-    "readers": [
-      1,
-      2,
-      4,
-      8,
-      16
-    ],
-    "pairs_per_cell": 5,
-    "processes": 150,
-    "requests": 120000,
-    "queue_observation": false,
-    "warning": "Different completion transport; these timings do not validate the corrected source across the full matrix."
-  },
   "configuration": {
     "embedding_dimensions": 1536,
     "dtype": "float64",
@@ -92,55 +59,140 @@
     ]
   },
   "regression_criteria": {
-    "tails": "pairedmedianP95/P99 increase>10% AND>0.5ms with>=4/5adversepairs",
-    "one_reader": "pairedmedianP50 increase>5% AND>0.2ms with>=4/5adversepairs",
-    "cpu": "repeated pairedmedianCPU/request increase>15%",
-    "rss": "increase>max20%,64MiB",
-    "correctness": "any wrong result, leaked task, stale confirmation, lifecycle violation or unbounded resource use blocks release"
+    "single_reader": "median pairedP50>5% AND>0.2ms with>=4/5adverse blocks",
+    "tail": "median pairedP95/P99>10% AND>0.5ms with>=4/5adverse blocks",
+    "cpu": "CPU/request>15% with>=4/5adverse blocks",
+    "rss": "peakRSS increase>max20%,64MiB with>=4/5adverse blocks",
+    "correctness": "any wrong result,error,stale hit,TTL/counter violation,leaked work or unbounded resource use blocks",
+    "benefit": "At1000/4000, warm exact/semantic>=10% lower P50 and>=10% higher throughput at4/16 versusmain in>=4/5pairs; other cells reported fully"
   },
-  "confirmed_final_blockers": [
-    {
-      "size": 4000,
-      "workers": 1,
-      "phase": "exact",
-      "blocking": [
-        "single_reader_p50"
-      ],
-      "p50_pct": 6.755617045874507,
-      "p50_ms": 0.3564499999999997,
-      "adverse_pairs": 5
-    },
-    {
-      "size": 4000,
-      "workers": 1,
-      "phase": "semantic",
-      "blocking": [
-        "single_reader_p50"
-      ],
-      "p50_pct": 8.44189137865552,
-      "p50_ms": 0.44454999999999956,
-      "adverse_pairs": 5
-    }
-  ],
+  "primary": {
+    "entries": [
+      100,
+      1000,
+      4000
+    ],
+    "readers": [
+      1,
+      4,
+      16
+    ],
+    "pairs_per_cell": 5,
+    "ttl_seconds": null,
+    "children": 90,
+    "requests": 72000,
+    "wrong": 0,
+    "errors": 0,
+    "pending_tasks": 0,
+    "unexpected_stderr": 0,
+    "identical_jobs_and_labels": true,
+    "source_hashes_verified": true,
+    "max_peak_mib": 403.58203125,
+    "blocking_cells": [
+      {
+        "size": 100,
+        "workers": 4,
+        "phase": "exact",
+        "blocking": [
+          "p95_ms",
+          "p99_ms"
+        ]
+      },
+      {
+        "size": 100,
+        "workers": 4,
+        "phase": "semantic",
+        "blocking": [
+          "p95_ms",
+          "p99_ms"
+        ]
+      }
+    ],
+    "benefit_target_misses": []
+  },
+  "finite_ttl_sensitivity": {
+    "entries": 1000,
+    "readers": [
+      1,
+      4,
+      16
+    ],
+    "pairs_per_cell": 5,
+    "ttl_seconds": 3600,
+    "children": 30,
+    "requests": 24000,
+    "wrong": 0,
+    "errors": 0,
+    "pending_tasks": 0,
+    "unexpected_stderr": 0,
+    "identical_jobs_and_labels": true,
+    "source_hashes_verified": true,
+    "max_peak_mib": 147.12109375,
+    "blocking_cells": [],
+    "benefit_target_misses": [
+      {
+        "size": 1000,
+        "workers": 16,
+        "phase": "semantic",
+        "p50_pct": -22.79006524593893,
+        "rps_pct": 23.470932111324917
+      }
+    ]
+  },
+  "targeted_longer_confirmation": {
+    "entries": 100,
+    "readers": 4,
+    "phases": [
+      "exact",
+      "semantic"
+    ],
+    "operations_per_path_process": 2000,
+    "pairs": 5,
+    "children": 10,
+    "requests": 40000,
+    "wrong": 0,
+    "errors": 0,
+    "pending_tasks": 0,
+    "unexpected_stderr": 0,
+    "source_hashes_verified": true,
+    "identical_jobs_and_labels": true,
+    "max_peak_mib": 62.99609375,
+    "blocking_cells": []
+  },
   "artifact_sha256": {
-    "corrected-final-manifest.json": "35f3602e7661f6a060c4b23d0eb3653590632252f69638cc078c0a97be46aab6",
-    "corrected-final-plan.json": "37a21fb1bc23f9f7b8080b3a95a4f18da901bddc9571c1f32d29d3e788637774",
-    "corrected-final-verification.json": "03fcbbd6ccd876d562c59d55d5db47d5bed20ec76c289f3e954ad6e94441d881",
-    "corrected-final-assessment.json": "3a3f77281f54aa6768759b9503580d79a934c10007dca154ce9677dc4d4b5d84",
-    "confirmation-manifest.json": "c45ac9fcb8a9701fd62049fc483b86f8895d187c576cb6a5c4badd5394d37c78",
-    "confirmation-assessment.json": "6ec9a1cfae180ba2875ccb5c92275968b4b39b5e37b0e716011b6de81d04cfc3",
-    "experiment-plan.json": "d592b5f40e1dd9ec6c47f3a226514cdeaf00cd4fa7556c709eacf5dabc91c78f",
-    "provenance.json": "69e034e4fa5ce1a9bda2d0abfe686c5ceb00678c997d72230db1722d84b57906"
+    "pr234-completion-plan.json": "acb0d60b09a45df25fb71dc3e2248ea38fae51bc145caa11ab4ee9af8034b14e",
+    "pr234-completion-candidate.json": "7c9962ba90629ea2bae9289e07fda076e541396046ca41e70a2cdafb30cb08fb",
+    "pr234-completion-scout-manifest.json": "5095eadcba59914692d8fec1971be367afd5218eeb2e33a39352a1d4c00b96e9",
+    "pr234-completion-scout-assessment.json": "1e769d75d2c9486d297653fcacd715f99d665708adc4c90295428fe15bac31b9",
+    "pr234-completion-final-manifest.json": "1f3b72d5012018020d8455eaad9f507ae9dd24dacae1e5ab680fff26dc47a41c",
+    "pr234-completion-final-assessment.json": "74f66d8d27979864165acfd9364f39352a07c7523eb38d74b7e3f142d026a8ee",
+    "pr234-completion-ttl-manifest.json": "6e574e0a4861c01c3e29152b685c6b87f518c85e4fbb2e50912cd64d2e2ec3b1",
+    "pr234-completion-ttl-assessment.json": "4f8585260313e27e6f473395b0588048df47243e434b0a4b5deca95d386b9134",
+    "pr234-completion-decision.json": "f0e8181469fd9f0a2f8e7ab047a4149df2bff16f21a33a5d3d2b96123f83d532",
+    "pr234-completion-confirmation-plan.json": "430089864655415d162e41ade8f71cf8e40d8b6af39e63532520eb2b91263300",
+    "pr234-completion-confirmation-manifest.json": "0ce3436c790b515c84f018373847f7ae0db81ca77b69ab0be798a424399be76c",
+    "pr234-completion-confirmation-assessment.json": "303e4473a11ea2c065f720e2e39b8b0621e12c02178ff8859489d91d4bc9539e",
+    "pr234-completion-preservation.json": "9a056b5d807ae1e28bf193f51d59edbf7210cede09fd6489f46f791b87dc8ee3"
   },
   "harness_sha256": {
-    "bench.py": "204a71aca9b47c643a7537bf5c989955f4219d47824123dd2ccc23b78b23a476",
     "corrected_bench.py": "474bcdb5cb7f0986784c73e56e43a32ffaba1f7638a01572a4ee06cde99f7324",
-    "corrected_final_matrix.py": "b695fa2a8f996e913479dba6ef292e32c46e4f717a5a5f29bc738f9224e5acf3",
-    "confirm_bench.py": "561acfceb4111db6865a4fc4234b78d674da2d7a9a6367bde53f44ba017d7a40",
     "profiling.py": "baede7a34a8c904343985e58ee8b7059b0dcae0c107f8f151a324f36674c72e6",
+    "completion_final.py": "7e9bc200fc99b03930f67ab347139cccb3afd1f082f3d4d5c540f9cdaef97449",
+    "completion_assess.py": "eae89f16b1ca621a286e4b94000503a08cb1bdd46db1b0c6e3c2b4ae1a4a472d",
+    "completion_confirmation.py": "abf759818874afd99f1d082a68cd9232ee2eecf00bb8e5691b8d5dc8bc96c098",
     "config.json": "09bf2b47189cb6dadfb4b04ea26afdb57b471b47a494c402bc0387630c007357"
   },
-  "raw_evidence": "Maintainer-owned Phase02 workspace Semantix_Memory_P2_20261025_b3836049; raw per-request CSVs,fresh-process JSONs,harnesses,and source variants retained there. Saved V2 vectors are required for replay; this folder contains derived summaries,not a standalone replacement benchmark.",
+  "resource_proof": {
+    "receipt_sha256": "396167afef56b02dea1adbcedd906147bcba5e14711455be82ae3f1fb71aea72",
+    "capacity": 5000,
+    "cancelled_callers": 32,
+    "replacement_writes": 128,
+    "store_cycles": 100,
+    "maximum_active_numerical_workers": 1,
+    "peak_mib": 480.28125,
+    "threads_before": 5,
+    "threads_after_shutdown": 5
+  },
   "untracked_local_csv_sha256": {
     "final-summary.csv": "f1929dc58fd3f9cf9e37230f3abd0a5de93bf60d91eb93bcc90d925ee0ae29bc",
     "prototype-summary.csv": "beb0bdca5734ab1cf14f397405c21dcce73cd0b37afed82ce29cff26219d8356"
@@ -154,54 +206,112 @@
     "local_csvs_preserved": true,
     "independent_reproduction": "Requires maintainer-owned Phase02 workspace, raw traces, source variants, harnesses and unchanged saved V2 vectors; these are not all distributed by this PR."
   },
-  "followup": {
-    "decision": "KEEP_EXISTING_DRAFT: neither candidate passed predefined scout",
-    "runtime_changed": false,
-    "selected": null,
-    "scout_verification": {
-      "children": 12,
-      "requests": 9600,
-      "wrong": 0,
-      "errors": 0,
-      "pending_tasks": 0,
-      "unexpected_stderr": 0,
-      "source_imports_and_hashes_verified": true,
-      "identical_jobs_and_expected_labels": true
+  "raw_evidence": "Maintainer-owned Phase02 workspace Semantix_Memory_P2_20261025_b3836049; raw per-request CSVs,fresh-process JSONs,harnesses,and source variants retained there. Saved V2 vectors are required for replay; this folder contains derived summaries,not a standalone replacement benchmark.",
+  "historical_evidence": {
+    "published_memory_sha256": "3c733129296bf0afa89a11192dd7a9d35539d1aef1020b1ce627e396a9b13e73",
+    "earlier_prototype_memory_sha256": "3bcc138c02013ef02c812d83bc79abc40f1637a60208f04835153b689e63ce85",
+    "original_4000_blockers": [
+      {
+        "size": 4000,
+        "workers": 1,
+        "phase": "exact",
+        "blocking": [
+          "single_reader_p50"
+        ],
+        "p50_pct": 6.755617045874507,
+        "p50_ms": 0.3564499999999997,
+        "adverse_pairs": 5
+      },
+      {
+        "size": 4000,
+        "workers": 1,
+        "phase": "semantic",
+        "blocking": [
+          "single_reader_p50"
+        ],
+        "p50_pct": 8.44189137865552,
+        "p50_ms": 0.44454999999999956,
+        "adverse_pairs": 5
+      }
+    ],
+    "artifact_sha256": {
+      "corrected-final-manifest.json": "35f3602e7661f6a060c4b23d0eb3653590632252f69638cc078c0a97be46aab6",
+      "corrected-final-plan.json": "37a21fb1bc23f9f7b8080b3a95a4f18da901bddc9571c1f32d29d3e788637774",
+      "corrected-final-verification.json": "03fcbbd6ccd876d562c59d55d5db47d5bed20ec76c289f3e954ad6e94441d881",
+      "corrected-final-assessment.json": "3a3f77281f54aa6768759b9503580d79a934c10007dca154ce9677dc4d4b5d84",
+      "confirmation-manifest.json": "c45ac9fcb8a9701fd62049fc483b86f8895d187c576cb6a5c4badd5394d37c78",
+      "confirmation-assessment.json": "6ec9a1cfae180ba2875ccb5c92275968b4b39b5e37b0e716011b6de81d04cfc3",
+      "experiment-plan.json": "d592b5f40e1dd9ec6c47f3a226514cdeaf00cd4fa7556c709eacf5dabc91c78f",
+      "provenance.json": "69e034e4fa5ce1a9bda2d0abfe686c5ceb00678c997d72230db1722d84b57906"
     },
-    "diagnostic_processes": 4,
-    "conditional_final_run": false,
-    "candidate_sources_sha256": {
-      "published234": "3c733129296bf0afa89a11192dd7a9d35539d1aef1020b1ce627e396a9b13e73",
-      "yield234": "198abdfd43ef8176efa7cd635865e717902bce8f31c290c6fabcc10e9c743b79",
-      "task234": "061e541a75c0a0dc1ebfcd79ff41ed783ff8522e2dcd9ddd8045c41f6b30356e"
-    },
-    "external_evidence_sha256": {
-      "pr234-followup-plan.json": "e23891e66ba4fa7aad8b3c5bd2c689cfa57492297a2e0d4bba218d110c726b5d",
-      "pr234-scout-manifest.json": "354f210ee6fb25b3131afa456a8c637ccb1306b78e198cfc4fcfe43cb3bdc925",
-      "pr234-scout-assessment.json": "5e9b3812d44a444f5bc9779ce21bd91efe2868de95fdd52627cb30ec1f452ae2",
-      "pr234-diagnostic-summary.json": "97c24b41dffd99ce16ef64f9d8fa09002430f20167368f25c3c492aff12d80fa"
-    },
-    "external_harness_sha256": {
-      "followup_profile.py": "e67415e0d74089cc8900a3e636d686c2ef9577d214d7eac20bfadc0265f681fd",
-      "followup_profile_bench.py": "1ffd1e061e3400ab09a947942cd66f1556027917d1b5c4bef7c54c7779b1117c",
-      "followup_run_verified.py": "8e17052fec6d8b6b67672ab08a3268b9a131550e08dc6d7944b4a99ffbb61c76",
-      "followup_assess.py": "a1e7ee2e2e744f1d05246fdc6f79580af9a170180c03f98c3932fccd5cc2e902"
-    },
-    "caution": "New three-pair unchanged-source versus main results did not reproduce earlier single-reader cost; this is uncertainty, not an implemented fix. Original five-pair evidence remains unchanged."
+    "rejected_followup": {
+      "decision": "KEEP_EXISTING_DRAFT: neither candidate passed predefined scout",
+      "runtime_changed": false,
+      "selected": null,
+      "scout_verification": {
+        "children": 12,
+        "requests": 9600,
+        "wrong": 0,
+        "errors": 0,
+        "pending_tasks": 0,
+        "unexpected_stderr": 0,
+        "source_imports_and_hashes_verified": true,
+        "identical_jobs_and_expected_labels": true
+      },
+      "diagnostic_processes": 4,
+      "conditional_final_run": false,
+      "candidate_sources_sha256": {
+        "published234": "3c733129296bf0afa89a11192dd7a9d35539d1aef1020b1ce627e396a9b13e73",
+        "yield234": "198abdfd43ef8176efa7cd635865e717902bce8f31c290c6fabcc10e9c743b79",
+        "task234": "061e541a75c0a0dc1ebfcd79ff41ed783ff8522e2dcd9ddd8045c41f6b30356e"
+      },
+      "external_evidence_sha256": {
+        "pr234-followup-plan.json": "e23891e66ba4fa7aad8b3c5bd2c689cfa57492297a2e0d4bba218d110c726b5d",
+        "pr234-scout-manifest.json": "354f210ee6fb25b3131afa456a8c637ccb1306b78e198cfc4fcfe43cb3bdc925",
+        "pr234-scout-assessment.json": "5e9b3812d44a444f5bc9779ce21bd91efe2868de95fdd52627cb30ec1f452ae2",
+        "pr234-diagnostic-summary.json": "97c24b41dffd99ce16ef64f9d8fa09002430f20167368f25c3c492aff12d80fa"
+      },
+      "external_harness_sha256": {
+        "followup_profile.py": "e67415e0d74089cc8900a3e636d686c2ef9577d214d7eac20bfadc0265f681fd",
+        "followup_profile_bench.py": "1ffd1e061e3400ab09a947942cd66f1556027917d1b5c4bef7c54c7779b1117c",
+        "followup_run_verified.py": "8e17052fec6d8b6b67672ab08a3268b9a131550e08dc6d7944b4a99ffbb61c76",
+        "followup_assess.py": "a1e7ee2e2e744f1d05246fdc6f79580af9a170180c03f98c3932fccd5cc2e902"
+      },
+      "caution": "New three-pair unchanged-source versus main results did not reproduce earlier single-reader cost; this is uncertainty, not an implemented fix. Original five-pair evidence remains unchanged."
+    }
   },
-  "verified_ci": {
-    "head": "2bc156df975d8e0685e1c887967e80e0a6e66bc9",
-    "run": 40159585505,
-    "embedded_python": [
+  "validation": {
+    "status": "PASS_LOCAL_CODE_CHECKS; PERFORMANCE_CONCERN_UNRESOLVED",
+    "offline_package": {
+      "passed": 1572,
+      "skipped": 80,
+      "deselected": 401
+    },
+    "focused_memory_per_python": 85,
+    "python": [
       "3.11",
-      "3.12",
-      "3.13",
       "3.14"
     ],
-    "embedded": "PASS",
-    "coverage314_pct": 94.75,
-    "overall": "FAIL: frontend image vulnerability and dependent quality gate",
-    "main_inherited_run": 40152041542,
-    "out_of_scope_fix": "Frontend/dependency changes explicitly excluded by latest user scope."
-  }
+    "inspection314_passed": 23,
+    "original_main_inspection_passed": 23,
+    "server_parity_passed": 24,
+    "configured_ruff_format_mypy_pyright": "PASS",
+    "reuse_quality_examples_build_twine_archives": "PASS",
+    "release_receipt_sha256": "c579ec3121e0864bfc4e4e252598ea38b36ee9645a4772c32f7feb48bbd64e46",
+    "independent_checks_sha256": "cdd54761c36806fa84015795a579d46175342899d64c40a2780c108cf716034f",
+    "full_package_xml_sha256": "3f456360a4bfa1551c1e05d5ca712b89f48d083feaf6f75e9b354d0c74b3d041",
+    "failed_validation_attempts_retained": true,
+    "provider_deadline_uncertainty": "Untouched mocked-provider test failed on unchanged main2/5 vs candidate0/5; final full package run passed. No provider code/test weakening or live-service pass claim."
+  },
+  "ci": {
+    "requirement": "Current-head GitHub embedded3.11-3.14, owned live-service integration, full coverage>=90% and Quality gates must pass. Local service skips are not passes. Exact current run/head is recorded in PR234 description and checks.",
+    "historical_receipt_only": {
+      "head": "2bc156df975d8e0685e1c887967e80e0a6e66bc9",
+      "run": 40159585505,
+      "embedded": "PASS",
+      "coverage314_pct": 94.75
+    },
+    "scope": "Other PRs/main updates are maintainer-owned; no frontend/dependency edits or rebase in this update."
+  },
+  "rebase": "Deferred until the maintainer finishes other main updates, as requested. No history rewrite performed."
 }

@@ -197,6 +197,8 @@ class MemoryStore:
         self._slot = asyncio.Semaphore(1)
         self._workers: set[asyncio.Future[CacheMatch]] = set()
         self._state = Lifecycle()
+        # Removals may leave an early bound; a due scan rebuilds it.
+        self._next_expiry: float | None = None
 
     @property
     def embedding_space(self) -> EmbeddingSpace:
@@ -211,14 +213,24 @@ class MemoryStore:
         self._snapshots.pop(item.entry.namespace, None)
 
     def _purge(self) -> None:
+        """Remove due entries and rebuild the conservative deadline in one scan."""
         now = monotonic()
-        for key in [
-            key
-            for key, item in self._items.items()
-            if item.expires_monotonic is not None and now >= item.expires_monotonic
-        ]:
+        if self._next_expiry is None or now < self._next_expiry:
+            return
+        expired: list[str] = []
+        next_expiry: float | None = None
+        for key, item in self._items.items():
+            expires = item.expires_monotonic
+            if expires is None:
+                continue
+            if now >= expires:
+                expired.append(key)
+            elif next_expiry is None or expires < next_expiry:
+                next_expiry = expires
+        for key in expired:
             self._discard(key)
             self._expirations += 1
+        self._next_expiry = next_expiry
 
     @staticmethod
     def _scope(cache_key: str, namespace: str) -> tuple[str, str]:
@@ -417,6 +429,11 @@ class MemoryStore:
                     if ttl is None
                     else datetime.now(UTC) + timedelta(seconds=ttl),
                 )
+                expires = self._items[entry.cache_key].expires_monotonic
+                if expires is not None and (
+                    self._next_expiry is None or expires < self._next_expiry
+                ):
+                    self._next_expiry = expires
                 self._items.move_to_end(entry.cache_key)
                 while len(self._items) > self._max_size:
                     self._discard(next(iter(self._items)))
@@ -593,6 +610,7 @@ class MemoryStore:
                 self._purge()
                 count = len(self._items)
                 self._items.clear()
+                self._next_expiry = None
                 self._snapshots.clear()
                 return count
 
@@ -615,6 +633,7 @@ class MemoryStore:
 
         self._state.close(workers=bool(self._workers))
         self._items.clear()
+        self._next_expiry = None
         self._snapshots.clear()
 
     async def __aenter__(self) -> Self:
