@@ -1,0 +1,202 @@
+{
+  "engineering_selection": "SHIP_COMBINED;performance and local correctness qualified;required current-head CI tracked on PR234",
+  "selected_runtime": "conservative expiry deadline and immediate single-worker executor dispatch",
+  "runtime_sha256": "38df02ddecc985f2bddae568f0ea2acbf52cea33a1ae72a10c2ac6b358d65201",
+  "baseline_main": "5044c050b7f7a5ce57fa86158071b2fddac9e013",
+  "baseline_memory_sha256": "c6c13c8ba3d2e394f0a8fa5f83e1065533abaa4ae9c296fb6e3872abfb5cf4a7",
+  "normalization_baseline": "4fdc884e876ef370b5c16c19a705138575a6226f",
+  "main_cache_package_identical_to_normalization_baseline": true,
+  "synchronization_commit": "43f51619c05c08807cd94fc2f6404e14c829f1bc",
+  "synchronization_method": "Non-rewriting merge of current main;original checkout and PR history preserved",
+  "research_ref": "perf/memory-reader-scheduling-research",
+  "research_head": "f2dee6d394bc3a944d331932666666605d2e423d",
+  "research_bundle_sha256": "eeb49b9256b4c0eee408bc48b4fe62b6e608e45fae23b8aa70e8464fc8cbf574",
+  "comparison_only_source_hashes": {
+    "baseline": "c6c13c8ba3d2e394f0a8fa5f83e1065533abaa4ae9c296fb6e3872abfb5cf4a7",
+    "ship_expiry": "6ef887513c98b87d2c4c4c00b5410f71c6cfc30d6f0abed9dc6a886b7e1cbb20",
+    "published234": "3c733129296bf0afa89a11192dd7a9d35539d1aef1020b1ce627e396a9b13e73",
+    "p2expiry1": "38df02ddecc985f2bddae568f0ea2acbf52cea33a1ae72a10c2ac6b358d65201"
+  },
+  "factors_ast_verified": true,
+  "vectors_sha256": "c45c65575d0cc2ddcf5be16cdcd2bb69dc2fc13218314ede4e570113f852ed26",
+  "canonical_corpus_sha256": "2850b2e6afb07edecd15ab76a0d94d0e1ee93c5351a52ea44afe4eaa4a2d8181",
+  "corpus_file_sha256": "b7f5580a5125dc54e604642ff0199bca748bc9828c86dee465fef5bad69328e4",
+  "configuration": {
+    "embedding_dimensions": 1536,
+    "dtype": "float64",
+    "max_size": 5000,
+    "ttl": null,
+    "strict_threshold": 0.9691803520567825,
+    "semantic_threshold": 0.8,
+    "seed": 20261024,
+    "blas_threads": 1,
+    "warmup_exact_requests": 10,
+    "four_thousand": "Four copies of 1000 real vectors under explicit compatible-answer stress aliases; not4000 independently embedded strings.",
+    "mixed": "70/30 default-namespace exact hits / unique miss namespaces; native resolve,generation with zero delay,and admission. Not the unsafe unpartitioned V2 mixed workload."
+  },
+  "runtime_environment": {
+    "python": "3.14.6",
+    "numpy": "2.4.6",
+    "pydantic": "2.13.4",
+    "os": "Windows x64",
+    "logical_cpus": 16,
+    "physical_cpus": 8,
+    "processor": "AMD64 Family25 Model80 Stepping0",
+    "affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "priority": "normal",
+    "openblas_readback": [
+      {
+        "dll": "libscipy_openblas64_-63c857e738469261263c764a36be9436.dll",
+        "getter": "scipy_openblas_get_num_threads64_",
+        "num_threads": 1
+      }
+    ]
+  },
+  "small_comparison": {
+    "entries": 100,
+    "readers": 4,
+    "blocks": 8,
+    "operations_per_path": 1000,
+    "phases": [
+      "exact",
+      "semantic"
+    ],
+    "children": 32,
+    "requests": 64000,
+    "wrong": 0,
+    "errors": 0,
+    "pending_tasks": 0,
+    "unexpected_stderr": 0,
+    "source_hashes_verified": true,
+    "identical_jobs_and_labels": true,
+    "max_peak_mib": 61.76171875,
+    "combined_material_flags": [],
+    "combined_exact_cpu_paired_pct": 2.2652284263959377,
+    "combined_exact_cpu_adverse_pairs": 8
+  },
+  "selected_source_sanity": {
+    "children": 12,
+    "requests": 9600,
+    "wrong": 0,
+    "errors": 0,
+    "pending_tasks": 0,
+    "unexpected_stderr": 0,
+    "source_hashes_verified": true,
+    "identical_jobs_and_labels": true,
+    "max_peak_mib": 402.61328125,
+    "cells": [
+      [
+        1000,
+        16
+      ],
+      [
+        4000,
+        16
+      ]
+    ],
+    "pairs": 3,
+    "alerts": [],
+    "role": "Supplement only to prior same-source five-pair full matrix"
+  },
+  "same_source_prior_full_matrix": {
+    "runtime_sha256": "38df02ddecc985f2bddae568f0ea2acbf52cea33a1ae72a10c2ac6b358d65201",
+    "children": 90,
+    "requests": 72000,
+    "wrong": 0,
+    "errors": 0,
+    "pending_tasks": 0,
+    "unexpected_stderr": 0,
+    "identical_jobs_and_labels": true,
+    "source_hashes_verified": true,
+    "max_peak_mib": 403.58203125,
+    "benefit_target_misses": [],
+    "historical_small_flags": "Two original100-entry/4-reader tail cells retained,investigated by new balanced4-implementation8-block study;not rewritten or excluded."
+  },
+  "finite_ttl_limit": "Prior same-source1000/16semantic benefit improved3/5pairs rather than target4/5;favorable medians,not repeatable material harm. No new TTL campaign.",
+  "criteria": {
+    "tail": "Median paired P95/P99 >10% AND >0.5ms with>=6/8 adverse is repeated material harm (75%,slightly more conservative than prior4/5 rule). Also report every effect, both four-block epochs and source-order/host variation. Any remaining large but inconsistent cost is quantified uncertainty, never silently waived.",
+    "cpu": "CPU/request >15% with>=6/8 adverse; peak RSS increase>max20%,64MiB with>=6/8 adverse; any incorrect/error/leaked work/lifecycle/TTL/numerical violation blocks.",
+    "large_final": "Existing rules unchanged for five pairs: P95/P99>10% AND>0.5ms with>=4/5adverse; one-reader P50>5% AND>0.2ms with>=4/5adverse; CPU/request>15% with>=4/5adverse; RSS>max20%,64MiB. Meaningful expiry-only benefit:>=10% lower median P50 and>=10% higher throughput in>=4/5pairs at4000 entries on at least one hit path; all other cells/adverse observations reported.",
+    "selection": "Prefer C if small-cache tails have no repeated material harm and evidence justifies remaining uncertainty. If C has material harm or unresolved substantial tails and E avoids it, choose E subject to independent larger validation. Do not infer source cause unless conditional S-M and C-E / E-M and C-S effects support it. Report conflicting evidence explicitly. No new runtime prototype beyond factor isolation."
+  },
+  "artifact_sha256": {
+    "pr234-ship-plan.json": "7b5223003aab34a6a17949f8367c576ae766abc1081e419bf87623c12e65effa",
+    "pr234-ship-selection.json": "98ca9f33f5792a037a363da324b5a4453ecfbdc42b5b1b4ca3adafe60c53f684",
+    "pr234-ship-small-manifest.json": "8c28e1114740afd7cf74db813769a1c13f7bcd3c805b1ebd0a9a36ab18fbce8b",
+    "pr234-ship-small-assessment.json": "ac623abc3a3397204e197bc3b7913125eaa9bb1ddcd81af968b4c0efb769f9b2",
+    "pr234-ship-sanity-manifest.json": "4a429cfcea36f6912d0cacd4445fcb920465b4155ed190d11b4dcb62acc3093a",
+    "pr234-ship-sanity-assessment.json": "4f1050c84eebaa715930377a8372c487946a818032ff6e9cfa5fa9b913cb628e",
+    "pr234-completion-final-manifest.json": "1f3b72d5012018020d8455eaad9f507ae9dd24dacae1e5ab680fff26dc47a41c",
+    "pr234-completion-final-assessment.json": "74f66d8d27979864165acfd9364f39352a07c7523eb38d74b7e3f142d026a8ee",
+    "pr234-completion-ttl-manifest.json": "6e574e0a4861c01c3e29152b685c6b87f518c85e4fbb2e50912cd64d2e2ec3b1",
+    "pr234-completion-ttl-assessment.json": "4f8585260313e27e6f473395b0588048df47243e434b0a4b5deca95d386b9134",
+    "pr234-completion-confirmation-manifest.json": "0ce3436c790b515c84f018373847f7ae0db81ca77b69ab0be798a424399be76c",
+    "pr234-completion-confirmation-assessment.json": "303e4473a11ea2c065f720e2e39b8b0621e12c02178ff8859489d91d4bc9539e",
+    "pr234-ship-preservation.json": "8ace3d0918d959b48271682932a792fd3e619538e387adb7f4d7626b6bd2cbe2"
+  },
+  "harness_sha256": {
+    "corrected_bench.py": "474bcdb5cb7f0986784c73e56e43a32ffaba1f7638a01572a4ee06cde99f7324",
+    "profiling.py": "baede7a34a8c904343985e58ee8b7059b0dcae0c107f8f151a324f36674c72e6",
+    "config.json": "09bf2b47189cb6dadfb4b04ea26afdb57b471b47a494c402bc0387630c007357",
+    "ship_setup.py": "2f4eab9148147523ba121ac9cc7aeccc08f792eeaff6b46835212d6941b5ca9f",
+    "ship_small.py": "459130b472bbf450b77318946e29eeb2e9ce88ef94a3f44bdc8fc28b6849915d",
+    "ship_assess.py": "6212d818f4ed0dede1cf588e5ed704748962374226003f75085605cedf8a0ad2",
+    "ship_select.py": "0b3cd40e32aceee9d9978f2173bcfa730b5138829086162ff26ad6be3b0acc22",
+    "ship_sanity.py": "b7b62ec568774c037b58fe0209c923522cc2d7ba457a58d0aeeba2ced83b74ab"
+  },
+  "validation": {
+    "selected_synchronized_status_sha256": "2c2e3a5c7ae104473cbfdaac2f53eadcbd718df6fa034db52b327c422d2faf54",
+    "four_variant_preflight_sha256": "e4e719d1ec1f1f8adf920f38672fa54219262aa2a9ba3d6066e0c1cf5eaa69cb",
+    "full_offline_package": {
+      "passed": 1572,
+      "skipped": 80,
+      "deselected": 401
+    },
+    "focused314": {
+      "passed": 108,
+      "deselected": 66
+    },
+    "server_parity_passed": 24,
+    "static": "Configured Ruff,format,strict mypy,pinned Pyright PASS",
+    "resource_proof": "Unchanged38df source:max one worker,5000entries,32cancellations,128writes,100storecycles,480.3MiB peak,threads return;existing exact-source receipt retained.",
+    "github_ci": "Fresh current-head fullservice/coverage/artifact/Quality checks required;exact run/head receipt in PR description. No reuse of historicalCI as a current-head pass."
+  },
+  "untracked_local_csv_sha256": {
+    "final-summary.csv": "f1929dc58fd3f9cf9e37230f3abd0a5de93bf60d91eb93bcc90d925ee0ae29bc",
+    "prototype-summary.csv": "beb0bdca5734ab1cf14f397405c21dcce73cd0b37afed82ce29cff26219d8356"
+  },
+  "artifact_policy": {
+    "tracked": [
+      "RESULTS.md",
+      "manifest.json"
+    ],
+    "generated_csvs_tracked": false,
+    "local_csvs_preserved": true,
+    "independent_reproduction": "Requires maintainer-owned Phase02 workspace, raw traces, source variants, harnesses and unchanged saved V2 vectors; these are not all distributed by this PR."
+  },
+  "raw_evidence": "Maintainer-owned Phase02 workspace Semantix_Memory_P2_20261025_b3836049; raw per-request CSVs,fresh-process JSONs,harnesses,and source variants retained there. Saved V2 vectors are required for replay; this folder contains derived summaries,not a standalone replacement benchmark.",
+  "limits": [
+    "Windows performance only;host busy measured,not controlledCPU frequency/thermals",
+    "Historical adverse timings retained;new controlled trials do not prove all host conditions safe",
+    "200obs/path prior matrix,1000obs/path small study;P99 estimates have sampling uncertainty",
+    "4000entries repeat1000vectors with compatible-answer aliases",
+    "No fresh GPTCache head-to-head;no claim of competitive victory or general semantic safety"
+  ]
+}

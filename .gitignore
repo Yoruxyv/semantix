@@ -43,3 +43,6 @@ graphify-out/
 # Disposable capacity-runner files and generated measurements.
 /capacity-runner-*/
 ops/load-testing/results/
+
+# Generated MemoryStore scheduling measurements; preserve locally.
+/packages/cache/benchmarks/memory_scheduling/*.csv

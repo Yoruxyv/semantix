@@ -100,6 +100,7 @@ async def snapshot(store: Store) -> object:
             tuple((k, id(v)) for k, v in store._snapshots.items()),
             store._last_revision,
             store.inspection_events,
+            getattr(store, "_next_expiry", None),
         )
     if isinstance(store, PgVectorStore):
         return [
@@ -286,11 +287,9 @@ async def expire_entry(
     inspected: Store, cache_key: str, namespace: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     if isinstance(inspected, MemoryStore):
-        old = inspected._items[cache_key]
-        inspected._items[cache_key] = replace(
-            old, expires_monotonic=1.0, expires_at=datetime(2000, 1, 1, tzinfo=UTC)
-        )
-        monkeypatch.setattr("semantix_cache.memory.monotonic", lambda: 2.0)
+        deadline = inspected._items[cache_key].expires_monotonic
+        assert deadline is not None
+        monkeypatch.setattr("semantix_cache.memory.monotonic", lambda: deadline)
     elif isinstance(inspected, PgVectorStore):
         await inspected._pool.execute(
             " ".join(
@@ -316,7 +315,7 @@ async def test_expired_exclusion_without_purging(
     inspected: Store, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     original = entry("expired")
-    await inspected.put(original)
+    await inspected.put(original, ttl_seconds=3600.0)
     await expire_entry(inspected, original.cache_key, original.namespace, monkeypatch)
     before = await snapshot(inspected)
     assert (await inspected.inspect_entries()).total == 0

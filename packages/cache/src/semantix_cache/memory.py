@@ -2,8 +2,10 @@ import asyncio
 import math
 from collections import OrderedDict
 from collections.abc import Sequence
+from contextvars import copy_context
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from time import monotonic
 from types import TracebackType
 from typing import Self, cast
@@ -193,8 +195,10 @@ class MemoryStore:
         self._expirations = 0
         self._lock = asyncio.Lock()
         self._slot = asyncio.Semaphore(1)
-        self._workers: set[asyncio.Task[CacheMatch]] = set()
+        self._workers: set[asyncio.Future[CacheMatch]] = set()
         self._state = Lifecycle()
+        # Removals may leave an early bound; a due scan rebuilds it.
+        self._next_expiry: float | None = None
 
     @property
     def embedding_space(self) -> EmbeddingSpace:
@@ -209,14 +213,24 @@ class MemoryStore:
         self._snapshots.pop(item.entry.namespace, None)
 
     def _purge(self) -> None:
+        """Remove due entries and rebuild the conservative deadline in one scan."""
         now = monotonic()
-        for key in [
-            key
-            for key, item in self._items.items()
-            if item.expires_monotonic is not None and now >= item.expires_monotonic
-        ]:
+        if self._next_expiry is None or now < self._next_expiry:
+            return
+        expired: list[str] = []
+        next_expiry: float | None = None
+        for key, item in self._items.items():
+            expires = item.expires_monotonic
+            if expires is None:
+                continue
+            if now >= expires:
+                expired.append(key)
+            elif next_expiry is None or expires < next_expiry:
+                next_expiry = expires
+        for key in expired:
             self._discard(key)
             self._expirations += 1
+        self._next_expiry = next_expiry
 
     @staticmethod
     def _scope(cache_key: str, namespace: str) -> tuple[str, str]:
@@ -225,12 +239,21 @@ class MemoryStore:
         except ValueError:
             raise CacheValidationError("Invalid cache key or namespace") from None
 
-    def _worker_done(self, worker: asyncio.Task[CacheMatch]) -> None:
+    def _worker_done(
+        self, result: asyncio.Future[CacheMatch], worker: asyncio.Future[CacheMatch]
+    ) -> None:
         self._workers.remove(worker)
         self._slot.release()
-        # Retrieve errors even when the caller was cancelled. Awaiters still see them.
-        if not worker.cancelled():
-            worker.exception()
+        if worker.cancelled():
+            if not result.done():
+                result.cancel()
+            return
+        error = worker.exception()
+        if not result.done():
+            if error is None:
+                result.set_result(worker.result())
+            else:
+                result.set_exception(error)
 
     async def find_nearest(
         self,
@@ -268,7 +291,7 @@ class MemoryStore:
                     "Invalid query vector or namespace"
                 ) from None
             await self._slot.acquire()
-            worker: asyncio.Task[CacheMatch] | None = None
+            worker: asyncio.Future[CacheMatch] | None = None
             try:
                 async with self._lock:
                     self._purge()
@@ -283,12 +306,14 @@ class MemoryStore:
                             return None
                         snapshot = _Snapshot(items)
                         self._snapshots[namespace] = snapshot
-                worker = asyncio.create_task(
-                    asyncio.to_thread(_nearest, query, snapshot)
-                )
+                loop = asyncio.get_running_loop()
+                # Completion must clear ownership before waking even a fast caller.
+                result: asyncio.Future[CacheMatch] = loop.create_future()
+                search = partial(_nearest, query, snapshot)
+                worker = loop.run_in_executor(None, copy_context().run, search)
                 self._workers.add(worker)
-                worker.add_done_callback(self._worker_done)
-                match = await asyncio.shield(worker)
+                worker.add_done_callback(partial(self._worker_done, result))
+                match = await result
             finally:
                 # A running numerical worker owns the slot, including cancellation.
                 if worker is None:
@@ -404,6 +429,11 @@ class MemoryStore:
                     if ttl is None
                     else datetime.now(UTC) + timedelta(seconds=ttl),
                 )
+                expires = self._items[entry.cache_key].expires_monotonic
+                if expires is not None and (
+                    self._next_expiry is None or expires < self._next_expiry
+                ):
+                    self._next_expiry = expires
                 self._items.move_to_end(entry.cache_key)
                 while len(self._items) > self._max_size:
                     self._discard(next(iter(self._items)))
@@ -580,6 +610,7 @@ class MemoryStore:
                 self._purge()
                 count = len(self._items)
                 self._items.clear()
+                self._next_expiry = None
                 self._snapshots.clear()
                 return count
 
@@ -602,6 +633,7 @@ class MemoryStore:
 
         self._state.close(workers=bool(self._workers))
         self._items.clear()
+        self._next_expiry = None
         self._snapshots.clear()
 
     async def __aenter__(self) -> Self:

@@ -39,6 +39,8 @@ def test_core_and_optional_provider_import_boundaries() -> None:
             if "adapters" in source.relative_to(root).parts
             else set()
         )
+        if source.relative_to(root).as_posix() == "memory.py":
+            allowed |= {"contextvars", "functools"}
         if "stores" in source.relative_to(root).parts:
             allowed |= {"asyncpg", "importlib", "__future__", "redis", "json", "urllib"}
         if source.relative_to(root).as_posix() in {
