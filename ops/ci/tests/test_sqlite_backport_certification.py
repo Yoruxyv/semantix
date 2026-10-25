@@ -28,6 +28,9 @@ MODULES = (
     "tests.test_sqlite_faults",
     "tests.test_sqlite_processes",
     "tests.test_sqlite_conformance",
+    "tests.test_sqlite_inspection",
+    "tests.test_sqlite_cleanup",
+    "tests.test_sqlite_search_snapshots",
 )
 
 
@@ -166,12 +169,12 @@ def report(path: Path, *, outcome: str = "", omit: str = "") -> None:
 def test_valid_junit_and_nested_conformance_class(tmp_path: Path) -> None:
     path = tmp_path / "report.xml"
     report(path)
-    assert certification.verify_tests(path) == 4
+    assert certification.verify_tests(path) == len(MODULES)
     tree = ElementTree.parse(path)  # noqa: S314 -- generated local fixture
     case = tree.findall(".//testcase")[-1]
     case.set("classname", MODULES[-1] + ".TestSQLiteStore")
     tree.write(path)
-    assert certification.verify_tests(path) == 4
+    assert certification.verify_tests(path) == len(MODULES)
 
 
 @pytest.mark.parametrize("outcome", ["skipped", "failure", "error"])

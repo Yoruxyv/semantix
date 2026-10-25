@@ -30,6 +30,7 @@ class SQLiteStore:
     upstream WAL-patched 3.44.6/3.50.7 backports. The linked library and its trusted
     build provenance matter, not Python's version. No package extra is needed.
     Capacity is 1-5,000 (default 500), dimensions 1-16,000, with capacity*D*8 <=64MiB.
+    One derived namespace matrix is reused until writes or expiry invalidate it.
     Total RSS exceeds the vector bound. Only owned ordinary files are supported.
     """
 
@@ -249,7 +250,16 @@ class SQLiteStore:
         physical-close failure is terminal and may leave a connection alive until
         operator-controlled process termination; that is not library cleanup success.
         """
-        await self._worker.close()
+        self._worker.check_owner()
+        try:
+            await self._worker.close()
+        finally:
+            cleanup = self._worker.cleanup
+            if cleanup is not None:
+                if cleanup.done():
+                    self._database.invalidate()
+                else:
+                    cleanup.add_done_callback(lambda _: self._database.invalidate())
 
     async def __aenter__(self) -> Self:
         self._worker.check_owner()

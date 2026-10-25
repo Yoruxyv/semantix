@@ -39,6 +39,9 @@ TEST_FILES = (
     "tests/test_sqlite_faults.py",
     "tests/test_sqlite_processes.py",
     "tests/test_sqlite_conformance.py",
+    "tests/test_sqlite_inspection.py",
+    "tests/test_sqlite_cleanup.py",
+    "tests/test_sqlite_search_snapshots.py",
 )
 
 
