@@ -120,6 +120,16 @@ class Database:
         else:
             self.invalidate()
 
+    def _retain_after_mutation(
+        self, job: Job, before: tuple[int, int] | None, changes: int
+    ) -> None:
+        after = self._change_token(job)
+        # Only the exact native DML receipt may advance validated metadata.
+        if before is not None and after == (before[0], before[1] + changes):
+            self._validated = after
+        else:
+            self.invalidate()
+
     def open(self, job: Job, *, initialize: bool = False) -> None:
         path = checked_path(self.config.path)
         created = False
@@ -305,7 +315,9 @@ class Database:
             safe(CacheStoreError("Invalid SQLite entry TTL or revision"))
         with job.transaction(write=True):
             binding, last, access = self.authority(job)
+            before = self._validated
             self.invalidate()
+            deleted = 0
             revision = requested if last is None else max(requested, last + 1)
             if revision > MAX_US or access == MAX_INT:
                 raise ValueError("Revision or recency exhausted")
@@ -315,9 +327,11 @@ class Database:
                 numerator, denominator = duration.as_integer_ratio()
                 expiry = observed + numerator * 1000000 // denominator
                 timestamp(expiry)
-            job.rows(
-                "DELETE FROM cache_entries WHERE binding_id=? AND expires_at_us<=?",
-                (binding, observed),
+            deleted += len(
+                job.rows(
+                    "DELETE FROM cache_entries WHERE binding_id=? AND expires_at_us<=? RETURNING cache_key",
+                    (binding, observed),
+                )
             )
             job.rows(
                 "INSERT INTO cache_entries VALUES(?,?,?,?,?,?,0,NULL,?) ON CONFLICT(binding_id,cache_key) DO UPDATE SET namespace=excluded.namespace,vector_blob=excluded.vector_blob,revision_us=excluded.revision_us,expires_at_us=excluded.expires_at_us,hit_count=0,last_accessed_at_us=NULL,access_seq=excluded.access_seq",
@@ -339,9 +353,11 @@ class Database:
                 "UPDATE binding_state SET last_revision_us=?,access_counter=? WHERE binding_id=?",
                 (revision, access + 1, binding),
             )
-            job.rows(
-                "DELETE FROM cache_entries WHERE binding_id=? AND expires_at_us<=?",
-                (binding, now_us()),
+            deleted += len(
+                job.rows(
+                    "DELETE FROM cache_entries WHERE binding_id=? AND expires_at_us<=? RETURNING cache_key",
+                    (binding, now_us()),
+                )
             )
             overflow = (
                 job.rows(
@@ -350,10 +366,13 @@ class Database:
                 - self.config.capacity
             )
             if overflow > 0:
-                job.rows(
-                    "DELETE FROM cache_entries WHERE binding_id=? AND cache_key IN (SELECT cache_key FROM cache_entries WHERE binding_id=? ORDER BY access_seq,revision_us,cache_key LIMIT ?)",
-                    (binding, binding, overflow),
+                deleted += len(
+                    job.rows(
+                        "DELETE FROM cache_entries WHERE binding_id=? AND cache_key IN (SELECT cache_key FROM cache_entries WHERE binding_id=? ORDER BY access_seq,revision_us,cache_key LIMIT ?) RETURNING cache_key",
+                        (binding, binding, overflow),
+                    )
                 )
+        self._retain_after_mutation(job, before, 3 + 2 * deleted)
 
     def record_hit(self, job: Job, key: str, namespace: str, expected: int) -> bool:
         changed = False
@@ -390,6 +409,7 @@ class Database:
     def delete(self, job: Job, key: str, namespace: str) -> bool:
         with job.transaction(write=True):
             binding, _, _ = self.authority(job)
+            before = self._validated
             self.invalidate()
             live = bool(
                 job.rows(
@@ -397,24 +417,27 @@ class Database:
                     (binding, namespace, key),
                 )
             )
-            job.rows(
-                "DELETE FROM cache_entries WHERE binding_id=? AND namespace=? AND cache_key=?",
+            deleted = job.rows(
+                "DELETE FROM cache_entries WHERE binding_id=? AND namespace=? AND cache_key=? RETURNING cache_key",
                 (binding, namespace, key),
             )
+        self._retain_after_mutation(job, before, 2 * len(deleted))
         return live
 
     def clear(self, job: Job, namespace: str) -> int:
         with job.transaction(write=True):
             binding, _, _ = self.authority(job)
+            before = self._validated
             self.invalidate()
             count = job.rows(
                 "SELECT count(*) FROM cache_entries WHERE binding_id=? AND namespace=? AND (expires_at_us IS NULL OR expires_at_us>?)",
                 (binding, namespace, now_us()),
             )[0][0]
-            job.rows(
-                "DELETE FROM cache_entries WHERE binding_id=? AND namespace=?",
+            deleted = job.rows(
+                "DELETE FROM cache_entries WHERE binding_id=? AND namespace=? RETURNING cache_key",
                 (binding, namespace),
             )
+        self._retain_after_mutation(job, before, 2 * len(deleted))
         return cast(int, count)
 
     def _search_snapshot(
