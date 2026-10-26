@@ -155,6 +155,130 @@ def public_command_output(output: str, credential: str | None, cwd: Path) -> str
     return safe if len(safe) <= 4096 else safe[:2048] + "[truncated]" + safe[-2048:]
 
 
+class ImageAcquisitionError(RuntimeError):
+    def __init__(self, category: str) -> None:
+        super().__init__(
+            "Disposable fixture command failed or timed out; sanitized output retained outside the repository"
+        )
+        self.category = category
+
+
+def image_failure_category(code: int | None, output: str) -> str:
+    # Signal exits remain terminal even when partial output names a transport error.
+    if code is not None and (code < 0 or code in (130, 137, 143, 0xC000013A)):
+        return "interrupted"
+    text = output.lower()
+    # Permanent failures take precedence even when a transport phrase also appears.
+    if any(
+        marker in text
+        for marker in (
+            "unauthorized",
+            "authentication required",
+            "authentication failed",
+            "error authenticating",
+            "denied",
+            "manifest unknown",
+            "name unknown",
+            "no matching manifest",
+            "invalid reference",
+            "digest mismatch",
+            "invalid digest",
+            "unexpected commit digest",
+            "failed to verify",
+            "checksum mismatch",
+            "checksum verification failed",
+            "invalid checksum",
+            "x509:",
+            "certificate verify failed",
+            "no space left",
+            "error getting credentials",
+            "cannot connect to the docker daemon",
+        )
+    ):
+        return "permanent"
+    if code is None:
+        return "timeout"
+    if any(
+        marker in text
+        for marker in (
+            "i/o timeout",
+            "connection timed out",
+            "connection reset",
+            "tls handshake timeout",
+            "unexpected eof",
+            "temporary failure in name resolution",
+            "500 internal server error",
+            "502 bad gateway",
+            "503 service unavailable",
+            "504 gateway timeout",
+        )
+    ):
+        return "transport"
+    return "unclassified"
+
+
+def pull_image(image: str, root: Path) -> None:
+    # Three 240s acquisition budgets reserve eight minutes of the 20-minute CI job.
+    deadline = time.monotonic() + 240
+    for attempt in (1, 2):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise RuntimeError(
+                "Pinned image acquisition exhausted its 240-second budget"
+            )
+        try:
+            command(
+                ["docker", "pull", image],
+                cwd=root,
+                phase=f"Pinned MySQL image acquisition (attempt {attempt}/2)",
+                timeout=min(150, remaining),
+            )
+            if time.monotonic() > deadline:
+                raise RuntimeError(
+                    "Pinned image acquisition exhausted its 240-second budget"
+                )
+            return
+        except ImageAcquisitionError as failure:
+            if failure.category not in ("timeout", "transport") or attempt == 2:
+                raise
+            remaining = deadline - time.monotonic()
+            if remaining <= 5:
+                raise RuntimeError(
+                    "Pinned image acquisition exhausted its 240-second budget"
+                ) from None
+            print(
+                "Fixture image retry: "
+                + json.dumps(
+                    {
+                        "next_attempt": attempt + 1,
+                        "backoff_seconds": 5,
+                        "budget_remaining_seconds": round(remaining, 3),
+                    }
+                ),
+                file=sys.stderr,
+                flush=True,
+            )
+            time.sleep(5)
+        except OSError:
+            print(
+                "Fixture image acquisition: "
+                + json.dumps(
+                    {
+                        "attempt": attempt,
+                        "category": "local_error",
+                        "elapsed_seconds": round(
+                            time.monotonic() - (deadline - remaining), 3
+                        ),
+                    }
+                ),
+                file=sys.stderr,
+                flush=True,
+            )
+            raise RuntimeError(
+                "Pinned image acquisition local command/diagnostic failure"
+            ) from None
+
+
 def command(
     args: list[str],
     *,
@@ -193,6 +317,10 @@ def command(
             "elapsed_seconds": elapsed,
             "timeout_seconds": round(timeout, 3),
         }
+        if args[:2] == ["docker", "pull"] and code != 0:
+            diagnostic["category"] = image_failure_category(
+                code, stdout + "\n" + stderr
+            )
         if phase is not None and code != 0:
             # Only credential-free image/permission commands export public streams.
             diagnostic["stdout"] = public_command_output(stdout, credential, cwd)
@@ -216,6 +344,10 @@ def command(
             ).encode("utf8"),
             append=True,
         )
+        if args[:2] == ["docker", "pull"]:
+            raise ImageAcquisitionError(
+                image_failure_category(code, stdout + "\n" + stderr)
+            ) from None
         raise RuntimeError(
             "Disposable fixture command failed or timed out; sanitized output retained outside the repository"
         ) from None
@@ -671,13 +803,7 @@ def main() -> int:
     if args.pull_image:
         if child:
             parser.error("--pull-image cannot be combined with a test command")
-        # The pinned cold download is 256 MiB; do not spend the 90s setup budget on it.
-        command(
-            ["docker", "pull", IMAGES[args.server_version]],
-            cwd=private_directory(),
-            phase="Pinned MySQL image acquisition",
-            timeout=300,
-        )
+        pull_image(IMAGES[args.server_version], private_directory())
         return 0
     if not child:
         parser.error("A test command is required after --")

@@ -10,6 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -577,7 +578,7 @@ def test_bounded_permission_diagnostics_keep_final_error_after_pull_progress(
 
 @pytest.mark.parametrize("server_version", ["8.4.11", "8.4.12"])
 @pytest.mark.parametrize("failure", [False, True])
-def test_explicit_image_acquisition_precedes_fixture_resources_without_retry(
+def test_explicit_image_acquisition_precedes_fixture_resources(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: bool, server_version: str
 ) -> None:
     monkeypatch.setattr(
@@ -600,8 +601,8 @@ def test_explicit_image_acquisition_precedes_fixture_resources_without_retry(
     command.assert_called_once_with(
         ["docker", "pull", fixture.IMAGES[server_version]],
         cwd=tmp_path,
-        phase="Pinned MySQL image acquisition",
-        timeout=300,
+        phase="Pinned MySQL image acquisition (attempt 1/2)",
+        timeout=150,
     )
     initialize.assert_not_called()
     generate.assert_not_called()
@@ -658,3 +659,380 @@ def test_unverified_server_argument_rejected_before_fixture_allocation(
         fixture.main()
     assert caught.value.code == 2
     allocate.assert_not_called()
+
+
+class PullClock:
+    def __init__(self) -> None:
+        self.now = 100.0
+        self.delays: list[float] = []
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def sleep(self, delay: float) -> None:
+        self.delays.append(delay)
+        self.now += delay
+
+
+def pull_test_setup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> PullClock:
+    clock = PullClock()
+    monkeypatch.setattr(fixture.time, "monotonic", clock.monotonic)
+    monkeypatch.setattr(fixture.time, "sleep", clock.sleep)
+    monkeypatch.setattr(fixture, "private_directory", lambda: tmp_path)
+    monkeypatch.setattr(sys, "argv", ["fixture", "--pull-image"])
+    monkeypatch.setattr(
+        fixture,
+        "Fixture",
+        MagicMock(side_effect=AssertionError("must not construct SQL fixture")),
+    )
+    monkeypatch.setattr(
+        fixture,
+        "certificates",
+        MagicMock(side_effect=AssertionError("must not create TLS keys")),
+    )
+    return clock
+
+
+@pytest.mark.parametrize("first", ["success", "timeout", "transport"])
+def test_pull_success_and_transient_retry_are_isolated(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    first: str,
+) -> None:
+    clock = pull_test_setup(tmp_path, monkeypatch)
+    timeouts: list[float] = []
+
+    def run(args: list[str], **options: Any) -> subprocess.CompletedProcess[str]:
+        assert args == ["docker", "pull", fixture.IMAGE]
+        assert options["capture_output"]
+        assert options["text"]
+        assert not options["check"]
+        timeouts.append(options["timeout"])
+        if len(timeouts) == 1 and first == "timeout":
+            clock.now += options["timeout"]
+            raise subprocess.TimeoutExpired(
+                args,
+                options["timeout"],
+                output=b"Verifying Checksum\nPull complete",
+                stderr=b"",
+            )
+        if len(timeouts) == 1 and first == "transport":
+            clock.now += 1
+            return subprocess.CompletedProcess(args, 1, "", "connection reset by peer")
+        clock.now += 2
+        return subprocess.CompletedProcess(args, 0, "verified pinned image", "")
+
+    monkeypatch.setattr(fixture.subprocess, "run", run)
+    assert fixture.main() == 0
+    assert timeouts == (
+        [150] if first == "success" else [150, 85] if first == "timeout" else [150, 150]
+    )
+    assert clock.delays == ([] if first == "success" else [5])
+    fixture.Fixture.assert_not_called()
+    fixture.certificates.assert_not_called()
+    assert not (tmp_path / "tls").exists()
+    output = capsys.readouterr().err
+    assert output.count('"status": "succeeded"') == 1
+    assert output.count('"status": "timeout"') == (first == "timeout")
+    assert output.count('"category": "transport"') == (first == "transport")
+
+
+def test_pull_timeout_exhaustion_caps_attempts_and_total_time(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    clock = pull_test_setup(tmp_path, monkeypatch)
+    timeouts: list[float] = []
+
+    def run(args: list[str], **options: Any) -> subprocess.CompletedProcess[str]:
+        timeouts.append(options["timeout"])
+        clock.now += options["timeout"]
+        raise subprocess.TimeoutExpired(args, options["timeout"])
+
+    monkeypatch.setattr(fixture.subprocess, "run", run)
+    with pytest.raises(fixture.ImageAcquisitionError) as caught:
+        fixture.main()
+    assert caught.value.category == "timeout"
+    assert timeouts == [150, 85]
+    assert clock.delays == [5]
+    assert clock.now == 340
+    fixture.Fixture.assert_not_called()
+    fixture.certificates.assert_not_called()
+    events = [
+        json.loads(line.removeprefix("Fixture command: "))
+        for line in capsys.readouterr().err.splitlines()
+        if line.startswith("Fixture command: ")
+    ]
+    assert len(events) == 2
+    assert [e["elapsed_seconds"] for e in events] == [150, 85]
+    assert all(e["category"] == "timeout" for e in events)
+    assert len((tmp_path / "command-failures.jsonl").read_text().splitlines()) == 2
+
+
+@pytest.mark.parametrize(
+    "diagnostic",
+    [
+        "unauthorized: authentication required; connection reset by peer",
+        "manifest unknown",
+        "no matching manifest for linux",
+        "invalid reference format",
+        "digest mismatch; connection reset",
+        "checksum verification failed",
+        "x509: certificate signed by unknown authority",
+        "permission denied",
+        "no space left on device",
+        "Cannot connect to the Docker daemon",
+        "unrecognized registry failure",
+    ],
+)
+def test_permanent_and_unknown_pull_failures_are_not_retried(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    diagnostic: str,
+) -> None:
+    clock = pull_test_setup(tmp_path, monkeypatch)
+    run = MagicMock(return_value=subprocess.CompletedProcess([], 1, "", diagnostic))
+    monkeypatch.setattr(fixture.subprocess, "run", run)
+    with pytest.raises(fixture.ImageAcquisitionError):
+        fixture.main()
+    run.assert_called_once()
+    assert not clock.delays
+    fixture.Fixture.assert_not_called()
+    fixture.certificates.assert_not_called()
+
+
+def test_pull_backoff_cannot_start_an_expired_attempt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = pull_test_setup(tmp_path, monkeypatch)
+
+    def run(args: list[str], **options: Any) -> subprocess.CompletedProcess[str]:
+        clock.now += 150
+        raise subprocess.TimeoutExpired(args, options["timeout"])
+
+    run_mock = MagicMock(side_effect=run)
+    monkeypatch.setattr(fixture.subprocess, "run", run_mock)
+
+    def oversleep(delay: float) -> None:
+        clock.delays.append(delay)
+        clock.now += 90
+
+    monkeypatch.setattr(fixture.time, "sleep", oversleep)
+    with pytest.raises(RuntimeError, match="240-second budget"):
+        fixture.main()
+    run_mock.assert_called_once()
+    assert clock.delays == [5]
+
+
+@pytest.mark.parametrize("interrupted", [KeyboardInterrupt, FileNotFoundError])
+def test_pull_interruption_or_local_failure_does_not_retry_or_initialize(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    interrupted: type[BaseException],
+) -> None:
+    clock = pull_test_setup(tmp_path, monkeypatch)
+    run = MagicMock(side_effect=interrupted("private path canary"))
+    monkeypatch.setattr(fixture.subprocess, "run", run)
+    with pytest.raises(
+        KeyboardInterrupt if interrupted is KeyboardInterrupt else RuntimeError
+    ):
+        fixture.main()
+    run.assert_called_once()
+    assert not clock.delays
+    fixture.Fixture.assert_not_called()
+    fixture.certificates.assert_not_called()
+    assert "private path canary" not in capsys.readouterr().err
+
+
+def test_pull_diagnostics_redact_paths_credentials_endpoints_and_keys(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    pull_test_setup(tmp_path, monkeypatch)
+    output = (
+        str(tmp_path)
+        + " https://user:credential-canary@private.invalid/token "
+        + ("-----BEGIN PRIVATE KEY-----\nkey-canary\n-----END PRIVATE KEY-----")
+    )
+    monkeypatch.setattr(
+        fixture.subprocess,
+        "run",
+        MagicMock(
+            return_value=subprocess.CompletedProcess([], 1, output, "unauthorized")
+        ),
+    )
+    with pytest.raises(fixture.ImageAcquisitionError):
+        fixture.main()
+    public = capsys.readouterr().err
+    assert str(tmp_path) not in public
+    assert "credential-canary" not in public
+    assert "private.invalid" not in public
+    assert "key-canary" not in public
+    assert '"category": "permanent"' in public
+
+
+def test_image_acquisition_never_replays_a_failed_integration_child(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owned = fixture.Fixture(tmp_path)
+    monkeypatch.setattr(fixture, "private_directory", lambda: tmp_path)
+    monkeypatch.setattr(fixture, "Fixture", MagicMock(return_value=owned))
+    start = MagicMock(return_value={"port": 33060, "server_version": "8.4.12"})
+    monkeypatch.setattr(owned, "start", start)
+    child = MagicMock(return_value=subprocess.CompletedProcess(["tests"], 7, b"", b""))
+    monkeypatch.setattr(fixture.subprocess, "run", child)
+    pull = MagicMock(side_effect=AssertionError("must not acquire/retry during tests"))
+    monkeypatch.setattr(fixture, "pull_image", pull)
+    monkeypatch.setattr(sys, "argv", ["fixture", "--", "tests"])
+    assert fixture.main() == 7
+    child.assert_called_once()
+    fixture.Fixture.assert_called_once()
+    assert start.call_count == 3
+    pull.assert_not_called()
+
+
+def test_repeated_transport_failure_stops_at_two_attempts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = pull_test_setup(tmp_path, monkeypatch)
+    run = MagicMock(
+        return_value=subprocess.CompletedProcess([], 1, "", "503 Service Unavailable")
+    )
+    monkeypatch.setattr(fixture.subprocess, "run", run)
+    with pytest.raises(fixture.ImageAcquisitionError) as caught:
+        fixture.main()
+    assert caught.value.category == "transport"
+    assert run.call_count == 2
+    assert clock.delays == [5]
+    fixture.Fixture.assert_not_called()
+
+
+@pytest.mark.parametrize("write_cost", [80, 85])
+def test_pull_private_diagnostic_cost_reduces_remaining_budget(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    write_cost: int,
+) -> None:
+    clock = pull_test_setup(tmp_path, monkeypatch)
+    timeouts: list[float] = []
+
+    def run(args: list[str], **options: Any) -> subprocess.CompletedProcess[str]:
+        timeouts.append(options["timeout"])
+        if len(timeouts) == 1:
+            clock.now += 150
+            raise subprocess.TimeoutExpired(args, options["timeout"])
+        clock.now += 1
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(fixture.subprocess, "run", run)
+    write = fixture.private_write
+
+    def delayed_write(path: Path, data: bytes, *, append: bool = False) -> None:
+        write(path, data, append=append)
+        clock.now += write_cost
+
+    monkeypatch.setattr(fixture, "private_write", delayed_write)
+    if write_cost == 80:
+        assert fixture.main() == 0
+        assert timeouts == [150, 5]
+        assert clock.delays == [5]
+    else:
+        with pytest.raises(RuntimeError, match="240-second budget"):
+            fixture.main()
+        assert timeouts == [150]
+        assert not clock.delays
+    fixture.Fixture.assert_not_called()
+
+
+def test_pull_late_success_does_not_bypass_total_deadline(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = pull_test_setup(tmp_path, monkeypatch)
+
+    def run(args: list[str], **options: Any) -> subprocess.CompletedProcess[str]:
+        clock.now += 241
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    run_mock = MagicMock(side_effect=run)
+    monkeypatch.setattr(fixture.subprocess, "run", run_mock)
+    with pytest.raises(RuntimeError, match="240-second budget"):
+        fixture.main()
+    run_mock.assert_called_once()
+    fixture.Fixture.assert_not_called()
+    assert not clock.delays
+
+
+def test_permanent_pull_diagnostic_takes_precedence_over_timeout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = pull_test_setup(tmp_path, monkeypatch)
+    run = MagicMock(
+        side_effect=subprocess.TimeoutExpired(
+            ["docker", "pull", fixture.IMAGE], 150, stderr=b"unauthorized; i/o timeout"
+        )
+    )
+    monkeypatch.setattr(fixture.subprocess, "run", run)
+    with pytest.raises(fixture.ImageAcquisitionError) as caught:
+        fixture.main()
+    assert caught.value.category == "permanent"
+    run.assert_called_once()
+    assert not clock.delays
+
+
+def test_pull_interrupt_kills_cli_and_exits_its_process_context(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = pull_test_setup(tmp_path, monkeypatch)
+    process = MagicMock()
+    process.__enter__.return_value = process
+    process.communicate.side_effect = KeyboardInterrupt()
+    lifecycle: list[str] = []
+    process.kill.side_effect = lambda: lifecycle.append("kill")
+
+    def exited(*args: object) -> bool:
+        lifecycle.append("exit")
+        return False
+
+    process.__exit__.side_effect = exited
+    create = MagicMock(return_value=process)
+    monkeypatch.setattr(fixture.subprocess, "Popen", create)
+    with pytest.raises(KeyboardInterrupt):
+        fixture.main()
+    create.assert_called_once()
+    assert lifecycle == ["kill", "exit"]
+    assert not clock.delays
+    fixture.Fixture.assert_not_called()
+
+
+@pytest.mark.parametrize("code", [-2, -15, 130, 137, 143, 0xC000013A])
+def test_interrupted_pull_exit_is_terminal_despite_partial_transport_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    code: int,
+) -> None:
+    clock = pull_test_setup(tmp_path, monkeypatch)
+    run = MagicMock(
+        return_value=subprocess.CompletedProcess(
+            [], code, "", "connection reset by peer"
+        )
+    )
+    monkeypatch.setattr(fixture.subprocess, "run", run)
+    with pytest.raises(fixture.ImageAcquisitionError) as caught:
+        fixture.main()
+    assert caught.value.category == "interrupted"
+    run.assert_called_once()
+    assert not clock.delays
+    fixture.Fixture.assert_not_called()
