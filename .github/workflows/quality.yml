@@ -54,7 +54,8 @@ jobs:
           uv run --project packages/cache --no-sync ruff format --config ruff.toml --check ops/ci/mysql_fixture.py ops/ci/tests/test_mysql_fixture.py
           uv run --project packages/cache --no-sync pytest -c packages/cache/pyproject.toml ops/ci/tests/test_mysql_fixture.py
       - name: Acquire pinned MySQL image before fixture setup
-        # A 256 MiB cold download has its own finite budget; no automatic retries.
+        # Only image acquisition retries: <=2 attempts, <=150s each, 5s backoff,
+        # 240s acquisition deadline per invocation; fixture/tests are never replayed.
         run: uv run --no-sync python ../../ops/ci/mysql_fixture.py --pull-image
       - name: Verify pinned MySQL, mandatory cases and independent wheel
         shell: bash
