@@ -49,3 +49,6 @@ ops/load-testing/results/
 
 # Generated SQLite search measurements remain outside tracked evidence.
 /packages/cache/benchmarks/sqlite_search/*.csv
+
+# Generated SQLite upkeep measurements remain outside tracked evidence.
+/packages/cache/benchmarks/sqlite_upkeep/*.csv

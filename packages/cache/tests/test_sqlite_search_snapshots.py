@@ -25,7 +25,7 @@ from semantix_cache.stores._backends.sqlite.worker import Job, Row, Worker
 from semantix_cache.stores.sqlite import SQLiteStore
 
 from . import sqlite_helpers
-from .sqlite_helpers import block_lookup, connection, drain_workers
+from .sqlite_helpers import block_lookup, connection, drain_workers, state
 from .test_sqlite_processes import receive, spawn, stop
 
 sqlite_store = sqlite_helpers.sqlite_store
@@ -504,3 +504,227 @@ async def test_late_close_cleanup_releases_retained_matrix(
         assert retained() is None
         assert store._database._validated is None
         await store.aclose()
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "insert",
+        "replace",
+        "delete",
+        "delete_empty",
+        "clear",
+        "clear_empty",
+    ],
+)
+async def test_native_receipt_preserves_validated_rows(
+    sqlite_store: SQLiteStore, monkeypatch: pytest.MonkeyPatch, mutation: str
+) -> None:
+    first = entry("first")
+    await sqlite_store.put(first)
+    await sqlite_store.put(entry("second", namespace="second"))
+    assert await sqlite_store.find_nearest((1, 0), namespace="default")
+    original = database.Database.binding
+    checks: list[bool] = []
+
+    def binding(
+        self: database.Database, job: Job, *, validated: bool = False
+    ) -> tuple[int, int | None, int]:
+        checks.append(validated)
+        return original(self, job, validated=validated)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(database.Database, "binding", binding)
+        if mutation in {"insert", "replace"}:
+            await sqlite_store.put(entry("third" if mutation == "insert" else "first"))
+        elif mutation.startswith("delete"):
+            assert await sqlite_store.delete_entry(
+                first.cache_key,
+                namespace="default" if mutation == "delete" else "empty",
+            ) is (mutation == "delete")
+        else:
+            assert await sqlite_store.clear(
+                namespace="default" if mutation == "clear" else "empty"
+            ) == (1 if mutation == "clear" else 0)
+        assert sqlite_store._database._validated is not None
+        assert sqlite_store._database._snapshot is None
+        await sqlite_store.inspect_entries()
+    assert checks
+    assert all(checks)
+    with connection(sqlite_store._config.path) as db:
+        assert db.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+        assert (
+            db.execute("SELECT count(*) FROM cache_entries").fetchone()
+            == db.execute("SELECT count(*) FROM cache_payloads").fetchone()
+        )
+
+
+@pytest.mark.parametrize("operation", ["put", "delete", "clear", "clear_all"])
+async def test_unexpected_local_dml_during_mutation_is_not_certified(
+    sqlite_store: SQLiteStore, monkeypatch: pytest.MonkeyPatch, operation: str
+) -> None:
+    value = entry("unchanged", namespace="other")
+    await sqlite_store.put(value)
+    await sqlite_store.put(entry("target"))
+    original = Job.rows
+    fired = False
+
+    def rows(job: Job, sql: str, parameters: Sequence[object] = ()) -> list[Row]:
+        nonlocal fired
+        result = original(job, sql, parameters)
+        if sql == "COMMIT" and not fired:
+            fired = True
+            if operation == "clear_all":
+                original(
+                    job, "UPDATE binding_state SET access_counter=access_counter+1"
+                )
+            else:
+                original(
+                    job,
+                    "DELETE FROM cache_payloads WHERE cache_key=?",
+                    (value.cache_key,),
+                )
+        return result
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Job, "rows", rows)
+        if operation == "put":
+            await sqlite_store.put(entry("target"))
+        elif operation == "delete":
+            await sqlite_store.delete_entry(
+                entry("target").cache_key, namespace="default"
+            )
+        elif operation == "clear":
+            await sqlite_store.clear(namespace="default")
+        else:
+            # Extra unrelated binding mutation survives the all-entry delete.
+            await sqlite_store.clear_all()
+    assert fired
+    assert sqlite_store._database._validated is None
+    if operation != "clear_all":
+        with pytest.raises(CacheStoreError):
+            await sqlite_store.find_nearest((1, 0), namespace="other")
+
+
+@pytest.mark.parametrize("operation", ["put", "delete", "clear", "clear_all"])
+async def test_external_commit_after_native_commit_invalidates_receipt(
+    sqlite_store: SQLiteStore, monkeypatch: pytest.MonkeyPatch, operation: str
+) -> None:
+    value = entry("first")
+    await sqlite_store.put(value)
+    original = Job.rows
+    fired = False
+
+    def rows(job: Job, sql: str, parameters: Sequence[object] = ()) -> list[Row]:
+        nonlocal fired
+        result = original(job, sql, parameters)
+        if sql == "COMMIT" and not fired:
+            fired = True
+            with connection(sqlite_store._config.path) as external:
+                external.execute(
+                    "UPDATE binding_state SET access_counter=access_counter+1"
+                )
+        return result
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Job, "rows", rows)
+        if operation == "put":
+            await sqlite_store.put(entry("second"))
+        elif operation == "delete":
+            await sqlite_store.delete_entry(value.cache_key, namespace="default")
+        elif operation == "clear":
+            await sqlite_store.clear(namespace="default")
+        else:
+            await sqlite_store.clear_all()
+    assert fired
+    assert sqlite_store._database._validated is None
+    assert sqlite_store._database._snapshot is None
+    await sqlite_store.inspect_entries()
+    assert sqlite_store._database._validated is not None
+
+
+async def test_expiry_cascades_and_eviction_have_exact_receipts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "receipts.db"
+    clock = [2_000_000_000_000_000]
+    monkeypatch.setattr(database, "now_us", lambda: clock[0])
+    await SQLiteStore.initialize_schema(
+        path, embedding_space=SPACE, max_size=2, default_ttl_seconds=None
+    )
+    async with await SQLiteStore.connect(
+        path, embedding_space=SPACE, max_size=2, default_ttl_seconds=None
+    ) as store:
+        await store.put(entry("expire"), ttl_seconds=1)
+        await store.put(entry("keep"))
+        clock[0] += 1_000_000
+        await store.put(entry("new"))
+        assert store._database._validated is not None
+        assert (await store.inspect_entries()).total == 2
+        await store.put(entry("evict"))
+        assert store._database._validated is not None
+        with connection(path) as db:
+            prompts = db.execute("SELECT cache_key FROM cache_entries").fetchall()
+            assert (entry("expire").cache_key,) not in prompts
+            assert (entry("keep").cache_key,) not in prompts
+            assert db.execute("SELECT count(*) FROM cache_payloads").fetchone() == (2,)
+
+
+async def test_cancel_after_commit_before_receipt_requires_fresh_authority(
+    sqlite_store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await sqlite_store.put(entry("before"))
+    original = database.Database._retain_after_mutation
+    entered = asyncio.Event()
+    release = threading.Event()
+    loop = asyncio.get_running_loop()
+
+    def retain(
+        self: database.Database, job: Job, before: tuple[int, int] | None, changes: int
+    ) -> None:
+        loop.call_soon_threadsafe(entered.set)
+        if not release.wait(5):
+            raise RuntimeError("Receipt test was not released")
+        original(self, job, before, changes)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(database.Database, "_retain_after_mutation", retain)
+        task = asyncio.create_task(sqlite_store.put(entry("committed")))
+        try:
+            await asyncio.wait_for(entered.wait(), 5)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        finally:
+            release.set()
+            await drain_workers(sqlite_store)
+    assert sqlite_store._database._validated is None
+    with connection(sqlite_store._config.path) as db:
+        assert db.execute(
+            "SELECT count(*) FROM cache_entries WHERE cache_key=?",
+            (entry("committed").cache_key,),
+        ).fetchone() == (1,)
+    assert (await sqlite_store.inspect_entries()).total == 2
+
+
+async def test_failed_mutation_does_not_certify_rolled_back_changes(
+    sqlite_store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await sqlite_store.put(entry("before"))
+    before = state(sqlite_store._config.path)
+    original = Job.rows
+
+    def rows(job: Job, sql: str, parameters: Sequence[object] = ()) -> list[Row]:
+        result = original(job, sql, parameters)
+        if sql.startswith("INSERT INTO cache_payloads"):
+            raise OSError("rollback injected")
+        return result
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Job, "rows", rows)
+        with pytest.raises(CacheStoreError):
+            await sqlite_store.put(entry("rolled back"))
+    assert sqlite_store._database._validated is None
+    assert state(sqlite_store._config.path) == before
+    await sqlite_store.put(entry("after rollback"))
+    assert sqlite_store._database._validated is not None
